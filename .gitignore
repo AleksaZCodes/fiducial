@@ -1,0 +1,20 @@
+# Rust
+target/
+*.pdb
+
+# Node
+node_modules/
+.pnpm-store/
+
+# Build outputs (binaries are release artifacts, not committed)
+dist/
+*.tgz
+
+# Local env
+.env
+.env.local
+.dev.vars
+
+# OS
+.DS_Store
+Thumbs.db
