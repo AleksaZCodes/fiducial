@@ -5,7 +5,7 @@ use clap::Subcommand;
 use std::env;
 
 use crate::{
-    capability::{self, BUILTIN_CAPABILITIES},
+    capability::{self, CapabilityDef, BUILTIN_CAPABILITIES},
     config::{Config, CONFIG_FILE},
 };
 
@@ -292,4 +292,3 @@ fn cmd_new(name: &str) -> Result<()> {
     Ok(())
 }
 
-use crate::capability::CapabilityDef;

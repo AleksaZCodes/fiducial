@@ -22,42 +22,90 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
-
       - name: Review PR
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          DIFF=$(git diff origin/${{ github.event.pull_request.base.ref }}...HEAD)
-          FILES=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD)
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "ANTHROPIC_API_KEY secret not set — skipping Claude review."
+            echo "Add it in Settings → Secrets → Actions to enable automatic Opus review."
+            exit 0
+          fi
 
-          REVIEW=$(claude --model claude-opus-5 -p \
-            "You are reviewing a pull request for the Fiducial platform.
+          git diff "origin/$BASE_REF...HEAD" | head -c 24000 > /tmp/pr.diff
+          git diff --name-only "origin/$BASE_REF...HEAD" > /tmp/pr.files
 
-          Changed files:
-          $FILES
+          python3 - << 'PYEOF'
+import json, os, sys, urllib.request, urllib.error, subprocess
 
-          Diff:
-          $DIFF
+with open('/tmp/pr.diff') as f:
+    diff = f.read()
+with open('/tmp/pr.files') as f:
+    files = f.read().strip()
 
-          Check for:
-          1. Bugs and correctness issues
-          2. Simplifications (unnecessary complexity)
-          3. Fiducial rule violations: hand-edited lock-tracked files, duplicated values, hand-written artifacts
-          4. Missing tests for new behaviour
-          5. Layer violations (logic that belongs in L0 Rust written in TS, or framework logic leaking into headless code)
-          6. Capability conformance issues (SKILL.md missing, guard rules malformed)
+truncated = len(diff) >= 24000
+note = "\n\n*(diff truncated to 24 KB — run `/review` locally for the full picture)*" if truncated else ""
 
-          Be concise and actionable. Format findings as: **file:line** — severity: summary
-          Severity: bug | simplification | rule-violation | test-gap
-          If nothing is wrong, say so plainly.")
+prompt = (
+    "You are reviewing a pull request for the Fiducial platform repository.\n\n"
+    "Rules to enforce:\n"
+    "- Hand-edited files recorded in fiducial.lock → rule-violation\n"
+    "- A value used in two places without a single declaration → rule-violation\n"
+    "- Derived artifacts written by hand instead of generated → rule-violation\n"
+    "- Logic that belongs in L0 (Rust no_std) written in TypeScript → rule-violation\n"
+    "- New behaviour without a test → test-gap\n\n"
+    f"Changed files:\n{files}\n\n"
+    f"Diff:{note}\n{diff}\n\n"
+    "Format each finding as: **file:line** — severity: one-sentence summary\n"
+    "Severity options: bug | simplification | rule-violation | test-gap\n"
+    "If nothing is wrong, say so plainly in one sentence."
+)
 
-          gh pr comment "${{ github.event.pull_request.number }}" \
-            --body "## Opus review
+payload = json.dumps({
+    "model": "claude-opus-5",
+    "max_tokens": 1024,
+    "messages": [{"role": "user", "content": prompt}]
+}).encode()
 
-          $REVIEW
+req = urllib.request.Request(
+    "https://api.anthropic.com/v1/messages",
+    data=payload,
+    headers={
+        "x-api-key": os.environ["ANTHROPIC_API_KEY"],
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    },
+)
 
-          ---
-          *Automated review by \`claude-opus-5\`. Run \`/review\` locally for an interactive session.*"
+try:
+    with urllib.request.urlopen(req) as resp:
+        result = json.loads(resp.read())
+        review = result["content"][0]["text"]
+except urllib.error.HTTPError as e:
+    body = e.read().decode()
+    print(f"Anthropic API error {e.code}: {body}", file=sys.stderr)
+    sys.exit(1)
+
+pr = os.environ["PR_NUMBER"]
+gh_token = os.environ["GH_TOKEN"]
+repo = os.environ.get("GITHUB_REPOSITORY", "")
+
+body = f"## Opus review\n\n{review}\n\n---\n*claude-opus-5 · [run `/review` locally for an interactive session](https://github.com/{repo})*"
+
+comment_payload = json.dumps({"body": body}).encode()
+comment_req = urllib.request.Request(
+    f"https://api.github.com/repos/{repo}/issues/{pr}/comments",
+    data=comment_payload,
+    headers={
+        "Authorization": f"Bearer {gh_token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "content-type": "application/json",
+    },
+)
+with urllib.request.urlopen(comment_req) as resp:
+    print(f"Posted review comment (HTTP {resp.status})")
+PYEOF
