@@ -30,6 +30,7 @@ Two specialised agents are pre-configured in `.claude/agents/`. Both use Opus.
 |---|---|
 | `/design` | Architecture decisions, brainstorming, new capability design |
 | `/review` | Review the current diff before committing or opening a PR |
+| `/fiducial:platform` | Load full platform context (via Fiducial plugin) |
 
 The default session model (Sonnet) handles implementation. Switch to `/design`
 or `/review` when the task is judgment, not code.
@@ -39,10 +40,10 @@ It requires `ANTHROPIC_API_KEY` in the repository's Actions secrets.
 
 ## Guard rules
 
-The Claude Code hook (`fid guard-check`) enforces the rules listed in
-`fiducial.toml [guard]`. Rules fire only when a forbidden command is in
-**command position** — not when it appears inside a quoted string or as
-an argument. This prevents the false positives that plagued earlier guards.
+The `PreToolUse` guard (`fid guard-check`) is contributed by the Fiducial Claude Code
+plugin (`.claude/settings.json`). It enforces the rules listed in `fiducial.toml [guard]`.
+Rules fire only when a forbidden command is in **command position** — not when it
+appears inside a quoted string or as an argument.
 
 ## What not to do
 

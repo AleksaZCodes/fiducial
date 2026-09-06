@@ -1,15 +1,6 @@
 {
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "fid guard-check"
-          }
-        ]
-      }
-    ]
-  }
+  "extraKnownMarketplaces": {
+    "fiducial": { "source": { "source": "github", "repo": "AleksaZCodes/fiducial" } }
+  },
+  "enabledPlugins": { "fiducial@fiducial": true }
 }
