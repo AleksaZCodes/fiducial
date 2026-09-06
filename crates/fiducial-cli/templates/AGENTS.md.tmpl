@@ -22,6 +22,21 @@ Built on [Fiducial](https://github.com/AleksaZCodes/fiducial) {{version}}.
 └── AGENTS.md       — this file
 ```
 
+## Agents
+
+Two specialised agents are pre-configured in `.claude/agents/`. Both use Opus.
+
+| Slash command | When to use |
+|---|---|
+| `/design` | Architecture decisions, brainstorming, new capability design |
+| `/review` | Review the current diff before committing or opening a PR |
+
+The default session model (Sonnet) handles implementation. Switch to `/design`
+or `/review` when the task is judgment, not code.
+
+A CI job (`claude-review.yml`) runs an Opus review automatically on every PR.
+It requires `ANTHROPIC_API_KEY` in the repository's Actions secrets.
+
 ## Guard rules
 
 The Claude Code hook (`fid guard-check`) enforces the rules listed in

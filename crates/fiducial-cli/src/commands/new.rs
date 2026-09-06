@@ -23,6 +23,9 @@ const TMPL_AGENTS_MD: &str = include_str!("../../templates/AGENTS.md.tmpl");
 const TMPL_GITIGNORE: &str = include_str!("../../templates/gitignore.tmpl");
 const TMPL_CLAUDE_SETTINGS: &str = include_str!("../../templates/claude-settings.json.tmpl");
 const TMPL_README: &str = include_str!("../../templates/README.md.tmpl");
+const TMPL_AGENT_REVIEW: &str = include_str!("../../templates/agents-review.md.tmpl");
+const TMPL_AGENT_DESIGN: &str = include_str!("../../templates/agents-design.md.tmpl");
+const TMPL_CI_REVIEW: &str = include_str!("../../templates/claude-review.yml.tmpl");
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
@@ -51,6 +54,27 @@ pub fn run(name: &str) -> Result<()> {
         &dest,
         ".claude/settings.json",
         TMPL_CLAUDE_SETTINGS,
+        name,
+        &mut lock,
+    )?;
+    write_template(
+        &dest,
+        ".claude/agents/review.md",
+        TMPL_AGENT_REVIEW,
+        name,
+        &mut lock,
+    )?;
+    write_template(
+        &dest,
+        ".claude/agents/design.md",
+        TMPL_AGENT_DESIGN,
+        name,
+        &mut lock,
+    )?;
+    write_template(
+        &dest,
+        ".github/workflows/claude-review.yml",
+        TMPL_CI_REVIEW,
         name,
         &mut lock,
     )?;
@@ -152,6 +176,11 @@ fn print_checklist(name: &str) {
     println!("  fid add firmware rp2040  # add RP2040 firmware");
     println!();
     println!("  fid doctor            # verify everything is in order");
+    println!();
+    println!("  # Agents — Sonnet for implementation, Opus for design/review:");
+    println!("  /design               # architecture brainstorming");
+    println!("  /review               # review diff before committing");
+    println!("  # CI auto-reviews every PR (needs ANTHROPIC_API_KEY in repo secrets).");
     println!();
     println!("  # When you're ready to commit:");
     println!("  git add -A && git commit -m 'feat: initial scaffold'");
