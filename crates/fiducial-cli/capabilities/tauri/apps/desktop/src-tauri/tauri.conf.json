@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "{{name}}",
+  "version": "0.1.0",
+  "identifier": "com.fiducial.{{name}}",
+  "build": {
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "{{name}}",
+        "width":  1200,
+        "height": 800
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.icns", "icons/icon.ico", "icons/icon.png"]
+  },
+  "plugins": {
+    "updater": {
+      "active":   true,
+      "pubkey":   "REPLACE_WITH_YOUR_PUBLIC_KEY",
+      "endpoints": ["https://releases.{{name}}.example.com/{{target}}/{{current_version}}"]
+    }
+  }
+}
