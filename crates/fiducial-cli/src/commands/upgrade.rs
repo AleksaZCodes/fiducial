@@ -84,8 +84,9 @@ pub fn run(dry_run: bool, portfolio: bool) -> Result<()> {
     if pending_count == 0 {
         println!("  · no pending migrations");
     } else {
-        // Apply all pending migrations in one pass.
-        let results = migration::apply_pending(&root, &lock.applied_migrations, dry_run);
+        // Apply all pending migrations in one pass. Propagate errors — a failed
+        // migration is not silently skipped.
+        let results = migration::apply_pending(&root, &lock.applied_migrations, dry_run)?;
         for r in results {
             let verb = if dry_run { "would apply" } else { "applied" };
             println!(
@@ -117,8 +118,10 @@ pub fn run(dry_run: bool, portfolio: bool) -> Result<()> {
                 }
                 std::fs::write(&dest, &expanded)
                     .with_context(|| format!("writing {skill_path}"))?;
+                println!("  ✓ {skill_path}: refreshed from platform");
+            } else {
+                println!("  · {skill_path}: would refresh from platform");
             }
-            println!("  ✓ {skill_path}: refreshed from platform");
             any_changes = true;
         }
     }
@@ -187,13 +190,14 @@ fn merge_one_template(
     let local_path = root.join(rel_path);
     let local = match std::fs::read_to_string(&local_path) {
         Ok(c) => c,
-        Err(_) => {
-            // File deleted locally — restore from upstream.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            // File was deleted locally — restore from upstream.
             if !dry_run {
                 if let Some(parent) = local_path.parent() {
                     std::fs::create_dir_all(parent)?;
                 }
-                std::fs::write(&local_path, &upstream)?;
+                std::fs::write(&local_path, &upstream)
+                    .with_context(|| format!("restoring deleted {rel_path}"))?;
                 let record = lock.templates.get_mut(rel_path).unwrap();
                 record.base_content = Some(upstream.clone());
                 record.hash = crate::lock::sha256_hex(upstream.as_bytes());
@@ -202,6 +206,10 @@ fn merge_one_template(
             return Ok(Some(TemplateOutcome::Clean(
                 "restored (was deleted locally)".into(),
             )));
+        }
+        Err(e) => {
+            // Other I/O error (e.g. permission denied) — surface it; do not overwrite.
+            return Err(e).with_context(|| format!("reading {rel_path}"));
         }
     };
 

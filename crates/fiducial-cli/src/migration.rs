@@ -104,25 +104,35 @@ pub struct ApplyResult {
 /// product rooted at `root`.
 ///
 /// Returns one `ApplyResult` per migration that was attempted.
-pub fn apply_pending(root: &Path, already_applied: &[String], dry_run: bool) -> Vec<ApplyResult> {
-    BUILTIN_MIGRATIONS
+/// Errors from individual migrations are propagated — a failed migration is not
+/// silently skipped or marked as applied.
+pub fn apply_pending(
+    root: &Path,
+    already_applied: &[String],
+    dry_run: bool,
+) -> Result<Vec<ApplyResult>> {
+    let mut results = Vec::new();
+    for m in BUILTIN_MIGRATIONS
         .iter()
-        .filter(|m| !already_applied.contains(&m.id.to_string()))
-        .filter_map(|m| apply_one(root, m, dry_run).ok())
-        .collect()
+        .filter(|m| !already_applied.iter().any(|s| s == m.id))
+    {
+        results.push(apply_one(root, m, dry_run)?);
+    }
+    Ok(results)
 }
 
 /// List all pending migrations (not yet applied).
 pub fn pending(already_applied: &[String]) -> Vec<&'static Migration> {
     BUILTIN_MIGRATIONS
         .iter()
-        .filter(|m| !already_applied.contains(&m.id.to_string()))
+        .filter(|m| !already_applied.iter().any(|s| s == m.id))
         .collect()
 }
 
 pub(crate) fn apply_one(root: &Path, migration: &Migration, dry_run: bool) -> Result<ApplyResult> {
     // Group ops by file path so we read/write each file exactly once.
-    use std::collections::{BTreeMap, BTreeSet};
+    // The BTreeMap guarantees each path appears as a key exactly once.
+    use std::collections::BTreeMap;
     let mut file_ops: BTreeMap<&'static str, Vec<&MigrationOp>> = BTreeMap::new();
     for op in migration.ops {
         file_ops.entry(op.file_path).or_default().push(op);
@@ -130,7 +140,6 @@ pub(crate) fn apply_one(root: &Path, migration: &Migration, dry_run: bool) -> Re
 
     let mut files_modified = 0usize;
     let mut files_skipped = 0usize;
-    let mut touched: BTreeSet<&str> = BTreeSet::new();
 
     for (file_path, ops) in &file_ops {
         let target = root.join(file_path);
@@ -161,9 +170,8 @@ pub(crate) fn apply_one(root: &Path, migration: &Migration, dry_run: bool) -> Re
                 .with_context(|| format!("writing {}", target.display()))?;
         }
 
-        if touched.insert(file_path) {
-            files_modified += 1;
-        }
+        // Each key in file_ops is unique (BTreeMap), so this always increments once per file.
+        files_modified += 1;
     }
 
     Ok(ApplyResult {
@@ -236,7 +244,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         // No files at all — migration should be filtered by applied list.
         let already_applied = vec!["web-next/0.2.0/font-inter-to-geist".to_string()];
-        let results = apply_pending(root, &already_applied, false);
+        let results = apply_pending(root, &already_applied, false).unwrap();
 
         // Only the worker migration should remain pending (or none if worker file missing)
         for r in &results {
