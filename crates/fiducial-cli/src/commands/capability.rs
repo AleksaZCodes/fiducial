@@ -291,4 +291,3 @@ fn cmd_new(name: &str) -> Result<()> {
 
     Ok(())
 }
-
