@@ -1,0 +1,52 @@
+# {{name}} — Agent Context
+
+This file is read by Claude Code (and any other agent) at session start.
+It records what is true about this product so that agents do not have to
+re-derive it.
+
+## Platform
+
+Built on [Fiducial](https://github.com/AleksaZCodes/fiducial) {{version}}.
+
+- `fid doctor` — check for drift before starting work
+- `fid derive` — run pipelines; `--check` fails CI on stale artifacts
+- `fid upgrade` — pull upstream template and package updates
+
+## Product layout
+
+```
+{{name}}/
+├── fiducial.toml   — product config, capabilities, guard rules
+├── fiducial.lock   — template version tracking (do not edit by hand)
+├── MISSION.md      — what this product is for
+└── AGENTS.md       — this file
+```
+
+## Agents
+
+Two specialised agents are pre-configured in `.claude/agents/`. Both use Opus.
+
+| Slash command | When to use |
+|---|---|
+| `/design` | Architecture decisions, brainstorming, new capability design |
+| `/review` | Review the current diff before committing or opening a PR |
+
+The default session model (Sonnet) handles implementation. Switch to `/design`
+or `/review` when the task is judgment, not code.
+
+A CI job (`claude-review.yml`) runs an Opus review automatically on every PR.
+It requires `ANTHROPIC_API_KEY` in the repository's Actions secrets.
+
+## Guard rules
+
+The Claude Code hook (`fid guard-check`) enforces the rules listed in
+`fiducial.toml [guard]`. Rules fire only when a forbidden command is in
+**command position** — not when it appears inside a quoted string or as
+an argument. This prevents the false positives that plagued earlier guards.
+
+## What not to do
+
+- Do not hand-edit files listed in `fiducial.lock` (they are template-tracked).
+- Do not commit directly to the default branch (`no-direct-main-push` rule).
+- Do not hand-write derived artifacts — change the upstream declaration and
+  re-run `fid derive`.

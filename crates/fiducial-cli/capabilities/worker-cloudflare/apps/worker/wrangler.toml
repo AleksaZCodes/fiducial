@@ -1,0 +1,22 @@
+name            = "{{name}}-worker"
+main            = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Non-secret environment variables. Secrets go through `wrangler secret put`.
+FIDUCIAL_VERSION = "{{version}}"
+
+# Uncomment to add KV, R2, D1, or Durable Object bindings.
+# [[kv_namespaces]]
+# binding = "MY_KV"
+# id      = "REPLACE_WITH_NAMESPACE_ID"
+
+# [[r2_buckets]]
+# binding  = "MY_BUCKET"
+# bucket_name = "{{name}}-bucket"
+
+# [[d1_databases]]
+# binding      = "MY_DB"
+# database_name = "{{name}}"
+# database_id  = "REPLACE_WITH_DATABASE_ID"

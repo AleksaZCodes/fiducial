@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 3
+## Current phase: Phase 4
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -48,12 +48,38 @@ _Read this at the start of every session. Updated manually as phases complete._
 | CI: `spine` job matrix + `wasm-pack` job + `firmware` job added to `ci.yml` | ✅ |
 | Flash to RP2040 + verify `defmt` log shows `fiducial-core` version | ⚠️ manual (no hw in CI) |
 
-**Phase 3 — not started**
+**Phase 3 — complete ✅ (2026-09-06)**
 
 > `fid` CLI: `new`, `add`, `doctor`; `fiducial.lock`; guard configurable and shell-aware.
 > Done when `fid new` yields a building repo, `fid doctor` is clean, and the §11 false-positive cannot recur.
 
-Spec: `docs/specs/2026-09-06-fiducial-design.md` §16, Phase 3 row.
+| Deliverable | Status |
+| --- | --- |
+| `crates/fiducial-cli/` — `fid` binary, added to host workspace | ✅ |
+| `fid new <name>` — scaffold: fiducial.toml, fiducial.lock, MISSION.md, AGENTS.md, .claude/settings.json, .gitignore, README.md, git init | ✅ |
+| `fid add app\|module\|firmware <target>` — real capability install for next/tauri/worker/rp2040 | ✅ |
+| `fid doctor` — checks config, lock, and template hash integrity | ✅ |
+| `fid guard-check` — shell-aware PreToolUse hook; tokenizes before matching; §11 false-positive cannot recur | ✅ |
+| `fiducial.lock` — SHA-256 per template file, records source version | ✅ |
+| 11 guard unit tests covering false-positive cases, pipelines, sudo, env assignments | ✅ |
+| `packages/cli/` — `@fiducial/cli` npm shim with 2 passing tests | ✅ |
+
+**Phase 3b — complete ✅ (2026-09-06)**
+
+> Capability mechanism: a capability installs, activates guard + skill.
+
+| Deliverable | Status |
+| --- | --- |
+| `capability.rs` — `CapabilityDef` type, built-in registry, `install()`, `check_capability()` | ✅ |
+| Built-in capabilities: `web-next`, `firmware-rp2040`, `tauri`, `worker-cloudflare` | ✅ |
+| Each capability: template files + `SKILL.md` (mandatory per §3.3) + guard rules | ✅ |
+| `fid capability list [--all]` — show installed + available | ✅ |
+| `fid capability check [--capability <id>]` — conformance validation | ✅ |
+| `fid capability new <name>` — scaffold a new first-party capability | ✅ |
+| `fid add app next\|tauri\|worker` / `fid add firmware rp2040` — real installs | ✅ |
+| `fid derive`, `fid upgrade`, `fid graph` — stubs with accurate help (Phase 4) | ✅ |
+| Comprehensive `--help` on all commands with `long_about`, `after_long_help`, `long_help` | ✅ |
+| `fid doctor` stays clean after capability install (lock re-baselines `fiducial.toml`) | ✅ |
 
 ---
 
@@ -82,14 +108,16 @@ fiducial/
 ├── crates/
 │   ├── fiducial/            crates.io placeholder
 │   ├── fiducial-core/       no_std spine — version(), DeviceId
-│   └── fiducial-wasm/       wasm-bindgen bindings → fiducial-core
+│   ├── fiducial-wasm/       wasm-bindgen bindings → fiducial-core
+│   └── fiducial-cli/        `fid` binary — new, add, doctor, guard-check
 ├── firmware/                SEPARATE Cargo workspace (excluded from root)
 │   ├── Cargo.toml           workspace root
 │   ├── rust-toolchain.toml  stable + embedded targets
 │   ├── shared/              target-agnostic helpers (blink constants, re-exports)
 │   └── rp2040/              Embassy blink demo — thumbv6m-none-eabi
 ├── packages/
-│   └── fiducial/            @fiducial/fiducial npm placeholder
+│   ├── fiducial/            @fiducial/fiducial npm placeholder
+│   └── cli/                 @fiducial/cli npm shim for `fid`
 └── docs/
     └── specs/
         └── 2026-09-06-fiducial-design.md
@@ -111,8 +139,8 @@ fiducial/
 | **0** | Claim names; repo; MISSION, LICENSE, IP-POLICY | Both publish --dry-run pass | ✅ |
 | **1** | Monorepo skeleton: Turborepo, Changesets, CI | Trivial package publishes and installs in scratch project | ✅ |
 | **2** | Vertical slice: `fiducial-core` no_std + WASM + 4-target CI | One fn runs in browser, Tauri, and blinks LED on RP2040 | ✅ |
-| **3** | `fid` CLI: `new`, `add`, `doctor`; shell-aware guard | `fid new` builds; `fid doctor` clean; false-positive cannot recur | ⬜ next |
-| **3b** | Capability mechanism | A capability installs, activates guard + skill | ⬜ |
+| **3** | `fid` CLI: `new`, `add`, `doctor`; shell-aware guard | `fid new` builds; `fid doctor` clean; false-positive cannot recur | ✅ |
+| **3b** | Capability mechanism | A capability installs, activates guard + skill | ✅ |
 | **4** | Propagation: codemods + 3-way template merge | Upstream change lands in product, conflict surfaced correctly | ⬜ |
 | **5** | Claude Code plugin | Six-line block → guard active in scratch repo | ⬜ |
 | **6** | ROP characterization harness | Green on unmodified ROP; fails on injected change | ⬜ |

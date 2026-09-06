@@ -4,6 +4,7 @@ members = [
     "crates/fiducial",
     "crates/fiducial-core",
     "crates/fiducial-wasm",
+    "crates/fiducial-cli",
 ]
 exclude = ["firmware/*"]
 
