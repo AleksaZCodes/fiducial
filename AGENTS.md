@@ -39,6 +39,30 @@ fiducial/
 └── .github/workflows/    CI (ci.yml) + release (release.yml)
 ```
 
+## Tools — use these before writing library code
+
+### context7 (live documentation)
+
+Before writing code against any named library — Embassy, wasm-bindgen, wasm-pack,
+Turborepo, Changesets, Tauri, probe-rs, Next.js, SvelteKit, and anything else with a
+versioned API — fetch current docs via context7. Training data goes stale; library
+feature names change. The Phase 2 Embassy renames (`arch-cortex-m` → `platform-cortex-m`,
+`integrated-timers` removed, `embassy-rp` jumping from 0.3 to 0.10) cost a full
+trial-and-error loop because context7 was not used. That is avoidable.
+
+Step 1: `resolve-library-id` with the library name and a topic query.
+Step 2: `query-docs` with the returned ID and a specific question.
+
+### Claude Code skills
+
+`/code-review`, `/commit`, `/commit-push-pr`, `/run`, `/security-review`,
+`/update-config`, `/claude-api`. Invoke by name or via the Skill tool.
+
+### GitHub MCP plugin
+
+`mcp__plugin_github_github__*` — search code, read files, create PRs, manage issues.
+Use `get_me` first to confirm current user context.
+
 ## Build
 
 ```sh

@@ -50,6 +50,42 @@ date stamp. Do not edit old decisions. The history is the record.
 
 When a technical decision is genuinely ambiguous, `MISSION.md` resolves it.
 
+## Tools available in this session
+
+### context7 — always use for library/framework questions
+
+Before writing code that touches any named library (Embassy, wasm-bindgen, wasm-pack,
+Turborepo, Changesets, Tauri, embassy-rp, embassy-executor, embassy-time, probe-rs,
+Next.js, SvelteKit, …) call context7 to get current docs. Training data goes stale;
+library APIs change without warning. The Phase 2 Embassy feature renames
+(`arch-cortex-m` → `platform-cortex-m`, `integrated-timers` removed, `embassy-rp 0.3`
+→ `0.10`) were discovered by trial-and-error because context7 was not used. That
+cost is avoidable.
+
+```
+# Pattern — always do this before writing library code:
+1. mcp__context7__resolve-library-id  (libraryName: "Embassy", query: "...")
+2. mcp__context7__query-docs          (libraryId: "/embassy-rs/embassy", query: "...")
+```
+
+### Skills available (`/skill-name` or via Skill tool)
+
+| Skill | When to use |
+|---|---|
+| `claude-api` | Any Claude/Anthropic API question — model IDs, pricing, streaming, tool use |
+| `code-review` | Review the current diff or a PR for bugs and simplifications |
+| `commit-commands:commit` | Create a well-formed commit |
+| `commit-commands:commit-push-pr` | Commit, push, and open a PR |
+| `run` | Run and screenshot the app to verify a change works |
+| `security-review` | Security audit of changed code |
+| `update-config` | Modify Claude Code settings, hooks, permissions |
+
+### MCP plugins available
+
+- **`mcp__plugin_github_github__*`** — GitHub API: PRs, issues, branches, files
+- **`mcp__context7__*`** — Live library documentation
+- **`mcp__ide__getDiagnostics`** — Pull current IDE errors/warnings into context
+
 ## Build commands
 
 ```sh
