@@ -1,0 +1,75 @@
+name: Release
+
+# Runs on every merge to main. If there are pending changesets it opens (or
+# updates) a "Release PR" that bumps versions and builds the changelog. When
+# that PR is merged, the same run detects no pending changesets and publishes
+# directly.
+#
+# Docs: https://github.com/changesets/action
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write  # for npm provenance
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # changesets needs full history for changelog
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # changesets/action either:
+      #   a) opens/updates a "Release PR" when changesets are pending, or
+      #   b) publishes when merging a Release PR (no pending changesets).
+      - name: Create Release PR or Publish
+        uses: changesets/action@v1
+        with:
+          publish: pnpm release
+          title: "chore: version packages"
+          commit: "chore: version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # ── Publish Rust crates ────────────────────────────────────────────────
+      # Only runs when the Release PR is merged (i.e. when changesets/action
+      # actually published — detected by the `published` output being truthy).
+      - name: Publish crates to crates.io
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          cargo publish --package fiducial
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

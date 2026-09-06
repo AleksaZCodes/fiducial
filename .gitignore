@@ -6,6 +6,9 @@ target/
 node_modules/
 .pnpm-store/
 
+# Turborepo cache
+.turbo/
+
 # Build outputs (binaries are release artifacts, not committed)
 dist/
 *.tgz
