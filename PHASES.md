@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 4
+## Current phase: Phase 5
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -81,6 +81,25 @@ _Read this at the start of every session. Updated manually as phases complete._
 | Comprehensive `--help` on all commands with `long_about`, `after_long_help`, `long_help` | ✅ |
 | `fid doctor` stays clean after capability install (lock re-baselines `fiducial.toml`) | ✅ |
 
+**Phase 4 — complete ✅ (2026-09-06)**
+
+> Propagation: codemods + 3-way template merge.
+> Done when an upstream template change and a renamed API both land in a scaffolded product, conflict surfaced correctly.
+
+| Deliverable | Status |
+| --- | --- |
+| `lock.rs` — `base_content` field on `TemplateRecord`; `applied_migrations` list | ✅ |
+| `templates.rs` — central registry of current in-binary template content by path | ✅ |
+| `migration.rs` — codemod migration structs, built-in registry, `apply_pending`, `pending` | ✅ |
+| Built-in migrations: `web-next/0.2.0/font-inter-to-geist`, `worker-cloudflare/0.2.0/wrangler-compatibility-date` | ✅ |
+| `fid upgrade` — 3-way template merge (base from lock, ours from disk, theirs from binary) using `diffy` | ✅ |
+| `fid upgrade` — codemod application in version order, recorded in `fiducial.lock` | ✅ |
+| `fid upgrade` — skill file refresh (platform-owned, always overwrites) | ✅ |
+| `fid upgrade --dry-run` — reports changes without writing | ✅ |
+| `fid doctor` — reports templates with upstream changes available | ✅ |
+| `fid doctor` — reports pending codemod migrations | ✅ |
+| 10 new tests: `lock::tests` (base_content, 3-way merge), `migration::tests` (apply, dry-run, idempotence) | ✅ |
+
 ---
 
 ## Repo layout (current)
@@ -141,7 +160,7 @@ fiducial/
 | **2** | Vertical slice: `fiducial-core` no_std + WASM + 4-target CI | One fn runs in browser, Tauri, and blinks LED on RP2040 | ✅ |
 | **3** | `fid` CLI: `new`, `add`, `doctor`; shell-aware guard | `fid new` builds; `fid doctor` clean; false-positive cannot recur | ✅ |
 | **3b** | Capability mechanism | A capability installs, activates guard + skill | ✅ |
-| **4** | Propagation: codemods + 3-way template merge | Upstream change lands in product, conflict surfaced correctly | ⬜ |
+| **4** | Propagation: codemods + 3-way template merge | Upstream change lands in product, conflict surfaced correctly | ✅ |
 | **5** | Claude Code plugin | Six-line block → guard active in scratch repo | ⬜ |
 | **6** | ROP characterization harness | Green on unmodified ROP; fails on injected change | ⬜ |
 | **7** | L1 tokens + L2 packages | Each publishes and typechecks in isolation | ⬜ |
