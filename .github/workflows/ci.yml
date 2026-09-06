@@ -15,14 +15,61 @@ env:
   CARGO_INCREMENTAL: 0
 
 jobs:
-  # ── Rust ──────────────────────────────────────────────────────────────────
-  rust:
-    name: Rust (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+  # ── L0 spine: 4-target matrix ─────────────────────────────────────────────
+  #
+  # fiducial-core is #![no_std] and must compile for every target, every commit.
+  # A failure here is treated as a P0 regression, not a future concern.
+  # Design spec §4: "CI compiles the spine for x86_64, wasm32-unknown-unknown,
+  # thumbv6m-none-eabi and thumbv7em-none-eabihf every commit."
+  spine:
+    name: spine (${{ matrix.target.triple }})
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        target:
+          - triple: x86_64-unknown-linux-gnu
+            features: "--features std"
+            check_wasm: false
+          - triple: wasm32-unknown-unknown
+            features: "--no-default-features"
+            check_wasm: true
+          - triple: thumbv6m-none-eabi
+            features: "--no-default-features"
+            check_wasm: false
+          - triple: thumbv7em-none-eabihf
+            features: "--no-default-features"
+            check_wasm: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target.triple }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check fiducial-core (${{ matrix.target.triple }})
+        run: >
+          cargo check
+          --package fiducial-core
+          --target ${{ matrix.target.triple }}
+          ${{ matrix.target.features }}
+
+      - name: Check fiducial-wasm (${{ matrix.target.triple }})
+        if: matrix.target.check_wasm
+        run: >
+          cargo check
+          --package fiducial-wasm
+          --target ${{ matrix.target.triple }}
+
+  # ── Host: full workspace build + tests ────────────────────────────────────
+  rust:
+    name: Rust (host)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -37,11 +84,56 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Clippy
+      - name: Clippy (workspace)
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-      - name: Tests
+      - name: Tests (workspace)
         run: cargo test --workspace
+
+  # ── WASM: wasm-pack build ─────────────────────────────────────────────────
+  wasm-pack:
+    name: wasm-pack (fiducial-wasm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable + wasm32 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: wasm-pack build (bundler)
+        run: wasm-pack build crates/fiducial-wasm --target bundler
+
+      - name: wasm-pack test (node)
+        run: wasm-pack test --node crates/fiducial-wasm
+
+  # ── Firmware: RP2040 check ────────────────────────────────────────────────
+  firmware:
+    name: firmware (thumbv6m-none-eabi)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable + embedded targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv6m-none-eabi,thumbv7em-none-eabihf
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: firmware -> firmware/target
+
+      - name: Check firmware workspace (RP2040)
+        working-directory: firmware
+        run: cargo check --target thumbv6m-none-eabi
 
   # ── JavaScript / TypeScript ───────────────────────────────────────────────
   js:

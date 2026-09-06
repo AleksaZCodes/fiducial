@@ -17,7 +17,7 @@ fiducial/
 └── .github/workflows/  CI + release automation
 ```
 
-## Current phase: Phase 1 — monorepo skeleton
+## Current phase: Phase 3 — `fid` CLI
 
 Read `PHASES.md` at the start of every session. The current phase row says what is
 in progress and what "done" means. Do not start Phase N+1 work inside Phase N.

@@ -1,0 +1,49 @@
+[package]
+name    = "fiducial-rp2040"
+description = "RP2040 / Pico firmware — Embassy async, fiducial-core spine."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+# Binary only — no library surface.
+[[bin]]
+name = "fiducial-rp2040"
+path = "src/main.rs"
+
+[dependencies]
+fiducial-firmware-shared = { path = "../shared" }
+
+embassy-executor = { workspace = true, features = [
+    "platform-cortex-m",
+    "executor-thread",
+] }
+embassy-rp = { workspace = true, features = [
+    "rp2040",
+    "defmt",
+    "time-driver",
+    "critical-section-impl",
+] }
+embassy-time = { workspace = true, features = [
+    "defmt",
+    "defmt-timestamp-uptime",
+] }
+
+defmt     = { workspace = true }
+defmt-rtt = { workspace = true }
+panic-probe = { workspace = true }
+
+cortex-m    = { workspace = true }
+cortex-m-rt = { workspace = true }
+
+[profile.dev]
+debug       = 2
+opt-level   = "s"   # small code; change to 3 for speed-sensitive loops
+overflow-checks = true
+
+[profile.release]
+debug       = 2     # keep symbols — probe-rs + defmt need them
+opt-level   = "s"
+lto         = true
+codegen-units = 1
+overflow-checks = false

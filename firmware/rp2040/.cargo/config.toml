@@ -1,0 +1,22 @@
+# RP2040 cargo configuration.
+#
+# target: thumbv6m-none-eabi — Cortex-M0+ (all RP2040 cores)
+# runner: probe-rs flashes via SWD and attaches defmt RTT for logging
+#
+# Install probe-rs: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/probe-rs/probe-rs/releases/latest/download/probe-rs-tools-installer.sh | sh
+
+[build]
+target = "thumbv6m-none-eabi"
+
+[target.thumbv6m-none-eabi]
+runner = "probe-rs run --chip RP2040"
+rustflags = [
+    # cortex-m-rt linker arguments
+    "-C", "link-arg=--nmagic",
+    "-C", "link-arg=-Tlink.x",
+    # defmt RTT logging
+    "-C", "link-arg=-Tdefmt.x",
+]
+
+[env]
+DEFMT_LOG = "debug"

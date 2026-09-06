@@ -2,6 +2,8 @@
 resolver = "2"
 members = [
     "crates/fiducial",
+    "crates/fiducial-core",
+    "crates/fiducial-wasm",
 ]
 exclude = ["firmware/*"]
 

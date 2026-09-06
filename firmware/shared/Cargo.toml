@@ -1,0 +1,15 @@
+[package]
+name    = "fiducial-firmware-shared"
+description = "Target-agnostic firmware helpers — shared across RP2040, STM32, etc."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+name = "fiducial_firmware_shared"
+
+# no_std, no alloc — must compile for all embedded targets with zero features
+[dependencies]
+fiducial-core = { workspace = true }
+defmt         = { workspace = true }

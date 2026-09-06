@@ -1,0 +1,27 @@
+[package]
+name        = "fiducial-core"
+description = "no_std spine: IDs, time primitives, validation, state machines."
+version.workspace     = true
+edition.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+homepage.workspace    = true
+authors.workspace     = true
+rust-version.workspace = true
+keywords    = ["no-std", "embedded", "cross-platform", "wasm", "fiducial"]
+categories  = ["no-std", "embedded", "wasm"]
+
+[lib]
+name = "fiducial_core"
+
+# ── Features ────────────────────────────────────────────────────────────────
+# Every L0 crate is `no_std` by default. `alloc` and `std` are opt-in.
+# Embedded targets use no features. WASM + host enable `std`.
+#
+# Design spec §4, §7: "every L0 crate is #![no_std], default-features = [],
+# with alloc/std behind flags."
+
+[features]
+default = []
+alloc   = []
+std     = ["alloc"]

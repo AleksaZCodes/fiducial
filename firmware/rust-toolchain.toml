@@ -1,0 +1,12 @@
+# Firmware toolchain — pinned to a stable channel with all required targets.
+#
+# Embassy works with stable Rust. Targets are installed here so `cargo check`
+# in CI does not require a separate `rustup target add` step per matrix row.
+
+[toolchain]
+channel  = "stable"
+targets  = [
+    "thumbv6m-none-eabi",   # RP2040 (Cortex-M0+)
+    "thumbv7em-none-eabihf", # STM32 (Cortex-M4F with FPU)
+]
+components = ["rust-src", "rustfmt", "clippy"]

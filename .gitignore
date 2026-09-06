@@ -13,6 +13,9 @@ node_modules/
 dist/
 *.tgz
 
+# wasm-pack output
+crates/fiducial-wasm/pkg/
+
 # Local env
 .env
 .env.local
