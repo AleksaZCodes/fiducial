@@ -1,0 +1,33 @@
+{
+  "name": "@fiducial/fiducial",
+  "version": "0.1.0",
+  "description": "Declare each fact once. Derive every artifact from it.",
+  "license": "MIT",
+  "author": "Aleksa Zdravkovic",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AleksaZCodes/fiducial.git"
+  },
+  "homepage": "https://github.com/AleksaZCodes/fiducial",
+  "keywords": [
+    "cross-domain",
+    "derive",
+    "monorepo",
+    "build-system",
+    "platform"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "types": "./src/index.d.ts"
+    }
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}

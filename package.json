@@ -1,0 +1,22 @@
+{
+  "name": "fiducial-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Declare each fact once. Derive every artifact from it.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AleksaZCodes/fiducial.git"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "packageManager": "pnpm@10.26.1",
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
+  }
+}
