@@ -1,0 +1,36 @@
+{
+  "name": "@fiducial/cli",
+  "version": "0.1.0",
+  "description": "fid — the Fiducial platform CLI",
+  "license": "MIT",
+  "author": "Aleksa Zdravkovic",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AleksaZCodes/fiducial.git"
+  },
+  "homepage": "https://github.com/AleksaZCodes/fiducial",
+  "keywords": [
+    "cli",
+    "fiducial",
+    "scaffold",
+    "cross-domain",
+    "fid"
+  ],
+  "type": "module",
+  "bin": {
+    "fid": "./src/cli.js"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "echo 'nothing to build (JS shim only — binary ships as a native install)'",
+    "typecheck": "echo 'no TS in this package'",
+    "lint": "echo 'no linter configured yet'",
+    "test": "node --test src/cli.test.js"
+  }
+}
