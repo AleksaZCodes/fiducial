@@ -1,0 +1,15 @@
+{
+  "name": "fiducial",
+  "description": "Fiducial platform — shell-aware guard, propagation, and capability skills for cross-domain products",
+  "version": "0.1.0",
+  "author": {
+    "name": "Aleksa Zdravkovic"
+  },
+  "homepage": "https://github.com/AleksaZCodes/fiducial",
+  "repository": "https://github.com/AleksaZCodes/fiducial",
+  "license": "MIT",
+  "keywords": ["fiducial", "guard", "scaffold", "cross-platform", "firmware", "web"],
+  "category": "developer-tools",
+  "commands": ["./commands/"],
+  "strict": false
+}

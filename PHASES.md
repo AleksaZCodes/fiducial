@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 5
+## Current phase: Phase 6
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -80,6 +80,20 @@ _Read this at the start of every session. Updated manually as phases complete._
 | `fid derive`, `fid upgrade`, `fid graph` — stubs with accurate help (Phase 4) | ✅ |
 | Comprehensive `--help` on all commands with `long_about`, `after_long_help`, `long_help` | ✅ |
 | `fid doctor` stays clean after capability install (lock re-baselines `fiducial.toml`) | ✅ |
+
+**Phase 5 — complete ✅ (2026-09-07)**
+
+> Claude Code plugin: six-line activation block → guard active in any scratch repo.
+
+| Deliverable | Status |
+| --- | --- |
+| `.claude-plugin/plugin.json` — plugin manifest (`name`, `version`, `commands`, `strict`) | ✅ |
+| `hooks/hooks.json` — auto-discovered `PreToolUse` hook: `fid guard-check` on every Bash call | ✅ |
+| `commands/platform.md` — `/fiducial:platform` skill: core commands, guard rules, propagation guide | ✅ |
+| `templates/claude-settings.json.tmpl` — changed from direct hook config to the 6-line plugin activation block | ✅ |
+| `templates/AGENTS.md.tmpl` — documents `/fiducial:platform` slash command, mentions plugin as guard source | ✅ |
+| `fid doctor` — migration filter: only surfaces migrations for installed capabilities (no spurious warnings) | ✅ |
+| End-to-end: `fid new scratch-test` → `.claude/settings.json` has 6-line block → `fid doctor: clean` | ✅ |
 
 **Phase 4 — complete ✅ (2026-09-06)**
 
@@ -161,7 +175,7 @@ fiducial/
 | **3** | `fid` CLI: `new`, `add`, `doctor`; shell-aware guard | `fid new` builds; `fid doctor` clean; false-positive cannot recur | ✅ |
 | **3b** | Capability mechanism | A capability installs, activates guard + skill | ✅ |
 | **4** | Propagation: codemods + 3-way template merge | Upstream change lands in product, conflict surfaced correctly | ✅ |
-| **5** | Claude Code plugin | Six-line block → guard active in scratch repo | ⬜ |
+| **5** | Claude Code plugin | Six-line block → guard active in scratch repo | ✅ |
 | **6** | ROP characterization harness | Green on unmodified ROP; fails on injected change | ⬜ |
 | **7** | L1 tokens + L2 packages | Each publishes and typechecks in isolation | ⬜ |
 | **8** | ROP migration wave 1 (optional, on your schedule) | Every PR green on all tiers + characterization | ⬜ |

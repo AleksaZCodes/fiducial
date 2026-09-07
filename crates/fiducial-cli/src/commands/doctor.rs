@@ -41,7 +41,7 @@ pub fn run() -> Result<()> {
     if let (Some(cfg), Some(lock)) = (&cfg, &lock) {
         check_upstream_templates(&root, cfg, lock, &mut warnings, &mut ok);
         // ── 6. Pending migrations ─────────────────────────────────────────
-        check_pending_migrations(lock, &mut warnings, &mut ok);
+        check_pending_migrations(cfg, lock, &mut warnings, &mut ok);
     }
 
     // ── Report ────────────────────────────────────────────────────────────
@@ -189,8 +189,23 @@ fn check_upstream_templates(
     }
 }
 
-fn check_pending_migrations(lock: &Lock, warnings: &mut Vec<String>, ok: &mut Vec<String>) {
-    let pending = migration::pending(&lock.applied_migrations);
+fn check_pending_migrations(
+    cfg: &Config,
+    lock: &Lock,
+    warnings: &mut Vec<String>,
+    ok: &mut Vec<String>,
+) {
+    // Only surface migrations whose capability prefix is installed in this product.
+    // A migration id has the form `<capability-id>/<version>/<slug>`.
+    // Migrations for uninstalled capabilities are silently skipped — they would
+    // modify 0 files anyway, and showing them to the user is misleading.
+    let pending: Vec<_> = migration::pending(&lock.applied_migrations)
+        .into_iter()
+        .filter(|m| {
+            let cap_prefix = m.id.split('/').next().unwrap_or("");
+            cfg.capabilities.enabled.iter().any(|c| c == cap_prefix)
+        })
+        .collect();
 
     if pending.is_empty() {
         ok.push("no pending codemod migrations".into());
