@@ -1,0 +1,45 @@
+{
+  "name": "@fiducial/tokens",
+  "version": "0.1.0",
+  "description": "Design tokens for Fiducial — typed token exports, CSS custom properties, Tailwind preset",
+  "license": "MIT",
+  "author": "Aleksa Zdravkovic",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AleksaZCodes/fiducial.git"
+  },
+  "homepage": "https://github.com/AleksaZCodes/fiducial",
+  "keywords": [
+    "design-tokens",
+    "tailwind",
+    "css",
+    "fiducial"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./tailwind": {
+      "import": "./dist/tailwind.js",
+      "types": "./dist/tailwind.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'no linter configured yet'",
+    "test": "echo 'no tests yet'"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}
