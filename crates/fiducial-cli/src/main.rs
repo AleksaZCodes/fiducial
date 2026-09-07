@@ -6,6 +6,8 @@ mod commands;
 mod config;
 mod guard;
 mod lock;
+mod migration;
+mod templates;
 
 // ── Top-level CLI ────────────────────────────────────────────────────────────
 
