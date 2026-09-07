@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 6
+## Current phase: Phase 7
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -80,6 +80,21 @@ _Read this at the start of every session. Updated manually as phases complete._
 | `fid derive`, `fid upgrade`, `fid graph` — stubs with accurate help (Phase 4) | ✅ |
 | Comprehensive `--help` on all commands with `long_about`, `after_long_help`, `long_help` | ✅ |
 | `fid doctor` stays clean after capability install (lock re-baselines `fiducial.toml`) | ✅ |
+
+**Phase 6 — complete ✅ (2026-09-07)**
+
+> ROP characterization harness — golden-file tests for every pure function.
+> Done when: Green on unmodified ROP; fails on injected change.
+> Lives at: `/home/aleksa/dev/rop-harness/` (standalone repo — not in fiducial)
+
+| Deliverable | Status |
+| --- | --- |
+| `rop/subject/game-logic.ts` — verbatim copy of ROP's pure game-logic (no I/O) | ✅ |
+| `rop/subject/types.ts` — verbatim copy of ROP's shared types | ✅ |
+| `rop/golden/game-logic.json` — 39 golden expected outputs across 10 exported functions | ✅ |
+| `rop/game-logic.char.test.ts` — 36 characterization assertions; green on unmodified subject | ✅ |
+| `rop/inject.char.test.ts` — 3 injection assertions; proves harness detects semantic divergence | ✅ |
+| `vitest.config.ts` — isolated `forks` pool; each file gets its own worker | ✅ |
 
 **Phase 5 — complete ✅ (2026-09-07)**
 
@@ -161,6 +176,7 @@ fiducial/
 ## Source material (local, not in this repo)
 
 - `/home/aleksa/dev/rop-reference/` — ROP snapshot at b16b226; characterization baseline for Phase 6. Never modify, never push (contains real secrets).
+- `/home/aleksa/dev/rop-harness/` — standalone characterization harness (Phase 6). Its own git repo; not part of the fiducial workspace.
 - `/home/aleksa/dev/platform/` — retired planning folder. Superseded by this repo.
 
 ---
@@ -176,6 +192,6 @@ fiducial/
 | **3b** | Capability mechanism | A capability installs, activates guard + skill | ✅ |
 | **4** | Propagation: codemods + 3-way template merge | Upstream change lands in product, conflict surfaced correctly | ✅ |
 | **5** | Claude Code plugin | Six-line block → guard active in scratch repo | ✅ |
-| **6** | ROP characterization harness | Green on unmodified ROP; fails on injected change | ⬜ |
+| **6** | ROP characterization harness | Green on unmodified ROP; fails on injected change | ✅ |
 | **7** | L1 tokens + L2 packages | Each publishes and typechecks in isolation | ⬜ |
 | **8** | ROP migration wave 1 (optional, on your schedule) | Every PR green on all tiers + characterization | ⬜ |
