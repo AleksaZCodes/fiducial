@@ -1,6 +1,6 @@
 {
   "name": "@fiducial/transport-web",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Web Serial, WebUSB, and BLE transports for Fiducial — same frame codec as the firmware",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
