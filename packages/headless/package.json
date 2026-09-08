@@ -33,7 +33,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'no linter configured yet'",
-    "test": "echo 'no tests yet'"
+    "test": "node --test src/headless.test.js"
   },
   "devDependencies": {
     "typescript": "^7.0.2"

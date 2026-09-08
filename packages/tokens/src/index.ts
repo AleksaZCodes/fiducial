@@ -1,5 +1,8 @@
 export { colors } from './colors.js'
 export type { Colors } from './colors.js'
+export { lightTheme, darkTheme } from './themes.js'
+export type { ThemeVars } from './themes.js'
+export { generateThemeCss } from './css.js'
 export { spacing } from './spacing.js'
 export type { Spacing } from './spacing.js'
 export { fontSizes, fontWeights, fontFamilies } from './typography.js'
