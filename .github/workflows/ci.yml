@@ -160,11 +160,11 @@ jobs:
 
       - name: Check firmware workspace (RP2040 — thumbv6m-none-eabi)
         working-directory: firmware
-        run: cargo check --target thumbv6m-none-eabi
+        run: cargo check --target thumbv6m-none-eabi -p fiducial-firmware-shared -p fiducial-rp2040
 
       - name: Check firmware workspace (STM32 — thumbv7em-none-eabihf)
         working-directory: firmware
-        run: cargo check --target thumbv7em-none-eabihf
+        run: cargo check --target thumbv7em-none-eabihf -p fiducial-firmware-shared -p fiducial-stm32
 
   # ── Types pipeline: generate TS types from Rust, verify freshness ──────────
   #

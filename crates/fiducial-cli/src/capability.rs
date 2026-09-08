@@ -149,9 +149,7 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
             ),
             (
                 "firmware/rp2040/.cargo/config.toml",
-                include_str!(
-                    "../capabilities/firmware-rp2040/firmware/rp2040/.cargo/config.toml"
-                ),
+                include_str!("../capabilities/firmware-rp2040/firmware/rp2040/.cargo/config.toml"),
             ),
             (
                 "firmware/rp2040/Cargo.toml",
@@ -199,9 +197,7 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
             ),
             (
                 "firmware/stm32/.cargo/config.toml",
-                include_str!(
-                    "../capabilities/firmware-stm32/firmware/stm32/.cargo/config.toml"
-                ),
+                include_str!("../capabilities/firmware-stm32/firmware/stm32/.cargo/config.toml"),
             ),
             (
                 "firmware/stm32/Cargo.toml",
