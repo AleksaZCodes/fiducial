@@ -1,0 +1,24 @@
+{
+  "name": "@fiducial/ui-react",
+  "version": "0.1.0",
+  "description": "Thin React component layer built on @fiducial/tokens and @fiducial/headless.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build":     "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "dependencies": {
+    "@fiducial/tokens":   "workspace:*",
+    "@fiducial/headless": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript":   "^7.0.0"
+  }
+}

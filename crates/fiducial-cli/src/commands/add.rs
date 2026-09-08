@@ -108,9 +108,10 @@ pub fn run(target: AddTarget) -> Result<()> {
 fn add_app(target: &str) -> Result<()> {
     let cap_id = match target {
         "next" => "web-next",
+        "svelte" => "web-svelte",
         "tauri" => "tauri",
         "worker" => "worker-cloudflare",
-        "svelte" | "mobile" => {
+        "mobile" => {
             println!(
                 "✦ fid add app {target}\n\n\
                  The `{target}` target is coming in Phase 3b.\n\

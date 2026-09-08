@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 8
+## Current phase: Phase 11
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -129,6 +129,20 @@ _Read this at the start of every session. Updated manually as phases complete._
 | CI: `types-pipeline` job — regenerates TS types, `git diff --exit-code` catches staleness | ✅ |
 | CI: spine matrix extended to check `fiducial-quantity` and `fiducial-model` for all 4 targets | ✅ |
 
+**Phase 10 — complete ✅ (2026-09-08)**
+
+> Next.js + SvelteKit templates + thin L3 bindings.
+> Done when: Both render the same tokens and the same headless logic.
+
+| Deliverable | Status |
+| --- | --- |
+| `capabilities/web-next/` — updated templates: `@fiducial/tokens` + `@fiducial/headless` deps, `globals.css` with token CSS vars, `layout.tsx` imports globals, `page.tsx` uses `Result<T,E>` | ✅ |
+| `capabilities/web-svelte/` — new capability: SvelteKit templates with `app.css` (same token vars), `+layout.svelte`, `+page.svelte` using `Result<T,E>` from headless | ✅ |
+| `fid add app svelte` — wired to `web-svelte` capability (was stub) | ✅ |
+| `packages/ui-react/` — `@fiducial/ui-react` v0.1.0 — `Button` + `StatusBadge<T,E>` built on token CSS vars + `@fiducial/headless` | ✅ |
+| `packages/ui-svelte/` — `@fiducial/ui-svelte` v0.1.0 — `Button.svelte` + `StatusBadge.svelte` (same token vars, same headless types) | ✅ |
+| `pnpm typecheck` — all 9 workspace packages green including ui-react and ui-svelte | ✅ |
+
 **Phase 7 — complete ✅ (2026-09-07)**
 
 > L1 tokens + L2 packages: each publishes and typechecks in isolation.
@@ -229,7 +243,7 @@ fiducial/
 | **7** | L1 tokens + L2 packages | Each publishes and typechecks in isolation | ✅ |
 | **8** | ROP migration wave 1 (optional, on your schedule) | Every PR green on all tiers + characterization | ⬜ |
 | **9** | `fiducial-quantity` + `fiducial-model` + `fid derive/graph` + types pipeline | A protocol edit regenerates TS types; stale artifact or violated assertion fails CI | ✅ |
-| **10** | Next.js + SvelteKit templates + thin L3 bindings | Both render the same tokens and the same headless logic | ⬜ |
+| **10** | Next.js + SvelteKit templates + thin L3 bindings | Both render the same tokens and the same headless logic | ✅ |
 | **11** | Tauri desktop + `fiducial-tauri` + `fiducial-protocol` | Desktop app talks to a device over USB serial | ⬜ |
 | **12** | `firmware/rp2040` + `stm32`, probe-rs + defmt, LoRa via `lora-rs` | `fid add firmware` yields a flashable project sharing L0 with the desktop app | ⬜ |
 | **13** | Web Serial/WebUSB + BLE transports | Same device reachable from browser and phone with the same codec | ⬜ |

@@ -28,6 +28,23 @@ const CAP_WEB_NEXT_TSCONFIG: &str = include_str!("../capabilities/web-next/apps/
 const CAP_WEB_NEXT_PAGE: &str = include_str!("../capabilities/web-next/apps/web/src/app/page.tsx");
 const CAP_WEB_NEXT_LAYOUT: &str =
     include_str!("../capabilities/web-next/apps/web/src/app/layout.tsx");
+const CAP_WEB_NEXT_GLOBALS: &str =
+    include_str!("../capabilities/web-next/apps/web/src/app/globals.css");
+
+// ── web-svelte capability templates ──────────────────────────────────────────
+
+const CAP_WEB_SVELTE_SVELTE_CONFIG: &str =
+    include_str!("../capabilities/web-svelte/apps/web/svelte.config.js");
+const CAP_WEB_SVELTE_VITE_CONFIG: &str =
+    include_str!("../capabilities/web-svelte/apps/web/vite.config.ts");
+const CAP_WEB_SVELTE_APP_HTML: &str =
+    include_str!("../capabilities/web-svelte/apps/web/src/app.html");
+const CAP_WEB_SVELTE_APP_CSS: &str =
+    include_str!("../capabilities/web-svelte/apps/web/src/app.css");
+const CAP_WEB_SVELTE_LAYOUT: &str =
+    include_str!("../capabilities/web-svelte/apps/web/src/routes/+layout.svelte");
+const CAP_WEB_SVELTE_PAGE: &str =
+    include_str!("../capabilities/web-svelte/apps/web/src/routes/+page.svelte");
 
 const CAP_FIRMWARE_README: &str =
     include_str!("../capabilities/firmware-rp2040/firmware/rp2040/README.md");
@@ -61,6 +78,14 @@ pub fn raw(rel_path: &str) -> Option<&'static str> {
         "apps/web/tsconfig.json" => Some(CAP_WEB_NEXT_TSCONFIG),
         "apps/web/src/app/page.tsx" => Some(CAP_WEB_NEXT_PAGE),
         "apps/web/src/app/layout.tsx" => Some(CAP_WEB_NEXT_LAYOUT),
+        "apps/web/src/app/globals.css" => Some(CAP_WEB_NEXT_GLOBALS),
+        // web-svelte capability (paths not shared with web-next)
+        "apps/web/svelte.config.js" => Some(CAP_WEB_SVELTE_SVELTE_CONFIG),
+        "apps/web/vite.config.ts" => Some(CAP_WEB_SVELTE_VITE_CONFIG),
+        "apps/web/src/app.html" => Some(CAP_WEB_SVELTE_APP_HTML),
+        "apps/web/src/app.css" => Some(CAP_WEB_SVELTE_APP_CSS),
+        "apps/web/src/routes/+layout.svelte" => Some(CAP_WEB_SVELTE_LAYOUT),
+        "apps/web/src/routes/+page.svelte" => Some(CAP_WEB_SVELTE_PAGE),
         // firmware-rp2040 capability
         "firmware/rp2040/README.md" => Some(CAP_FIRMWARE_README),
         // tauri capability
