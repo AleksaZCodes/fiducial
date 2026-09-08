@@ -134,12 +134,30 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
     },
     CapabilityDef {
         id: "tauri",
-        description: "Tauri desktop + mobile app sharing crates with firmware and geometry",
+        description: "Tauri 2 desktop app with fiducial-tauri serial transport",
         guard_rules: &["no-unpinned-cli-fetch"],
-        templates: &[(
-            "apps/desktop/src-tauri/tauri.conf.json",
-            include_str!("../capabilities/tauri/apps/desktop/src-tauri/tauri.conf.json"),
-        )],
+        templates: &[
+            (
+                "apps/desktop/src-tauri/tauri.conf.json",
+                include_str!("../capabilities/tauri/apps/desktop/src-tauri/tauri.conf.json"),
+            ),
+            (
+                "apps/desktop/src-tauri/Cargo.toml",
+                include_str!("../capabilities/tauri/apps/desktop/src-tauri/Cargo.toml.tmpl"),
+            ),
+            (
+                "apps/desktop/src-tauri/build.rs",
+                include_str!("../capabilities/tauri/apps/desktop/src-tauri/build.rs"),
+            ),
+            (
+                "apps/desktop/src-tauri/src/lib.rs",
+                include_str!("../capabilities/tauri/apps/desktop/src-tauri/src/lib.rs"),
+            ),
+            (
+                "apps/desktop/src-tauri/src/main.rs",
+                include_str!("../capabilities/tauri/apps/desktop/src-tauri/src/main.rs"),
+            ),
+        ],
         skill_md: include_str!("../capabilities/tauri/SKILL.md"),
     },
     CapabilityDef {

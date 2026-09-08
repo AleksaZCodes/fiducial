@@ -1,0 +1,20 @@
+[package]
+name        = "fiducial-protocol"
+description = "no_std transport-agnostic protocol: framing, checksums, sequencing."
+version.workspace     = true
+edition.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+homepage.workspace    = true
+authors.workspace     = true
+rust-version.workspace = true
+keywords    = ["no-std", "protocol", "serial", "embedded", "fiducial"]
+categories  = ["no-std", "embedded", "network-programming"]
+
+[lib]
+name = "fiducial_protocol"
+
+[features]
+default = []
+alloc   = []
+std     = ["alloc"]

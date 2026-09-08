@@ -51,6 +51,12 @@ const CAP_FIRMWARE_README: &str =
 
 const CAP_TAURI_CONF: &str =
     include_str!("../capabilities/tauri/apps/desktop/src-tauri/tauri.conf.json");
+const CAP_TAURI_CARGO: &str =
+    include_str!("../capabilities/tauri/apps/desktop/src-tauri/Cargo.toml.tmpl");
+const CAP_TAURI_BUILD: &str = include_str!("../capabilities/tauri/apps/desktop/src-tauri/build.rs");
+const CAP_TAURI_LIB: &str = include_str!("../capabilities/tauri/apps/desktop/src-tauri/src/lib.rs");
+const CAP_TAURI_MAIN: &str =
+    include_str!("../capabilities/tauri/apps/desktop/src-tauri/src/main.rs");
 
 const CAP_WORKER_WRANGLER: &str =
     include_str!("../capabilities/worker-cloudflare/apps/worker/wrangler.toml");
@@ -90,6 +96,10 @@ pub fn raw(rel_path: &str) -> Option<&'static str> {
         "firmware/rp2040/README.md" => Some(CAP_FIRMWARE_README),
         // tauri capability
         "apps/desktop/src-tauri/tauri.conf.json" => Some(CAP_TAURI_CONF),
+        "apps/desktop/src-tauri/Cargo.toml" => Some(CAP_TAURI_CARGO),
+        "apps/desktop/src-tauri/build.rs" => Some(CAP_TAURI_BUILD),
+        "apps/desktop/src-tauri/src/lib.rs" => Some(CAP_TAURI_LIB),
+        "apps/desktop/src-tauri/src/main.rs" => Some(CAP_TAURI_MAIN),
         // worker-cloudflare capability
         "apps/worker/wrangler.toml" => Some(CAP_WORKER_WRANGLER),
         _ => None,

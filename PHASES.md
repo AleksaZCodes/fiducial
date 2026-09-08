@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 11
+## Current phase: Phase 12
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -129,6 +129,23 @@ _Read this at the start of every session. Updated manually as phases complete._
 | CI: `types-pipeline` job — regenerates TS types, `git diff --exit-code` catches staleness | ✅ |
 | CI: spine matrix extended to check `fiducial-quantity` and `fiducial-model` for all 4 targets | ✅ |
 
+**Phase 11 — complete ✅ (2026-09-08)**
+
+> `fiducial-protocol` (no_std framing) + `fiducial-tauri` (serial transport) + Tauri desktop capability.
+> Done when the desktop app can open a USB serial port, frame a message, and decode a reply.
+
+| Deliverable | Status |
+| --- | --- |
+| `crates/fiducial-protocol/` — `#![no_std]` frame encoder/decoder; `[MAGIC\|LEN_LO\|LEN_HI\|PAYLOAD\|CRC8]`; 9 tests | ✅ |
+| `fiducial-protocol` — CRC-8 XOR fold; `FrameDecoder<N>` state machine; resync on bad magic; oversized frame rejection | ✅ |
+| `crates/fiducial-tauri/` — `SerialTransport` (open, send, recv); `list_ports()`; `TransportError` | ✅ |
+| `capabilities/tauri/` — 5-file template: `tauri.conf.json`, `Cargo.toml`, `build.rs`, `src/lib.rs`, `src/main.rs` | ✅ |
+| Tauri commands: `cmd_list_ports`, `cmd_connect`, `cmd_disconnect`, `cmd_send`, `cmd_recv` | ✅ |
+| `crates/fiducial-cli/src/capability.rs` — `tauri` capability expanded to 5 templates | ✅ |
+| `crates/fiducial-cli/src/templates.rs` — 4 new `CAP_TAURI_*` constants + `raw()` entries | ✅ |
+| CI: `fiducial-protocol` added to 4-target spine matrix; `apt-get install libudev-dev` for serialport | ✅ |
+| `cargo clippy --all-features -D warnings` clean; `cargo fmt` applied; all 15 test suites green | ✅ |
+
 **Phase 10 — complete ✅ (2026-09-08)**
 
 > Next.js + SvelteKit templates + thin L3 bindings.
@@ -244,7 +261,7 @@ fiducial/
 | **8** | ROP migration wave 1 (optional, on your schedule) | Every PR green on all tiers + characterization | ⬜ |
 | **9** | `fiducial-quantity` + `fiducial-model` + `fid derive/graph` + types pipeline | A protocol edit regenerates TS types; stale artifact or violated assertion fails CI | ✅ |
 | **10** | Next.js + SvelteKit templates + thin L3 bindings | Both render the same tokens and the same headless logic | ✅ |
-| **11** | Tauri desktop + `fiducial-tauri` + `fiducial-protocol` | Desktop app talks to a device over USB serial | ⬜ |
+| **11** | Tauri desktop + `fiducial-tauri` + `fiducial-protocol` | Desktop app talks to a device over USB serial | ✅ |
 | **12** | `firmware/rp2040` + `stm32`, probe-rs + defmt, LoRa via `lora-rs` | `fid add firmware` yields a flashable project sharing L0 with the desktop app | ⬜ |
 | **13** | Web Serial/WebUSB + BLE transports | Same device reachable from browser and phone with the same codec | ⬜ |
 | **14** | EDA pipeline: atopile → KiCad → `board.interface.json` + fab outputs | A board change regenerates every output; `--check` catches staleness | ⬜ |
