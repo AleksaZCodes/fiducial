@@ -1,24 +1,17 @@
-import { colors } from './colors.js'
-import { radii } from './radii.js'
-
 /**
- * Tailwind v3 preset — for projects not yet on Tailwind v4.
+ * Tailwind v4 integration — CSS only, no JS config.
  *
- * Usage in tailwind.config.ts:
- *   import { fiducialPreset } from '@fiducial/tokens/tailwind'
- *   export default { presets: [fiducialPreset], content: [...] }
+ * In Tailwind v4 there is no tailwind.config.ts. Everything is configured in
+ * CSS. The only step needed to integrate @fiducial/tokens into a Tailwind v4
+ * project is to paste the output of generateThemeCss() into your globals.css:
  *
- * Also inject `generateThemeCss()` output into your global CSS so the CSS
- * custom properties (OKLCH values) are defined at runtime.
+ *   @import "tailwindcss";
+ *   @import "tw-animate-css";
  *
- * For Tailwind v4: skip this file. Use only `generateThemeCss()` — the
- * `@theme inline` block registers all utilities automatically.
+ *   <paste generateThemeCss() output here>
+ *
+ * The @theme inline block inside that output registers --color-* and --radius-*
+ * tokens, making bg-background, text-foreground, rounded-lg, etc. available.
+ * Spacing and typography are Tailwind v4 built-ins — no registration needed.
  */
-export const fiducialPreset = {
-  theme: {
-    extend: {
-      colors,
-      borderRadius: radii,
-    },
-  },
-} as const
+export { generateThemeCss } from './css.js'

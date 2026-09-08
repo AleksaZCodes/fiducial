@@ -1,7 +1,7 @@
 {
   "name": "@fiducial/tokens",
   "version": "0.1.0",
-  "description": "Design tokens for Fiducial — typed token exports, CSS custom properties, Tailwind preset",
+  "description": "Design tokens for Fiducial — OKLCH theme vars, Tailwind v4 @theme inline, cross-platform spacing and typography",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
   "repository": {

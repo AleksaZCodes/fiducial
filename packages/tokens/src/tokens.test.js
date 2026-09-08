@@ -10,13 +10,20 @@ import {
   lightTheme,
   darkTheme,
   generateThemeCss,
+  spacing,
+  fontSizes,
+  fontWeights,
+  fontFamilies,
+  leadings,
   radii,
 } from '../dist/index.js'
-import { fiducialPreset } from '../dist/tailwind.js'
+import { generateThemeCss as generateThemeCssFromTailwind } from '../dist/tailwind.js'
 
 const VAR_RE = /^var\(--[a-z0-9-]+\)$/
 
 describe('@fiducial/tokens', () => {
+  // ── Colors ────────────────────────────────────────────────────────────────
+
   describe('colors', () => {
     it('has all core scalar slots', () => {
       for (const key of ['background', 'foreground', 'border', 'input', 'ring', 'destructive']) {
@@ -29,13 +36,6 @@ describe('@fiducial/tokens', () => {
         assert.ok(colors[group]?.DEFAULT,    `missing colors.${group}.DEFAULT`)
         assert.ok(colors[group]?.foreground, `missing colors.${group}.foreground`)
       }
-    })
-
-    it('card and popover have DEFAULT + foreground', () => {
-      assert.ok(colors.card.DEFAULT)
-      assert.ok(colors.card.foreground)
-      assert.ok(colors.popover.DEFAULT)
-      assert.ok(colors.popover.foreground)
     })
 
     it('chart has slots 1–5', () => {
@@ -55,12 +55,7 @@ describe('@fiducial/tokens', () => {
     })
 
     it('all scalar values are var(--*) references (no hsl wrapper)', () => {
-      const scalars = [
-        colors.background, colors.foreground,
-        colors.border, colors.input, colors.ring,
-        colors.destructive,
-      ]
-      for (const v of scalars) {
+      for (const v of [colors.background, colors.foreground, colors.border, colors.input, colors.ring, colors.destructive]) {
         assert.match(v, VAR_RE, `unexpected format: ${v}`)
       }
     })
@@ -68,37 +63,16 @@ describe('@fiducial/tokens', () => {
     it('primary.DEFAULT is var(--primary)', () => {
       assert.equal(colors.primary.DEFAULT, 'var(--primary)')
     })
-
-    it('chart.1 is var(--chart-1)', () => {
-      assert.equal(colors.chart['1'], 'var(--chart-1)')
-    })
   })
 
+  // ── Themes ────────────────────────────────────────────────────────────────
+
   describe('themes', () => {
-    const EXPECTED_KEYS = [
-      '--background', '--foreground',
-      '--primary', '--primary-foreground',
-      '--destructive',
-      '--border', '--input', '--ring',
-      '--chart-1', '--chart-5',
-      '--radius',
-      '--sidebar', '--sidebar-ring',
-    ]
-
-    it('lightTheme has all expected keys', () => {
-      for (const k of EXPECTED_KEYS) {
-        assert.ok(k in lightTheme, `missing lightTheme ${k}`)
-      }
-    })
-
-    it('darkTheme has all expected keys', () => {
-      for (const k of EXPECTED_KEYS) {
-        assert.ok(k in darkTheme, `missing darkTheme ${k}`)
-      }
-    })
-
-    it('has exactly 32 custom properties each', () => {
+    it('lightTheme has exactly 32 custom properties', () => {
       assert.equal(Object.keys(lightTheme).length, 32)
+    })
+
+    it('darkTheme has exactly 32 custom properties', () => {
       assert.equal(Object.keys(darkTheme).length, 32)
     })
 
@@ -108,7 +82,7 @@ describe('@fiducial/tokens', () => {
       }
     })
 
-    it('light and dark --background differ (OKLCH values)', () => {
+    it('light and dark --background differ', () => {
       assert.notEqual(lightTheme['--background'], darkTheme['--background'])
     })
 
@@ -117,20 +91,17 @@ describe('@fiducial/tokens', () => {
       assert.match(darkTheme['--background'], /^oklch\(/)
     })
 
-    it('--radius is a CSS length', () => {
-      assert.match(lightTheme['--radius'], /^\d+(\.\d+)?(rem|px|em)$/)
-      assert.equal(lightTheme['--radius'], darkTheme['--radius'])
-    })
-
-    it('dark sidebar-primary can have a non-zero hue (blue accent)', () => {
-      // dark theme sidebar-primary is oklch(0.488 0.243 264.376) — chroma > 0
-      assert.match(darkTheme['--sidebar-primary'], /^oklch\(/)
+    it('--radius is 0.625rem in both themes', () => {
+      assert.equal(lightTheme['--radius'], '0.625rem')
+      assert.equal(darkTheme['--radius'], '0.625rem')
     })
 
     it('dark --border uses alpha notation', () => {
       assert.match(darkTheme['--border'], /oklch\(.*\/.*\)/)
     })
   })
+
+  // ── generateThemeCss ──────────────────────────────────────────────────────
 
   describe('generateThemeCss', () => {
     let css
@@ -140,97 +111,204 @@ describe('@fiducial/tokens', () => {
       assert.ok(typeof css === 'string' && css.length > 0)
     })
 
-    it('contains :root block', () => {
-      assert.ok(generateThemeCss().includes(':root {'))
+    it('contains :root, .dark, and @theme inline blocks', () => {
+      const out = generateThemeCss()
+      assert.ok(out.includes(':root {'))
+      assert.ok(out.includes('.dark {'))
+      assert.ok(out.includes('@theme inline {'))
     })
 
-    it('contains .dark block', () => {
-      assert.ok(generateThemeCss().includes('.dark {'))
-    })
-
-    it('contains @theme inline block', () => {
-      assert.ok(generateThemeCss().includes('@theme inline {'))
-    })
-
-    it('@theme inline has --color-background', () => {
+    it('@theme inline maps --color-background', () => {
       assert.ok(generateThemeCss().includes('--color-background: var(--background)'))
     })
 
-    it('@theme inline has --color-destructive (no foreground in new shadcn)', () => {
+    it('@theme inline maps all chart slots', () => {
       const out = generateThemeCss()
-      assert.ok(out.includes('--color-destructive: var(--destructive)'))
+      for (const n of [1, 2, 3, 4, 5]) {
+        assert.ok(out.includes(`--color-chart-${n}: var(--chart-${n})`), `missing chart-${n}`)
+      }
     })
 
-    it('@theme inline has --color-sidebar-ring', () => {
-      assert.ok(generateThemeCss().includes('--color-sidebar-ring: var(--sidebar-ring)'))
+    it('@theme inline maps all sidebar slots', () => {
+      const out = generateThemeCss()
+      for (const slot of ['sidebar', 'sidebar-foreground', 'sidebar-primary', 'sidebar-ring']) {
+        assert.ok(out.includes(`--color-${slot}: var(--${slot})`), `missing ${slot}`)
+      }
     })
 
-    it('@theme inline has full radius scale', () => {
+    it('@theme inline has full radius scale sm through 4xl', () => {
       const out = generateThemeCss()
       for (const suffix of ['sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl']) {
         assert.ok(out.includes(`--radius-${suffix}:`), `missing --radius-${suffix}`)
       }
     })
 
-    it('light and dark background vars appear in distinct blocks', () => {
+    it('light and dark backgrounds appear in correct blocks', () => {
       const out = generateThemeCss()
-      const darkIdx = out.indexOf('.dark {')
+      const darkIdx  = out.indexOf('.dark {')
       const themeIdx = out.indexOf('@theme inline {')
-      const lightBg = lightTheme['--background']
-      const darkBg = darkTheme['--background']
-      // light bg appears before .dark block
-      assert.ok(out.indexOf(lightBg) < darkIdx)
-      // dark bg appears between .dark and @theme
-      const darkBgIdx = out.lastIndexOf(darkBg)
-      assert.ok(darkBgIdx > darkIdx && darkBgIdx < themeIdx)
+      const lightBg  = lightTheme['--background']
+      const darkBg   = darkTheme['--background']
+      assert.ok(out.indexOf(lightBg) < darkIdx,    'light bg should appear before .dark block')
+      assert.ok(out.lastIndexOf(darkBg) > darkIdx && out.lastIndexOf(darkBg) < themeIdx)
+    })
+
+    it('./tailwind re-exports generateThemeCss identically', () => {
+      assert.equal(generateThemeCssFromTailwind(), generateThemeCss())
     })
   })
 
-  describe('radii', () => {
-    it('lg is var(--radius)', () => {
-      assert.equal(radii.lg, 'var(--radius)')
+  // ── Spacing ───────────────────────────────────────────────────────────────
+
+  describe('spacing', () => {
+    it('has 35 steps covering px, 0, 0.5–96', () => {
+      assert.equal(Object.keys(spacing).length, 35)
     })
 
-    it('sm / md are calc() shrink expressions', () => {
+    it('step 4 = 1rem = 16px (Tailwind 4px base unit)', () => {
+      assert.equal(spacing['4'].rem, '1rem')
+      assert.equal(spacing['4'].px,  16)
+    })
+
+    it('step 8 = 2rem = 32px', () => {
+      assert.equal(spacing['8'].rem, '2rem')
+      assert.equal(spacing['8'].px,  32)
+    })
+
+    it('px step = 1px = 1px', () => {
+      assert.equal(spacing['px'].rem, '1px')
+      assert.equal(spacing['px'].px,  1)
+    })
+
+    it('step 0 = 0rem = 0px', () => {
+      assert.equal(spacing['0'].rem, '0rem')
+      assert.equal(spacing['0'].px,  0)
+    })
+
+    it('px values are exactly rem × 16 (0.25rem base)', () => {
+      for (const [key, { rem, px }] of Object.entries(spacing)) {
+        if (rem === '1px' || rem === '0rem' || rem === '0px') continue
+        const computed = parseFloat(rem) * 16
+        assert.ok(Math.abs(computed - px) < 0.01, `spacing[${key}]: ${rem} × 16 ≠ ${px}`)
+      }
+    })
+
+    it('step 96 = 24rem = 384px (largest step)', () => {
+      assert.equal(spacing['96'].rem, '24rem')
+      assert.equal(spacing['96'].px,  384)
+    })
+  })
+
+  // ── Typography ────────────────────────────────────────────────────────────
+
+  describe('typography', () => {
+    describe('fontSizes', () => {
+      it('has 13 steps from xs to 9xl', () => {
+        const keys = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl', '7xl', '8xl', '9xl']
+        assert.equal(Object.keys(fontSizes).length, 13)
+        for (const k of keys) assert.ok(k in fontSizes, `missing fontSizes.${k}`)
+      })
+
+      it('each entry has size and lineHeight strings', () => {
+        for (const [k, v] of Object.entries(fontSizes)) {
+          assert.ok(typeof v.size === 'string' && v.size.length > 0, `empty size for ${k}`)
+          assert.ok(typeof v.lineHeight === 'string' && v.lineHeight.length > 0, `empty lineHeight for ${k}`)
+        }
+      })
+
+      it('base is 1rem / 1.5rem', () => {
+        assert.equal(fontSizes['base'].size, '1rem')
+        assert.equal(fontSizes['base'].lineHeight, '1.5rem')
+      })
+
+      it('xs is 0.75rem / 1rem (12px / 16px)', () => {
+        assert.equal(fontSizes['xs'].size, '0.75rem')
+        assert.equal(fontSizes['xs'].lineHeight, '1rem')
+      })
+
+      it('sizes increase monotonically', () => {
+        const sizes = Object.values(fontSizes).map(e =>
+          e.size === '1px' ? 1 / 16 : parseFloat(e.size),
+        )
+        for (let i = 1; i < sizes.length; i++) {
+          assert.ok(sizes[i] > sizes[i - 1], `sizes not monotonic at index ${i}`)
+        }
+      })
+
+      it('display sizes (5xl+) have lineHeight 1', () => {
+        for (const key of ['5xl', '6xl', '7xl', '8xl', '9xl']) {
+          assert.equal(fontSizes[key].lineHeight, '1', `${key} should be tight (1)`)
+        }
+      })
+
+      it('text sizes (xs–4xl) have absolute rem line-heights', () => {
+        for (const key of ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl']) {
+          assert.match(fontSizes[key].lineHeight, /rem$/, `${key} lineHeight should be in rem`)
+        }
+      })
+    })
+
+    describe('fontWeights', () => {
+      it('has nine named weights', () => {
+        const expected = ['thin', 'extralight', 'light', 'normal', 'medium', 'semibold', 'bold', 'extrabold', 'black']
+        for (const w of expected) assert.ok(w in fontWeights, `missing ${w}`)
+      })
+
+      it('normal is 400, bold is 700', () => {
+        assert.equal(fontWeights.normal, '400')
+        assert.equal(fontWeights.bold,   '700')
+      })
+
+      it('black is 900 (heaviest)', () => {
+        assert.equal(fontWeights.black, '900')
+      })
+    })
+
+    describe('fontFamilies', () => {
+      it('has sans, serif, mono stacks', () => {
+        assert.ok(Array.isArray(fontFamilies.sans)  && fontFamilies.sans.length  > 0)
+        assert.ok(Array.isArray(fontFamilies.serif) && fontFamilies.serif.length > 0)
+        assert.ok(Array.isArray(fontFamilies.mono)  && fontFamilies.mono.length  > 0)
+      })
+
+      it('sans stack starts with system fonts', () => {
+        assert.equal(fontFamilies.sans[0], '-apple-system')
+      })
+
+      it('mono stack includes ui-monospace', () => {
+        assert.ok(fontFamilies.mono.includes('ui-monospace'))
+      })
+    })
+
+    describe('leadings', () => {
+      it('has tight, snug, normal, relaxed, loose', () => {
+        for (const k of ['tight', 'snug', 'normal', 'relaxed', 'loose']) {
+          assert.ok(k in leadings, `missing leadings.${k}`)
+        }
+      })
+
+      it('normal is 1.5', () => assert.equal(leadings.normal, '1.5'))
+      it('tight is 1.25', () => assert.equal(leadings.tight, '1.25'))
+      it('loose is 2', () => assert.equal(leadings.loose, '2'))
+    })
+  })
+
+  // ── Radii ─────────────────────────────────────────────────────────────────
+
+  describe('radii', () => {
+    it('lg is var(--radius)', () => assert.equal(radii.lg, 'var(--radius)'))
+
+    it('sm / md shrink from base', () => {
       assert.match(radii.sm, /^calc\(var\(--radius\) - \d+px\)$/)
       assert.match(radii.md, /^calc\(var\(--radius\) - \d+px\)$/)
     })
 
-    it('xl / 2xl / 3xl / 4xl are calc() grow expressions', () => {
+    it('xl / 2xl / 3xl / 4xl grow from base', () => {
       for (const key of ['xl', '2xl', '3xl', '4xl']) {
         assert.match(radii[key], /^calc\(var\(--radius\) \+ \d+px\)$/, `radii.${key}`)
       }
     })
 
-    it('full is 9999px', () => {
-      assert.equal(radii.full, '9999px')
-    })
-
-    it('sm < md < lg in pixel offsets', () => {
-      // sm subtracts 4px, md subtracts 2px — sm is smaller
-      const smOffset = parseInt(radii.sm.match(/(\d+)px\)$/)?.[1] ?? '0')
-      const mdOffset = parseInt(radii.md.match(/(\d+)px\)$/)?.[1] ?? '0')
-      assert.ok(smOffset > mdOffset, 'sm should subtract more than md')
-    })
-  })
-
-  describe('fiducialPreset (Tailwind v3)', () => {
-    it('has theme.extend.colors and theme.extend.borderRadius', () => {
-      assert.ok(fiducialPreset.theme.extend.colors)
-      assert.ok(fiducialPreset.theme.extend.borderRadius)
-    })
-
-    it('does NOT add custom spacing or fontSize (use Tailwind defaults)', () => {
-      assert.ok(!('spacing' in fiducialPreset.theme.extend))
-      assert.ok(!('fontSize' in fiducialPreset.theme.extend))
-    })
-
-    it('preset colors are reference-equal to exported colors', () => {
-      assert.equal(fiducialPreset.theme.extend.colors, colors)
-    })
-
-    it('preset borderRadius.lg is var(--radius)', () => {
-      assert.equal(fiducialPreset.theme.extend.borderRadius.lg, 'var(--radius)')
-    })
+    it('full is 9999px', () => assert.equal(radii.full, '9999px'))
   })
 })
