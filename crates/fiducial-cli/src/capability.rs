@@ -256,6 +256,26 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
         )],
         skill_md: include_str!("../capabilities/worker-cloudflare/SKILL.md"),
     },
+    CapabilityDef {
+        id: "eda",
+        description: "EDA pipeline: atopile → KiCad → board.interface.json tracked by fid derive",
+        guard_rules: &["no-hand-edit-generated-board-interface"],
+        templates: &[
+            (
+                "board/main.ato",
+                include_str!("../capabilities/eda/board/main.ato"),
+            ),
+            (
+                "board/board.interface.json",
+                include_str!("../capabilities/eda/board/board.interface.json"),
+            ),
+            (
+                "pipelines/eda.toml",
+                include_str!("../capabilities/eda/pipelines/eda.toml"),
+            ),
+        ],
+        skill_md: include_str!("../capabilities/eda/SKILL.md"),
+    },
 ];
 
 /// Look up a capability by id.

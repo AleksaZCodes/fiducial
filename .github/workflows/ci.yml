@@ -87,6 +87,27 @@ jobs:
           --target ${{ matrix.target.triple }}
           ${{ matrix.target.features }}
 
+      - name: Check fiducial-eda (${{ matrix.target.triple }})
+        run: >
+          cargo check
+          --package fiducial-eda
+          --target ${{ matrix.target.triple }}
+          ${{ matrix.target.features }}
+
+      - name: Check fiducial-geometry (${{ matrix.target.triple }})
+        run: >
+          cargo check
+          --package fiducial-geometry
+          --target ${{ matrix.target.triple }}
+          ${{ matrix.target.features }}
+
+      - name: Check fiducial-mesh (${{ matrix.target.triple }})
+        run: >
+          cargo check
+          --package fiducial-mesh
+          --target ${{ matrix.target.triple }}
+          ${{ matrix.target.features }}
+
   # ── Host: full workspace build + tests ────────────────────────────────────
   rust:
     name: Rust (host)
@@ -187,6 +208,48 @@ jobs:
 
       - name: Check for drift
         run: git diff --exit-code packages/wasm-bridge/src/generated.ts
+
+  # ── EDA pipeline: validate board.interface.json schema ───────────────────
+  #
+  # "A board change regenerates every output; --check catches staleness" — Phase 14.
+  # Runs cargo test -p fiducial-eda to validate the seed board.interface.json
+  # against the BoardInterface schema. No atopile/KiCad needed in CI.
+  eda-pipeline:
+    name: EDA pipeline (schema check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Validate board.interface.json schema
+        run: cargo test --features std -p fiducial-eda
+
+  # ── Mesh generation: geometry + mesh crate tests ─────────────────────────
+  #
+  # "Board outline → printable STL and a GLB" — Phase 15.
+  # Runs unit tests that verify extrusion, STL header, and GLB magic bytes.
+  mesh-gen:
+    name: mesh generation (STL + GLB)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Test fiducial-geometry
+        run: cargo test -p fiducial-geometry
+
+      - name: Test fiducial-mesh (std feature)
+        run: cargo test --features std -p fiducial-mesh
 
   # ── JavaScript / TypeScript ───────────────────────────────────────────────
   js:

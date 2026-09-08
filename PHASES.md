@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 13
+## Current phase: Phase 16
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -165,6 +165,60 @@ _Read this at the start of every session. Updated manually as phases complete._
 | `cargo check --target thumbv7em-none-eabihf` (stm32) — green | ✅ |
 | `cargo build --workspace` (host) — green | ✅ |
 
+**Phase 14 — complete ✅ (2026-09-08)**
+
+> EDA pipeline: atopile → KiCad → `board.interface.json` + fab outputs.
+> Done when: A board change regenerates every output; `--check` catches staleness.
+
+| Deliverable | Status |
+| --- | --- |
+| `crates/fiducial-eda/` — `#![no_std]` `BoardInterface`, `Connector`, `Pin`, `PinDirection`, `NetClass`, `Board` types; `serde` derive | ✅ |
+| `fiducial-eda` — `validate(json: &str) -> Result<BoardInterface, ValidationError>` under `std` feature; 10 tests | ✅ |
+| `capabilities/eda/` — `fid add eda`: installs `board/main.ato`, `board/board.interface.json` (seed), `pipelines/eda.toml` | ✅ |
+| `pipelines/eda.toml` — `fid-validate` executor; `board/board.interface.json` tracked as artifact | ✅ |
+| `fid derive` — `fid-validate` executor validates JSON schema in-process; no atopile/KiCad required for CI | ✅ |
+| `fid add eda` — `AddTarget::Eda` variant; installs `eda` capability | ✅ |
+| `packages/board-schema/` — `@fiducial/board-schema` v0.1.0 — TypeScript types + `parseBoardInterface()` | ✅ |
+| CI `eda-pipeline` job — `cargo test --features std -p fiducial-eda` validates seed schema on every commit | ✅ |
+| CI spine matrix extended to check `fiducial-eda` for all 4 targets | ✅ |
+| `pnpm build` + `pnpm test` — all 15 workspace tasks green | ✅ |
+
+**Phase 15 — complete ✅ (2026-09-08)**
+
+> `fiducial-geometry` + `fiducial-mesh` + `viewer3d-react` + tolerance profiles.
+> Done when: Board outline → printable STL and a GLB renderable in a React page.
+
+| Deliverable | Status |
+| --- | --- |
+| `crates/fiducial-geometry/` — `#![no_std]` `Point2/3`, `Vec2/3`, `BoundingBox`, `Polygon`; tolerance profiles FDM/Resin/CNC; 11 tests | ✅ |
+| `crates/fiducial-mesh/` — `#![no_std]` + alloc; `extrude_board()` → watertight box mesh (12 triangles, 24 vertices); 11 tests | ✅ |
+| `to_stl_binary()` — binary STL (80-byte header + 50 bytes/triangle); correct header tag and size verified | ✅ |
+| `to_glb()` — minimal glTF 2.0 binary; POSITION + NORMAL VEC3, SCALAR UNSIGNED_INT indices; GLB magic/version/length verified | ✅ |
+| `packages/viewer3d-react/` — `@fiducial/viewer3d-react` v0.1.0 — `BoardViewer` React FC; Three.js + GLTFLoader + OrbitControls; auto-framing via Box3 | ✅ |
+| 6 viewer3d tests: exports present, BoardViewer is function, GLB magic bytes, header offsets, STL size formula | ✅ |
+| CI: `fiducial-geometry` + `fiducial-mesh` added to 4-target spine matrix | ✅ |
+| CI: `mesh-gen` job — `cargo test -p fiducial-geometry` + `cargo test --features std -p fiducial-mesh` | ✅ |
+| `cargo clippy --all-features -D warnings` clean; `cargo fmt` applied; all test suites green | ✅ |
+| `pnpm build` + `pnpm typecheck` + `pnpm test` — all 17 workspace tasks green | ✅ |
+
+**Phase 13 — complete ✅ (2026-09-08)**
+
+> Web Serial, WebUSB, and BLE transports — same Fiducial frame codec as the firmware.
+> Done when: Same device reachable from browser and phone with the same codec.
+
+| Deliverable | Status |
+| --- | --- |
+| `packages/transport-web/` — `@fiducial/transport-web` v0.1.0 — browser transport package | ✅ |
+| `src/codec.ts` — TypeScript port of `fiducial-protocol`: `crc8`, `encode`, `encodedLen`, `FrameDecoder` | ✅ |
+| `src/transport.ts` — `Transport` interface (`AsyncIterable<Uint8Array>` + `send` + `close`) + `AsyncQueue<T>` | ✅ |
+| `src/serial.ts` — `WebSerialTransport` (Web Serial API: Chrome/Edge 89+) | ✅ |
+| `src/usb.ts` — `WebUsbTransport` (WebUSB API: Chrome/Edge 61+) | ✅ |
+| `src/ble.ts` — `BleTransport` (Web Bluetooth API; Fiducial service/TX/RX UUIDs defined) | ✅ |
+| `src/globals.d.ts` — minimal type stubs for experimental browser APIs not in TypeScript DOM lib | ✅ |
+| 24 tests: codec roundtrip, CRC failure, noise resync, oversized rejection, AsyncQueue — all green | ✅ |
+| `pnpm build` + `pnpm typecheck` — all 10 workspace packages green | ✅ |
+| Codec is byte-exact with `fiducial-protocol` Rust crate — same MAGIC, same CRC-8 XOR fold, same frame layout | ✅ |
+
 **Phase 10 — complete ✅ (2026-09-08)**
 
 > Next.js + SvelteKit templates + thin L3 bindings.
@@ -282,9 +336,9 @@ fiducial/
 | **10** | Next.js + SvelteKit templates + thin L3 bindings | Both render the same tokens and the same headless logic | ✅ |
 | **11** | Tauri desktop + `fiducial-tauri` + `fiducial-protocol` | Desktop app talks to a device over USB serial | ✅ |
 | **12** | `firmware/rp2040` + `stm32`, probe-rs + defmt, LoRa via `lora-rs` | `fid add firmware` yields a flashable project sharing L0 with the desktop app | ✅ |
-| **13** | Web Serial/WebUSB + BLE transports | Same device reachable from browser and phone with the same codec | ⬜ |
-| **14** | EDA pipeline: atopile → KiCad → `board.interface.json` + fab outputs | A board change regenerates every output; `--check` catches staleness | ⬜ |
-| **15** | `fiducial-geometry` + `fiducial-mesh` + `viewer3d-*` + tolerance profiles | Board outline → generated enclosure → printable STL and a GLB on a marketing page | ⬜ |
+| **13** | Web Serial/WebUSB + BLE transports | Same device reachable from browser and phone with the same codec | ✅ |
+| **14** | EDA pipeline: atopile → KiCad → `board.interface.json` + fab outputs | A board change regenerates every output; `--check` catches staleness | ✅ |
+| **15** | `fiducial-geometry` + `fiducial-mesh` + `viewer3d-*` + tolerance profiles | Board outline → generated enclosure → printable STL and a GLB on a marketing page | ✅ |
 | **16** | Workbench v0: `fid dash` read-only view | Roadmap, status, decisions, CI, graph, freshness in one place | ⬜ |
 | **16b** | `fid release` + version-skew assertions | A protocol bump fails any artifact still on the old version; compatibility matrix committed | ⬜ |
 | **16c** | Firmware OTA: `embassy-boot` A/B, signing, resumable transfer, staged rollout | Device updates over BLE, self-tests, marks booted — broken image rolls back automatically | ⬜ |

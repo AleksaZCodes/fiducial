@@ -14,6 +14,8 @@ use std::{
     process::Command,
 };
 
+use fiducial_eda::validate as validate_board_interface;
+
 use crate::{
     config::{Config, CONFIG_FILE},
     lock::{sha256_hex, Lock, LOCK_FILE},
@@ -219,28 +221,60 @@ fn builtin_types_pipeline() -> PipelineToml {
     }
 }
 
+// ── Built-in fid-validate executor ───────────────────────────────────────────
+
+/// Validate each output listed in the pipeline against its declared schema.
+///
+/// Supported schema names (pipeline `args[0]`):
+///   - `board-interface` — validates JSON against the `BoardInterface` schema
+///
+/// Does not run any external process; validates in-process using `fiducial-eda`.
+fn run_fid_validate(pipeline: &PipelineToml, working_dir: &Path) -> Result<()> {
+    let schema = pipeline
+        .args
+        .first()
+        .map(|s| s.as_str())
+        .unwrap_or("board-interface");
+
+    match schema {
+        "board-interface" => {
+            for out in &pipeline.outputs {
+                let abs = working_dir.join(out);
+                let json =
+                    std::fs::read_to_string(&abs).with_context(|| format!("reading {out}"))?;
+                validate_board_interface(&json).map_err(|e| anyhow::anyhow!("{out}: {e}"))?;
+            }
+            Ok(())
+        }
+        other => bail!("fid-validate: unknown schema `{other}` (supported: board-interface)"),
+    }
+}
+
 // ── Command execution ─────────────────────────────────────────────────────────
 
 fn run_pipeline_command(pipeline: &PipelineToml, working_dir: &Path) -> Result<()> {
-    let (program, base_args, extra_args): (&str, Vec<&str>, Vec<&str>) =
-        match pipeline.executor.as_str() {
-            "cargo-test" => (
-                "cargo",
-                vec!["test"],
-                pipeline.args.iter().map(|s| s.as_str()).collect(),
-            ),
-            "shell" => {
-                if pipeline.args.is_empty() {
-                    bail!("shell executor requires at least one arg (the command)");
-                }
-                (
-                    pipeline.args[0].as_str(),
-                    pipeline.args[1..].iter().map(|s| s.as_str()).collect(),
-                    Vec::new(),
-                )
+    let (program, base_args, extra_args): (&str, Vec<&str>, Vec<&str>) = match pipeline
+        .executor
+        .as_str()
+    {
+        "cargo-test" => (
+            "cargo",
+            vec!["test"],
+            pipeline.args.iter().map(|s| s.as_str()).collect(),
+        ),
+        "shell" => {
+            if pipeline.args.is_empty() {
+                bail!("shell executor requires at least one arg (the command)");
             }
-            other => bail!("unknown executor `{other}` (supported: cargo-test, shell)"),
-        };
+            (
+                pipeline.args[0].as_str(),
+                pipeline.args[1..].iter().map(|s| s.as_str()).collect(),
+                Vec::new(),
+            )
+        }
+        "fid-validate" => return run_fid_validate(pipeline, working_dir),
+        other => bail!("unknown executor `{other}` (supported: cargo-test, shell, fid-validate)"),
+    };
 
     let status = Command::new(program)
         .args(&base_args)

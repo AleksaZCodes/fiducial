@@ -104,6 +104,13 @@ const CAP_TAURI_MAIN: &str =
 const CAP_WORKER_WRANGLER: &str =
     include_str!("../capabilities/worker-cloudflare/apps/worker/wrangler.toml");
 
+// ── eda capability templates ──────────────────────────────────────────────────
+
+const CAP_EDA_MAIN_ATO: &str = include_str!("../capabilities/eda/board/main.ato");
+const CAP_EDA_BOARD_INTERFACE: &str =
+    include_str!("../capabilities/eda/board/board.interface.json");
+const CAP_EDA_PIPELINE: &str = include_str!("../capabilities/eda/pipelines/eda.toml");
+
 // ── Lookup ────────────────────────────────────────────────────────────────────
 
 /// Look up the raw (unexpanded) template for a repo-relative path.
@@ -168,6 +175,10 @@ pub fn raw(rel_path: &str) -> Option<&'static str> {
         "apps/desktop/src-tauri/src/main.rs" => Some(CAP_TAURI_MAIN),
         // worker-cloudflare capability
         "apps/worker/wrangler.toml" => Some(CAP_WORKER_WRANGLER),
+        // eda capability
+        "board/main.ato" => Some(CAP_EDA_MAIN_ATO),
+        "board/board.interface.json" => Some(CAP_EDA_BOARD_INTERFACE),
+        "pipelines/eda.toml" => Some(CAP_EDA_PIPELINE),
         _ => None,
     }
 }
