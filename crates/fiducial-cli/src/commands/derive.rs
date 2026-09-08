@@ -15,6 +15,8 @@ use std::{
 };
 
 use fiducial_eda::validate as validate_board_interface;
+use fiducial_geometry::{BoardOutline, ToleranceClass};
+use fiducial_mesh::{enclosure_for, to_glb, to_stl_binary};
 
 use crate::{
     config::{Config, CONFIG_FILE},
@@ -250,31 +252,86 @@ fn run_fid_validate(pipeline: &PipelineToml, working_dir: &Path) -> Result<()> {
     }
 }
 
+// ── Built-in fid-mesh executor ───────────────────────────────────────────────
+
+/// Generate the enclosure mesh declared by a `board.interface.json` outline.
+///
+/// `args[0]` is the path to the board interface JSON (default
+/// `board/board.interface.json`). Outputs are written by extension: `.stl`
+/// receives binary STL, `.glb` receives glTF 2.0 binary. The board's declared
+/// tolerance class drives wall thickness and clearance.
+///
+/// Runs in-process — no CAD tool required in CI.
+fn run_fid_mesh(pipeline: &PipelineToml, working_dir: &Path) -> Result<()> {
+    let source = pipeline
+        .args
+        .first()
+        .map(|s| s.as_str())
+        .unwrap_or("board/board.interface.json");
+
+    let json = std::fs::read_to_string(working_dir.join(source))
+        .with_context(|| format!("reading {source}"))?;
+    let bi = validate_board_interface(&json).map_err(|e| anyhow::anyhow!("{source}: {e}"))?;
+
+    let outline_decl = bi.outline.ok_or_else(|| {
+        anyhow::anyhow!("{source} declares no `outline`; nothing for the mesh pipeline to derive")
+    })?;
+
+    // validate() already rejected unknown tolerance names.
+    let tolerance = match outline_decl.tolerance.as_str() {
+        "resin" => ToleranceClass::Resin,
+        "cnc" => ToleranceClass::Cnc,
+        _ => ToleranceClass::Fdm,
+    };
+    let outline = BoardOutline::new(outline_decl.width_mm, outline_decl.height_mm)
+        .with_thickness(outline_decl.thickness_mm)
+        .with_tolerance(tolerance);
+
+    let mesh = enclosure_for(&outline);
+
+    for out in &pipeline.outputs {
+        let abs = working_dir.join(out);
+        if let Some(parent) = abs.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("creating {}", parent.display()))?;
+        }
+        let bytes = match Path::new(out).extension().and_then(|e| e.to_str()) {
+            Some("stl") => to_stl_binary(&mesh),
+            Some("glb") => to_glb(&mesh),
+            _ => bail!("fid-mesh: unsupported output `{out}` (expected .stl or .glb)"),
+        };
+        std::fs::write(&abs, bytes).with_context(|| format!("writing {out}"))?;
+    }
+
+    Ok(())
+}
+
 // ── Command execution ─────────────────────────────────────────────────────────
 
 fn run_pipeline_command(pipeline: &PipelineToml, working_dir: &Path) -> Result<()> {
-    let (program, base_args, extra_args): (&str, Vec<&str>, Vec<&str>) = match pipeline
-        .executor
-        .as_str()
-    {
-        "cargo-test" => (
-            "cargo",
-            vec!["test"],
-            pipeline.args.iter().map(|s| s.as_str()).collect(),
-        ),
-        "shell" => {
-            if pipeline.args.is_empty() {
-                bail!("shell executor requires at least one arg (the command)");
+    let (program, base_args, extra_args): (&str, Vec<&str>, Vec<&str>) =
+        match pipeline.executor.as_str() {
+            "cargo-test" => (
+                "cargo",
+                vec!["test"],
+                pipeline.args.iter().map(|s| s.as_str()).collect(),
+            ),
+            "shell" => {
+                if pipeline.args.is_empty() {
+                    bail!("shell executor requires at least one arg (the command)");
+                }
+                (
+                    pipeline.args[0].as_str(),
+                    pipeline.args[1..].iter().map(|s| s.as_str()).collect(),
+                    Vec::new(),
+                )
             }
-            (
-                pipeline.args[0].as_str(),
-                pipeline.args[1..].iter().map(|s| s.as_str()).collect(),
-                Vec::new(),
-            )
-        }
-        "fid-validate" => return run_fid_validate(pipeline, working_dir),
-        other => bail!("unknown executor `{other}` (supported: cargo-test, shell, fid-validate)"),
-    };
+            "fid-validate" => return run_fid_validate(pipeline, working_dir),
+            "fid-mesh" => return run_fid_mesh(pipeline, working_dir),
+            other => bail!(
+                "unknown executor `{other}` (supported: cargo-test, shell, fid-validate, fid-mesh)"
+            ),
+        };
 
     let status = Command::new(program)
         .args(&base_args)

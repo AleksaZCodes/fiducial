@@ -99,4 +99,55 @@ describe('@fiducial/board-schema', () => {
       assert.equal(typeof bi.board.description, 'string')
     })
   })
+
+  describe('outline', () => {
+    const withOutline = outline =>
+      JSON.stringify({
+        schema_version: '1.0',
+        board: { name: 'x' },
+        outline,
+        connectors: [],
+        net_classes: [],
+      })
+
+    it('reads the outline declared by the seed board', () => {
+      const { outline } = parseBoardInterface(SEED_JSON)
+      assert.ok(outline, 'seed must declare an outline')
+      assert.ok(outline.width_mm > 0)
+      assert.ok(outline.height_mm > 0)
+      assert.equal(outline.tolerance, 'fdm')
+    })
+
+    it('treats outline as optional', () => {
+      const json = JSON.stringify({
+        schema_version: '1.0',
+        board: { name: 'x' },
+        connectors: [],
+        net_classes: [],
+      })
+      assert.equal(parseBoardInterface(json).outline, undefined)
+    })
+
+    it('rejects a non-positive dimension', () => {
+      assert.throws(
+        () => parseBoardInterface(withOutline({ width_mm: 0, height_mm: 5 })),
+        /must all be > 0/
+      )
+    })
+
+    it('rejects an unknown tolerance class', () => {
+      assert.throws(
+        () => parseBoardInterface(withOutline({ width_mm: 10, height_mm: 5, tolerance: 'sintering' })),
+        /unknown tolerance/
+      )
+    })
+
+    it('accepts each supported tolerance class', () => {
+      for (const tolerance of ['fdm', 'resin', 'cnc']) {
+        assert.doesNotThrow(() =>
+          parseBoardInterface(withOutline({ width_mm: 10, height_mm: 5, tolerance }))
+        )
+      }
+    })
+  })
 })

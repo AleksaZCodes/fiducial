@@ -72,6 +72,10 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
                 include_str!("../capabilities/web-next/apps/web/src/app/page.tsx"),
             ),
             (
+                "apps/web/src/app/board/page.tsx",
+                include_str!("../capabilities/web-next/apps/web/src/app/board/page.tsx"),
+            ),
+            (
                 "apps/web/src/app/layout.tsx",
                 include_str!("../capabilities/web-next/apps/web/src/app/layout.tsx"),
             ),
@@ -272,6 +276,10 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
             (
                 "pipelines/eda.toml",
                 include_str!("../capabilities/eda/pipelines/eda.toml"),
+            ),
+            (
+                "pipelines/enclosure.toml",
+                include_str!("../capabilities/eda/pipelines/enclosure.toml"),
             ),
         ],
         skill_md: include_str!("../capabilities/eda/SKILL.md"),

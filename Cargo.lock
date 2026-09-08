@@ -279,6 +279,8 @@ dependencies = [
  "clap",
  "diffy",
  "fiducial-eda",
+ "fiducial-geometry",
+ "fiducial-mesh",
  "hex",
  "serde",
  "serde_json",

@@ -32,7 +32,7 @@
 
 extern crate alloc;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "std"))]
 extern crate std;
 
 use alloc::{string::String, vec::Vec};
@@ -106,6 +106,32 @@ pub struct Board {
     pub description: Option<String>,
 }
 
+/// Physical board outline — the declaration the mesh pipeline derives from.
+///
+/// Optional so that boards which do not need an enclosure omit it entirely;
+/// when present, `fid derive` generates the enclosure STL and GLB from it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Outline {
+    /// Board width in millimetres.
+    pub width_mm: f32,
+    /// Board height in millimetres.
+    pub height_mm: f32,
+    /// PCB thickness in millimetres (standard FR4 = 1.6).
+    #[serde(default = "default_thickness")]
+    pub thickness_mm: f32,
+    /// Manufacturing process for the generated enclosure: `fdm`, `resin`, or `cnc`.
+    #[serde(default = "default_tolerance")]
+    pub tolerance: String,
+}
+
+fn default_thickness() -> f32 {
+    1.6
+}
+
+fn default_tolerance() -> String {
+    alloc::string::ToString::to_string("fdm")
+}
+
 /// Root of `board/board.interface.json`.
 ///
 /// Declares every connector, pin, and net class on the board — the machine-
@@ -116,6 +142,9 @@ pub struct BoardInterface {
     pub schema_version: String,
     /// Board identity.
     pub board: Board,
+    /// Physical outline, when the board drives enclosure generation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outline: Option<Outline>,
     /// All external connectors.
     pub connectors: Vec<Connector>,
     /// Net class groupings.
@@ -132,6 +161,8 @@ pub enum ValidationError {
     Parse(serde_json::Error),
     /// Schema version is not supported by this version of `fiducial-eda`.
     UnsupportedVersion(String),
+    /// An `outline` block was present but describes an unbuildable board.
+    InvalidOutline(String),
 }
 
 #[cfg(feature = "std")]
@@ -140,6 +171,17 @@ impl core::fmt::Display for ValidationError {
         match self {
             Self::Parse(e) => write!(f, "parse error: {e}"),
             Self::UnsupportedVersion(v) => write!(f, "unsupported schema_version: {v:?}"),
+            Self::InvalidOutline(m) => write!(f, "invalid outline: {m}"),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for ValidationError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Parse(e) => Some(e),
+            _ => None,
         }
     }
 }
@@ -150,9 +192,26 @@ impl core::fmt::Display for ValidationError {
 /// `schema_version` is supported. Returns `Err(ValidationError)` otherwise.
 #[cfg(feature = "std")]
 pub fn validate(json: &str) -> Result<BoardInterface, ValidationError> {
+    use alloc::string::ToString;
+
     let bi: BoardInterface = serde_json::from_str(json).map_err(ValidationError::Parse)?;
     if bi.schema_version != "1.0" {
         return Err(ValidationError::UnsupportedVersion(bi.schema_version));
+    }
+    if let Some(o) = &bi.outline {
+        // A non-positive dimension produces a degenerate mesh that slicers
+        // accept and then print as nothing, so reject it at the declaration.
+        if !(o.width_mm > 0.0 && o.height_mm > 0.0 && o.thickness_mm > 0.0) {
+            return Err(ValidationError::InvalidOutline(
+                "width_mm, height_mm and thickness_mm must all be > 0".to_string(),
+            ));
+        }
+        if !matches!(o.tolerance.as_str(), "fdm" | "resin" | "cnc") {
+            return Err(ValidationError::InvalidOutline(alloc::format!(
+                "unknown tolerance {:?} (expected fdm, resin or cnc)",
+                o.tolerance
+            )));
+        }
     }
     Ok(bi)
 }
@@ -253,5 +312,62 @@ mod tests {
     fn validate_rejects_malformed_json() {
         let result = validate("{not json}");
         assert!(matches!(result, Err(ValidationError::Parse(_))));
+    }
+
+    // ── Outline ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn seed_declares_an_outline() {
+        let bi = validate(SEED_JSON).unwrap();
+        let o = bi.outline.expect("seed must declare an outline");
+        assert!(o.width_mm > 0.0 && o.height_mm > 0.0);
+        assert_eq!(o.tolerance, "fdm");
+    }
+
+    #[test]
+    fn outline_is_optional() {
+        let json =
+            r#"{"schema_version":"1.0","board":{"name":"x"},"connectors":[],"net_classes":[]}"#;
+        assert!(validate(json).unwrap().outline.is_none());
+    }
+
+    #[test]
+    fn outline_defaults_thickness_and_tolerance() {
+        let json = r#"{"schema_version":"1.0","board":{"name":"x"},
+            "outline":{"width_mm":10.0,"height_mm":5.0},
+            "connectors":[],"net_classes":[]}"#;
+        let o = validate(json).unwrap().outline.unwrap();
+        assert_eq!(o.thickness_mm, 1.6);
+        assert_eq!(o.tolerance, "fdm");
+    }
+
+    #[test]
+    fn validate_rejects_non_positive_dimensions() {
+        let json = r#"{"schema_version":"1.0","board":{"name":"x"},
+            "outline":{"width_mm":0.0,"height_mm":5.0},
+            "connectors":[],"net_classes":[]}"#;
+        assert!(matches!(
+            validate(json),
+            Err(ValidationError::InvalidOutline(_))
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_unknown_tolerance() {
+        let json = r#"{"schema_version":"1.0","board":{"name":"x"},
+            "outline":{"width_mm":10.0,"height_mm":5.0,"tolerance":"sintering"},
+            "connectors":[],"net_classes":[]}"#;
+        assert!(matches!(
+            validate(json),
+            Err(ValidationError::InvalidOutline(_))
+        ));
+    }
+
+    #[test]
+    fn outline_roundtrips_through_serde() {
+        let bi = validate(SEED_JSON).unwrap();
+        let json = serde_json::to_string(&bi).unwrap();
+        let again = validate(&json).unwrap().outline.unwrap();
+        assert_eq!(again.width_mm, bi.outline.unwrap().width_mm);
     }
 }

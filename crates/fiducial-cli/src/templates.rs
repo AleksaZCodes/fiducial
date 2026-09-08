@@ -26,6 +26,8 @@ const CAP_WEB_NEXT_PKG: &str = include_str!("../capabilities/web-next/apps/web/p
 const CAP_WEB_NEXT_CONFIG: &str = include_str!("../capabilities/web-next/apps/web/next.config.ts");
 const CAP_WEB_NEXT_TSCONFIG: &str = include_str!("../capabilities/web-next/apps/web/tsconfig.json");
 const CAP_WEB_NEXT_PAGE: &str = include_str!("../capabilities/web-next/apps/web/src/app/page.tsx");
+const CAP_WEB_BOARD_PAGE: &str =
+    include_str!("../capabilities/web-next/apps/web/src/app/board/page.tsx");
 const CAP_WEB_NEXT_LAYOUT: &str =
     include_str!("../capabilities/web-next/apps/web/src/app/layout.tsx");
 const CAP_WEB_NEXT_GLOBALS: &str =
@@ -110,6 +112,8 @@ const CAP_EDA_MAIN_ATO: &str = include_str!("../capabilities/eda/board/main.ato"
 const CAP_EDA_BOARD_INTERFACE: &str =
     include_str!("../capabilities/eda/board/board.interface.json");
 const CAP_EDA_PIPELINE: &str = include_str!("../capabilities/eda/pipelines/eda.toml");
+const CAP_EDA_ENCLOSURE_PIPELINE: &str =
+    include_str!("../capabilities/eda/pipelines/enclosure.toml");
 
 // ── Lookup ────────────────────────────────────────────────────────────────────
 
@@ -179,6 +183,8 @@ pub fn raw(rel_path: &str) -> Option<&'static str> {
         "board/main.ato" => Some(CAP_EDA_MAIN_ATO),
         "board/board.interface.json" => Some(CAP_EDA_BOARD_INTERFACE),
         "pipelines/eda.toml" => Some(CAP_EDA_PIPELINE),
+        "pipelines/enclosure.toml" => Some(CAP_EDA_ENCLOSURE_PIPELINE),
+        "apps/web/src/app/board/page.tsx" => Some(CAP_WEB_BOARD_PAGE),
         _ => None,
     }
 }

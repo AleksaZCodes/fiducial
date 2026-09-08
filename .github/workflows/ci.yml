@@ -251,6 +251,11 @@ jobs:
       - name: Test fiducial-mesh (std feature)
         run: cargo test --features std -p fiducial-mesh
 
+      # End-to-end: fid new -> fid add eda -> fid derive -> validate STL/GLB.
+      # Covers the executor, the pipeline wiring, and --check staleness.
+      - name: Enclosure pipeline (end-to-end)
+        run: cargo test -p fiducial-cli --test enclosure_pipeline
+
   # ── JavaScript / TypeScript ───────────────────────────────────────────────
   js:
     name: JS/TS

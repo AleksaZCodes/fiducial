@@ -45,6 +45,26 @@ export interface NetClass {
   nets: string[]
 }
 
+/** Manufacturing process driving enclosure tolerances. */
+export type ToleranceClass = 'fdm' | 'resin' | 'cnc'
+
+/**
+ * Physical board outline — the declaration the mesh pipeline derives from.
+ *
+ * When present, `fid derive` generates `enclosure/board.stl` and
+ * `enclosure/board.glb` from it, sized by `tolerance`.
+ */
+export interface Outline {
+  /** Board width in millimetres. */
+  width_mm: number
+  /** Board height in millimetres. */
+  height_mm: number
+  /** PCB thickness in millimetres (defaults to 1.6 when omitted). */
+  thickness_mm?: number
+  /** Enclosure manufacturing process (defaults to "fdm" when omitted). */
+  tolerance?: ToleranceClass
+}
+
 /** Board identity block. */
 export interface Board {
   /** Machine-readable board identifier. */
@@ -67,6 +87,8 @@ export interface BoardInterface {
   schema_version: string
   /** Board identity. */
   board: Board
+  /** Physical outline, when the board drives enclosure generation. */
+  outline?: Outline
   /** All external connectors and their pins. */
   connectors: Connector[]
   /** Net class groupings. */
@@ -86,5 +108,16 @@ export function parseBoardInterface(json: string): BoardInterface {
   if (!bi.board?.name) throw new Error('board.name is required')
   if (!Array.isArray(bi.connectors)) throw new Error('connectors must be an array')
   if (!Array.isArray(bi.net_classes)) throw new Error('net_classes must be an array')
+  if (bi.outline) {
+    const { width_mm, height_mm, thickness_mm, tolerance } = bi.outline
+    // Mirrors fiducial_eda::validate — a non-positive dimension yields a
+    // degenerate mesh that slicers accept and then print as nothing.
+    if (!(width_mm > 0) || !(height_mm > 0) || (thickness_mm !== undefined && !(thickness_mm > 0))) {
+      throw new Error('outline width_mm, height_mm and thickness_mm must all be > 0')
+    }
+    if (tolerance !== undefined && !['fdm', 'resin', 'cnc'].includes(tolerance)) {
+      throw new Error(`unknown tolerance ${JSON.stringify(tolerance)} (expected fdm, resin or cnc)`)
+    }
+  }
   return bi
 }

@@ -130,6 +130,193 @@ pub fn extrude_board(outline: &BoardOutline) -> Mesh {
     }
 }
 
+// ── Enclosure generation ─────────────────────────────────────────────────────
+
+/// Dimensions of a generated enclosure, in millimetres.
+///
+/// Defaults are derived from the board's [`ToleranceProfile`] rather than
+/// hardcoded, so the same board yields a tighter enclosure on resin or CNC than
+/// on FDM. Every field can be overridden with the builder methods.
+///
+/// [`ToleranceProfile`]: fiducial_geometry::ToleranceProfile
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EnclosureParams {
+    /// Gap between the board edge and the cavity wall, per side.
+    pub clearance_mm: f32,
+    /// Side wall thickness.
+    pub wall_mm: f32,
+    /// Floor thickness beneath the board.
+    pub floor_mm: f32,
+    /// Vertical space above the board for components.
+    pub headroom_mm: f32,
+}
+
+impl EnclosureParams {
+    /// Derive parameters from the outline's tolerance profile.
+    ///
+    /// - `clearance` = 2 × the process XY accuracy — the board edge and the
+    ///   printed wall can each drift by one tolerance, so the gap must absorb
+    ///   both or the board will not drop in.
+    /// - `wall` and `floor` = the process minimum wall thickness, the thinnest
+    ///   feature that will survive the build.
+    /// - `headroom` = 5 mm, a component-height default with no process basis;
+    ///   override it for tall parts.
+    pub fn from_outline(outline: &BoardOutline) -> Self {
+        let p = outline.tolerance_profile();
+        Self {
+            clearance_mm: p.xy_accuracy_mm * 2.0,
+            wall_mm: p.min_wall_thickness_mm,
+            floor_mm: p.min_wall_thickness_mm,
+            headroom_mm: 5.0,
+        }
+    }
+
+    /// Override the per-side clearance.
+    pub const fn with_clearance(mut self, clearance_mm: f32) -> Self {
+        self.clearance_mm = clearance_mm;
+        self
+    }
+
+    /// Override the side wall thickness.
+    pub const fn with_wall(mut self, wall_mm: f32) -> Self {
+        self.wall_mm = wall_mm;
+        self
+    }
+
+    /// Override the floor thickness.
+    pub const fn with_floor(mut self, floor_mm: f32) -> Self {
+        self.floor_mm = floor_mm;
+        self
+    }
+
+    /// Override the headroom above the board.
+    pub const fn with_headroom(mut self, headroom_mm: f32) -> Self {
+        self.headroom_mm = headroom_mm;
+        self
+    }
+}
+
+/// Outer dimensions of the enclosure produced for `outline` with `params`.
+///
+/// Returns `(width, height, depth)` in millimetres.
+pub fn enclosure_extents(outline: &BoardOutline, params: &EnclosureParams) -> (f32, f32, f32) {
+    let bb = outline.to_polygon().bounding_box();
+    let inner_w = bb.width() + 2.0 * params.clearance_mm;
+    let inner_h = bb.height() + 2.0 * params.clearance_mm;
+    let cavity_d = outline.thickness_mm + params.headroom_mm;
+    (
+        inner_w + 2.0 * params.wall_mm,
+        inner_h + 2.0 * params.wall_mm,
+        cavity_d + params.floor_mm,
+    )
+}
+
+/// Append a quad as two triangles, with a shared flat normal.
+///
+/// `quad` must be wound counter-clockwise when viewed from outside the solid
+/// (i.e. looking down `-normal`).
+fn push_quad(
+    vertices: &mut Vec<[f32; 3]>,
+    normals: &mut Vec<[f32; 3]>,
+    triangles: &mut Vec<[u32; 3]>,
+    quad: [[f32; 3]; 4],
+    normal: [f32; 3],
+) {
+    let base = vertices.len() as u32;
+    for v in quad {
+        vertices.push(v);
+        normals.push(normal);
+    }
+    triangles.push([base, base + 1, base + 2]);
+    triangles.push([base, base + 2, base + 3]);
+}
+
+/// Generate a watertight open-top enclosure tray sized to `outline`.
+///
+/// The board drops into a cavity that is `clearance` larger than the board on
+/// every side and sits `floor` above the ground plane. The result is a closed
+/// manifold of 28 triangles: outer box, inner cavity, and a mitred rim joining
+/// them at the open top.
+///
+/// Use [`enclosure_for`] to take the tolerance-derived defaults.
+pub fn generate_enclosure(outline: &BoardOutline, params: &EnclosureParams) -> Mesh {
+    let bb = outline.to_polygon().bounding_box();
+    let w = params.wall_mm;
+    let f = params.floor_mm;
+
+    let inner_w = bb.width() + 2.0 * params.clearance_mm;
+    let inner_h = bb.height() + 2.0 * params.clearance_mm;
+    let ow = inner_w + 2.0 * w;
+    let oh = inner_h + 2.0 * w;
+    let od = outline.thickness_mm + params.headroom_mm + f;
+
+    // Outer shell corners: o0..o3 at z=0, o4..o7 at z=od.
+    let o0 = [0.0, 0.0, 0.0];
+    let o1 = [ow, 0.0, 0.0];
+    let o2 = [ow, oh, 0.0];
+    let o3 = [0.0, oh, 0.0];
+    let o4 = [0.0, 0.0, od];
+    let o5 = [ow, 0.0, od];
+    let o6 = [ow, oh, od];
+    let o7 = [0.0, oh, od];
+
+    // Cavity corners: i0..i3 on the cavity floor (z=f), i4..i7 at the rim.
+    let (x0, x1) = (w, w + inner_w);
+    let (y0, y1) = (w, w + inner_h);
+    let i0 = [x0, y0, f];
+    let i1 = [x1, y0, f];
+    let i2 = [x1, y1, f];
+    let i3 = [x0, y1, f];
+    let i4 = [x0, y0, od];
+    let i5 = [x1, y0, od];
+    let i6 = [x1, y1, od];
+    let i7 = [x0, y1, od];
+
+    let mut vertices: Vec<[f32; 3]> = Vec::with_capacity(56);
+    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(56);
+    let mut triangles: Vec<[u32; 3]> = Vec::with_capacity(28);
+    let mut quad = |q: [[f32; 3]; 4], n: [f32; 3]| {
+        push_quad(&mut vertices, &mut normals, &mut triangles, q, n)
+    };
+
+    // Underside.
+    quad([o0, o3, o2, o1], [0.0, 0.0, -1.0]);
+
+    // Outer walls — normals face away from the solid.
+    quad([o0, o1, o5, o4], [0.0, -1.0, 0.0]);
+    quad([o2, o3, o7, o6], [0.0, 1.0, 0.0]);
+    quad([o0, o4, o7, o3], [-1.0, 0.0, 0.0]);
+    quad([o1, o2, o6, o5], [1.0, 0.0, 0.0]);
+
+    // Cavity floor, facing up into the void.
+    quad([i0, i1, i2, i3], [0.0, 0.0, 1.0]);
+
+    // Cavity walls — normals point inward, into the void.
+    quad([i1, i0, i4, i5], [0.0, 1.0, 0.0]);
+    quad([i3, i2, i6, i7], [0.0, -1.0, 0.0]);
+    quad([i0, i3, i7, i4], [1.0, 0.0, 0.0]);
+    quad([i2, i1, i5, i6], [-1.0, 0.0, 0.0]);
+
+    // Mitred rim closing outer shell to cavity at the open top.
+    quad([o4, o5, i5, i4], [0.0, 0.0, 1.0]);
+    quad([o5, o6, i6, i5], [0.0, 0.0, 1.0]);
+    quad([o6, o7, i7, i6], [0.0, 0.0, 1.0]);
+    quad([o7, o4, i4, i7], [0.0, 0.0, 1.0]);
+
+    Mesh {
+        vertices,
+        normals,
+        triangles,
+    }
+}
+
+/// Generate an enclosure using parameters derived from the board's tolerance class.
+///
+/// Equivalent to `generate_enclosure(outline, &EnclosureParams::from_outline(outline))`.
+pub fn enclosure_for(outline: &BoardOutline) -> Mesh {
+    generate_enclosure(outline, &EnclosureParams::from_outline(outline))
+}
+
 // ── Binary STL export (std feature) ──────────────────────────────────────────
 
 /// Encode `mesh` as an 80-byte-header binary STL.
@@ -360,6 +547,157 @@ mod tests {
     fn glb_total_length_matches_buffer() {
         let m = standard_board();
         let glb = to_glb(&m);
+        let declared = u32::from_le_bytes([glb[8], glb[9], glb[10], glb[11]]) as usize;
+        assert_eq!(declared, glb.len());
+    }
+
+    // ── Enclosure ────────────────────────────────────────────────────────────
+
+    use fiducial_geometry::ToleranceClass;
+    use std::collections::HashMap;
+
+    /// A vertex position quantised to 1 µm.
+    type VertexKey = (i64, i64, i64);
+    /// An undirected edge, stored with its endpoints in sorted order.
+    type EdgeKey = (VertexKey, VertexKey);
+
+    /// Quantise a vertex to 1 µm so shared corners compare equal despite being
+    /// duplicated per-face for flat shading.
+    fn key(v: [f32; 3]) -> VertexKey {
+        let q = |x: f32| (x * 1000.0).round() as i64;
+        (q(v[0]), q(v[1]), q(v[2]))
+    }
+
+    /// Every undirected edge of a closed manifold is shared by exactly two
+    /// triangles. Anything else means a hole or a duplicate face — a mesh a
+    /// slicer would reject.
+    fn assert_watertight(m: &Mesh) {
+        let mut edges: HashMap<EdgeKey, usize> = HashMap::new();
+        for tri in &m.triangles {
+            for k in 0..3 {
+                let a = key(m.vertices[tri[k] as usize]);
+                let b = key(m.vertices[tri[(k + 1) % 3] as usize]);
+                let e = if a <= b { (a, b) } else { (b, a) };
+                *edges.entry(e).or_insert(0) += 1;
+            }
+        }
+        for (edge, count) in &edges {
+            assert_eq!(
+                *count, 2,
+                "edge {edge:?} shared by {count} triangles, expected 2"
+            );
+        }
+    }
+
+    #[test]
+    fn enclosure_is_watertight() {
+        assert_watertight(&enclosure_for(&BoardOutline::new(100.0, 60.0)));
+    }
+
+    #[test]
+    fn extruded_board_is_watertight() {
+        assert_watertight(&standard_board());
+    }
+
+    #[test]
+    fn enclosure_has_28_triangles() {
+        // 1 underside + 4 outer walls + 1 cavity floor + 4 cavity walls + 4 rim
+        // = 14 quads = 28 triangles.
+        assert_eq!(
+            enclosure_for(&BoardOutline::new(100.0, 60.0)).triangle_count(),
+            28
+        );
+    }
+
+    #[test]
+    fn enclosure_outer_size_matches_extents() {
+        let outline = BoardOutline::new(100.0, 60.0);
+        let params = EnclosureParams::from_outline(&outline);
+        let (ew, eh, ed) = enclosure_extents(&outline, &params);
+        let (mn, mx) = enclosure_for(&outline).aabb();
+        assert!(
+            (mx[0] - mn[0] - ew).abs() < 1e-3,
+            "width {} != {ew}",
+            mx[0] - mn[0]
+        );
+        assert!(
+            (mx[1] - mn[1] - eh).abs() < 1e-3,
+            "height {} != {eh}",
+            mx[1] - mn[1]
+        );
+        assert!(
+            (mx[2] - mn[2] - ed).abs() < 1e-3,
+            "depth {} != {ed}",
+            mx[2] - mn[2]
+        );
+    }
+
+    #[test]
+    fn cavity_admits_the_board_with_clearance() {
+        let outline = BoardOutline::new(100.0, 60.0);
+        let p = EnclosureParams::from_outline(&outline);
+        let (ew, eh, _) = enclosure_extents(&outline, &p);
+        // Outer minus both walls is the cavity; it must exceed the board by
+        // exactly one clearance per side.
+        let cavity_w = ew - 2.0 * p.wall_mm;
+        let cavity_h = eh - 2.0 * p.wall_mm;
+        assert!((cavity_w - (100.0 + 2.0 * p.clearance_mm)).abs() < 1e-3);
+        assert!((cavity_h - (60.0 + 2.0 * p.clearance_mm)).abs() < 1e-3);
+        assert!(cavity_w > 100.0, "cavity must be wider than the board");
+    }
+
+    #[test]
+    fn tolerance_class_drives_enclosure_size() {
+        // The whole point of the tolerance profiles: a tighter process yields a
+        // tighter enclosure for the identical board.
+        let fdm = BoardOutline::new(100.0, 60.0).with_tolerance(ToleranceClass::Fdm);
+        let cnc = BoardOutline::new(100.0, 60.0).with_tolerance(ToleranceClass::Cnc);
+        let (fw, ..) = enclosure_extents(&fdm, &EnclosureParams::from_outline(&fdm));
+        let (cw, ..) = enclosure_extents(&cnc, &EnclosureParams::from_outline(&cnc));
+        assert!(
+            cw < fw,
+            "cnc enclosure ({cw}) should be tighter than fdm ({fw})"
+        );
+    }
+
+    #[test]
+    fn params_derive_from_tolerance_profile() {
+        let resin = BoardOutline::new(10.0, 10.0).with_tolerance(ToleranceClass::Resin);
+        let p = EnclosureParams::from_outline(&resin);
+        let profile = resin.tolerance_profile();
+        assert!((p.clearance_mm - profile.xy_accuracy_mm * 2.0).abs() < 1e-6);
+        assert!((p.wall_mm - profile.min_wall_thickness_mm).abs() < 1e-6);
+    }
+
+    #[test]
+    fn builder_overrides_are_honoured() {
+        let outline = BoardOutline::new(50.0, 50.0);
+        let p = EnclosureParams::from_outline(&outline)
+            .with_clearance(1.0)
+            .with_wall(3.0)
+            .with_floor(2.0)
+            .with_headroom(10.0);
+        let (w, h, d) = enclosure_extents(&outline, &p);
+        assert!((w - (50.0 + 2.0 + 6.0)).abs() < 1e-3, "width {w}");
+        assert!((h - (50.0 + 2.0 + 6.0)).abs() < 1e-3, "height {h}");
+        assert!((d - (1.6 + 10.0 + 2.0)).abs() < 1e-3, "depth {d}");
+    }
+
+    #[test]
+    fn enclosure_normals_are_unit_vectors() {
+        for n in &enclosure_for(&BoardOutline::new(80.0, 40.0)).normals {
+            let len = libm::sqrtf(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+            assert!((len - 1.0).abs() < 1e-5, "normal length {len} != 1");
+        }
+    }
+
+    #[test]
+    fn enclosure_exports_to_stl_and_glb() {
+        let m = enclosure_for(&BoardOutline::new(100.0, 60.0));
+        let stl = to_stl_binary(&m);
+        assert_eq!(stl.len(), 84 + 50 * 28);
+        let glb = to_glb(&m);
+        assert_eq!(&glb[0..4], b"glTF");
         let declared = u32::from_le_bytes([glb[8], glb[9], glb[10], glb[11]]) as usize;
         assert_eq!(declared, glb.len());
     }

@@ -435,6 +435,17 @@ impl BoardOutline {
             max: Point2::new(self.width_mm, self.height_mm),
         }
     }
+
+    /// The board boundary as a closed polygon, origin at (0, 0).
+    ///
+    /// Rectangular today. Downstream code (enclosure generation) sizes itself
+    /// from this polygon's bounding box rather than from `width_mm`/`height_mm`
+    /// directly, so a non-rectangular outline becomes a change to this method
+    /// alone.
+    #[cfg(feature = "alloc")]
+    pub fn to_polygon(&self) -> Polygon {
+        Polygon::rect(self.width_mm, self.height_mm)
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
