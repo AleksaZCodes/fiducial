@@ -79,6 +79,10 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
                 "apps/web/src/app/globals.css",
                 include_str!("../capabilities/web-next/apps/web/src/app/globals.css"),
             ),
+            (
+                "apps/web/components.json",
+                include_str!("../capabilities/web-next/apps/web/components.json"),
+            ),
         ],
         skill_md: include_str!("../capabilities/web-next/SKILL.md"),
     },

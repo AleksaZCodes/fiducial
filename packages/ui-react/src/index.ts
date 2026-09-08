@@ -1,25 +1,27 @@
-// Fiducial component registry — React.
+// Fiducial component registry — React (shadcn conventions).
 // Copy-in via `fid add component <name>` — not an installed runtime dependency.
 //
-// Available:
-//   button  Button (primary | secondary | ghost | destructive)
-//   card    Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter
-//   badge   Badge (default | secondary | destructive | outline)
-//   dialog  Dialog (Base UI — accessible focus trap, keyboard nav, ARIA)
+// Simple components (button, card, badge) use native HTML + Tailwind + CVA.
+// Complex components (dialog) use @base-ui-components/react internally for
+// accessible focus trap, keyboard nav, and ARIA — the external API matches shadcn.
+//
+// Requires in the consuming app: clsx, tailwind-merge, class-variance-authority,
+// @base-ui-components/react (dialog only).
 
-export { Button } from "./button.js";
+export { Button, buttonVariants } from "./button.js";
 export type { ButtonProps } from "./button.js";
 export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "./card.js";
-export { Badge } from "./badge.js";
+export { Badge, badgeVariants } from "./badge.js";
 export type { BadgeProps } from "./badge.js";
 export {
   Dialog,
+  DialogPortal,
+  DialogOverlay,
+  DialogClose,
   DialogTrigger,
   DialogContent,
   DialogHeader,
+  DialogFooter,
   DialogTitle,
   DialogDescription,
-  DialogClose,
-  DialogFooter,
 } from "./dialog.js";
-export type { DialogProps } from "./dialog.js";

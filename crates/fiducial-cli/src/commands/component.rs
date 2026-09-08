@@ -6,6 +6,9 @@
 //! Components become product-owned after copy — no runtime package dep.
 //! `fid upgrade` tracks them via `fiducial.lock` and offers upstream changes
 //! through 3-way merge, same as scaffolded template files.
+//!
+//! React components follow shadcn conventions: Tailwind + CVA + cn() utility.
+//! Complex components (dialog) use @base-ui-components/react internally.
 
 use anyhow::{bail, Context, Result};
 use std::path::Path;
@@ -65,20 +68,25 @@ fn capitalise(s: &str) -> String {
 }
 
 fn install_react(name: &str, root: &Path, lock: &mut Lock, version: &str) -> Result<()> {
-    let (tsx, css) = react_source(name)?;
+    let tsx = react_source(name)?;
 
     let ui_dir = root.join("apps/web/src/components/ui");
     std::fs::create_dir_all(&ui_dir).context("creating components/ui")?;
 
+    // Bootstrap lib/utils.ts (cn utility) if not yet present.
+    let lib_dir = root.join("apps/web/src/lib");
+    let utils_path = lib_dir.join("utils.ts");
+    if !utils_path.exists() {
+        std::fs::create_dir_all(&lib_dir).context("creating src/lib")?;
+        std::fs::write(&utils_path, UTILS_TS).context("writing lib/utils.ts")?;
+        lock.record("apps/web/src/lib/utils.ts", UTILS_TS.as_bytes(), version);
+    }
+
+    // Write component .tsx
     let tsx_path = ui_dir.join(format!("{name}.tsx"));
     let tsx_rel = format!("apps/web/src/components/ui/{name}.tsx");
     std::fs::write(&tsx_path, tsx).with_context(|| format!("writing {}", tsx_path.display()))?;
     lock.record(&tsx_rel, tsx.as_bytes(), version);
-
-    let css_path = ui_dir.join(format!("{name}.css"));
-    let css_rel = format!("apps/web/src/components/ui/{name}.css");
-    std::fs::write(&css_path, css).with_context(|| format!("writing {}", css_path.display()))?;
-    lock.record(&css_rel, css.as_bytes(), version);
 
     Ok(())
 }
@@ -100,24 +108,14 @@ fn install_svelte(name: &str, root: &Path, lock: &mut Lock, version: &str) -> Re
 
 // ── Embedded component sources ────────────────────────────────────────────────
 
-fn react_source(name: &str) -> Result<(&'static str, &'static str)> {
+const UTILS_TS: &str = include_str!("../../components/react/utils.ts");
+
+fn react_source(name: &str) -> Result<&'static str> {
     match name {
-        "button" => Ok((
-            include_str!("../../components/react/button.tsx"),
-            include_str!("../../components/react/button.css"),
-        )),
-        "card" => Ok((
-            include_str!("../../components/react/card.tsx"),
-            include_str!("../../components/react/card.css"),
-        )),
-        "badge" => Ok((
-            include_str!("../../components/react/badge.tsx"),
-            include_str!("../../components/react/badge.css"),
-        )),
-        "dialog" => Ok((
-            include_str!("../../components/react/dialog.tsx"),
-            include_str!("../../components/react/dialog.css"),
-        )),
+        "button" => Ok(include_str!("../../components/react/button.tsx")),
+        "card" => Ok(include_str!("../../components/react/card.tsx")),
+        "badge" => Ok(include_str!("../../components/react/badge.tsx")),
+        "dialog" => Ok(include_str!("../../components/react/dialog.tsx")),
         other => bail!(
             "unknown component `{other}`\n  \
              Available: button, card, badge, dialog\n  \
@@ -149,10 +147,34 @@ mod tests {
     #[test]
     fn react_source_returns_all_components() {
         for name in ["button", "card", "badge", "dialog"] {
-            let (tsx, css) = react_source(name).unwrap_or_else(|e| panic!("{name}: {e}"));
+            let tsx = react_source(name).unwrap_or_else(|e| panic!("{name}: {e}"));
             assert!(!tsx.is_empty(), "{name}.tsx is empty");
-            assert!(!css.is_empty(), "{name}.css is empty");
         }
+    }
+
+    #[test]
+    fn react_components_use_cn_utility() {
+        // Verify shadcn convention: all components import cn() not fid-btn classes.
+        for name in ["button", "card", "badge", "dialog"] {
+            let tsx = react_source(name).unwrap();
+            assert!(
+                tsx.contains("cn("),
+                "{name}.tsx must use cn() utility (shadcn convention)"
+            );
+            assert!(
+                !tsx.contains("fid-"),
+                "{name}.tsx must not contain legacy fid-* CSS class names"
+            );
+        }
+    }
+
+    #[test]
+    fn utils_ts_is_embedded() {
+        assert!(!UTILS_TS.is_empty());
+        assert!(
+            UTILS_TS.contains("twMerge"),
+            "utils.ts must export cn via tailwind-merge"
+        );
     }
 
     #[test]

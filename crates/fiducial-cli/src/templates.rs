@@ -30,6 +30,8 @@ const CAP_WEB_NEXT_LAYOUT: &str =
     include_str!("../capabilities/web-next/apps/web/src/app/layout.tsx");
 const CAP_WEB_NEXT_GLOBALS: &str =
     include_str!("../capabilities/web-next/apps/web/src/app/globals.css");
+const CAP_WEB_NEXT_COMPONENTS_JSON: &str =
+    include_str!("../capabilities/web-next/apps/web/components.json");
 
 // ── web-svelte capability templates ──────────────────────────────────────────
 
@@ -85,6 +87,7 @@ pub fn raw(rel_path: &str) -> Option<&'static str> {
         "apps/web/src/app/page.tsx" => Some(CAP_WEB_NEXT_PAGE),
         "apps/web/src/app/layout.tsx" => Some(CAP_WEB_NEXT_LAYOUT),
         "apps/web/src/app/globals.css" => Some(CAP_WEB_NEXT_GLOBALS),
+        "apps/web/components.json" => Some(CAP_WEB_NEXT_COMPONENTS_JSON),
         // web-svelte capability (paths not shared with web-next)
         "apps/web/svelte.config.js" => Some(CAP_WEB_SVELTE_SVELTE_CONFIG),
         "apps/web/vite.config.ts" => Some(CAP_WEB_SVELTE_VITE_CONFIG),

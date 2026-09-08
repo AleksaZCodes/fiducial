@@ -15,9 +15,12 @@
     "react": ">=18"
   },
   "dependencies": {
-    "@base-ui-components/react": "^1.0.0-alpha.8",
-    "@fiducial/tokens":          "workspace:*",
-    "@fiducial/headless":        "workspace:*"
+    "@base-ui-components/react":  "^1.0.0-alpha.8",
+    "class-variance-authority":   "^0.7.1",
+    "clsx":                       "^2.1.1",
+    "tailwind-merge":             "^2.6.0",
+    "@fiducial/tokens":           "workspace:*",
+    "@fiducial/headless":         "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
