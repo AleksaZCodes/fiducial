@@ -26,6 +26,18 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  packages/headless:
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/tokens:
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
 packages:
 
   '@changesets/apply-release-plan@8.1.0':

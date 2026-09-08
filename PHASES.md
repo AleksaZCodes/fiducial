@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 7
+## Current phase: Phase 8
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -110,6 +110,18 @@ _Read this at the start of every session. Updated manually as phases complete._
 | `fid doctor` — migration filter: only surfaces migrations for installed capabilities (no spurious warnings) | ✅ |
 | End-to-end: `fid new scratch-test` → `.claude/settings.json` has 6-line block → `fid doctor: clean` | ✅ |
 
+**Phase 7 — complete ✅ (2026-09-07)**
+
+> L1 tokens + L2 packages: each publishes and typechecks in isolation.
+
+| Deliverable | Status |
+| --- | --- |
+| `packages/tokens/` — `@fiducial/tokens` v0.1.0 — typed color, spacing, typography, radii tokens | ✅ |
+| `packages/tokens/src/tailwind.ts` — `fiducialPreset` for Tailwind CSS (no tailwindcss dep) | ✅ |
+| `packages/headless/` — `@fiducial/headless` v0.1.0 — `Result<T,E>` + `OfflineQueue<T>` | ✅ |
+| `pnpm build` + `pnpm typecheck` green across all 4 workspace packages | ✅ |
+| Changeset: both packages at `minor` (0.1.0 initial release) | ✅ |
+
 **Phase 4 — complete ✅ (2026-09-06)**
 
 > Propagation: codemods + 3-way template merge.
@@ -165,7 +177,9 @@ fiducial/
 │   └── rp2040/              Embassy blink demo — thumbv6m-none-eabi
 ├── packages/
 │   ├── fiducial/            @fiducial/fiducial npm placeholder
-│   └── cli/                 @fiducial/cli npm shim for `fid`
+│   ├── cli/                 @fiducial/cli npm shim for `fid`
+│   ├── tokens/              @fiducial/tokens — L1 design tokens + Tailwind preset
+│   └── headless/            @fiducial/headless — L2 Result<T,E> + OfflineQueue<T>
 └── docs/
     └── specs/
         └── 2026-09-06-fiducial-design.md
@@ -193,5 +207,5 @@ fiducial/
 | **4** | Propagation: codemods + 3-way template merge | Upstream change lands in product, conflict surfaced correctly | ✅ |
 | **5** | Claude Code plugin | Six-line block → guard active in scratch repo | ✅ |
 | **6** | ROP characterization harness | Green on unmodified ROP; fails on injected change | ✅ |
-| **7** | L1 tokens + L2 packages | Each publishes and typechecks in isolation | ⬜ |
+| **7** | L1 tokens + L2 packages | Each publishes and typechecks in isolation | ✅ |
 | **8** | ROP migration wave 1 (optional, on your schedule) | Every PR green on all tiers + characterization | ⬜ |

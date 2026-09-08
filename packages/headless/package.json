@@ -1,0 +1,41 @@
+{
+  "name": "@fiducial/headless",
+  "version": "0.1.0",
+  "description": "Framework-agnostic headless utilities for Fiducial — Result type, offline queue",
+  "license": "MIT",
+  "author": "Aleksa Zdravkovic",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AleksaZCodes/fiducial.git"
+  },
+  "homepage": "https://github.com/AleksaZCodes/fiducial",
+  "keywords": [
+    "headless",
+    "offline-queue",
+    "result",
+    "fiducial"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'no linter configured yet'",
+    "test": "node --test src/headless.test.js"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}
