@@ -1,0 +1,23 @@
+# Fiducial EDA capability — atopile source for board/board.interface.json
+#
+# Run `atopile build` in the product root to regenerate board/board.interface.json,
+# then `fid derive` to re-hash the output and update fiducial.lock.
+#
+# atopile docs: https://atopile.io/docs
+# fid derive:   https://github.com/AleksaZCodes/fiducial
+
+from "generics/connectors.ato" import USB_C_PowerPort
+from "generics/interfaces.ato" import SWD, I2C
+
+module FiducialDevBoard:
+    # Power input
+    usb_power = new USB_C_PowerPort
+
+    # Programming / debug
+    debug = new SWD
+
+    # Peripheral bus
+    i2c_bus = new I2C
+
+    # Declare outputs that appear in board.interface.json
+    # After editing this file: atopile build && fid derive

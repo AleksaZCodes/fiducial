@@ -278,6 +278,9 @@ dependencies = [
  "chrono",
  "clap",
  "diffy",
+ "fiducial-eda",
+ "fiducial-geometry",
+ "fiducial-mesh",
  "hex",
  "serde",
  "serde_json",
@@ -289,6 +292,29 @@ dependencies = [
 [[package]]
 name = "fiducial-core"
 version = "0.1.0"
+
+[[package]]
+name = "fiducial-eda"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "fiducial-geometry"
+version = "0.1.0"
+dependencies = [
+ "libm",
+]
+
+[[package]]
+name = "fiducial-mesh"
+version = "0.1.0"
+dependencies = [
+ "fiducial-geometry",
+ "libm",
+]
 
 [[package]]
 name = "fiducial-model"

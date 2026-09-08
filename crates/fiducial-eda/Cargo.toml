@@ -1,0 +1,31 @@
+[package]
+name        = "fiducial-eda"
+description = "no_std EDA pipeline types — BoardInterface schema for board.interface.json."
+version.workspace     = true
+edition.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+homepage.workspace    = true
+authors.workspace     = true
+rust-version.workspace = true
+keywords    = ["no-std", "eda", "kicad", "atopile", "fiducial"]
+categories  = ["no-std", "hardware-support"]
+
+[lib]
+name = "fiducial_eda"
+
+[features]
+default = []
+alloc   = []
+# serde_json is only needed for validate(), which is std-only.
+std     = ["alloc", "serde/std", "dep:serde_json"]
+
+[dependencies]
+# `alloc` is not optional: BoardInterface and friends use String/Vec
+# unconditionally, so their derived impls need serde's alloc support on
+# every target — including thumbv6m/thumbv7em/wasm32 with no default features.
+serde      = { version = "1", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1", optional = true }
+
+[dev-dependencies]
+serde_json = "1"

@@ -1,0 +1,51 @@
+{
+  "name": "@fiducial/viewer3d-react",
+  "version": "0.1.0",
+  "description": "React component for rendering Fiducial board GLB files in a Three.js WebGL canvas",
+  "license": "MIT",
+  "author": "Aleksa Zdravkovic",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AleksaZCodes/fiducial.git"
+  },
+  "homepage": "https://github.com/AleksaZCodes/fiducial",
+  "keywords": [
+    "react",
+    "three",
+    "gltf",
+    "glb",
+    "3d",
+    "viewer",
+    "fiducial"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'no linter configured yet'",
+    "test": "node --test src/viewer3d.test.js"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "three": ">=0.160.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/three": "^0.175.0",
+    "three": "^0.175.0",
+    "typescript": "^7.0.2"
+  }
+}

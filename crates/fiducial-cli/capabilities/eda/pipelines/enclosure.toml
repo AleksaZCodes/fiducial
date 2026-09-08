@@ -1,0 +1,12 @@
+# Enclosure mesh pipeline — derives printable geometry from the board outline.
+#
+# Reads the `outline` block declared in board/board.interface.json and generates
+# a watertight enclosure tray sized by the board's tolerance class. Runs
+# in-process via fiducial-mesh; no CAD tool is required.
+#
+#   fid derive           regenerate enclosure/*.stl and *.glb, record hashes
+#   fid derive --check   fail if either output is stale
+name     = "enclosure"
+executor = "fid-mesh"
+args     = ["board/board.interface.json"]
+outputs  = ["enclosure/board.stl", "enclosure/board.glb"]

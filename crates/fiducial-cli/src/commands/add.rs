@@ -107,6 +107,31 @@ EXAMPLES
         framework: String,
     },
 
+    /// Add the EDA pipeline capability (atopile → KiCad → board.interface.json)
+    #[command(
+        long_about = "\
+Add the EDA pipeline capability to this product.
+
+Installs the `eda` capability: writes board/main.ato (atopile source),
+board/board.interface.json (seed output), and pipelines/eda.toml
+(fid derive pipeline config).
+
+After installation:
+  1. Edit board/main.ato with your schematic.
+  2. Run `atopile build` to generate KiCad files + board.interface.json.
+  3. Run `fid derive` to validate and record the artifact hash.
+  4. CI runs `fid derive --check` to catch staleness.",
+        after_long_help = "\
+WORKFLOW
+  atopile build    Compile .ato → KiCad + board.interface.json
+  fid derive       Validate board.interface.json + record hash in fiducial.lock
+  fid derive --check  CI check: fails if board.interface.json is stale
+
+EXAMPLES
+  fid add eda"
+    )]
+    Eda,
+
     /// Add firmware support for a microcontroller target
     #[command(
         long_about = "\
@@ -142,6 +167,7 @@ pub fn run(target: AddTarget) -> Result<()> {
         AddTarget::Component { name, framework } => {
             crate::commands::component::run(&name, &framework)
         }
+        AddTarget::Eda => install_capability("eda"),
     }
 }
 

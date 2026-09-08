@@ -1,0 +1,21 @@
+name     = "eda"
+executor = "fid-validate"
+args     = ["board-interface"]
+outputs  = ["board/board.interface.json"]
+
+# This pipeline validates board/board.interface.json against the BoardInterface
+# schema and records its hash in fiducial.lock.
+#
+# To regenerate from atopile source, run:
+#   atopile build
+#   fid derive
+#
+# To check freshness (used by CI):
+#   fid derive --check
+#
+# To also export Gerbers and drill files, add an additional shell pipeline:
+#
+#   name     = "eda-fab"
+#   executor = "shell"
+#   args     = ["kicad-cli", "pcb", "export", "gerbers", "board/board.kicad_pcb", "--output", "board/fab/"]
+#   outputs  = ["board/fab/board-F_Cu.gbr", "board/fab/board-Edge_Cuts.gbr", "board/fab/board.drl"]
