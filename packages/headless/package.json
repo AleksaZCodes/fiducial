@@ -1,6 +1,6 @@
 {
   "name": "@fiducial/headless",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Framework-agnostic headless utilities for Fiducial — Result type, offline queue",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
