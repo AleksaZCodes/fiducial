@@ -1,6 +1,6 @@
 {
   "name": "@fiducial/viewer3d-react",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "React component for rendering Fiducial board GLB files in a Three.js WebGL canvas",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
