@@ -130,11 +130,93 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
         id: "firmware-rp2040",
         description: "RP2040 Embassy firmware with defmt logging and probe-rs flashing",
         guard_rules: &["no-direct-flash-without-check", "no-unpinned-cli-fetch"],
-        templates: &[(
-            "firmware/rp2040/README.md",
-            include_str!("../capabilities/firmware-rp2040/firmware/rp2040/README.md"),
-        )],
+        templates: &[
+            (
+                "firmware/Cargo.toml",
+                include_str!("../capabilities/firmware-rp2040/firmware/Cargo.toml"),
+            ),
+            (
+                "firmware/rust-toolchain.toml",
+                include_str!("../capabilities/firmware-rp2040/firmware/rust-toolchain.toml"),
+            ),
+            (
+                "firmware/shared/Cargo.toml",
+                include_str!("../capabilities/firmware-rp2040/firmware/shared/Cargo.toml"),
+            ),
+            (
+                "firmware/shared/src/lib.rs",
+                include_str!("../capabilities/firmware-rp2040/firmware/shared/src/lib.rs"),
+            ),
+            (
+                "firmware/rp2040/.cargo/config.toml",
+                include_str!("../capabilities/firmware-rp2040/firmware/rp2040/.cargo/config.toml"),
+            ),
+            (
+                "firmware/rp2040/Cargo.toml",
+                include_str!("../capabilities/firmware-rp2040/firmware/rp2040/Cargo.toml"),
+            ),
+            (
+                "firmware/rp2040/build.rs",
+                include_str!("../capabilities/firmware-rp2040/firmware/rp2040/build.rs"),
+            ),
+            (
+                "firmware/rp2040/memory.x",
+                include_str!("../capabilities/firmware-rp2040/firmware/rp2040/memory.x"),
+            ),
+            (
+                "firmware/rp2040/src/main.rs",
+                include_str!("../capabilities/firmware-rp2040/firmware/rp2040/src/main.rs"),
+            ),
+            (
+                "firmware/rp2040/README.md",
+                include_str!("../capabilities/firmware-rp2040/firmware/rp2040/README.md"),
+            ),
+        ],
         skill_md: include_str!("../capabilities/firmware-rp2040/SKILL.md"),
+    },
+    CapabilityDef {
+        id: "firmware-stm32",
+        description: "STM32F401 Embassy firmware with defmt logging and probe-rs flashing",
+        guard_rules: &["no-direct-flash-without-check", "no-unpinned-cli-fetch"],
+        templates: &[
+            (
+                "firmware/Cargo.toml",
+                include_str!("../capabilities/firmware-stm32/firmware/Cargo.toml"),
+            ),
+            (
+                "firmware/rust-toolchain.toml",
+                include_str!("../capabilities/firmware-stm32/firmware/rust-toolchain.toml"),
+            ),
+            (
+                "firmware/shared/Cargo.toml",
+                include_str!("../capabilities/firmware-stm32/firmware/shared/Cargo.toml"),
+            ),
+            (
+                "firmware/shared/src/lib.rs",
+                include_str!("../capabilities/firmware-stm32/firmware/shared/src/lib.rs"),
+            ),
+            (
+                "firmware/stm32/.cargo/config.toml",
+                include_str!("../capabilities/firmware-stm32/firmware/stm32/.cargo/config.toml"),
+            ),
+            (
+                "firmware/stm32/Cargo.toml",
+                include_str!("../capabilities/firmware-stm32/firmware/stm32/Cargo.toml"),
+            ),
+            (
+                "firmware/stm32/build.rs",
+                include_str!("../capabilities/firmware-stm32/firmware/stm32/build.rs"),
+            ),
+            (
+                "firmware/stm32/memory.x",
+                include_str!("../capabilities/firmware-stm32/firmware/stm32/memory.x"),
+            ),
+            (
+                "firmware/stm32/src/main.rs",
+                include_str!("../capabilities/firmware-stm32/firmware/stm32/src/main.rs"),
+            ),
+        ],
+        skill_md: include_str!("../capabilities/firmware-stm32/SKILL.md"),
     },
     CapabilityDef {
         id: "tauri",

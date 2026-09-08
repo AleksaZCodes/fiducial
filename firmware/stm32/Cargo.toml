@@ -1,14 +1,13 @@
 [package]
-name    = "fiducial-rp2040"
-description = "RP2040 / Pico firmware — Embassy async, fiducial-core spine."
+name        = "fiducial-stm32"
+description = "STM32F401 firmware — Embassy async, fiducial-core spine."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
 
-# Binary only — no library surface.
 [[bin]]
-name = "fiducial-rp2040"
+name = "fiducial-stm32"
 path = "src/main.rs"
 
 [dependencies]
@@ -18,19 +17,19 @@ embassy-executor = { workspace = true, features = [
     "platform-cortex-m",
     "executor-thread",
 ] }
-embassy-rp = { workspace = true, features = [
-    "rp2040",
+embassy-stm32 = { workspace = true, features = [
+    "stm32f401cc",
     "defmt",
-    "time-driver",
-    "critical-section-impl",
+    "time-driver-tim2",
+    "exti",
 ] }
 embassy-time = { workspace = true, features = [
     "defmt",
     "defmt-timestamp-uptime",
 ] }
 
-defmt     = { workspace = true }
-defmt-rtt = { workspace = true }
+defmt       = { workspace = true }
+defmt-rtt   = { workspace = true }
 panic-probe = { workspace = true }
 
 cortex-m    = { workspace = true }

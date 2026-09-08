@@ -1,0 +1,47 @@
+[package]
+name        = "firmware-stm32"
+description = "STM32F401 firmware for {{name}}."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "firmware-stm32"
+path = "src/main.rs"
+
+[dependencies]
+firmware-shared = { path = "../shared" }
+
+embassy-executor = { workspace = true, features = [
+    "platform-cortex-m",
+    "executor-thread",
+] }
+embassy-stm32 = { workspace = true, features = [
+    "stm32f401cc",
+    "defmt",
+    "time-driver-tim2",
+    "exti",
+] }
+embassy-time = { workspace = true, features = [
+    "defmt",
+    "defmt-timestamp-uptime",
+] }
+
+defmt       = { workspace = true }
+defmt-rtt   = { workspace = true }
+panic-probe = { workspace = true }
+
+cortex-m    = { workspace = true }
+cortex-m-rt = { workspace = true }
+
+[profile.dev]
+debug           = 2
+opt-level       = "s"
+overflow-checks = true
+
+[profile.release]
+debug           = 2
+opt-level       = "s"
+lto             = true
+codegen-units   = 1
+overflow-checks = false

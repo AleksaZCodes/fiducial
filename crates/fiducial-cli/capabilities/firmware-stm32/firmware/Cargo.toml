@@ -1,0 +1,29 @@
+# Firmware Cargo workspace for {{name}}.
+# Intentionally separate from the host workspace — different target triple + toolchain.
+
+[workspace]
+resolver = "2"
+members  = [
+    "shared",
+    "stm32",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+fiducial-core     = "0.1"
+fiducial-protocol = "0.1"
+
+embassy-executor = { version = "0.10", default-features = false }
+embassy-stm32    = { version = "0.6", default-features = false }
+embassy-time     = { version = "0.5",  default-features = false }
+
+defmt       = "0.3"
+defmt-rtt   = "0.4"
+panic-probe = { version = "0.3", features = ["print-defmt"] }
+
+cortex-m    = { version = "0.7", features = ["inline-asm"] }
+cortex-m-rt = "0.7"

@@ -1,18 +1,16 @@
 [package]
-name    = "fiducial-rp2040"
-description = "RP2040 / Pico firmware — Embassy async, fiducial-core spine."
+name        = "firmware-rp2040"
+description = "RP2040 firmware for {{name}}."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-authors.workspace = true
 
-# Binary only — no library surface.
 [[bin]]
-name = "fiducial-rp2040"
+name = "firmware-rp2040"
 path = "src/main.rs"
 
 [dependencies]
-fiducial-firmware-shared = { path = "../shared" }
+firmware-shared = { path = "../shared" }
 
 embassy-executor = { workspace = true, features = [
     "platform-cortex-m",
@@ -29,10 +27,21 @@ embassy-time = { workspace = true, features = [
     "defmt-timestamp-uptime",
 ] }
 
-defmt     = { workspace = true }
-defmt-rtt = { workspace = true }
+defmt       = { workspace = true }
+defmt-rtt   = { workspace = true }
 panic-probe = { workspace = true }
 
 cortex-m    = { workspace = true }
 cortex-m-rt = { workspace = true }
 
+[profile.dev]
+debug           = 2
+opt-level       = "s"
+overflow-checks = true
+
+[profile.release]
+debug           = 2
+opt-level       = "s"
+lto             = true
+codegen-units   = 1
+overflow-checks = false
