@@ -29,6 +29,20 @@ pub struct Lock {
     /// Codemod migrations that have already been applied to this product.
     #[serde(default)]
     pub applied_migrations: Vec<String>,
+    /// Derived artifact records, keyed by repo-relative path.
+    #[serde(default)]
+    pub artifacts: BTreeMap<String, ArtifactRecord>,
+}
+
+/// A record of a derived artifact produced by a pipeline.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtifactRecord {
+    /// Pipeline that produced this artifact.
+    pub pipeline: String,
+    /// Platform version when the artifact was last regenerated.
+    pub source_version: String,
+    /// Lowercase hex SHA-256 of the file content after last generation.
+    pub hash: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,6 +65,7 @@ impl Lock {
             version: 1,
             templates: BTreeMap::new(),
             applied_migrations: Vec::new(),
+            artifacts: BTreeMap::new(),
         }
     }
 
@@ -83,6 +98,55 @@ impl Lock {
                       # Do not edit by hand. Updated by `fid upgrade`.\n\n";
         std::fs::write(path, format!("{header}{raw}"))
             .with_context(|| format!("writing {}", path.display()))
+    }
+
+    /// Record a derived artifact produced by a pipeline.
+    /// `path` is repo-relative (forward slashes). `content` is the artifact bytes.
+    pub fn record_artifact(
+        &mut self,
+        path: impl Into<String>,
+        content: &[u8],
+        pipeline: &str,
+        source_version: &str,
+    ) {
+        let hash = sha256_hex(content);
+        self.artifacts.insert(
+            path.into(),
+            ArtifactRecord {
+                pipeline: pipeline.into(),
+                source_version: source_version.into(),
+                hash,
+            },
+        );
+    }
+
+    /// Verify all recorded artifact files against their stored hashes.
+    /// Returns a list of (path, problem) for any that are stale or missing.
+    #[allow(dead_code)]
+    pub fn verify_artifacts(&self, root: &Path) -> Vec<(PathBuf, String)> {
+        let mut issues = Vec::new();
+        for (rel, record) in &self.artifacts {
+            let abs = root.join(rel);
+            match std::fs::read(&abs) {
+                Err(e) => {
+                    issues.push((abs, format!("missing: {e}")));
+                }
+                Ok(content) => {
+                    let actual = sha256_hex(&content);
+                    if actual != record.hash {
+                        issues.push((
+                            abs,
+                            format!(
+                                "stale (lock: {}, file: {}) — run `fid derive`",
+                                &record.hash[..8],
+                                &actual[..8],
+                            ),
+                        ));
+                    }
+                }
+            }
+        }
+        issues
     }
 
     /// Verify all recorded template files against their stored hashes.

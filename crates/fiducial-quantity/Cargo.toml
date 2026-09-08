@@ -1,0 +1,20 @@
+[package]
+name        = "fiducial-quantity"
+description = "no_std typed quantities with tolerance algebra and assertions."
+version.workspace     = true
+edition.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+homepage.workspace    = true
+authors.workspace     = true
+rust-version.workspace = true
+keywords    = ["no-std", "units", "tolerance", "fiducial"]
+categories  = ["no-std", "science"]
+
+[lib]
+name = "fiducial_quantity"
+
+[features]
+default = []
+alloc   = []
+std     = ["alloc"]

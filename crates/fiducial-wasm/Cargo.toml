@@ -20,9 +20,14 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 fiducial-core = { path = "../fiducial-core" }
 wasm-bindgen  = "0.2"
+ts-rs         = { version = "10", optional = true }
 
 # ts-rs generates TypeScript type definitions from Rust types.
-# Run `cargo test --features ts` to emit them to packages/wasm-bridge/src/types.ts.
-# Hand-writing a type that crosses this boundary is guard-blocked (Phase 3).
+# Run `cargo test --features ts -p fiducial-wasm` to emit them to
+# packages/wasm-bridge/src/generated.ts.
+# Hand-writing a type that crosses this boundary is guard-blocked (spec §7, Appendix A).
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
+
+[features]
+ts = ["ts-rs"]

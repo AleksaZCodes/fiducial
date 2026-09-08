@@ -1,0 +1,20 @@
+[package]
+name        = "fiducial-model"
+description = "no_std Fact, Decision and Pipeline contract types."
+version.workspace     = true
+edition.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+homepage.workspace    = true
+authors.workspace     = true
+rust-version.workspace = true
+keywords    = ["no-std", "model", "fiducial"]
+categories  = ["no-std"]
+
+[lib]
+name = "fiducial_model"
+
+[features]
+default = []
+alloc   = []
+std     = ["alloc"]
