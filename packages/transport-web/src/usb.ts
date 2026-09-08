@@ -25,6 +25,14 @@ export interface UsbOptions {
   endpointIn?: number
   /** Max bytes per IN transfer (default: 64). */
   packetSize?: number
+  /**
+   * Largest payload the decoder will accept, in bytes (default: 4096).
+   *
+   * Frames declaring a longer payload are silently dropped, so this must be at
+   * least as large as the biggest frame the device sends. `encode()` permits up
+   * to `MAX_PAYLOAD` (65535).
+   */
+  maxPayload?: number
 }
 
 export class WebUsbTransport implements Transport {
@@ -38,7 +46,7 @@ export class WebUsbTransport implements Transport {
 
   private constructor(device: USBDevice, opts: Required<Omit<UsbOptions, 'filters'>>) {
     this.device = device
-    this.decoder = new FrameDecoder()
+    this.decoder = new FrameDecoder(opts.maxPayload)
     this.interfaceNumber = opts.interfaceNumber
     this.endpointOut = opts.endpointOut
     this.endpointIn = opts.endpointIn
@@ -52,12 +60,19 @@ export class WebUsbTransport implements Transport {
       endpointOut = 1,
       endpointIn = 1,
       packetSize = 64,
+      maxPayload = 4096,
     } = options
     const device = await navigator.usb.requestDevice({ filters })
     await device.open()
     await device.selectConfiguration(1)
     await device.claimInterface(interfaceNumber)
-    return new WebUsbTransport(device, { interfaceNumber, endpointOut, endpointIn, packetSize })
+    return new WebUsbTransport(device, {
+      interfaceNumber,
+      endpointOut,
+      endpointIn,
+      packetSize,
+      maxPayload,
+    })
   }
 
   async send(payload: Uint8Array): Promise<void> {

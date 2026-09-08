@@ -4,8 +4,8 @@
 //!
 //! - [`Point2`] / [`Vec2`] — 2D coordinate arithmetic
 //! - [`Point3`] / [`Vec3`] — 3D coordinate arithmetic
-//! - [`Polygon`] — closed 2D boundary (board outline)
-//! - [`BoardOutline`] — polygon + PCB thickness + tolerance class
+//! - [`Polygon`] — closed 2D boundary (not yet consumed by the mesh pipeline)
+//! - [`BoardOutline`] — rectangular width/height + PCB thickness + tolerance class
 //! - [`BoundingBox`] — axis-aligned 2D envelope
 //! - [`ToleranceProfile`] — per-process manufacturing tolerances (FDM, Resin)
 
@@ -380,7 +380,11 @@ pub fn tolerance_by_name(name: &str) -> Option<&'static ToleranceProfile> {
     }
 }
 
-/// A board outline: the 2D boundary of a PCB + its thickness + process profile.
+/// A board outline: a rectangular PCB footprint + thickness + process profile.
+///
+/// Currently rectangular only. The `tolerance` field is carried for downstream
+/// enclosure generation, which is not yet implemented — `fiducial_mesh` reads
+/// only `width_mm`, `height_mm`, and `thickness_mm`.
 pub struct BoardOutline {
     /// PCB width in millimetres.
     pub width_mm: f32,

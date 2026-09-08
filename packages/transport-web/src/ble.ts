@@ -45,6 +45,14 @@ export interface BleOptions {
   txUuid?: string
   /** Write characteristic UUID (default: {@link FIDUCIAL_RX_UUID}). */
   rxUuid?: string
+  /**
+   * Largest payload the decoder will accept, in bytes (default: 4096).
+   *
+   * Frames declaring a longer payload are silently dropped, so this must be at
+   * least as large as the biggest frame the device sends. `encode()` permits up
+   * to `MAX_PAYLOAD` (65535).
+   */
+  maxPayload?: number
 }
 
 export class BleTransport implements Transport {
@@ -58,10 +66,11 @@ export class BleTransport implements Transport {
     device: BluetoothDevice,
     txChar: BluetoothRemoteGATTCharacteristic,
     rxChar: BluetoothRemoteGATTCharacteristic,
+    maxPayload: number,
   ) {
     this.device = device
     this.rxChar = rxChar
-    this.decoder = new FrameDecoder()
+    this.decoder = new FrameDecoder(maxPayload)
     this.queue = new AsyncQueue()
 
     this.onNotify = (event: Event) => {
@@ -91,7 +100,7 @@ export class BleTransport implements Transport {
     const txChar = await service.getCharacteristic(txUuid)
     const rxChar = await service.getCharacteristic(rxUuid)
     await txChar.startNotifications()
-    return new BleTransport(device, txChar, rxChar)
+    return new BleTransport(device, txChar, rxChar, options.maxPayload ?? 4096)
   }
 
   async send(payload: Uint8Array): Promise<void> {

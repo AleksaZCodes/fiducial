@@ -4,7 +4,11 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 16
+## Current phase: Phase 15 (enclosure generation outstanding)
+
+Phases 13 and 14 are complete. Phase 15 landed its geometry/mesh/viewer
+foundation but not enclosure generation — see "Phase 15 — outstanding" below.
+Finish that before starting Phase 16.
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -183,10 +187,15 @@ _Read this at the start of every session. Updated manually as phases complete._
 | CI spine matrix extended to check `fiducial-eda` for all 4 targets | ✅ |
 | `pnpm build` + `pnpm test` — all 15 workspace tasks green | ✅ |
 
-**Phase 15 — complete ✅ (2026-09-08)**
+**Phase 15 — partial 🟡 (2026-09-08)**
 
 > `fiducial-geometry` + `fiducial-mesh` + `viewer3d-react` + tolerance profiles.
-> Done when: Board outline → printable STL and a GLB renderable in a React page.
+> Done when: Board outline → generated enclosure → printable STL and a GLB on a marketing page.
+>
+> **Not met.** The geometry/mesh/viewer foundation is in place and tested, but the
+> phase's actual deliverable — enclosure generation — does not exist. What ships
+> is the *board* extruded into a box, not an enclosure around it. Remaining work
+> is listed under "Phase 15 — outstanding" below.
 
 | Deliverable | Status |
 | --- | --- |
@@ -200,6 +209,16 @@ _Read this at the start of every session. Updated manually as phases complete._
 | CI: `mesh-gen` job — `cargo test -p fiducial-geometry` + `cargo test --features std -p fiducial-mesh` | ✅ |
 | `cargo clippy --all-features -D warnings` clean; `cargo fmt` applied; all test suites green | ✅ |
 | `pnpm build` + `pnpm typecheck` + `pnpm test` — all 17 workspace tasks green | ✅ |
+
+**Phase 15 — outstanding**
+
+| Gap | Detail |
+| --- | --- |
+| Enclosure generation | `extrude_board()` extrudes the *board* into a box. There is no shell, wall offset, lid, or standoff generation — the phase's headline deliverable. |
+| Tolerance profiles are inert | `TOLERANCE_FDM/RESIN/CNC` and `BoardOutline::tolerance` are declared and tested but read by nothing. `fiducial-mesh` uses only width/height/thickness. |
+| `Polygon` unused | `Polygon::bounding_box()` / `signed_area()` exist and are tested, but `BoardOutline` is rectangular (width/height) and no code path consumes a `Polygon`. |
+| Not wired into `fid` | Neither crate is referenced by `fiducial-cli`. No `fid derive` pipeline emits an STL or GLB; nothing regenerates them or checks their freshness. |
+| No marketing page | The GLB-on-a-marketing-page half of the done-condition was not attempted. `BoardViewer` renders a GLB you supply, but no page uses it. |
 
 **Phase 13 — complete ✅ (2026-09-08)**
 
@@ -338,7 +357,7 @@ fiducial/
 | **12** | `firmware/rp2040` + `stm32`, probe-rs + defmt, LoRa via `lora-rs` | `fid add firmware` yields a flashable project sharing L0 with the desktop app | ✅ |
 | **13** | Web Serial/WebUSB + BLE transports | Same device reachable from browser and phone with the same codec | ✅ |
 | **14** | EDA pipeline: atopile → KiCad → `board.interface.json` + fab outputs | A board change regenerates every output; `--check` catches staleness | ✅ |
-| **15** | `fiducial-geometry` + `fiducial-mesh` + `viewer3d-*` + tolerance profiles | Board outline → generated enclosure → printable STL and a GLB on a marketing page | ✅ |
+| **15** | `fiducial-geometry` + `fiducial-mesh` + `viewer3d-*` + tolerance profiles | Board outline → generated enclosure → printable STL and a GLB on a marketing page | 🟡 |
 | **16** | Workbench v0: `fid dash` read-only view | Roadmap, status, decisions, CI, graph, freshness in one place | ⬜ |
 | **16b** | `fid release` + version-skew assertions | A protocol bump fails any artifact still on the old version; compatibility matrix committed | ⬜ |
 | **16c** | Firmware OTA: `embassy-boot` A/B, signing, resumable transfer, staged rollout | Device updates over BLE, self-tests, marks booted — broken image rolls back automatically | ⬜ |
