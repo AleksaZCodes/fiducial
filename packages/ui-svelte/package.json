@@ -1,19 +1,15 @@
 {
   "name": "@fiducial/ui-svelte",
   "version": "0.1.0",
-  "description": "Thin Svelte component layer built on @fiducial/tokens and @fiducial/headless.",
+  "description": "Fiducial component registry source — Svelte. Use `fid add component <name>` to copy components into your product.",
   "license": "MIT",
+  "private": true,
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "exports": {
-    ".": "./src/index.ts",
-    "./Button.svelte": "./src/Button.svelte",
-    "./StatusBadge.svelte": "./src/StatusBadge.svelte"
-  },
   "scripts": {
-    "build":     "echo 'svelte components export from src directly'",
-    "typecheck": "tsc --noEmit"
+    "build":     "echo 'Registry source — no build step. Use fid add component.'",
+    "typecheck": "echo 'ui-svelte: .svelte files checked by svelte-check at build time'"
   },
   "peerDependencies": {
     "svelte": ">=5"
@@ -23,7 +19,7 @@
     "@fiducial/headless": "workspace:*"
   },
   "devDependencies": {
-    "svelte":     "^5.0.0",
-    "typescript": "^7.0.0"
+    "svelte":      "^5.0.0",
+    "typescript":  "^7.0.0"
   }
 }

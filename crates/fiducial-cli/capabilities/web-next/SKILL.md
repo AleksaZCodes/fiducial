@@ -49,6 +49,25 @@ apps/web/src/app/
 Declare in `apps/web/.env.local` (git-ignored). Prefix with `NEXT_PUBLIC_` to
 expose to the browser. Never commit secrets — use the declared secret store.
 
+## Components (registry model)
+
+Components are **copy-in**, not installed as a package dependency. Use `fid add component`
+to copy into `apps/web/src/components/ui/`:
+
+```sh
+fid add component button
+fid add component card
+fid add component badge
+fid add component dialog    # requires: pnpm add @base-ui-components/react
+```
+
+**Convention:** simple components (button, card, badge) use native HTML styled with token
+CSS custom properties. Complex components (dialog, popover, menu) use Base UI
+(`@base-ui-components/react`) for accessible keyboard/focus handling and ARIA.
+
+After copying, components are yours — edit freely. `fid upgrade` proposes upstream
+changes via 3-way merge (same mechanism as all other template files).
+
 ## Key constraints
 
 - **Do not hand-edit** files listed in `fiducial.lock` — change upstream templates

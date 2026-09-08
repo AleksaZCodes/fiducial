@@ -42,6 +42,25 @@ apps/web/
 └── tsconfig.json
 ```
 
+## Components (registry model)
+
+Components are **copy-in**, not installed as a package dependency. Use `fid add component`
+to copy into `apps/web/src/components/ui/`:
+
+```sh
+fid add component button --framework svelte
+fid add component card --framework svelte
+fid add component badge --framework svelte
+fid add component dialog --framework svelte    # uses native <dialog> element
+```
+
+**Convention:** all Svelte components use native HTML styled with token CSS custom
+properties. No external UI library is required — the native `<dialog>` element is used
+for accessible dialogs (all modern browsers support it).
+
+After copying, components are yours — edit freely. `fid upgrade` proposes upstream
+changes via 3-way merge.
+
 ## Guard rules
 
 - No direct schema migrations via MCP tools

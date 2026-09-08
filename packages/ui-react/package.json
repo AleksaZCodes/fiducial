@@ -1,21 +1,23 @@
 {
   "name": "@fiducial/ui-react",
   "version": "0.1.0",
-  "description": "Thin React component layer built on @fiducial/tokens and @fiducial/headless.",
+  "description": "Fiducial component registry source — React. Use `fid add component <name>` to copy components into your product.",
   "license": "MIT",
+  "private": true,
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "build":     "tsc",
+    "build":     "echo 'Registry source — no build step. Use fid add component.'",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
     "react": ">=18"
   },
   "dependencies": {
-    "@fiducial/tokens":   "workspace:*",
-    "@fiducial/headless": "workspace:*"
+    "@base-ui-components/react": "^1.0.0-alpha.8",
+    "@fiducial/tokens":          "workspace:*",
+    "@fiducial/headless":        "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
