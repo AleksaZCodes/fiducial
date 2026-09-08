@@ -309,21 +309,36 @@ fiducial/
 ├── crates/
 │   ├── fiducial/            crates.io placeholder
 │   ├── fiducial-core/       no_std spine — version(), DeviceId
+│   ├── fiducial-quantity/   no_std Quantity<D>, Tolerance, AssertionError
+│   ├── fiducial-model/      no_std Fact<T>, Decision, PipelineMeta
+│   ├── fiducial-protocol/   no_std frame codec — MAGIC/LEN/PAYLOAD/CRC8
+│   ├── fiducial-eda/        no_std BoardInterface schema + validate()
+│   ├── fiducial-geometry/   no_std 2D/3D primitives + tolerance profiles
+│   ├── fiducial-mesh/       no_std extrusion, enclosure, STL + GLB export
+│   ├── fiducial-tauri/      SerialTransport for the desktop app
 │   ├── fiducial-wasm/       wasm-bindgen bindings → fiducial-core
-│   └── fiducial-cli/        `fid` binary — new, add, doctor, guard-check
+│   └── fiducial-cli/        `fid` binary — new, add, derive, doctor, guard-check
 ├── firmware/                SEPARATE Cargo workspace (excluded from root)
 │   ├── Cargo.toml           workspace root
 │   ├── rust-toolchain.toml  stable + embedded targets
-│   ├── shared/              target-agnostic helpers (blink constants, re-exports)
-│   └── rp2040/              Embassy blink demo — thumbv6m-none-eabi
+│   ├── shared/              target-agnostic helpers (blink constants, LoRa)
+│   ├── rp2040/              Embassy blink — thumbv6m-none-eabi
+│   └── stm32/               Embassy blink — thumbv7em-none-eabihf
 ├── packages/
 │   ├── fiducial/            @fiducial/fiducial npm placeholder
 │   ├── cli/                 @fiducial/cli npm shim for `fid`
-│   ├── tokens/              @fiducial/tokens — L1 design tokens + Tailwind preset
-│   └── headless/            @fiducial/headless — L2 Result<T,E> + OfflineQueue<T>
+│   ├── tokens/              @fiducial/tokens — L1 design tokens + theme CSS
+│   ├── headless/            @fiducial/headless — L2 Result<T,E> + OfflineQueue<T>
+│   ├── ui-react/            @fiducial/ui-react — shadcn/Base UI registry
+│   ├── ui-svelte/           @fiducial/ui-svelte — same tokens, Svelte
+│   ├── wasm-bridge/         @fiducial/wasm-bridge — generated TS types
+│   ├── transport-web/       @fiducial/transport-web — Web Serial/USB/BLE
+│   ├── board-schema/        @fiducial/board-schema — board.interface.json types
+│   └── viewer3d-react/      @fiducial/viewer3d-react — GLB viewer (Three.js)
 └── docs/
     └── specs/
-        └── 2026-09-06-fiducial-design.md
+        ├── 2026-09-06-fiducial-design.md
+        └── 2026-09-08-phases-13-15-transports-eda-geometry.md
 ```
 
 ---
