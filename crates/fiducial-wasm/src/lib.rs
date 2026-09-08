@@ -88,6 +88,41 @@ impl DeviceId {
     }
 }
 
+// ── TypeScript type generation (Phase 9) ─────────────────────────────────────
+//
+// Run `cargo test --features ts -p fiducial-wasm` to regenerate
+// packages/wasm-bridge/src/generated.ts.  Guard-blocked: never hand-write types
+// that cross this boundary (spec §7, Appendix A).
+
+#[cfg(feature = "ts")]
+mod ts_export {
+    use ts_rs::TS;
+
+    /// TypeScript shape of a device identifier exchanged over the wire.
+    #[derive(TS)]
+    #[ts(export, export_to = "../../../packages/wasm-bridge/src/generated.ts")]
+    #[allow(dead_code)]
+    struct DeviceIdTs {
+        /// Raw bytes, big-endian, 8 octets.
+        bytes: Vec<u8>,
+    }
+
+    /// Platform version reported by every artifact.
+    #[derive(TS)]
+    #[ts(export, export_to = "../../../packages/wasm-bridge/src/generated.ts")]
+    #[allow(dead_code)]
+    struct PlatformVersion {
+        /// Semver string, e.g. "0.1.0".
+        version: String,
+    }
+
+    #[test]
+    fn export_ts_types() {
+        DeviceIdTs::export_all().expect("TS type export failed");
+        PlatformVersion::export_all().expect("TS type export failed");
+    }
+}
+
 // ── WASM tests ───────────────────────────────────────────────────────────────
 // Run with: wasm-pack test --node crates/fiducial-wasm
 

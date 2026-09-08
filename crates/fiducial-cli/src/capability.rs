@@ -75,8 +75,56 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
                 "apps/web/src/app/layout.tsx",
                 include_str!("../capabilities/web-next/apps/web/src/app/layout.tsx"),
             ),
+            (
+                "apps/web/src/app/globals.css",
+                include_str!("../capabilities/web-next/apps/web/src/app/globals.css"),
+            ),
+            (
+                "apps/web/components.json",
+                include_str!("../capabilities/web-next/apps/web/components.json"),
+            ),
         ],
         skill_md: include_str!("../capabilities/web-next/SKILL.md"),
+    },
+    CapabilityDef {
+        id: "web-svelte",
+        description: "SvelteKit web app with Turborepo wiring, Biome, and Changesets",
+        guard_rules: &["no-direct-schema-migration", "no-unpinned-cli-fetch"],
+        templates: &[
+            (
+                "apps/web/package.json",
+                include_str!("../capabilities/web-svelte/apps/web/package.json"),
+            ),
+            (
+                "apps/web/svelte.config.js",
+                include_str!("../capabilities/web-svelte/apps/web/svelte.config.js"),
+            ),
+            (
+                "apps/web/vite.config.ts",
+                include_str!("../capabilities/web-svelte/apps/web/vite.config.ts"),
+            ),
+            (
+                "apps/web/tsconfig.json",
+                include_str!("../capabilities/web-svelte/apps/web/tsconfig.json"),
+            ),
+            (
+                "apps/web/src/app.html",
+                include_str!("../capabilities/web-svelte/apps/web/src/app.html"),
+            ),
+            (
+                "apps/web/src/app.css",
+                include_str!("../capabilities/web-svelte/apps/web/src/app.css"),
+            ),
+            (
+                "apps/web/src/routes/+layout.svelte",
+                include_str!("../capabilities/web-svelte/apps/web/src/routes/+layout.svelte"),
+            ),
+            (
+                "apps/web/src/routes/+page.svelte",
+                include_str!("../capabilities/web-svelte/apps/web/src/routes/+page.svelte"),
+            ),
+        ],
+        skill_md: include_str!("../capabilities/web-svelte/SKILL.md"),
     },
     CapabilityDef {
         id: "firmware-rp2040",
@@ -90,12 +138,30 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
     },
     CapabilityDef {
         id: "tauri",
-        description: "Tauri desktop + mobile app sharing crates with firmware and geometry",
+        description: "Tauri 2 desktop app with fiducial-tauri serial transport",
         guard_rules: &["no-unpinned-cli-fetch"],
-        templates: &[(
-            "apps/desktop/src-tauri/tauri.conf.json",
-            include_str!("../capabilities/tauri/apps/desktop/src-tauri/tauri.conf.json"),
-        )],
+        templates: &[
+            (
+                "apps/desktop/src-tauri/tauri.conf.json",
+                include_str!("../capabilities/tauri/apps/desktop/src-tauri/tauri.conf.json"),
+            ),
+            (
+                "apps/desktop/src-tauri/Cargo.toml",
+                include_str!("../capabilities/tauri/apps/desktop/src-tauri/Cargo.toml.tmpl"),
+            ),
+            (
+                "apps/desktop/src-tauri/build.rs",
+                include_str!("../capabilities/tauri/apps/desktop/src-tauri/build.rs"),
+            ),
+            (
+                "apps/desktop/src-tauri/src/lib.rs",
+                include_str!("../capabilities/tauri/apps/desktop/src-tauri/src/lib.rs"),
+            ),
+            (
+                "apps/desktop/src-tauri/src/main.rs",
+                include_str!("../capabilities/tauri/apps/desktop/src-tauri/src/main.rs"),
+            ),
+        ],
         skill_md: include_str!("../capabilities/tauri/SKILL.md"),
     },
     CapabilityDef {

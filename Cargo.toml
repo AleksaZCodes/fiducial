@@ -3,6 +3,10 @@ resolver = "2"
 members = [
     "crates/fiducial",
     "crates/fiducial-core",
+    "crates/fiducial-quantity",
+    "crates/fiducial-model",
+    "crates/fiducial-protocol",
+    "crates/fiducial-tauri",
     "crates/fiducial-wasm",
     "crates/fiducial-cli",
 ]

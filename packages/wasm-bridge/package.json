@@ -1,0 +1,16 @@
+{
+  "name": "@fiducial/wasm-bridge",
+  "version": "0.1.0",
+  "description": "Generated TypeScript types for the fiducial WASM boundary.",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

@@ -70,6 +70,43 @@ STATUS
         name: String,
     },
 
+    /// Copy a UI component into apps/web/src/components/ui/
+    #[command(
+        long_about = "\
+Copy a Fiducial UI component into this product's web app.
+
+Components are copied into `apps/web/src/components/ui/` and become yours —
+no runtime dependency on a Fiducial package. Edit freely; `fid upgrade` will
+offer upstream changes via 3-way merge.
+
+Base UI (@base-ui-components/react) is used for accessible complex components
+(dialog, popover, menu). Run `pnpm add @base-ui-components/react` after adding
+the dialog component.",
+        after_long_help = "\
+COMPONENTS
+  button   Button with 4 variants (primary, secondary, ghost, destructive)
+  card     Card, CardHeader, CardTitle, CardContent, CardFooter
+  badge    Badge with 4 variants (default, secondary, destructive, outline)
+  dialog   Accessible dialog (Base UI React / native <dialog> Svelte)
+
+FRAMEWORKS
+  react    (default) copies .tsx + .css
+  svelte   copies .svelte
+
+EXAMPLES
+  fid add component button
+  fid add component dialog --framework svelte
+  fid add component card --framework react"
+    )]
+    Component {
+        /// Component name: button | card | badge | dialog
+        #[arg(value_name = "NAME")]
+        name: String,
+        /// Framework: react (default) | svelte
+        #[arg(long, default_value = "react")]
+        framework: String,
+    },
+
     /// Add firmware support for a microcontroller target
     #[command(
         long_about = "\
@@ -102,15 +139,19 @@ pub fn run(target: AddTarget) -> Result<()> {
         AddTarget::App { target } => add_app(&target),
         AddTarget::Module { name } => add_module(&name),
         AddTarget::Firmware { target } => add_firmware(&target),
+        AddTarget::Component { name, framework } => {
+            crate::commands::component::run(&name, &framework)
+        }
     }
 }
 
 fn add_app(target: &str) -> Result<()> {
     let cap_id = match target {
         "next" => "web-next",
+        "svelte" => "web-svelte",
         "tauri" => "tauri",
         "worker" => "worker-cloudflare",
-        "svelte" | "mobile" => {
+        "mobile" => {
             println!(
                 "✦ fid add app {target}\n\n\
                  The `{target}` target is coming in Phase 3b.\n\

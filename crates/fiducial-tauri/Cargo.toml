@@ -1,0 +1,21 @@
+[package]
+name        = "fiducial-tauri"
+description = "Serial transport and device discovery for Fiducial Tauri apps."
+version.workspace     = true
+edition.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+homepage.workspace    = true
+authors.workspace     = true
+rust-version.workspace = true
+keywords    = ["tauri", "serial", "usb", "fiducial", "desktop"]
+categories  = ["hardware-support", "embedded"]
+
+[lib]
+name = "fiducial_tauri"
+
+[dependencies]
+fiducial-protocol = { path = "../fiducial-protocol" }
+serialport = { version = "4", default-features = false }
+thiserror  = "2"
+serde      = { version = "1", features = ["derive"] }

@@ -1,0 +1,29 @@
+{
+  "name": "@fiducial/ui-react",
+  "version": "0.1.0",
+  "description": "Fiducial component registry source — React. Use `fid add component <name>` to copy components into your product.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build":     "echo 'Registry source — no build step. Use fid add component.'",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "dependencies": {
+    "@base-ui-components/react":  "^1.0.0-alpha.8",
+    "class-variance-authority":   "^0.7.1",
+    "clsx":                       "^2.1.1",
+    "tailwind-merge":             "^2.6.0",
+    "@fiducial/tokens":           "workspace:*",
+    "@fiducial/headless":         "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript":   "^7.0.0"
+  }
+}

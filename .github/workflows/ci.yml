@@ -66,12 +66,36 @@ jobs:
           --package fiducial-wasm
           --target ${{ matrix.target.triple }}
 
+      - name: Check fiducial-quantity (${{ matrix.target.triple }})
+        run: >
+          cargo check
+          --package fiducial-quantity
+          --target ${{ matrix.target.triple }}
+          ${{ matrix.target.features }}
+
+      - name: Check fiducial-model (${{ matrix.target.triple }})
+        run: >
+          cargo check
+          --package fiducial-model
+          --target ${{ matrix.target.triple }}
+          ${{ matrix.target.features }}
+
+      - name: Check fiducial-protocol (${{ matrix.target.triple }})
+        run: >
+          cargo check
+          --package fiducial-protocol
+          --target ${{ matrix.target.triple }}
+          ${{ matrix.target.features }}
+
   # ── Host: full workspace build + tests ────────────────────────────────────
   rust:
     name: Rust (host)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install system deps (libudev for serialport)
+        run: sudo apt-get update -q && sudo apt-get install -y pkg-config libudev-dev
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -134,6 +158,28 @@ jobs:
       - name: Check firmware workspace (RP2040)
         working-directory: firmware
         run: cargo check --target thumbv6m-none-eabi
+
+  # ── Types pipeline: generate TS types from Rust, verify freshness ──────────
+  #
+  # "A stale artifact fails CI" — Phase 9. Runs cargo test --features ts to
+  # regenerate packages/wasm-bridge/src/generated.ts, then checks for drift.
+  types-pipeline:
+    name: types pipeline (--check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Regenerate TS types
+        run: cargo test --features ts -p fiducial-wasm
+
+      - name: Check for drift
+        run: git diff --exit-code packages/wasm-bridge/src/generated.ts
 
   # ── JavaScript / TypeScript ───────────────────────────────────────────────
   js:
