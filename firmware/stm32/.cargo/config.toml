@@ -1,0 +1,21 @@
+# STM32F401 cargo configuration.
+#
+# target: thumbv7em-none-eabihf — Cortex-M4F with FPU
+# runner: probe-rs flashes via SWD and attaches defmt RTT
+#
+# Install probe-rs: curl --proto '=https' --tlsv1.2 -LsSf \
+#   https://github.com/probe-rs/probe-rs/releases/latest/download/probe-rs-tools-installer.sh | sh
+
+[build]
+target = "thumbv7em-none-eabihf"
+
+[target.thumbv7em-none-eabihf]
+runner = "probe-rs run --chip STM32F401CCUx"
+rustflags = [
+    "-C", "link-arg=--nmagic",
+    "-C", "link-arg=-Tlink.x",
+    "-C", "link-arg=-Tdefmt.x",
+]
+
+[env]
+DEFMT_LOG = "debug"

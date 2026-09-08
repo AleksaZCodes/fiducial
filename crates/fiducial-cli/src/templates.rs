@@ -48,8 +48,49 @@ const CAP_WEB_SVELTE_LAYOUT: &str =
 const CAP_WEB_SVELTE_PAGE: &str =
     include_str!("../capabilities/web-svelte/apps/web/src/routes/+page.svelte");
 
+// ── firmware-rp2040 capability templates ─────────────────────────────────────
+
+const CAP_FIRMWARE_RP2040_WORKSPACE: &str =
+    include_str!("../capabilities/firmware-rp2040/firmware/Cargo.toml");
+const CAP_FIRMWARE_RP2040_TOOLCHAIN: &str =
+    include_str!("../capabilities/firmware-rp2040/firmware/rust-toolchain.toml");
+const CAP_FIRMWARE_RP2040_SHARED_CARGO: &str =
+    include_str!("../capabilities/firmware-rp2040/firmware/shared/Cargo.toml");
+const CAP_FIRMWARE_RP2040_SHARED_LIB: &str =
+    include_str!("../capabilities/firmware-rp2040/firmware/shared/src/lib.rs");
+const CAP_FIRMWARE_RP2040_CARGO_CONFIG: &str =
+    include_str!("../capabilities/firmware-rp2040/firmware/rp2040/.cargo/config.toml");
+const CAP_FIRMWARE_RP2040_CARGO: &str =
+    include_str!("../capabilities/firmware-rp2040/firmware/rp2040/Cargo.toml");
+const CAP_FIRMWARE_RP2040_BUILD: &str =
+    include_str!("../capabilities/firmware-rp2040/firmware/rp2040/build.rs");
+const CAP_FIRMWARE_RP2040_MEMORY: &str =
+    include_str!("../capabilities/firmware-rp2040/firmware/rp2040/memory.x");
+const CAP_FIRMWARE_RP2040_MAIN: &str =
+    include_str!("../capabilities/firmware-rp2040/firmware/rp2040/src/main.rs");
 const CAP_FIRMWARE_README: &str =
     include_str!("../capabilities/firmware-rp2040/firmware/rp2040/README.md");
+
+// ── firmware-stm32 capability templates ──────────────────────────────────────
+
+const CAP_FIRMWARE_STM32_WORKSPACE: &str =
+    include_str!("../capabilities/firmware-stm32/firmware/Cargo.toml");
+const CAP_FIRMWARE_STM32_TOOLCHAIN: &str =
+    include_str!("../capabilities/firmware-stm32/firmware/rust-toolchain.toml");
+const CAP_FIRMWARE_STM32_SHARED_CARGO: &str =
+    include_str!("../capabilities/firmware-stm32/firmware/shared/Cargo.toml");
+const CAP_FIRMWARE_STM32_SHARED_LIB: &str =
+    include_str!("../capabilities/firmware-stm32/firmware/shared/src/lib.rs");
+const CAP_FIRMWARE_STM32_CARGO_CONFIG: &str =
+    include_str!("../capabilities/firmware-stm32/firmware/stm32/.cargo/config.toml");
+const CAP_FIRMWARE_STM32_CARGO: &str =
+    include_str!("../capabilities/firmware-stm32/firmware/stm32/Cargo.toml");
+const CAP_FIRMWARE_STM32_BUILD: &str =
+    include_str!("../capabilities/firmware-stm32/firmware/stm32/build.rs");
+const CAP_FIRMWARE_STM32_MEMORY: &str =
+    include_str!("../capabilities/firmware-stm32/firmware/stm32/memory.x");
+const CAP_FIRMWARE_STM32_MAIN: &str =
+    include_str!("../capabilities/firmware-stm32/firmware/stm32/src/main.rs");
 
 const CAP_TAURI_CONF: &str =
     include_str!("../capabilities/tauri/apps/desktop/src-tauri/tauri.conf.json");
@@ -96,7 +137,29 @@ pub fn raw(rel_path: &str) -> Option<&'static str> {
         "apps/web/src/routes/+layout.svelte" => Some(CAP_WEB_SVELTE_LAYOUT),
         "apps/web/src/routes/+page.svelte" => Some(CAP_WEB_SVELTE_PAGE),
         // firmware-rp2040 capability
+        "firmware/Cargo.toml" => Some(CAP_FIRMWARE_RP2040_WORKSPACE),
+        "firmware/rust-toolchain.toml" => Some(CAP_FIRMWARE_RP2040_TOOLCHAIN),
+        "firmware/shared/Cargo.toml" => Some(CAP_FIRMWARE_RP2040_SHARED_CARGO),
+        "firmware/shared/src/lib.rs" => Some(CAP_FIRMWARE_RP2040_SHARED_LIB),
+        "firmware/rp2040/.cargo/config.toml" => Some(CAP_FIRMWARE_RP2040_CARGO_CONFIG),
+        "firmware/rp2040/Cargo.toml" => Some(CAP_FIRMWARE_RP2040_CARGO),
+        "firmware/rp2040/build.rs" => Some(CAP_FIRMWARE_RP2040_BUILD),
+        "firmware/rp2040/memory.x" => Some(CAP_FIRMWARE_RP2040_MEMORY),
+        "firmware/rp2040/src/main.rs" => Some(CAP_FIRMWARE_RP2040_MAIN),
         "firmware/rp2040/README.md" => Some(CAP_FIRMWARE_README),
+        // firmware-stm32 capability
+        // Note: firmware/Cargo.toml and firmware/rust-toolchain.toml are shared
+        // path keys; stm32 variants are referenced here under stm32-prefixed keys
+        // so they are accessible for upgrade checks when both capabilities coexist.
+        "firmware-stm32/Cargo.toml" => Some(CAP_FIRMWARE_STM32_WORKSPACE),
+        "firmware-stm32/rust-toolchain.toml" => Some(CAP_FIRMWARE_STM32_TOOLCHAIN),
+        "firmware-stm32/shared/Cargo.toml" => Some(CAP_FIRMWARE_STM32_SHARED_CARGO),
+        "firmware-stm32/shared/src/lib.rs" => Some(CAP_FIRMWARE_STM32_SHARED_LIB),
+        "firmware/stm32/.cargo/config.toml" => Some(CAP_FIRMWARE_STM32_CARGO_CONFIG),
+        "firmware/stm32/Cargo.toml" => Some(CAP_FIRMWARE_STM32_CARGO),
+        "firmware/stm32/build.rs" => Some(CAP_FIRMWARE_STM32_BUILD),
+        "firmware/stm32/memory.x" => Some(CAP_FIRMWARE_STM32_MEMORY),
+        "firmware/stm32/src/main.rs" => Some(CAP_FIRMWARE_STM32_MAIN),
         // tauri capability
         "apps/desktop/src-tauri/tauri.conf.json" => Some(CAP_TAURI_CONF),
         "apps/desktop/src-tauri/Cargo.toml" => Some(CAP_TAURI_CARGO),

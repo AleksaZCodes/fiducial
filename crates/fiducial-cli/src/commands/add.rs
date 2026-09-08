@@ -171,20 +171,20 @@ fn add_app(target: &str) -> Result<()> {
 fn add_firmware(target: &str) -> Result<()> {
     let cap_id = match target {
         "rp2040" => "firmware-rp2040",
+        "stm32" => "firmware-stm32",
         "rp2350" => {
-            // rp2350 is structurally identical to rp2040 for Phase 3b — stub.
             println!(
                 "✦ fid add firmware rp2350\n\n\
-                 The `rp2350` firmware target is coming in Phase 3b.\n\
+                 The `rp2350` firmware target is coming in a future phase.\n\
                  It reuses the same Embassy setup as rp2040 with the RP2350 HAL.\n\
                  Track progress: https://github.com/AleksaZCodes/fiducial"
             );
             return Ok(());
         }
-        "stm32" | "nrf52" => {
+        "nrf52" => {
             println!(
-                "✦ fid add firmware {target}\n\n\
-                 The `{target}` firmware target is coming in Phase 3b.\n\
+                "✦ fid add firmware nrf52\n\n\
+                 The `nrf52` firmware target is coming in a future phase.\n\
                  Track progress: https://github.com/AleksaZCodes/fiducial"
             );
             return Ok(());

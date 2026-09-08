@@ -10,6 +10,10 @@ authors.workspace = true
 name = "fiducial_firmware_shared"
 
 # no_std, no alloc — must compile for all embedded targets with zero features
+[features]
+lora = ["dep:lora-modulation"]
+
 [dependencies]
-fiducial-core = { workspace = true }
-defmt         = { workspace = true }
+fiducial-core   = { workspace = true }
+defmt           = { workspace = true }
+lora-modulation = { version = "0.1", optional = true, default-features = false }

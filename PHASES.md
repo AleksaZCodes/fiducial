@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 12
+## Current phase: Phase 13
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -146,6 +146,25 @@ _Read this at the start of every session. Updated manually as phases complete._
 | CI: `fiducial-protocol` added to 4-target spine matrix; `apt-get install libudev-dev` for serialport | ✅ |
 | `cargo clippy --all-features -D warnings` clean; `cargo fmt` applied; all 15 test suites green | ✅ |
 
+**Phase 12 — complete ✅ (2026-09-08)**
+
+> `firmware/rp2040` + `stm32`, probe-rs + defmt, LoRa via `lora-rs`.
+> Done when `fid add firmware rp2040|stm32` yields a flashable project sharing L0 with the desktop app.
+
+| Deliverable | Status |
+| --- | --- |
+| `firmware/stm32/` — STM32F401 Embassy firmware (Cortex-M4F, thumbv7em-none-eabihf); blinks PC13 via embassy-stm32 0.6 | ✅ |
+| `firmware/Cargo.toml` — workspace extended to include `stm32` member + `embassy-stm32 0.6` dep | ✅ |
+| `firmware/shared/` — `lora` feature added: `lora-modulation 0.1`, EU868 channel/DR constants | ✅ |
+| Workspace-level `[profile.dev/release]` in `firmware/Cargo.toml`; per-crate tables removed | ✅ |
+| `capabilities/firmware-rp2040/` — expanded from README-only to full flashable scaffold (10 templates) | ✅ |
+| `capabilities/firmware-stm32/` — new capability: 9 templates + SKILL.md | ✅ |
+| `fid add firmware stm32` — wired to `firmware-stm32` capability (was stub) | ✅ |
+| CI: `firmware` job extended — `cargo check --target thumbv7em-none-eabihf` + `libudev-dev` install | ✅ |
+| `cargo check --target thumbv6m-none-eabi` (rp2040) — green | ✅ |
+| `cargo check --target thumbv7em-none-eabihf` (stm32) — green | ✅ |
+| `cargo build --workspace` (host) — green | ✅ |
+
 **Phase 10 — complete ✅ (2026-09-08)**
 
 > Next.js + SvelteKit templates + thin L3 bindings.
@@ -262,7 +281,7 @@ fiducial/
 | **9** | `fiducial-quantity` + `fiducial-model` + `fid derive/graph` + types pipeline | A protocol edit regenerates TS types; stale artifact or violated assertion fails CI | ✅ |
 | **10** | Next.js + SvelteKit templates + thin L3 bindings | Both render the same tokens and the same headless logic | ✅ |
 | **11** | Tauri desktop + `fiducial-tauri` + `fiducial-protocol` | Desktop app talks to a device over USB serial | ✅ |
-| **12** | `firmware/rp2040` + `stm32`, probe-rs + defmt, LoRa via `lora-rs` | `fid add firmware` yields a flashable project sharing L0 with the desktop app | ⬜ |
+| **12** | `firmware/rp2040` + `stm32`, probe-rs + defmt, LoRa via `lora-rs` | `fid add firmware` yields a flashable project sharing L0 with the desktop app | ✅ |
 | **13** | Web Serial/WebUSB + BLE transports | Same device reachable from browser and phone with the same codec | ⬜ |
 | **14** | EDA pipeline: atopile → KiCad → `board.interface.json` + fab outputs | A board change regenerates every output; `--check` catches staleness | ⬜ |
 | **15** | `fiducial-geometry` + `fiducial-mesh` + `viewer3d-*` + tolerance profiles | Board outline → generated enclosure → printable STL and a GLB on a marketing page | ⬜ |

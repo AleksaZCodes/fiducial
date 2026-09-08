@@ -140,7 +140,7 @@ jobs:
 
   # ── Firmware: RP2040 check ────────────────────────────────────────────────
   firmware:
-    name: firmware (thumbv6m-none-eabi)
+    name: firmware (RP2040 + STM32)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -150,14 +150,21 @@ jobs:
         with:
           targets: thumbv6m-none-eabi,thumbv7em-none-eabihf
 
+      - name: Install libudev (required by serialport / probe-rs build deps)
+        run: sudo apt-get install -y libudev-dev
+
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: firmware -> firmware/target
 
-      - name: Check firmware workspace (RP2040)
+      - name: Check firmware workspace (RP2040 — thumbv6m-none-eabi)
         working-directory: firmware
         run: cargo check --target thumbv6m-none-eabi
+
+      - name: Check firmware workspace (STM32 — thumbv7em-none-eabihf)
+        working-directory: firmware
+        run: cargo check --target thumbv7em-none-eabihf
 
   # ── Types pipeline: generate TS types from Rust, verify freshness ──────────
   #
