@@ -22,16 +22,29 @@ import { encode, FrameDecoder } from './codec.js'
 import { AsyncQueue } from './transport.js'
 import type { Transport } from './transport.js'
 
-/** Fiducial GATT service UUID. */
+/**
+ * Default Fiducial GATT service UUID.
+ *
+ * PLACEHOLDER — `fd01`/`fd02`/`fd03` sit in the 16-bit SIG range and are not
+ * allocated to Fiducial. Ship a product on BLE only after replacing these with
+ * your own UUIDs via {@link BleOptions}; changing them after devices are in the
+ * field breaks every existing pairing.
+ */
 export const FIDUCIAL_SERVICE_UUID = '0000fd01-0000-1000-8000-00805f9b34fb'
-/** TX characteristic — device notifies browser (read this for incoming frames). */
+/** Default TX characteristic — device notifies browser (incoming frames). */
 export const FIDUCIAL_TX_UUID = '0000fd02-0000-1000-8000-00805f9b34fb'
-/** RX characteristic — browser writes to device. */
+/** Default RX characteristic — browser writes to device. */
 export const FIDUCIAL_RX_UUID = '0000fd03-0000-1000-8000-00805f9b34fb'
 
 export interface BleOptions {
-  /** Additional device filters (default: accept any device with the Fiducial service). */
+  /** Additional device filters (default: accept any device with `serviceUuid`). */
   filters?: BluetoothLEScanFilter[]
+  /** GATT service UUID (default: {@link FIDUCIAL_SERVICE_UUID}). */
+  serviceUuid?: string
+  /** Notify characteristic UUID (default: {@link FIDUCIAL_TX_UUID}). */
+  txUuid?: string
+  /** Write characteristic UUID (default: {@link FIDUCIAL_RX_UUID}). */
+  rxUuid?: string
 }
 
 export class BleTransport implements Transport {
@@ -64,15 +77,19 @@ export class BleTransport implements Transport {
   }
 
   static async open(options: BleOptions = {}): Promise<BleTransport> {
-    const filters = options.filters ?? [{ services: [FIDUCIAL_SERVICE_UUID] }]
+    const serviceUuid = options.serviceUuid ?? FIDUCIAL_SERVICE_UUID
+    const txUuid = options.txUuid ?? FIDUCIAL_TX_UUID
+    const rxUuid = options.rxUuid ?? FIDUCIAL_RX_UUID
+
+    const filters = options.filters ?? [{ services: [serviceUuid] }]
     const device = await navigator.bluetooth.requestDevice({
       filters,
-      optionalServices: [FIDUCIAL_SERVICE_UUID],
+      optionalServices: [serviceUuid],
     })
     const server = await device.gatt!.connect()
-    const service = await server.getPrimaryService(FIDUCIAL_SERVICE_UUID)
-    const txChar = await service.getCharacteristic(FIDUCIAL_TX_UUID)
-    const rxChar = await service.getCharacteristic(FIDUCIAL_RX_UUID)
+    const service = await server.getPrimaryService(serviceUuid)
+    const txChar = await service.getCharacteristic(txUuid)
+    const rxChar = await service.getCharacteristic(rxUuid)
     await txChar.startNotifications()
     return new BleTransport(device, txChar, rxChar)
   }
