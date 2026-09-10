@@ -1,6 +1,6 @@
 [package]
 name        = "fiducial-mesh"
-description = "no_std mesh generation from board outlines — extrusion, binary STL, GLB export."
+description = "no_std case generation from a board outline: gasket-sealed base/lid/gasket, connector cutouts, standoffs, fasteners; binary STL + GLB export."
 version.workspace     = true
 edition.workspace     = true
 license.workspace     = true

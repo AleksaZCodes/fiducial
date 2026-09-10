@@ -114,7 +114,11 @@ component clearance.
     "height_mm": 60.0,
     "thickness_mm": 1.6,
     "tolerance": "fdm",
-    "enclosure": { "headroom_mm": 10.0, "standoff_height_mm": 3.0 }
+    "enclosure": {
+      "headroom_mm": 10.0,
+      "standoff_height_mm": 3.0,
+      "fastener_diameter_mm": 3.0
+    }
   },
   "connectors": [{
     "id": "J1",
