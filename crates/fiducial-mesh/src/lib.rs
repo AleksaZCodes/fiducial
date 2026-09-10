@@ -1013,29 +1013,9 @@ pub fn case_for(outline: &BoardOutline) -> CaseParts {
     generate_case(outline, &CaseParams::from_outline(outline))
 }
 
-/// An exploded view of the assembled case, for rendering.
-///
-/// Base at the origin, gasket lifted clear of its groove, lid above that with
-/// its tongue pointing down — the arrangement that shows how the seal works.
-/// The parts are separated rather than interpenetrating, so nothing z-fights.
-///
-/// This merges three disjoint solids into one mesh: fine to render or slice,
-/// but not a closed manifold.
+/// An exploded view of a featureless case — see [`Case::exploded`].
 pub fn case_exploded(outline: &BoardOutline, p: &CaseParams) -> Mesh {
-    let g = CaseGeometry::new(outline, p);
-    let parts = generate_case(outline, p);
-    let gap = (p.headroom_mm * 0.6).max(4.0);
-
-    let gasket_z = g.z_groove_bottom + gap;
-    // The lid is modelled tongue-up for printing; mirroring turns it over, and
-    // the offset then places its tongue tip one gap above the gasket.
-    let lid_z = gasket_z + p.gasket_height_mm + gap + p.lid_thickness_mm + p.tongue_height_mm();
-
-    Mesh::merge([
-        parts.base,
-        parts.gasket.translated([0.0, 0.0, gasket_z]),
-        parts.lid.mirrored_z().translated([0.0, 0.0, lid_z]),
-    ])
+    Case::new(*outline).with_params(*p).exploded()
 }
 
 // ── Features: cutouts and standoffs ──────────────────────────────────────────
@@ -1280,7 +1260,7 @@ impl Case {
                 });
             }
             let wall = p.wall_mm();
-            let len = wall_length(g.outer, c.side);
+            let len = c.side.span_mm(g.outer.width(), g.outer.height());
             if h.u0 < wall + margin || h.u1 > len - wall - margin {
                 return Err(CaseError::OffWall {
                     label: c.label.clone(),
@@ -1328,7 +1308,7 @@ impl Case {
         let p = &self.params;
         let fit = p.fit_clearance_mm;
         let inboard = p.wall_mm() + p.clearance_mm;
-        let len = wall_length(g.outer, c.side);
+        let len = c.side.span_mm(g.outer.width(), g.outer.height());
         // South and East run with the board axes; North and West run against
         // them, so the same declared offset measures from the same board
         // corner on every side.
@@ -1414,26 +1394,28 @@ impl Case {
         }
     }
 
-    /// Exploded assembly for rendering — see [`case_exploded`].
+    /// An exploded view of the assembled case, for rendering.
+    ///
+    /// Base at the origin, gasket lifted clear of its groove, lid above that
+    /// with its tongue pointing down — the arrangement that shows how the seal
+    /// works. The parts are separated rather than interpenetrating, so nothing
+    /// z-fights.
+    ///
+    /// This merges three disjoint solids into one mesh: fine to render or
+    /// slice, but not a closed manifold.
     pub fn exploded(&self) -> Mesh {
         let g = CaseGeometry::new(&self.outline, &self.params);
         let p = &self.params;
         let gap = (p.headroom_mm * 0.6).max(4.0);
         let gasket_z = g.z_groove_bottom + gap;
+        // The lid is modelled tongue-up for printing; mirroring turns it over,
+        // and the offset then places its tongue tip one gap above the gasket.
         let lid_z = gasket_z + p.gasket_height_mm + gap + p.lid_thickness_mm + p.tongue_height_mm();
         Mesh::merge([
             self.base(),
             self.gasket().translated([0.0, 0.0, gasket_z]),
             self.lid().mirrored_z().translated([0.0, 0.0, lid_z]),
         ])
-    }
-}
-
-/// Length of the wall on `side`, in the case's own coordinates.
-fn wall_length(outer: Rect, side: Side) -> f32 {
-    match side {
-        Side::South | Side::North => outer.width(),
-        Side::East | Side::West => outer.height(),
     }
 }
 
