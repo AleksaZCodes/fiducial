@@ -218,3 +218,70 @@ describe('AsyncQueue', () => {
     assert.equal(await q.pop(), 3)
   })
 })
+
+// ── Conformance vectors ───────────────────────────────────────────────────────
+//
+// The cross-implementation anchor. These vectors are generated from the Rust
+// crate and committed at docs/protocol/vectors.json; this suite and the Rust
+// suite both assert against that one file.
+//
+// Two hand-written implementations of one spec drift, and the drift is silent
+// until a device stops talking to a browser. A third artifact both answer to is
+// what makes "byte-exact" a checked property instead of a claim in a comment.
+
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+
+const here = dirname(fileURLToPath(import.meta.url))
+const vectorsPath = join(here, '..', '..', '..', 'docs', 'protocol', 'vectors.json')
+const vectors = JSON.parse(readFileSync(vectorsPath, 'utf8'))
+
+const fromHex = (h) =>
+  new Uint8Array((h.match(/../g) ?? []).map((b) => parseInt(b, 16)))
+const toHex = (u8) =>
+  Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
+
+describe('conformance vectors (docs/protocol/vectors.json)', () => {
+  it('agrees with Rust on the wire version', () => {
+    assert.equal(vectors.wire_version, 2)
+  })
+
+  it('agrees on MAGIC and frame overhead', () => {
+    assert.equal(MAGIC, parseInt(vectors.magic, 16))
+    assert.equal(encodedLen(0), vectors.frame_overhead)
+  })
+
+  it('agrees on MAX_PAYLOAD', () => {
+    assert.equal(MAX_PAYLOAD, vectors.max_payload)
+  })
+
+  it('has vectors to check', () => {
+    assert.ok(vectors.vectors.length > 0)
+  })
+
+  for (const v of vectors.vectors) {
+    it(`crc32 matches Rust for "${v.name}"`, () => {
+      const got = crc32(fromHex(v.payload))
+      assert.equal(
+        '0x' + got.toString(16).toUpperCase().padStart(8, '0'),
+        v.crc32,
+      )
+    })
+
+    it(`encodes byte-for-byte like Rust for "${v.name}"`, () => {
+      assert.equal(toHex(encode(fromHex(v.payload))), v.frame)
+    })
+
+    it(`decodes the Rust-generated frame for "${v.name}"`, () => {
+      const dec = new FrameDecoder(1024)
+      const frame = fromHex(v.frame)
+      let got = null
+      for (const b of frame) {
+        const out = dec.feed(b)
+        if (out !== null) got = out
+      }
+      assert.equal(toHex(got ?? new Uint8Array()), v.payload)
+    })
+  }
+})

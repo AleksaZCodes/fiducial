@@ -1,0 +1,40 @@
+[package]
+name        = "fiducial-ota"
+description = "no_std over-the-air firmware update protocol: signed manifests, resumable transfer, trial boot."
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+homepage.workspace     = true
+authors.workspace      = true
+rust-version.workspace = true
+keywords    = ["no-std", "ota", "firmware", "embedded", "fiducial"]
+categories  = ["no-std", "embedded"]
+
+[lib]
+name = "fiducial_ota"
+
+[features]
+default = []
+alloc   = []
+std     = ["alloc", "serde/std", "postcard/use-std"]
+# Software ed25519 verification. Optional because a device with a hardware
+# public-key accelerator (STM32WLE5 PKA) implements `SignatureVerifier` against
+# that instead, and the transfer state machine must build without any crypto
+# dependency at all on every target.
+ed25519 = ["dep:ed25519-dalek"]
+
+[dependencies]
+# The wire contract. Every OTA message is one declared Rust type serialized
+# with postcard — the same contract every other Fiducial message uses.
+serde    = { version = "1", default-features = false, features = ["derive"] }
+postcard = { version = "1", default-features = false }
+sha2     = { version = "0.10", default-features = false }
+
+ed25519-dalek = { version = "2", default-features = false, features = ["digest"], optional = true }
+
+[dev-dependencies]
+postcard          = { version = "1", features = ["use-std"] }
+sha2              = { version = "0.10" }
+fiducial-protocol = { path = "../fiducial-protocol" }
+ed25519-dalek     = { version = "2", features = ["rand_core"] }

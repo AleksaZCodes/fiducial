@@ -1,0 +1,95 @@
+{
+  "wire_version": 2,
+  "magic": "0xfd",
+  "max_payload": 65535,
+  "frame_overhead": 7,
+  "frame_layout": "MAGIC(1) | LEN_LO(1) | LEN_HI(1) | PAYLOAD(N) | CRC32(4, LE)",
+  "crc": {
+    "algorithm": "CRC-32/ISO-HDLC",
+    "poly": "0x04C11DB7",
+    "init": "0xFFFFFFFF",
+    "refin": true,
+    "refout": true,
+    "xorout": "0xFFFFFFFF",
+    "check": "0xCBF43926"
+  },
+  "vectors": [
+    {
+      "name": "empty",
+      "payload": "",
+      "payload_len": 0,
+      "crc32": "0x00000000",
+      "frame": "fd000000000000"
+    },
+    {
+      "name": "single_byte",
+      "payload": "42",
+      "payload_len": 1,
+      "crc32": "0x4AD0CF31",
+      "frame": "fd01004231cfd04a"
+    },
+    {
+      "name": "ab",
+      "payload": "6162",
+      "payload_len": 2,
+      "crc32": "0x9E83486D",
+      "frame": "fd020061626d48839e"
+    },
+    {
+      "name": "ba",
+      "payload": "6261",
+      "payload_len": 2,
+      "crc32": "0x2CA74A14",
+      "frame": "fd02006261144aa72c"
+    },
+    {
+      "name": "check_string",
+      "payload": "313233343536373839",
+      "payload_len": 9,
+      "crc32": "0xCBF43926",
+      "frame": "fd09003132333435363738392639f4cb"
+    },
+    {
+      "name": "payload_contains_magic",
+      "payload": "fdfd00fd",
+      "payload_len": 4,
+      "crc32": "0x2B587F44",
+      "frame": "fd0400fdfd00fd447f582b"
+    },
+    {
+      "name": "zeros_16",
+      "payload": "00000000000000000000000000000000",
+      "payload_len": 16,
+      "crc32": "0xECBB4B55",
+      "frame": "fd100000000000000000000000000000000000554bbbec"
+    },
+    {
+      "name": "ones_16",
+      "payload": "ffffffffffffffffffffffffffffffff",
+      "payload_len": 16,
+      "crc32": "0x3FB3C61A",
+      "frame": "fd1000ffffffffffffffffffffffffffffffff1ac6b33f"
+    },
+    {
+      "name": "len_255",
+      "payload": "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5",
+      "payload_len": 255,
+      "crc32": "0x77D71763",
+      "frame": "fdff00a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a56317d777"
+    },
+    {
+      "name": "len_256",
+      "payload": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+      "payload_len": 256,
+      "crc32": "0x534C7266",
+      "frame": "fd00015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a66724c53"
+    },
+    {
+      "name": "counting_64",
+      "payload": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "payload_len": 64,
+      "crc32": "0x100ECE8C",
+      "frame": "fd4000000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f8cce0e10"
+    }
+  ]
+}
