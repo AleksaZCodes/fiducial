@@ -11,7 +11,7 @@ import assert from 'node:assert/strict'
 import {
   MAGIC,
   MAX_PAYLOAD,
-  crc8,
+  crc32,
   encode,
   encodedLen,
   EncodeError,
@@ -19,31 +19,36 @@ import {
   AsyncQueue,
 } from '../dist/index.js'
 
-// ── crc8 ──────────────────────────────────────────────────────────────────────
+// ── crc32 ─────────────────────────────────────────────────────────────────────
 
-describe('crc8', () => {
+describe('crc32', () => {
+  // The cross-implementation anchor: this is the CRC-32/ISO-HDLC check value,
+  // asserted identically in the Rust crate. If these two ever disagree, the
+  // TypeScript port has drifted from the wire format.
+  it('standard check value for "123456789"', () => {
+    const data = new TextEncoder().encode('123456789')
+    assert.equal(crc32(data), 0xCBF43926)
+  })
   it('empty input returns 0', () => {
-    assert.equal(crc8(new Uint8Array([])), 0)
+    assert.equal(crc32(new Uint8Array([])), 0)
   })
-  it('single byte is returned as-is', () => {
-    assert.equal(crc8(new Uint8Array([0x42])), 0x42)
+  it('detects byte reordering', () => {
+    const ab = new TextEncoder().encode('ab')
+    const ba = new TextEncoder().encode('ba')
+    assert.notEqual(crc32(ab), crc32(ba))
   })
-  it('two identical bytes XOR to 0', () => {
-    assert.equal(crc8(new Uint8Array([0xAB, 0xAB])), 0)
-  })
-  it('"hi" = h ^ i', () => {
-    const h = 'h'.charCodeAt(0)
-    const i = 'i'.charCodeAt(0)
-    assert.equal(crc8(new Uint8Array([h, i])), h ^ i)
+  it('always returns an unsigned 32-bit value', () => {
+    const data = new Uint8Array([0xFF, 0xFF, 0xFF, 0xFF])
+    assert.ok(crc32(data) >= 0)
   })
 })
 
 // ── encodedLen ────────────────────────────────────────────────────────────────
 
 describe('encodedLen', () => {
-  it('empty payload is 4 bytes', () => assert.equal(encodedLen(0), 4))
-  it('10-byte payload is 14 bytes', () => assert.equal(encodedLen(10), 14))
-  it('100-byte payload is 104 bytes', () => assert.equal(encodedLen(100), 104))
+  it('empty payload is 7 bytes', () => assert.equal(encodedLen(0), 7))
+  it('10-byte payload is 17 bytes', () => assert.equal(encodedLen(10), 17))
+  it('100-byte payload is 107 bytes', () => assert.equal(encodedLen(100), 107))
 })
 
 // ── encode ────────────────────────────────────────────────────────────────────
@@ -53,13 +58,13 @@ describe('encode', () => {
     assert.equal(encode(new Uint8Array([])).at(0), MAGIC)
   })
 
-  it('empty payload: 4 bytes, crc=0', () => {
+  it('empty payload: 7 bytes, crc=0', () => {
     const frame = encode(new Uint8Array([]))
-    assert.equal(frame.length, 4)
+    assert.equal(frame.length, 7)
     assert.equal(frame[0], MAGIC)
     assert.equal(frame[1], 0)
     assert.equal(frame[2], 0)
-    assert.equal(frame[3], 0)
+    assert.deepEqual(Array.from(frame.slice(3, 7)), [0, 0, 0, 0])
   })
 
   it('"hi" payload matches known layout', () => {
@@ -70,7 +75,13 @@ describe('encode', () => {
     assert.equal(frame[2], 0)
     assert.equal(frame[3], 'h'.charCodeAt(0))
     assert.equal(frame[4], 'i'.charCodeAt(0))
-    assert.equal(frame[5], 'h'.charCodeAt(0) ^ 'i'.charCodeAt(0))
+    const crc = crc32(payload)
+    assert.deepEqual(Array.from(frame.slice(5, 9)), [
+      crc & 0xff,
+      (crc >>> 8) & 0xff,
+      (crc >>> 16) & 0xff,
+      (crc >>> 24) & 0xff,
+    ])
   })
 
   it('length field is little-endian', () => {
@@ -206,4 +217,71 @@ describe('AsyncQueue', () => {
     assert.equal(await q.pop(), 2)
     assert.equal(await q.pop(), 3)
   })
+})
+
+// ── Conformance vectors ───────────────────────────────────────────────────────
+//
+// The cross-implementation anchor. These vectors are generated from the Rust
+// crate and committed at docs/protocol/vectors.json; this suite and the Rust
+// suite both assert against that one file.
+//
+// Two hand-written implementations of one spec drift, and the drift is silent
+// until a device stops talking to a browser. A third artifact both answer to is
+// what makes "byte-exact" a checked property instead of a claim in a comment.
+
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+
+const here = dirname(fileURLToPath(import.meta.url))
+const vectorsPath = join(here, '..', '..', '..', 'docs', 'protocol', 'vectors.json')
+const vectors = JSON.parse(readFileSync(vectorsPath, 'utf8'))
+
+const fromHex = (h) =>
+  new Uint8Array((h.match(/../g) ?? []).map((b) => parseInt(b, 16)))
+const toHex = (u8) =>
+  Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
+
+describe('conformance vectors (docs/protocol/vectors.json)', () => {
+  it('agrees with Rust on the wire version', () => {
+    assert.equal(vectors.wire_version, 2)
+  })
+
+  it('agrees on MAGIC and frame overhead', () => {
+    assert.equal(MAGIC, parseInt(vectors.magic, 16))
+    assert.equal(encodedLen(0), vectors.frame_overhead)
+  })
+
+  it('agrees on MAX_PAYLOAD', () => {
+    assert.equal(MAX_PAYLOAD, vectors.max_payload)
+  })
+
+  it('has vectors to check', () => {
+    assert.ok(vectors.vectors.length > 0)
+  })
+
+  for (const v of vectors.vectors) {
+    it(`crc32 matches Rust for "${v.name}"`, () => {
+      const got = crc32(fromHex(v.payload))
+      assert.equal(
+        '0x' + got.toString(16).toUpperCase().padStart(8, '0'),
+        v.crc32,
+      )
+    })
+
+    it(`encodes byte-for-byte like Rust for "${v.name}"`, () => {
+      assert.equal(toHex(encode(fromHex(v.payload))), v.frame)
+    })
+
+    it(`decodes the Rust-generated frame for "${v.name}"`, () => {
+      const dec = new FrameDecoder(1024)
+      const frame = fromHex(v.frame)
+      let got = null
+      for (const b of frame) {
+        const out = dec.feed(b)
+        if (out !== null) got = out
+      }
+      assert.equal(toHex(got ?? new Uint8Array()), v.payload)
+    })
+  }
 })

@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 16c
+## Current phase: Phase 17
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -349,6 +349,46 @@ no live CI status (deliberate; would go behind a flag), decisions are listed but
 not read so supersession is undetected, and `briefs` from §10's v0 row is not
 built because no product has one yet.
 
+**Phase 16c — complete ✅ (2026-09-10)**
+
+> Firmware OTA: `fiducial-ota` — the first sub-protocol built on the waist.
+> Done when: transfer resumes after a drop; an unsigned image cannot stage; a failed self-test rolls back.
+
+| Deliverable | Status |
+| --- | --- |
+| `crates/fiducial-ota/` — `no_std`, no `alloc`; builds on all four targets with and without software crypto | ✅ |
+| `ImageManifest` — signed metadata; commits to the image by SHA-256, so 43 bytes authenticate a 400 KB image and a bad offer costs zero flash writes | ✅ |
+| `signing_bytes()` — fixed-width big-endian canonical form, deliberately **not** postcard: postcard is a serialization, not a canonicalization, and tying signatures to it would let an encoding change silently invalidate deployed keys | ✅ |
+| `OtaMessage` — `Offer` / `Resume` / `Chunk` / `Ack` / `Status`, postcard-serialized, carried in a `fiducial-protocol` frame | ✅ |
+| `Receiver<V, SLOT>` — pure state machine. Touches no flash, no radio, no clock; that is what makes every §12.3 failure mode a host test | ✅ |
+| **Never brick** — `TrialState`: trial boot, boot budget, automatic rollback when unconfirmed | ✅ |
+| **Booting ≠ healthy** — `mark_booted(self_test_passed)`; a booted-but-failing image still rolls back | ✅ |
+| **Signed, always** — no code path reaches `Phase::Staged` without a verified signature; asserted, not commented | ✅ |
+| Default verifier is `RejectAll` — an unconfigured device installs *nothing* rather than *anything* | ✅ |
+| `SignatureVerifier` trait — software ed25519, STM32WLE5 hardware PKA, or a test stub. Three real implementations, not a speculative abstraction | ✅ |
+| **Resumable** — `resume_offset()`; a 1 KB transfer dropped at 384 bytes continues from 384 | ✅ |
+| **Idempotent** — a duplicate chunk is *acknowledged*, not rejected (§12.4); failing there live-locks a flaky link | ✅ |
+| **Power-safe** — `PowerPolicy` is a declared fact; a product declaring 80% gets 80% enforced | ✅ |
+| **Staged rollout** — `Cohort` is inside the signed bytes, so a canary image cannot be replayed at the fleet | ✅ |
+| No downgrade or replay — offers at or below the running version refused | ✅ |
+| 21 transfer tests + 5 real-ed25519 signing tests (genuine key signs; wrong key, flipped bit, and every tampered field all refused) | ✅ |
+| CI: `ota` job — transfer, signing, and `no_std` on thumbv6m / thumbv7em / wasm32, each with and without `ed25519` | ✅ |
+
+**Phase 16 — the protocol, documented and pinned ✅ (2026-09-10)**
+
+> Closing out Phase 16 altogether: the wire is specified, and conformance is machine-checked.
+
+| Deliverable | Status |
+| --- | --- |
+| `docs/protocol/README.md` — canonical wire specification: hourglass model, frame layout, decoder state machine, CRC-32 parameters, version negotiation, OTA sub-protocol, implementation checklist | ✅ |
+| `docs/protocol/vectors.json` — **conformance vectors**, generated from Rust, committed, asserted by **both** the Rust and TypeScript suites | ✅ |
+| Vector cases chosen for properties, not coverage: empty payload, `"ab"` vs `"ba"` (reordering — indistinguishable under the v1 XOR fold), payload containing `MAGIC`, all-zeros/all-ones, lengths straddling the `LEN` byte boundary | ✅ |
+| Round-trip closed through the **decoder**, not the encoder — asserting the encoder against itself would be circular | ✅ |
+| Freshness gate: CI runs the generator without `FIDUCIAL_WRITE_VECTORS`, so a wire change that skipped regeneration fails the build | ✅ |
+| **Anchor verified adversarially** — flipping one bit of the TypeScript CRC polynomial fails 31 tests. The vectors catch drift; they do not merely pass | ✅ |
+| Section 8 records what is deliberately *excluded* (encryption, COSE, CBOR, per-frame version byte, fragmentation, retransmission) with the reason, so each stops being re-proposed | ✅ |
+| TypeScript suite: 24 → **61** tests | ✅ |
+
 **Phase 16b — complete ✅ (2026-09-10)**
 
 > `fid release` + version-skew assertions.
@@ -526,6 +566,6 @@ fiducial/
 | **15** | `fiducial-geometry` + `fiducial-mesh` + `viewer3d-*` + tolerance profiles | Board outline → generated enclosure → printable STL and a GLB on a marketing page | ✅ |
 | **16** | Workbench v0: `fid dash` read-only view | Roadmap, status, decisions, CI, graph, freshness in one place | ✅ |
 | **16b** | `fid release` + version-skew assertions | A protocol bump fails any artifact still on the old version; compatibility matrix committed | ✅ |
-| **16c** | Firmware OTA: `embassy-boot` A/B, signing, resumable transfer, staged rollout | Device updates over BLE, self-tests, marks booted — broken image rolls back automatically | ⬜ |
+| **16c** | Firmware OTA: `fiducial-ota` — signed manifests, resumable transfer, trial boot, staged rollout | Transfer resumes after a drop; unsigned image cannot stage; failed self-test rolls back ([rescoped from BLE](docs/specs/2026-09-10-phase-16c-ota-transport-rescope.md)) | ✅ |
 | **17** | `fiducial-sim`, `realtime`, workbench v1 | Simulation runs native and in WASM; realtime's three contracts covered by tests | ⬜ |
 | **18** | ROP migration wave 2 (optional) — eligible rules to L0 Rust | Each differential-tested before the TypeScript is deleted | ⬜ |

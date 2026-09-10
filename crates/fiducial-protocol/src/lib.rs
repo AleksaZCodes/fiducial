@@ -3,14 +3,26 @@
 //! # Frame format
 //!
 //! ```text
-//! [ MAGIC(1) | LEN_LO(1) | LEN_HI(1) | PAYLOAD(N) | CRC8(1) ]
+//! [ MAGIC(1) | LEN_LO(1) | LEN_HI(1) | PAYLOAD(N) | CRC32(4) ]
 //! ```
 //!
 //! - `MAGIC` = `0xFD` — identifies a Fiducial frame
 //! - `LEN` = payload byte count, 2-byte little-endian
-//! - `CRC8` = XOR fold of all payload bytes (fast, sufficient for a framed link)
+//! - `CRC32` = CRC-32/ISO-HDLC over the payload, 4-byte little-endian
 //!
-//! Total overhead: 4 bytes per frame. Maximum payload: 65 535 bytes.
+//! Total overhead: 7 bytes per frame. Maximum payload: 65 535 bytes.
+//!
+//! # Why CRC-32
+//!
+//! Wire version 1 used an 8-bit XOR fold. Over a payload of up to 65 535 bytes
+//! that is not adequate: an XOR fold is a parity byte, not a polynomial CRC —
+//! it misses byte reordering, byte duplication, and any even-length burst — and
+//! even a *true* 8-bit CRC lets roughly 1 in 256 corrupted frames through.
+//!
+//! `CRC-32/ISO-HDLC` is the variant used by zlib, gzip, PNG and Ethernet FCS,
+//! so a frame can be verified against any other implementation on any platform.
+//! Its check value over `b"123456789"` is `0xCBF4_3926`, asserted in the tests
+//! here and mirrored in the TypeScript port.
 //!
 //! # Usage
 //!
@@ -72,7 +84,7 @@ pub const MAX_PAYLOAD: usize = u16::MAX as usize;
 /// workspace. The committed `docs/compat/matrix.toml` records the same number
 /// plus the range of older versions still accepted — `fid release check`
 /// enforces that they agree.
-pub const WIRE_VERSION: u8 = 1;
+pub const WIRE_VERSION: u8 = 2;
 
 // ── Version-skew ──────────────────────────────────────────────────────────────
 
@@ -145,14 +157,38 @@ pub fn is_current_compatible(remote: u8) -> Result<(), VersionSkewError> {
     assert_compatible(WIRE_VERSION, remote, WIRE_VERSION)
 }
 
-// ── CRC-8 ─────────────────────────────────────────────────────────────────────
+// ── CRC-32 ────────────────────────────────────────────────────────────────────
 
-/// Compute the CRC-8 of a byte slice (XOR fold).
+/// Reflected polynomial for CRC-32/ISO-HDLC (`0x04C1_1DB7` reflected).
+const CRC32_POLY: u32 = 0xEDB8_8320;
+
+/// Compute the CRC-32/ISO-HDLC of a byte slice.
 ///
-/// Fast and allocation-free. Sufficient for a framed point-to-point link
-/// where the transport already has its own error detection (USB, UART FIFO).
-pub fn crc8(data: &[u8]) -> u8 {
-    data.iter().fold(0u8, |acc, &b| acc ^ b)
+/// Parameters: `poly=0x04C11DB7`, `init=0xFFFFFFFF`, `refin=true`,
+/// `refout=true`, `xorout=0xFFFFFFFF`. This is the variant used by zlib, gzip,
+/// PNG and Ethernet — `crc32(b"123456789") == 0xCBF4_3926`.
+///
+/// Bitwise and table-free: no heap, no static table, `const`-evaluable. The
+/// wire is the bottleneck on every link this protocol runs over (UART at
+/// 115200 baud is 11.5 KB/s; LoRa is slower still), so a 1 KB lookup table
+/// would buy throughput that no transport here can use.
+pub const fn crc32(data: &[u8]) -> u32 {
+    let mut crc: u32 = 0xFFFF_FFFF;
+    let mut i = 0;
+    while i < data.len() {
+        crc ^= data[i] as u32;
+        let mut bit = 0;
+        while bit < 8 {
+            crc = if crc & 1 != 0 {
+                (crc >> 1) ^ CRC32_POLY
+            } else {
+                crc >> 1
+            };
+            bit += 1;
+        }
+        i += 1;
+    }
+    !crc
 }
 
 // ── Encoding ──────────────────────────────────────────────────────────────────
@@ -169,7 +205,7 @@ pub enum EncodeError {
 /// Number of bytes produced by [`encode`] for the given payload length.
 #[inline]
 pub const fn encoded_len(payload_len: usize) -> usize {
-    payload_len + 4 // magic + len_lo + len_hi + crc8
+    payload_len + 7 // magic + len_lo + len_hi + crc32(4)
 }
 
 /// Encode `payload` as a framed message into `out`.
@@ -188,7 +224,8 @@ pub fn encode(payload: &[u8], out: &mut [u8]) -> Result<usize, EncodeError> {
     out[1] = (len & 0xFF) as u8;
     out[2] = (len >> 8) as u8;
     out[3..3 + payload.len()].copy_from_slice(payload);
-    out[3 + payload.len()] = crc8(payload);
+    let crc = crc32(payload).to_le_bytes();
+    out[3 + payload.len()..3 + payload.len() + 4].copy_from_slice(&crc);
     Ok(total)
 }
 
@@ -198,18 +235,26 @@ pub fn encode(payload: &[u8], out: &mut [u8]) -> Result<usize, EncodeError> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CrcError {
     /// CRC computed over the received payload.
-    pub computed: u8,
+    pub computed: u32,
     /// CRC received in the frame trailer.
-    pub received: u8,
+    pub received: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DecodeState {
     Magic,
     LenLo,
-    LenHi { len_lo: u8 },
-    Payload { remaining: u16 },
-    Crc,
+    LenHi {
+        len_lo: u8,
+    },
+    Payload {
+        remaining: u16,
+    },
+    /// Accumulating the 4-byte little-endian CRC trailer.
+    Crc {
+        got: u8,
+        acc: u32,
+    },
 }
 
 /// Byte-by-byte frame decoder with a fixed-size internal buffer.
@@ -269,7 +314,7 @@ impl<const N: usize> FrameDecoder<N> {
                 self.pos = 0;
                 self.expected = len;
                 if len == 0 {
-                    self.state = DecodeState::Crc;
+                    self.state = DecodeState::Crc { got: 0, acc: 0 };
                 } else if len as usize > N {
                     self.state = DecodeState::Magic;
                 } else {
@@ -283,7 +328,7 @@ impl<const N: usize> FrameDecoder<N> {
                     self.pos += 1;
                 }
                 if remaining == 1 {
-                    self.state = DecodeState::Crc;
+                    self.state = DecodeState::Crc { got: 0, acc: 0 };
                 } else {
                     self.state = DecodeState::Payload {
                         remaining: remaining - 1,
@@ -291,11 +336,18 @@ impl<const N: usize> FrameDecoder<N> {
                 }
                 None
             }
-            DecodeState::Crc => {
+            DecodeState::Crc { got, acc } => {
+                // Little-endian: first byte received is the least significant.
+                let acc = acc | ((byte as u32) << (8 * got as u32));
+                let got = got + 1;
+                if got < 4 {
+                    self.state = DecodeState::Crc { got, acc };
+                    return None;
+                }
                 let payload = &self.buf[..self.expected as usize];
-                let computed = crc8(payload);
+                let computed = crc32(payload);
                 self.state = DecodeState::Magic;
-                if computed == byte {
+                if computed == acc {
                     Some(payload)
                 } else {
                     None
@@ -335,13 +387,38 @@ mod tests {
     }
 
     #[test]
+    fn crc32_standard_check_value() {
+        // The CRC-32/ISO-HDLC check value. Any conforming implementation on any
+        // platform produces this for b"123456789" — this is what makes the frame
+        // verifiable outside Rust, and what the TypeScript port asserts too.
+        assert_eq!(crc32(b"123456789"), 0xCBF4_3926);
+    }
+
+    #[test]
+    fn crc32_empty_is_zero() {
+        assert_eq!(crc32(&[]), 0);
+    }
+
+    #[test]
+    fn crc32_detects_byte_reorder() {
+        // The property the old XOR fold did not have: order matters.
+        assert_ne!(crc32(b"ab"), crc32(b"ba"));
+    }
+
+    #[test]
+    fn crc32_is_const_evaluable() {
+        const CHECK: u32 = crc32(b"123456789");
+        assert_eq!(CHECK, 0xCBF4_3926);
+    }
+
+    #[test]
     fn encode_empty_payload() {
         let bytes = encode_to_vec(&[]);
-        assert_eq!(bytes.len(), 4);
+        assert_eq!(bytes.len(), 7);
         assert_eq!(bytes[0], MAGIC);
         assert_eq!(bytes[1], 0);
         assert_eq!(bytes[2], 0);
-        assert_eq!(bytes[3], 0); // crc8([]) = 0
+        assert_eq!(&bytes[3..7], &[0, 0, 0, 0]); // crc32([]) = 0
     }
 
     #[test]
@@ -353,7 +430,7 @@ mod tests {
         assert_eq!(bytes[2], 0);
         assert_eq!(bytes[3], b'h');
         assert_eq!(bytes[4], b'i');
-        assert_eq!(bytes[5], b'h' ^ b'i');
+        assert_eq!(&bytes[5..9], &crc32(payload).to_le_bytes());
     }
 
     #[test]
@@ -395,9 +472,9 @@ mod tests {
 
     #[test]
     fn encoded_len_formula() {
-        assert_eq!(encoded_len(0), 4);
-        assert_eq!(encoded_len(10), 14);
-        assert_eq!(encoded_len(100), 104);
+        assert_eq!(encoded_len(0), 7);
+        assert_eq!(encoded_len(10), 17);
+        assert_eq!(encoded_len(100), 107);
     }
 
     // ── Version-skew tests ────────────────────────────────────────────────────
@@ -446,7 +523,7 @@ mod tests {
         let claimed_len: u16 = 300;
         let mut input = vec![MAGIC, (claimed_len & 0xFF) as u8, (claimed_len >> 8) as u8];
         input.extend_from_slice(&[0u8; 300]);
-        input.push(0);
+        input.extend_from_slice(&[0u8; 4]); // 4-byte CRC trailer
         input.extend_from_slice(&encode_to_vec(b"ok"));
         let decoded = decode_all::<64>(&input).unwrap();
         assert_eq!(decoded, b"ok");
