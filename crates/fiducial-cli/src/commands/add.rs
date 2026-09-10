@@ -28,10 +28,10 @@ into the product. After installation, run `fid capability check` to verify.",
         after_long_help = "\
 TARGETS
   next      Next.js 15 (App Router) web app     → apps/web/
-  svelte    SvelteKit web app                    → apps/web/   (Phase 3b)
+  svelte    SvelteKit web app                    → apps/web/
   tauri     Tauri 2 desktop + mobile             → apps/desktop/
   worker    Cloudflare Worker / Durable Object   → apps/worker/
-  mobile    Tauri mobile standalone              → apps/mobile/ (Phase 3b)
+  mobile    Tauri mobile standalone              → apps/mobile/ (not available yet)
 
 EXAMPLES
   fid add app next
@@ -62,7 +62,8 @@ EXAMPLES
   fid add module telemetry    device telemetry pipeline
 
 STATUS
-  Module scaffolding is coming in Phase 3b."
+  Not available yet. `PHASES.md` in the platform repository records what is
+  planned; this help does not restate a schedule it would only get wrong."
     )]
     Module {
         /// Module name in kebab-case (e.g. `payments`, `auth`)
@@ -143,8 +144,8 @@ structure, configures the embedded toolchain, and adds the relevant guard rules.
 TARGETS
   rp2040     Raspberry Pi RP2040 — Embassy + probe-rs      → firmware/rp2040/
   rp2350     Raspberry Pi RP2350 — Embassy + probe-rs      → firmware/rp2350/
-  stm32      STM32 family — Embassy HAL                    → firmware/stm32/  (Phase 3b)
-  nrf52      nRF52 family — Embassy HAL                    → firmware/nrf52/  (Phase 3b)
+  stm32      STM32 family — Embassy HAL                    → firmware/stm32/
+  nrf52      nRF52 family — Embassy HAL                    → firmware/nrf52/  (not available yet)
 
 EXAMPLES
   fid add firmware rp2040
@@ -180,8 +181,8 @@ fn add_app(target: &str) -> Result<()> {
         "mobile" => {
             println!(
                 "✦ fid add app {target}\n\n\
-                 The `{target}` target is coming in Phase 3b.\n\
-                 Track progress: https://github.com/AleksaZCodes/fiducial"
+                 The `{target}` target is not available yet.\n\
+                 See PHASES.md: https://github.com/AleksaZCodes/fiducial/blob/main/PHASES.md"
             );
             return Ok(());
         }
@@ -227,8 +228,8 @@ fn add_firmware(target: &str) -> Result<()> {
 fn add_module(name: &str) -> Result<()> {
     println!(
         "✦ fid add module {name}\n\n\
-         Module scaffolding is coming in Phase 3b.\n\
-         Track progress: https://github.com/AleksaZCodes/fiducial"
+         Module scaffolding is not available yet.\n\
+         See PHASES.md: https://github.com/AleksaZCodes/fiducial/blob/main/PHASES.md"
     );
     Ok(())
 }
@@ -256,7 +257,7 @@ pub fn install_capability(cap_id: &str) -> Result<()> {
         anyhow::anyhow!(
             "capability `{cap_id}` not found in the built-in registry.\n\
              Run `fid capability list --all` to see available capabilities.\n\
-             Third-party capabilities (from git repos) are supported in Phase 5+."
+             Only built-in capabilities are supported; third-party ones are not."
         )
     })?;
 

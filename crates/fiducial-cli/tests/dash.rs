@@ -554,3 +554,214 @@ fn dash_outside_a_product_says_so() {
         "should name what is missing: {stderr}"
     );
 }
+
+// ── Regressions ───────────────────────────────────────────────────────────────
+//
+// Each of these reproduces something dash got wrong. Two were crashes; three
+// were worse — it reported a confident number that was false. A view an agent
+// reads has to be right or say nothing, so they are pinned here.
+
+#[test]
+fn a_non_ascii_decision_filename_does_not_crash_the_dashboard() {
+    // `&name[..10]` panics when byte 10 lands inside a multi-byte character,
+    // so one decision file with a non-English name took down every section.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    write(&root, "docs/specs/启动决定-2026.md", "# 启动决定\n");
+    write(&root, "docs/specs/2026-01-02-ok.md", "# Dated and fine\n");
+
+    let d = dash(&root);
+    assert_eq!(d["decisions"]["count"], 2);
+    let recent = d["decisions"]["recent"].as_array().unwrap();
+    // The undated one still appears, with no date rather than a crash.
+    assert!(recent.iter().any(|r| r["date"].is_null()));
+    assert!(recent.iter().any(|r| r["date"] == "2026-01-02"));
+}
+
+#[test]
+fn a_long_roadmap_row_with_multibyte_text_does_not_crash() {
+    // `String::truncate(93)` panics mid-character. An em-dash in a long row was
+    // enough — and this project writes em-dashes everywhere.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    let long = "x".repeat(91);
+    write(
+        &root,
+        "ROADMAP.md",
+        &format!("# Roadmap\n| 2 | {long}—ship it, eventually, after the review | 🟡 |\n"),
+    );
+
+    let d = dash(&root);
+    assert_eq!(d["roadmap"]["in_progress"], 1);
+    let active = d["roadmap"]["active"].as_array().unwrap();
+    assert!(
+        active[0].as_str().unwrap().ends_with("..."),
+        "should truncate"
+    );
+}
+
+#[test]
+fn a_legend_line_is_not_counted_as_roadmap_progress() {
+    // "Legend: ✅ done · 🟡 in progress · ⬜ not started" is a normal thing to
+    // write, and it used to score as one completed item.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    write(
+        &root,
+        "ROADMAP.md",
+        "# Roadmap\n\n\
+         Legend: ✅ done · 🟡 in progress · ⬜ not started\n\n\
+         | 1 | Real item | ✅ |\n",
+    );
+
+    let d = dash(&root);
+    assert_eq!(d["roadmap"]["done"], 1, "the legend is not an item");
+    assert_eq!(d["roadmap"]["in_progress"], 0);
+    assert_eq!(d["roadmap"]["todo"], 0);
+}
+
+#[test]
+fn two_markers_meaning_the_same_thing_are_still_one_item() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    write(&root, "ROADMAP.md", "# Roadmap\n- [x] shipped ✅\n");
+    assert_eq!(dash(&root)["roadmap"]["done"], 1);
+}
+
+#[test]
+fn a_commented_out_freshness_check_does_not_count_as_one() {
+    // The inversion that mattered most: dash's most useful finding is "no
+    // workflow guards artifact freshness", and a comment mentioning
+    // `fid derive --check` used to flip it to "guarded".
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    write(
+        &root,
+        ".github/workflows/manual.yml",
+        "name: Manual only\n\
+         # someone should run fid derive --check here one day\n\
+         on:\n  workflow_dispatch:\n\
+         jobs:\n  note:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n",
+    );
+
+    let d = dash(&root);
+    let w = d["ci"]["workflows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|w| w["name"] == "Manual only")
+        .expect("Manual only");
+    assert_eq!(
+        w["checks_freshness"], false,
+        "a comment is not a freshness check"
+    );
+}
+
+#[test]
+fn job_names_are_not_mistaken_for_triggers() {
+    // `push` and `schedule` are plausible job names, and substring-searching
+    // the file reported both as triggers of a manual-only workflow.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    write(
+        &root,
+        ".github/workflows/deploy.yml",
+        "name: Deploy\n\
+         on:\n  workflow_dispatch:\n\
+         jobs:\n\
+         \x20 push:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo a\n\
+         \x20 schedule:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo b\n",
+    );
+
+    let d = dash(&root);
+    let w = d["ci"]["workflows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|w| w["name"] == "Deploy")
+        .expect("Deploy");
+    assert_eq!(
+        w["triggers"],
+        serde_json::json!(["workflow_dispatch"]),
+        "job names are not triggers"
+    );
+}
+
+#[test]
+fn every_shape_of_the_on_key_is_read() {
+    // GitHub accepts three forms, and `on` is a YAML 1.1 boolean so the key is
+    // sometimes quoted. All four appear in real repositories.
+    let cases: [(&str, &str, serde_json::Value); 4] = [
+        (
+            "scalar.yml",
+            "name: Scalar\non: push\njobs: {}\n",
+            serde_json::json!(["push"]),
+        ),
+        (
+            "flow.yml",
+            "name: Flow\non: [push, pull_request]\njobs: {}\n",
+            serde_json::json!(["push", "pull_request"]),
+        ),
+        (
+            "block.yml",
+            "name: Block\non:\n  push:\n    branches: [main]\n  pull_request:\njobs: {}\n",
+            serde_json::json!(["push", "pull_request"]),
+        ),
+        (
+            "quoted.yml",
+            "name: Quoted\n\"on\":\n  schedule:\n    - cron: '0 0 * * *'\njobs: {}\n",
+            serde_json::json!(["schedule"]),
+        ),
+    ];
+
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    for (file, body, _) in &cases {
+        write(&root, &format!(".github/workflows/{file}"), body);
+    }
+
+    let d = dash(&root);
+    let workflows = d["ci"]["workflows"].as_array().unwrap();
+    for (file, _, expected) in &cases {
+        let w = workflows
+            .iter()
+            .find(|w| w["file"] == *file)
+            .unwrap_or_else(|| panic!("missing {file}"));
+        assert_eq!(&w["triggers"], expected, "{file} triggers");
+    }
+}
+
+#[test]
+fn a_triggers_options_are_not_read_as_triggers() {
+    // `branches:` is a property of the `push` trigger, not another trigger.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    write(
+        &root,
+        ".github/workflows/deep.yml",
+        "name: Deep\non:\n  push:\n    branches:\n      - main\n      - dev\n    tags: ['v*']\njobs: {}\n",
+    );
+    let d = dash(&root);
+    let w = d["ci"]["workflows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|w| w["name"] == "Deep")
+        .unwrap();
+    assert_eq!(w["triggers"], serde_json::json!(["push"]));
+}
+
+#[test]
+fn text_output_carries_no_escape_codes_when_redirected() {
+    // Output captured by a pipe is not a terminal, and styling it writes escape
+    // codes into whatever reads it.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    let out = run(&root, &["dash"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        !text.contains('\x1b'),
+        "redirected output must be plain text: {text:?}"
+    );
+    assert!(text.contains("Product"), "headings still present");
+}

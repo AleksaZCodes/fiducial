@@ -6,8 +6,8 @@
 //!   3. Every template file recorded in the lock is present.
 //!   4. No template file recorded in the lock has been hand-modified
 //!      (its SHA-256 matches the lock record).
-//!   5. (Phase 4) Templates with upstream changes available — run `fid upgrade`.
-//!   6. (Phase 4) Pending codemod migrations — run `fid upgrade`.
+//!   5. Templates with upstream changes available — run `fid upgrade`.
+//!   6. Pending codemod migrations — run `fid upgrade`.
 
 use anyhow::{Context, Result};
 use std::{env, path::Path};
