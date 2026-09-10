@@ -31,5 +31,6 @@ fiducial-mesh     = { path = "../fiducial-mesh",     features = ["std"] }
 fiducial-protocol = { path = "../fiducial-protocol", features = ["std"] }
 
 [dev-dependencies]
-tempfile         = "3"
+tempfile          = "3"
+walkdir           = "2"
 fiducial-protocol = { path = "../fiducial-protocol" }
