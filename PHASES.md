@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 16
+## Current phase: Phase 16b
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -298,6 +298,36 @@ a vertical face with a horizontal bore, so it needs those primitives
 parameterised the way `punched_face` already is. `Polygon::signed_area()` still awaits
 offsetting a non-rectangular outline — the one genuinely absent primitive.
 
+**Phase 16 — Workbench v0 ✅ (2026-09-11)**
+
+> `fid dash` — one read-only view of roadmap, status, decisions, CI, graph, freshness.
+> Spec: `docs/specs/2026-09-11-workbench-v0-fid-dash.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| `fid dash` — seven sections: product, git, roadmap, decisions, CI, graph, freshness | ✅ |
+| **Owns no store.** Every number recomputed per run from files already in the repo; a test asserts dash writes nothing at all | ✅ |
+| **No network.** CI read from declared workflow files, not a live API — a test renders it with every proxy pointed at a closed port | ✅ |
+| Reports whether *any* workflow runs `fid derive --check`; a fresh scaffold has none, so a stale artifact would reach main — dash says so | ✅ |
+| Absence is a finding: no roadmap / no decisions / no pipelines each render a "not declared" line and still exit 0 | ✅ |
+| Exits 0 even on findings — gating is `fid derive --check` and `fid doctor`; a dashboard must be runnable casually | ✅ |
+| Freshness re-hashes artifacts (fresh / stale / missing / **never derived**) and reports hand-edited templates as drift | ✅ |
+| Roadmap counted from `✅ 🟡 ⬜` and task-list markers in `ROADMAP.md` or `PHASES.md`; unmarked prose counts as nothing | ✅ |
+| Decisions read from `docs/specs` (or `docs/decisions`, `docs/adr`), newest first by date-prefixed filename, titled from the first heading | ✅ |
+| Git handles the unborn HEAD a fresh `fid new` leaves — `is_repo` is tracked separately, because inferring it from a missing branch called every new product un-versioned | ✅ |
+| `--json` — same facts for agents and workbench v1, so neither reimplements these reads | ✅ |
+| `--section <name>`; an unknown name lists the valid ones | ✅ |
+| **`pipeline::discover` — one reader for `pipelines/*.toml`.** `derive` and `graph` each parsed it and *disagreed*: derive failed with the filename, graph labelled it `"unknown"`. Dash would have been the third copy | ✅ |
+| Scaffolded `AGENTS.md` + `README.md` templates now point agents at `fid dash` / `--json` | ✅ |
+| `fid graph` help no longer claims "not yet implemented (Phase 4)" | ✅ |
+| CI: `workbench` job — pipeline-discovery unit tests + 21 end-to-end dash tests | ✅ |
+| 21 dash end-to-end, 7 pipeline unit, 24 enclosure, 34 CLI lib tests; clippy + fmt clean | ✅ |
+
+**Still open on the workbench** — single repo only (multi-repo is v1 per §10),
+no live CI status (deliberate; would go behind a flag), decisions are listed but
+not read so supersession is undetected, and `briefs` from §10's v0 row is not
+built because no product has one yet.
+
 **Phase 13 — complete ✅ (2026-09-08)**
 
 > Web Serial, WebUSB, and BLE transports — same Fiducial frame codec as the firmware.
@@ -451,7 +481,7 @@ fiducial/
 | **13** | Web Serial/WebUSB + BLE transports | Same device reachable from browser and phone with the same codec | ✅ |
 | **14** | EDA pipeline: atopile → KiCad → `board.interface.json` + fab outputs | A board change regenerates every output; `--check` catches staleness | ✅ |
 | **15** | `fiducial-geometry` + `fiducial-mesh` + `viewer3d-*` + tolerance profiles | Board outline → generated enclosure → printable STL and a GLB on a marketing page | ✅ |
-| **16** | Workbench v0: `fid dash` read-only view | Roadmap, status, decisions, CI, graph, freshness in one place | ⬜ |
+| **16** | Workbench v0: `fid dash` read-only view | Roadmap, status, decisions, CI, graph, freshness in one place | ✅ |
 | **16b** | `fid release` + version-skew assertions | A protocol bump fails any artifact still on the old version; compatibility matrix committed | ⬜ |
 | **16c** | Firmware OTA: `embassy-boot` A/B, signing, resumable transfer, staged rollout | Device updates over BLE, self-tests, marks booted — broken image rolls back automatically | ⬜ |
 | **17** | `fiducial-sim`, `realtime`, workbench v1 | Simulation runs native and in WASM; realtime's three contracts covered by tests | ⬜ |

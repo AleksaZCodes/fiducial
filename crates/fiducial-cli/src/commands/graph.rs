@@ -7,7 +7,10 @@
 use anyhow::Result;
 use serde::Serialize;
 
-use crate::config::{Config, CONFIG_FILE};
+use crate::{
+    config::{Config, CONFIG_FILE},
+    pipeline::{self, Pipeline},
+};
 
 // ── Graph types ───────────────────────────────────────────────────────────────
 
@@ -37,7 +40,7 @@ pub fn run(format: &str) -> Result<()> {
     let root = Config::find_root(&cwd)?;
     let config = Config::load(&root.join(CONFIG_FILE))?;
 
-    let pipelines = discover_pipelines_simple(&root, &config);
+    let pipelines = pipeline::discover(&root, &config)?;
 
     let mut nodes: Vec<GraphNode> = Vec::new();
     let mut edges: Vec<GraphEdge> = Vec::new();
@@ -82,13 +85,7 @@ pub fn run(format: &str) -> Result<()> {
 
 // ── Format emitters ───────────────────────────────────────────────────────────
 
-struct SimplePipeline {
-    name: String,
-    outputs: Vec<String>,
-    executor: String,
-}
-
-fn emit_text(pipelines: &[SimplePipeline]) {
+fn emit_text(pipelines: &[Pipeline]) {
     if pipelines.is_empty() {
         println!("(no pipelines declared)");
         println!("Declare pipelines in `pipelines/*.toml` or enable [spine] in fiducial.toml.");
@@ -117,65 +114,4 @@ fn emit_dot(graph: &Graph) {
         println!("  {:?} -> {:?};", edge.from, edge.to);
     }
     println!("}}");
-}
-
-fn discover_pipelines_simple(root: &std::path::Path, config: &Config) -> Vec<SimplePipeline> {
-    let mut pipelines = Vec::new();
-
-    if config.spine.enabled {
-        pipelines.push(SimplePipeline {
-            name: "types".into(),
-            outputs: vec!["packages/wasm-bridge/src/generated.ts".into()],
-            executor: "cargo-test".into(),
-        });
-    }
-
-    let pipelines_dir = root.join("pipelines");
-    if pipelines_dir.is_dir() {
-        let mut entries: Vec<_> = std::fs::read_dir(&pipelines_dir)
-            .ok()
-            .into_iter()
-            .flatten()
-            .filter_map(|e| e.ok())
-            .map(|e| e.path())
-            .filter(|p| p.extension().is_some_and(|e| e == "toml"))
-            .collect();
-        entries.sort();
-
-        for path in entries {
-            if let Ok(raw) = std::fs::read_to_string(&path) {
-                if let Ok(toml_val) = raw.parse::<toml::Value>() {
-                    let name = toml_val
-                        .get("name")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("unknown")
-                        .to_string();
-                    if pipelines.iter().any(|p: &SimplePipeline| p.name == name) {
-                        continue;
-                    }
-                    let outputs = toml_val
-                        .get("outputs")
-                        .and_then(|v| v.as_array())
-                        .map(|arr| {
-                            arr.iter()
-                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                                .collect()
-                        })
-                        .unwrap_or_default();
-                    let executor = toml_val
-                        .get("executor")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("shell")
-                        .to_string();
-                    pipelines.push(SimplePipeline {
-                        name,
-                        outputs,
-                        executor,
-                    });
-                }
-            }
-        }
-    }
-
-    pipelines
 }

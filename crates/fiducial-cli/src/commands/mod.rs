@@ -1,6 +1,7 @@
 pub mod add;
 pub mod capability;
 pub mod component;
+pub mod dash;
 pub mod derive;
 pub mod doctor;
 pub mod graph;
