@@ -283,6 +283,35 @@ jobs:
       - name: Help text names no phase and claims nothing false
         run: cargo test -p fiducial-cli --test help_honesty
 
+  # ── Release: wire-version matrix in sync with compiled constant ───────────
+  #
+  # Phase 16b. The test suite drives `fid release` through its subcommands and
+  # verifies that a protocol bump correctly fails an old-version artifact.
+  # `check_passes_with_committed_matrix` is the hard gate: it fails when someone
+  # bumps WIRE_VERSION without updating docs/compat/matrix.toml (or vice-versa).
+  release:
+    name: release (fid release check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Protocol unit tests (version-skew assertions)
+        run: cargo test -p fiducial-protocol
+
+      - name: Release integration tests
+        run: cargo test -p fiducial-cli --test release
+
+      - name: fid release check (matrix ↔ WIRE_VERSION in sync)
+        run: |
+          cargo build -p fiducial-cli --bin fid
+          ./target/debug/fid release check
+
   # ── JavaScript / TypeScript ───────────────────────────────────────────────
   js:
     name: JS/TS

@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 16b
+## Current phase: Phase 16c
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -349,6 +349,28 @@ no live CI status (deliberate; would go behind a flag), decisions are listed but
 not read so supersession is undetected, and `briefs` from §10's v0 row is not
 built because no product has one yet.
 
+**Phase 16b — complete ✅ (2026-09-10)**
+
+> `fid release` + version-skew assertions.
+> Done when: A protocol bump fails any artifact still on the old version; compatibility matrix committed.
+
+| Deliverable | Status |
+| --- | --- |
+| `WIRE_VERSION: u8 = 1` in `fiducial-protocol` — single declaration of the wire protocol version, embedded in every compiled artifact | ✅ |
+| `assert_compatible(local, remote, min_compatible)` — rejects a remote below the declared minimum; returns `VersionSkewError` with all three fields | ✅ |
+| `is_current_compatible(remote)` — convenience form using `WIRE_VERSION` as both local and min | ✅ |
+| `core::error::Error` impl for `VersionSkewError` — usable in `?` chains on any Rust target (MSRV 1.82) | ✅ |
+| `docs/compat/matrix.toml` — committed compatibility policy: `wire.current`, `wire.min_compatible`, dated history | ✅ |
+| `fid release status` — print platform CLI version, WIRE_VERSION, and matrix | ✅ |
+| `fid release check` — fail when `matrix.wire.current ≠ WIRE_VERSION`; the CI enforcement point | ✅ |
+| `fid release protocol --bump breaking` — increment wire version, raise min_compatible, print ACTION REQUIRED reminder | ✅ |
+| `fid release protocol --bump compatible` — increment wire version, keep min_compatible, print reminder | ✅ |
+| 5 unit tests in `commands::release` + 14 version-skew tests in `fiducial-protocol` | ✅ |
+| 6 end-to-end tests in `tests/release.rs` — covers happy-path check, stale-matrix rejection, breaking bump, compatible bump, old-artifact rejection | ✅ |
+| `release` CI job — protocol tests + integration tests + `fid release check` on the committed matrix | ✅ |
+| `docs/specs/2026-09-10-release-and-version-skew.md` — decision record | ✅ |
+| "Done when" criterion: `assert_compatible(2, 1, 2).is_err()` proves an artifact on v1 is rejected after a breaking bump to v2 | ✅ |
+
 **Phase 13 — complete ✅ (2026-09-08)**
 
 > Web Serial, WebUSB, and BLE transports — same Fiducial frame codec as the firmware.
@@ -503,7 +525,7 @@ fiducial/
 | **14** | EDA pipeline: atopile → KiCad → `board.interface.json` + fab outputs | A board change regenerates every output; `--check` catches staleness | ✅ |
 | **15** | `fiducial-geometry` + `fiducial-mesh` + `viewer3d-*` + tolerance profiles | Board outline → generated enclosure → printable STL and a GLB on a marketing page | ✅ |
 | **16** | Workbench v0: `fid dash` read-only view | Roadmap, status, decisions, CI, graph, freshness in one place | ✅ |
-| **16b** | `fid release` + version-skew assertions | A protocol bump fails any artifact still on the old version; compatibility matrix committed | ⬜ |
+| **16b** | `fid release` + version-skew assertions | A protocol bump fails any artifact still on the old version; compatibility matrix committed | ✅ |
 | **16c** | Firmware OTA: `embassy-boot` A/B, signing, resumable transfer, staged rollout | Device updates over BLE, self-tests, marks booted — broken image rolls back automatically | ⬜ |
 | **17** | `fiducial-sim`, `realtime`, workbench v1 | Simulation runs native and in WASM; realtime's three contracts covered by tests | ⬜ |
 | **18** | ROP migration wave 2 (optional) — eligible rules to L0 Rust | Each differential-tested before the TypeScript is deleted | ⬜ |

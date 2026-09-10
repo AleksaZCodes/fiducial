@@ -6,4 +6,5 @@ pub mod derive;
 pub mod doctor;
 pub mod graph;
 pub mod new;
+pub mod release;
 pub mod upgrade;

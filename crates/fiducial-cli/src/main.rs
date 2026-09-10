@@ -248,6 +248,41 @@ SEE ALSO
         format: String,
     },
 
+    /// Platform version management and version-skew enforcement
+    #[command(
+        long_about = "\
+Manage the platform wire-protocol version and verify the committed compatibility
+matrix stays in sync with the compiled constant.
+
+SUBCOMMANDS
+  fid release status                      show current versions and matrix
+  fid release check                       fail if matrix ≠ WIRE_VERSION (CI gate)
+  fid release protocol --bump breaking    bump wire version, drop old artifacts
+  fid release protocol --bump compatible  bump wire version, keep old artifacts
+
+The wire protocol version (`WIRE_VERSION` in `crates/fiducial-protocol/src/lib.rs`)
+is embedded in every compiled artifact. When two endpoints connect they exchange
+this version; `assert_compatible` rejects anything below the declared minimum.
+
+The committed `docs/compat/matrix.toml` records the current version and the
+minimum accepted version. `fid release check` enforces that the file and the
+constant agree — a PR that bumps one without the other fails CI.",
+        after_long_help = "\
+EXAMPLES
+  fid release status
+  fid release check
+  fid release protocol --bump breaking --note \"Removed legacy handshake field\"
+  fid release protocol --bump compatible --note \"Added optional capabilities byte\"
+
+SEE ALSO
+  docs/compat/matrix.toml   the committed compatibility policy
+  fid dash                  freshness and pipeline state at a glance"
+    )]
+    Release {
+        #[command(subcommand)]
+        action: commands::release::ReleaseAction,
+    },
+
     /// The workbench — one read-only view of roadmap, decisions, CI, graph, freshness
     #[command(
         long_about = "\
@@ -356,6 +391,7 @@ fn main() -> Result<()> {
         Commands::Derive { check, pipeline } => commands::derive::run(check, pipeline),
         Commands::Upgrade { dry_run, portfolio } => commands::upgrade::run(dry_run, portfolio),
         Commands::Graph { format } => commands::graph::run(&format),
+        Commands::Release { action } => commands::release::run(action),
         Commands::Dash { json, section } => commands::dash::run(json, section),
         Commands::Doctor => commands::doctor::run(),
         Commands::GuardCheck => guard::check_from_stdin(),
