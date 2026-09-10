@@ -14,6 +14,40 @@
 //! let stl  = to_stl_binary(&mesh);     // Vec<u8> — save as board.stl
 //! let glb  = to_glb(&mesh);            // Vec<u8> — save as board.glb
 //! ```
+//!
+//! # Sealed cases with features
+//!
+//! [`Case`] is the full API: a gasket-sealed base, lid, and gasket, with
+//! connector openings punched through the walls and optional standoff posts
+//! under the board. Validate before generating — the meshes are produced
+//! unconditionally, so an opening that breaches the seal yields a case that
+//! slices cleanly and leaks.
+//!
+//! ```rust,ignore
+//! use fiducial_geometry::{BoardOutline, Side, connector_opening};
+//! use fiducial_mesh::{Case, CaseParams, Cutout, to_stl_binary};
+//!
+//! let outline = BoardOutline::new(100.0, 60.0);
+//! let usb = connector_opening("usb-c").unwrap();
+//! let case = Case::new(outline)
+//!     .with_params(CaseParams::from_outline(&outline).with_headroom(10.0))
+//!     .with_cutouts(vec![Cutout::new("J1", Side::South, 20.0, usb.width_mm, usb.height_mm)]);
+//!
+//! case.validate()?;                    // reports against the declaration
+//! let stl = to_stl_binary(&case.base());
+//! ```
+//!
+//! # How a punched face stays closed
+//!
+//! A hole in a wall would normally force every neighbouring surface to be
+//! re-tessellated: subdivide one edge and the surface beside it no longer
+//! matches, leaving a T-junction that is not a closed manifold. Instead each
+//! punched face keeps a mitred frame around an inset grid, fanned from its
+//! outer corners. The inset boundary carries as many vertices as the holes
+//! need while the outer boundary stays four single edges — so the rim, groove,
+//! and lip rings are generated exactly as they are for a featureless case, and
+//! a case with no features is byte-identical to one from before cutouts
+//! existed.
 
 #![no_std]
 #![deny(unsafe_code)]
@@ -21,8 +55,17 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
-use fiducial_geometry::BoardOutline;
+#[cfg(any(test, feature = "std"))]
+extern crate std;
+
+use alloc::{string::String, vec::Vec};
+use fiducial_geometry::{BoardOutline, Side};
+
+/// Tolerance for comparing generated coordinates, in millimetres.
+///
+/// One nanometre: far below any printable feature, far above f32 noise at the
+/// scale of a case.
+const EPS: f32 = 1e-6;
 
 // ── Mesh ──────────────────────────────────────────────────────────────────────
 
@@ -417,6 +460,55 @@ impl Rect {
     }
 }
 
+/// The extent of a punched face in its own parameters.
+///
+/// `inset` is the width of the mitred frame the face keeps around its grid —
+/// the mechanism that lets a hole subdivide the inside of a face while its
+/// outer boundary stays four single edges.
+#[derive(Debug, Clone, Copy)]
+struct FaceSpan {
+    u: (f32, f32),
+    v: (f32, f32),
+    inset: f32,
+}
+
+/// A rectangular hole in a punched face, in that face's own (u, v) parameters.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Hole {
+    u0: f32,
+    v0: f32,
+    u1: f32,
+    v1: f32,
+}
+
+impl Hole {
+    /// Whether a point lies strictly inside — used on cell centres, so a cell
+    /// merely touching the hole boundary is kept.
+    fn contains(&self, u: f32, v: f32) -> bool {
+        u > self.u0 && u < self.u1 && v > self.v0 && v < self.v1
+    }
+
+    /// Other holes' `u` boundaries falling strictly inside this one's span.
+    ///
+    /// A neighbouring hole splits this hole's rim on the panel, so the tunnel
+    /// through it has to be split at the same places or the two surfaces meet
+    /// at a T-junction and the solid is no longer closed.
+    fn u_cuts(&self, all: &[Hole]) -> Vec<f32> {
+        all.iter()
+            .flat_map(|h| [h.u0, h.u1])
+            .filter(|t| *t > self.u0 + EPS && *t < self.u1 - EPS)
+            .collect()
+    }
+
+    /// Other holes' `v` boundaries falling strictly inside this one's span.
+    fn v_cuts(&self, all: &[Hole]) -> Vec<f32> {
+        all.iter()
+            .flat_map(|h| [h.v0, h.v1])
+            .filter(|t| *t > self.v0 + EPS && *t < self.v1 - EPS)
+            .collect()
+    }
+}
+
 /// Accumulates quads into a [`Mesh`].
 ///
 /// Every surface of a rectangular case is one of three shapes — a flat cap, a
@@ -506,6 +598,155 @@ impl MeshBuilder {
         }
     }
 
+    /// Sorted, de-duplicated grid lines spanning `lo..hi`.
+    ///
+    /// Cut values outside the span are dropped rather than clamped: a clamped
+    /// cut would collapse a grid cell to zero width and emit a degenerate
+    /// triangle, which is exactly the kind of facet a slicer chokes on.
+    fn grid_lines(lo: f32, hi: f32, cuts: impl Iterator<Item = f32>) -> Vec<f32> {
+        let mut v: Vec<f32> = Vec::new();
+        v.push(lo);
+        for c in cuts {
+            if c > lo + EPS && c < hi - EPS {
+                v.push(c);
+            }
+        }
+        v.push(hi);
+        v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
+        v.dedup_by(|a, b| (*a - *b).abs() < EPS);
+        v
+    }
+
+    /// A single quad of a parameterised face, wound from `(u0, v0)`.
+    fn face_quad<F>(&mut self, map: &F, normal: [f32; 3], u: (f32, f32), v: (f32, f32), flip: bool)
+    where
+        F: Fn(f32, f32) -> [f32; 3],
+    {
+        let q = [map(u.0, v.0), map(u.1, v.0), map(u.1, v.1), map(u.0, v.1)];
+        if flip {
+            self.quad([q[0], q[3], q[2], q[1]], normal);
+        } else {
+            self.quad(q, normal);
+        }
+    }
+
+    /// Triangulate a planar polygon as a fan from its first vertex.
+    ///
+    /// Only valid for convex or fan-visible polygons — every polygon fanned
+    /// here is a mitred trapezoid with extra vertices along one edge, which
+    /// qualifies. Each boundary edge is used exactly once, which is what keeps
+    /// the surface closed.
+    fn poly_fan(&mut self, pts: &[[f32; 3]], normal: [f32; 3], flip: bool) {
+        if pts.len() < 3 {
+            return;
+        }
+        let base = self.vertices.len() as u32;
+        for p in pts {
+            self.vertices.push(*p);
+            self.normals.push(normal);
+        }
+        for i in 1..pts.len() as u32 - 1 {
+            if flip {
+                self.triangles.push([base, base + i + 1, base + i]);
+            } else {
+                self.triangles.push([base, base + i, base + i + 1]);
+            }
+        }
+    }
+
+    /// A parameterised face tessellated on an explicit grid, omitting any cell
+    /// whose centre falls inside a hole.
+    ///
+    /// `map(u, v)` places a parameter pair in space; increasing `u` then `v`
+    /// must wind counter-clockwise about `normal` unless `flip` is set.
+    fn grid_face<F>(
+        &mut self,
+        map: &F,
+        normal: [f32; 3],
+        u_lines: &[f32],
+        v_lines: &[f32],
+        holes: &[Hole],
+        flip: bool,
+    ) where
+        F: Fn(f32, f32) -> [f32; 3],
+    {
+        for i in 0..u_lines.len().saturating_sub(1) {
+            for j in 0..v_lines.len().saturating_sub(1) {
+                let (u0, u1) = (u_lines[i], u_lines[i + 1]);
+                let (v0, v1) = (v_lines[j], v_lines[j + 1]);
+                let (uc, vc) = ((u0 + u1) * 0.5, (v0 + v1) * 0.5);
+                if holes.iter().any(|h| h.contains(uc, vc)) {
+                    continue;
+                }
+                self.face_quad(map, normal, (u0, u1), (v0, v1), flip);
+            }
+        }
+    }
+
+    /// A rectangular face with rectangular holes punched through it.
+    ///
+    /// The face is split into a mitred frame and an inset grid. The frame is
+    /// fanned from the outer corners, so the inset boundary can carry as many
+    /// vertices as the grid needs while the outer boundary stays four single
+    /// edges. That is what lets a punched wall sit beside an unpunched rim
+    /// without a T-junction — the neighbouring surfaces need no knowledge of
+    /// the holes at all.
+    ///
+    /// With no holes it degenerates to one quad, so an unfeatured case is
+    /// byte-identical to one generated before cutouts existed.
+    fn punched_face<F>(
+        &mut self,
+        map: F,
+        normal: [f32; 3],
+        span: FaceSpan,
+        holes: &[Hole],
+        flip: bool,
+    ) where
+        F: Fn(f32, f32) -> [f32; 3],
+    {
+        let FaceSpan { u, v, inset } = span;
+        if holes.is_empty() {
+            self.face_quad(&map, normal, u, v, flip);
+            return;
+        }
+
+        let inner = (u.0 + inset, u.1 - inset, v.0 + inset, v.1 - inset);
+        let u_lines = Self::grid_lines(inner.0, inner.1, holes.iter().flat_map(|h| [h.u0, h.u1]));
+        let v_lines = Self::grid_lines(inner.2, inner.3, holes.iter().flat_map(|h| [h.v0, h.v1]));
+
+        // Frame corners, counter-clockwise in (u, v).
+        let oc = [(u.0, v.0), (u.1, v.0), (u.1, v.1), (u.0, v.1)];
+        let ic = [
+            (inner.0, inner.2),
+            (inner.1, inner.2),
+            (inner.1, inner.3),
+            (inner.0, inner.3),
+        ];
+
+        for k in 0..4 {
+            let n = (k + 1) % 4;
+            // The inset boundary walked from corner n back to corner k,
+            // through every grid vertex on the way.
+            let mut chain: Vec<(f32, f32)> = Vec::new();
+            match k {
+                0 => chain.extend(u_lines.iter().rev().map(|&t| (t, inner.2))),
+                1 => chain.extend(v_lines.iter().rev().map(|&t| (inner.1, t))),
+                2 => chain.extend(u_lines.iter().map(|&t| (t, inner.3))),
+                _ => chain.extend(v_lines.iter().map(|&t| (inner.0, t))),
+            }
+            let mut poly: Vec<[f32; 3]> = Vec::with_capacity(chain.len() + 2);
+            poly.push(map(oc[k].0, oc[k].1));
+            poly.push(map(oc[n].0, oc[n].1));
+            debug_assert!((chain[0].0 - ic[n].0).abs() < EPS && (chain[0].1 - ic[n].1).abs() < EPS);
+            for (cu, cv) in chain {
+                poly.push(map(cu, cv));
+            }
+            self.poly_fan(&poly, normal, flip);
+        }
+
+        self.grid_face(&map, normal, &u_lines, &v_lines, holes, flip);
+    }
+
     fn build(self) -> Mesh {
         Mesh {
             vertices: self.vertices,
@@ -543,6 +784,14 @@ pub struct CaseParams {
     pub gasket_compression: f32,
     /// Slack between the gasket and its groove, per side, so it can be seated.
     pub fit_clearance_mm: f32,
+    /// Smallest feature the process can resolve — the margin every cutout must
+    /// leave to a wall edge, and the floor on a cutout's own dimensions.
+    pub min_feature_mm: f32,
+    /// Height of the posts the board rests on. Zero means no standoffs and the
+    /// board sits on the cavity floor.
+    pub standoff_height_mm: f32,
+    /// Footprint of each standoff post, square.
+    pub standoff_size_mm: f32,
 }
 
 impl CaseParams {
@@ -565,6 +814,9 @@ impl CaseParams {
             gasket_height_mm: 2.0,
             gasket_compression: 0.25,
             fit_clearance_mm: p.xy_accuracy_mm,
+            min_feature_mm: p.min_feature_mm,
+            standoff_height_mm: 0.0,
+            standoff_size_mm: 4.0,
         }
     }
 
@@ -617,6 +869,15 @@ impl CaseParams {
         self.gasket_compression = v;
         self
     }
+    /// Raise the board onto standoff posts of this height.
+    ///
+    /// The case grows by the same amount: headroom is measured above the board,
+    /// so lifting the board lifts the rim with it.
+    pub const fn with_standoffs(mut self, height_mm: f32, size_mm: f32) -> Self {
+        self.standoff_height_mm = height_mm;
+        self.standoff_size_mm = size_mm;
+        self
+    }
 }
 
 /// Every rectangle and height the three case parts share.
@@ -632,6 +893,7 @@ struct CaseGeometry {
     gasket_outer: Rect,
     gasket_inner: Rect,
     z_cavity_floor: f32,
+    z_board_top: f32,
     z_rim: f32,
     z_groove_bottom: f32,
 }
@@ -644,7 +906,10 @@ impl CaseGeometry {
             bb.width() + 2.0 * p.clearance_mm + 2.0 * wall,
             bb.height() + 2.0 * p.clearance_mm + 2.0 * wall,
         );
-        let z_rim = p.floor_mm + outline.thickness_mm + p.headroom_mm;
+        // Standoffs lift the board, and headroom is measured above the board,
+        // so the rim rises with them rather than eating into the clearance.
+        let z_board_top = p.floor_mm + p.standoff_height_mm + outline.thickness_mm;
+        let z_rim = z_board_top + p.headroom_mm;
         Self {
             outer,
             groove_outer: outer.inset(p.lip_mm),
@@ -653,6 +918,7 @@ impl CaseGeometry {
             gasket_outer: outer.inset(p.lip_mm + p.fit_clearance_mm),
             gasket_inner: outer.inset(p.lip_mm + p.groove_width_mm() - p.fit_clearance_mm),
             z_cavity_floor: p.floor_mm,
+            z_board_top,
             z_rim,
             z_groove_bottom: z_rim - p.groove_depth_mm(),
         }
@@ -687,19 +953,12 @@ pub fn case_extents(outline: &BoardOutline, params: &CaseParams) -> (f32, f32, f
 /// into a single manifold of 60 triangles.
 pub fn generate_case_base(outline: &BoardOutline, p: &CaseParams) -> Mesh {
     let g = CaseGeometry::new(outline, p);
-    let mut b = MeshBuilder::new();
-
-    b.cap(g.outer, 0.0, false);
-    b.band(g.outer, 0.0, g.z_rim, true);
-    b.ring(g.outer, g.groove_outer, g.z_rim, true);
-    b.band(g.groove_outer, g.z_groove_bottom, g.z_rim, false);
-    b.ring(g.groove_outer, g.groove_inner, g.z_groove_bottom, true);
-    b.band(g.groove_inner, g.z_groove_bottom, g.z_rim, true);
-    b.ring(g.groove_inner, g.cavity, g.z_rim, true);
-    b.band(g.cavity, g.z_cavity_floor, g.z_rim, false);
-    b.cap(g.cavity, g.z_cavity_floor, true);
-
-    b.build()
+    case_base(
+        p,
+        &g,
+        &[Vec::new(), Vec::new(), Vec::new(), Vec::new()],
+        &[],
+    )
 }
 
 /// Lid plate with a downward tongue that compresses the gasket.
@@ -754,29 +1013,620 @@ pub fn case_for(outline: &BoardOutline) -> CaseParts {
     generate_case(outline, &CaseParams::from_outline(outline))
 }
 
-/// An exploded view of the assembled case, for rendering.
-///
-/// Base at the origin, gasket lifted clear of its groove, lid above that with
-/// its tongue pointing down — the arrangement that shows how the seal works.
-/// The parts are separated rather than interpenetrating, so nothing z-fights.
-///
-/// This merges three disjoint solids into one mesh: fine to render or slice,
-/// but not a closed manifold.
+/// An exploded view of a featureless case — see [`Case::exploded`].
 pub fn case_exploded(outline: &BoardOutline, p: &CaseParams) -> Mesh {
-    let g = CaseGeometry::new(outline, p);
-    let parts = generate_case(outline, p);
-    let gap = (p.headroom_mm * 0.6).max(4.0);
+    Case::new(*outline).with_params(*p).exploded()
+}
 
-    let gasket_z = g.z_groove_bottom + gap;
-    // The lid is modelled tongue-up for printing; mirroring turns it over, and
-    // the offset then places its tongue tip one gap above the gasket.
-    let lid_z = gasket_z + p.gasket_height_mm + gap + p.lid_thickness_mm + p.tongue_height_mm();
+// ── Features: cutouts and standoffs ──────────────────────────────────────────
 
-    Mesh::merge([
-        parts.base,
-        parts.gasket.translated([0.0, 0.0, gasket_z]),
-        parts.lid.mirrored_z().translated([0.0, 0.0, lid_z]),
-    ])
+/// A rectangular opening punched through one wall of the case.
+///
+/// Declared in **board coordinates**: `offset_mm` is the centre of the opening
+/// measured along the named board edge from the board's origin corner, and
+/// `z_offset_mm` is the opening floor above the board's top surface. That way
+/// a cutout is positioned by where the connector sits on the PCB, not by where
+/// it lands on a wall whose thickness the seal decides.
+///
+/// `width_mm` and `height_mm` are the **connector body**; the process
+/// clearance is added when the hole is cut, so the same declaration yields a
+/// tighter opening on resin than on FDM.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Cutout {
+    /// Which board edge — and so which wall — the opening passes through.
+    pub side: Side,
+    /// Centre of the opening along that edge, from the board's origin corner.
+    pub offset_mm: f32,
+    /// Connector body width across the edge.
+    pub width_mm: f32,
+    /// Connector body height.
+    pub height_mm: f32,
+    /// Opening floor above the board's top surface. Negative for a connector
+    /// that hangs below the PCB surface, such as a mid-mount receptacle.
+    pub z_offset_mm: f32,
+    /// Name used in validation errors — normally the connector's designator.
+    pub label: String,
+}
+
+impl Cutout {
+    /// A cutout for a connector body `width_mm` × `height_mm` on `side`.
+    pub fn new(
+        label: impl Into<String>,
+        side: Side,
+        offset_mm: f32,
+        width_mm: f32,
+        height_mm: f32,
+    ) -> Self {
+        Self {
+            side,
+            offset_mm,
+            width_mm,
+            height_mm,
+            z_offset_mm: 0.0,
+            label: label.into(),
+        }
+    }
+
+    /// Move the opening floor relative to the board's top surface.
+    pub fn with_z_offset(mut self, z_offset_mm: f32) -> Self {
+        self.z_offset_mm = z_offset_mm;
+        self
+    }
+}
+
+/// Why a declared case cannot be generated.
+///
+/// Every variant is a condition that yields geometry a printer would accept
+/// and a product would not: an opening that cuts the seal, one too small to
+/// resolve, or two that merge into one.
+#[derive(Debug, Clone, PartialEq)]
+pub enum CaseError {
+    /// A cutout reaches the gasket groove, so the case would no longer seal.
+    SealBreached {
+        /// Cutout label.
+        label: String,
+        /// Where the opening's top edge lands, in case coordinates.
+        top_mm: f32,
+        /// The highest an opening may reach.
+        limit_mm: f32,
+    },
+    /// A cutout sits below the cavity floor, where there is no wall to cut.
+    BelowCavity {
+        /// Cutout label.
+        label: String,
+    },
+    /// A cutout runs off the end of its wall.
+    OffWall {
+        /// Cutout label.
+        label: String,
+        /// Usable span along that wall.
+        span_mm: f32,
+    },
+    /// A cutout is smaller than the process can resolve.
+    TooSmall {
+        /// Cutout label.
+        label: String,
+        /// The smaller of the two declared dimensions.
+        smallest_mm: f32,
+        /// The process minimum feature size.
+        min_feature_mm: f32,
+    },
+    /// Two cutouts on the same wall overlap, which would merge them into one
+    /// opening with no material between.
+    Overlap {
+        /// First cutout label.
+        a: String,
+        /// Second cutout label.
+        b: String,
+    },
+    /// Standoffs were requested but four of them will not fit on the board.
+    StandoffsTooLarge {
+        /// Requested post footprint.
+        size_mm: f32,
+        /// The shorter board dimension they must share.
+        span_mm: f32,
+    },
+}
+
+impl core::fmt::Display for CaseError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::SealBreached {
+                label,
+                top_mm,
+                limit_mm,
+            } => write!(
+                f,
+                "cutout `{label}` reaches {top_mm:.2} mm but the gasket groove starts at \
+                 {limit_mm:.2} mm — the case would not seal. Lower z_offset_mm, shrink the \
+                 opening, or raise headroom_mm"
+            ),
+            Self::BelowCavity { label } => write!(
+                f,
+                "cutout `{label}` sits below the cavity floor, where there is no wall to cut \
+                 — raise z_offset_mm"
+            ),
+            Self::OffWall { label, span_mm } => write!(
+                f,
+                "cutout `{label}` runs off its wall; openings must fit within {span_mm:.2} mm \
+                 of usable span"
+            ),
+            Self::TooSmall {
+                label,
+                smallest_mm,
+                min_feature_mm,
+            } => write!(
+                f,
+                "cutout `{label}` is {smallest_mm:.2} mm across, below the {min_feature_mm:.2} mm \
+                 this process can resolve"
+            ),
+            Self::Overlap { a, b } => write!(
+                f,
+                "cutouts `{a}` and `{b}` overlap on the same wall — they would merge into one \
+                 opening"
+            ),
+            Self::StandoffsTooLarge { size_mm, span_mm } => write!(
+                f,
+                "four {size_mm:.2} mm standoffs do not fit across a {span_mm:.2} mm board"
+            ),
+        }
+    }
+}
+
+#[cfg(any(test, feature = "std"))]
+impl std::error::Error for CaseError {}
+
+/// A sealed case together with the features cut into it.
+///
+/// Generation is split from validation on purpose: [`Case::validate`] reports
+/// what is wrong with the *declaration*, in the declaration's own terms, before
+/// any geometry exists. A cutout that breaches the seal is a design error, and
+/// the only place it is still cheap to explain is here.
+pub struct Case {
+    outline: BoardOutline,
+    params: CaseParams,
+    cutouts: Vec<Cutout>,
+}
+
+impl Case {
+    /// A case for `outline` with tolerance-derived parameters and no features.
+    pub fn new(outline: BoardOutline) -> Self {
+        Self {
+            params: CaseParams::from_outline(&outline),
+            outline,
+            cutouts: Vec::new(),
+        }
+    }
+
+    /// Replace the derived parameters.
+    pub fn with_params(mut self, params: CaseParams) -> Self {
+        self.params = params;
+        self
+    }
+
+    /// Punch these openings through the walls.
+    pub fn with_cutouts(mut self, cutouts: Vec<Cutout>) -> Self {
+        self.cutouts = cutouts;
+        self
+    }
+
+    /// The parameters this case will be generated with.
+    pub fn params(&self) -> &CaseParams {
+        &self.params
+    }
+
+    /// The openings declared on this case.
+    pub fn cutouts(&self) -> &[Cutout] {
+        &self.cutouts
+    }
+
+    /// Outer dimensions `(width, height, depth)` of the closed case.
+    pub fn extents(&self) -> (f32, f32, f32) {
+        case_extents(&self.outline, &self.params)
+    }
+
+    /// Check every declared feature against the geometry it would cut.
+    ///
+    /// Call this before generating: the meshes are produced unconditionally, so
+    /// an unvalidated declaration yields a case that slices cleanly and leaks.
+    pub fn validate(&self) -> Result<(), CaseError> {
+        let g = CaseGeometry::new(&self.outline, &self.params);
+        let p = &self.params;
+        let margin = p.min_feature_mm;
+        let limit = g.z_groove_bottom - margin;
+
+        for c in &self.cutouts {
+            let smallest = c.width_mm.min(c.height_mm);
+            // NaN is checked explicitly: it compares false against every
+            // bound, so a bare `<` would let it through into the mesh.
+            if smallest.is_nan() || smallest < p.min_feature_mm {
+                return Err(CaseError::TooSmall {
+                    label: c.label.clone(),
+                    smallest_mm: smallest,
+                    min_feature_mm: p.min_feature_mm,
+                });
+            }
+            let h = self.hole_for(c, &g);
+            if h.v1 > limit {
+                return Err(CaseError::SealBreached {
+                    label: c.label.clone(),
+                    top_mm: h.v1,
+                    limit_mm: limit,
+                });
+            }
+            if h.v0 < g.z_cavity_floor + margin {
+                return Err(CaseError::BelowCavity {
+                    label: c.label.clone(),
+                });
+            }
+            let wall = p.wall_mm();
+            let len = c.side.span_mm(g.outer.width(), g.outer.height());
+            if h.u0 < wall + margin || h.u1 > len - wall - margin {
+                return Err(CaseError::OffWall {
+                    label: c.label.clone(),
+                    span_mm: len - 2.0 * (wall + margin),
+                });
+            }
+        }
+
+        // Overlap is checked pairwise per wall. Openings that merge produce a
+        // single wide slot with no material between them, which is silently
+        // watertight and structurally wrong.
+        for (i, a) in self.cutouts.iter().enumerate() {
+            for b in &self.cutouts[i + 1..] {
+                if a.side != b.side {
+                    continue;
+                }
+                let (ha, hb) = (self.hole_for(a, &g), self.hole_for(b, &g));
+                if ha.u0 < hb.u1 + margin && hb.u0 < ha.u1 + margin {
+                    return Err(CaseError::Overlap {
+                        a: a.label.clone(),
+                        b: b.label.clone(),
+                    });
+                }
+            }
+        }
+
+        if p.standoff_height_mm > 0.0 {
+            let span = self.outline.width_mm.min(self.outline.height_mm);
+            if 2.0 * (p.standoff_size_mm + margin) + margin >= span {
+                return Err(CaseError::StandoffsTooLarge {
+                    size_mm: p.standoff_size_mm,
+                    span_mm: span,
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Resolve one declared cutout into its wall's (along, z) coordinates.
+    ///
+    /// The declared size is the connector body; one process tolerance is added
+    /// on every side so the part actually passes through a printed wall.
+    fn hole_for(&self, c: &Cutout, g: &CaseGeometry) -> Hole {
+        let p = &self.params;
+        let fit = p.fit_clearance_mm;
+        let inboard = p.wall_mm() + p.clearance_mm;
+        let len = c.side.span_mm(g.outer.width(), g.outer.height());
+        // South and East run with the board axes; North and West run against
+        // them, so the same declared offset measures from the same board
+        // corner on every side.
+        let centre = match c.side {
+            Side::South | Side::East => inboard + c.offset_mm,
+            Side::North | Side::West => len - (inboard + c.offset_mm),
+        };
+        let half = c.width_mm * 0.5 + fit;
+        let v0 = g.z_board_top + c.z_offset_mm - fit;
+        Hole {
+            u0: centre - half,
+            u1: centre + half,
+            v0,
+            v1: v0 + c.height_mm + 2.0 * fit,
+        }
+    }
+
+    /// Cutouts grouped by wall, in generation order.
+    fn wall_holes(&self, g: &CaseGeometry) -> [Vec<Hole>; 4] {
+        let mut walls: [Vec<Hole>; 4] = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+        for c in &self.cutouts {
+            let k = Side::ALL.iter().position(|s| *s == c.side).unwrap_or(0);
+            walls[k].push(self.hole_for(c, g));
+        }
+        walls
+    }
+
+    /// Standoff footprints in case coordinates — empty unless a height was set.
+    ///
+    /// Four posts, one under each board corner, inset by the process minimum
+    /// feature so the punched cavity floor keeps material between each post and
+    /// the wall.
+    fn standoff_feet(&self, g: &CaseGeometry) -> Vec<Rect> {
+        let p = &self.params;
+        if p.standoff_height_mm <= 0.0 || p.standoff_size_mm <= 0.0 {
+            return Vec::new();
+        }
+        let m = p.min_feature_mm;
+        let s = p.standoff_size_mm;
+        let (bx, by) = (g.cavity.x0 + p.clearance_mm, g.cavity.y0 + p.clearance_mm);
+        let (bw, bh) = (self.outline.width_mm, self.outline.height_mm);
+        let xs = [bx + m, bx + bw - m - s];
+        let ys = [by + m, by + bh - m - s];
+        let mut feet = Vec::with_capacity(4);
+        for &x in &xs {
+            for &y in &ys {
+                feet.push(Rect::new(x, y, x + s, y + s));
+            }
+        }
+        feet
+    }
+
+    /// Base tray with the gasket groove, connector cutouts, and standoffs.
+    pub fn base(&self) -> Mesh {
+        let g = CaseGeometry::new(&self.outline, &self.params);
+        case_base(
+            &self.params,
+            &g,
+            &self.wall_holes(&g),
+            &self.standoff_feet(&g),
+        )
+    }
+
+    /// Lid with the compression tongue, in print orientation.
+    ///
+    /// The lid carries no features: a hole in the lid is a hole inside the
+    /// gasket line, and no amount of compression seals that.
+    pub fn lid(&self) -> Mesh {
+        generate_case_lid(&self.outline, &self.params)
+    }
+
+    /// Gasket ring — print in TPU.
+    pub fn gasket(&self) -> Mesh {
+        generate_gasket(&self.outline, &self.params)
+    }
+
+    /// All three printed parts.
+    pub fn parts(&self) -> CaseParts {
+        CaseParts {
+            base: self.base(),
+            lid: self.lid(),
+            gasket: self.gasket(),
+        }
+    }
+
+    /// An exploded view of the assembled case, for rendering.
+    ///
+    /// Base at the origin, gasket lifted clear of its groove, lid above that
+    /// with its tongue pointing down — the arrangement that shows how the seal
+    /// works. The parts are separated rather than interpenetrating, so nothing
+    /// z-fights.
+    ///
+    /// This merges three disjoint solids into one mesh: fine to render or
+    /// slice, but not a closed manifold.
+    pub fn exploded(&self) -> Mesh {
+        let g = CaseGeometry::new(&self.outline, &self.params);
+        let p = &self.params;
+        let gap = (p.headroom_mm * 0.6).max(4.0);
+        let gasket_z = g.z_groove_bottom + gap;
+        // The lid is modelled tongue-up for printing; mirroring turns it over,
+        // and the offset then places its tongue tip one gap above the gasket.
+        let lid_z = gasket_z + p.gasket_height_mm + gap + p.lid_thickness_mm + p.tongue_height_mm();
+        Mesh::merge([
+            self.base(),
+            self.gasket().translated([0.0, 0.0, gasket_z]),
+            self.lid().mirrored_z().translated([0.0, 0.0, lid_z]),
+        ])
+    }
+}
+
+/// Origin, along-direction, outward normal, and length of wall `k`.
+///
+/// `k` indexes the same corner order [`MeshBuilder::band`] walks, so a punched
+/// wall lands exactly where the unpunched band would have.
+fn wall_frame(r: Rect, k: usize) -> ([f32; 2], [f32; 2], [f32; 3], f32) {
+    match k {
+        0 => ([r.x0, r.y0], [1.0, 0.0], [0.0, -1.0, 0.0], r.width()),
+        1 => ([r.x1, r.y0], [0.0, 1.0], [1.0, 0.0, 0.0], r.height()),
+        2 => ([r.x1, r.y1], [-1.0, 0.0], [0.0, 1.0, 0.0], r.width()),
+        _ => ([r.x0, r.y1], [0.0, -1.0], [-1.0, 0.0, 0.0], r.height()),
+    }
+}
+
+/// The four faces of the prismatic void a cutout cuts through a wall.
+///
+/// Subdivided by any neighbouring hole's boundaries so both ends meet the
+/// punched panels vertex for vertex.
+fn tunnel(
+    b: &mut MeshBuilder,
+    origin: [f32; 2],
+    dir: [f32; 2],
+    normal: [f32; 3],
+    depth: f32,
+    h: &Hole,
+    all: &[Hole],
+) {
+    let inward = [-normal[0], -normal[1]];
+    let at = |u: f32, d: f32, z: f32| {
+        [
+            origin[0] + dir[0] * u + inward[0] * d,
+            origin[1] + dir[1] * u + inward[1] * d,
+            z,
+        ]
+    };
+    let u_lines = MeshBuilder::grid_lines(h.u0, h.u1, h.u_cuts(all).into_iter());
+    let v_lines = MeshBuilder::grid_lines(h.v0, h.v1, h.v_cuts(all).into_iter());
+    let d_lines = [0.0, depth];
+    let along = [dir[0], dir[1], 0.0];
+
+    // Floor and ceiling of the opening.
+    b.grid_face(
+        &|u, d| at(u, d, h.v0),
+        [0.0, 0.0, 1.0],
+        &u_lines,
+        &d_lines,
+        &[],
+        false,
+    );
+    b.grid_face(
+        &|u, d| at(u, d, h.v1),
+        [0.0, 0.0, -1.0],
+        &u_lines,
+        &d_lines,
+        &[],
+        true,
+    );
+    // Its two jambs.
+    b.grid_face(
+        &|d, z| at(h.u0, d, z),
+        along,
+        &d_lines,
+        &v_lines,
+        &[],
+        false,
+    );
+    b.grid_face(
+        &|d, z| at(h.u1, d, z),
+        [-along[0], -along[1], 0.0],
+        &d_lines,
+        &v_lines,
+        &[],
+        true,
+    );
+}
+
+/// A solid post rising from a hole punched in the cavity floor.
+///
+/// The post is not a separate solid dropped onto the floor: the floor is
+/// punched and the surface continues up the post, so base and standoffs remain
+/// one closed manifold. Walls and top are subdivided on the floor's grid for
+/// the same reason.
+fn post(b: &mut MeshBuilder, foot: Rect, z_lo: f32, z_hi: f32, x_cuts: &[f32], y_cuts: &[f32]) {
+    let xl = MeshBuilder::grid_lines(foot.x0, foot.x1, x_cuts.iter().copied());
+    let yl = MeshBuilder::grid_lines(foot.y0, foot.y1, y_cuts.iter().copied());
+    let z = [z_lo, z_hi];
+    b.grid_face(
+        &|u, v| [u, foot.y0, v],
+        [0.0, -1.0, 0.0],
+        &xl,
+        &z,
+        &[],
+        false,
+    );
+    b.grid_face(
+        &|u, v| [foot.x1, u, v],
+        [1.0, 0.0, 0.0],
+        &yl,
+        &z,
+        &[],
+        false,
+    );
+    b.grid_face(&|u, v| [u, foot.y1, v], [0.0, 1.0, 0.0], &xl, &z, &[], true);
+    b.grid_face(
+        &|u, v| [foot.x0, u, v],
+        [-1.0, 0.0, 0.0],
+        &yl,
+        &z,
+        &[],
+        true,
+    );
+    b.grid_face(&|u, v| [u, v, z_hi], [0.0, 0.0, 1.0], &xl, &yl, &[], false);
+}
+
+/// Build the base tray, punching `walls` through its sides and raising `feet`
+/// from its floor.
+///
+/// The underside, rim, groove, and lip rings are generated exactly as they are
+/// for a featureless case. That is the point of [`MeshBuilder::punched_face`]:
+/// features stay local, so nothing downstream of a wall has to know a hole
+/// went through it.
+fn case_base(p: &CaseParams, g: &CaseGeometry, walls: &[Vec<Hole>; 4], feet: &[Rect]) -> Mesh {
+    let wall = p.wall_mm();
+    let inset = p.min_feature_mm * 0.5;
+    let mut b = MeshBuilder::new();
+
+    b.cap(g.outer, 0.0, false);
+
+    for (k, holes) in walls.iter().enumerate() {
+        let (o, dir, n, len) = wall_frame(g.outer, k);
+        let inward = [-n[0], -n[1]];
+
+        // Outer face of the wall.
+        b.punched_face(
+            |u, v| [o[0] + dir[0] * u, o[1] + dir[1] * u, v],
+            n,
+            FaceSpan {
+                u: (0.0, len),
+                v: (0.0, g.z_rim),
+                inset,
+            },
+            holes,
+            false,
+        );
+        // Cavity face, parameterised by the same along-axis so a cutout's two
+        // ends share one coordinate and the tunnel between them is straight.
+        b.punched_face(
+            |u, v| {
+                [
+                    o[0] + dir[0] * u + inward[0] * wall,
+                    o[1] + dir[1] * u + inward[1] * wall,
+                    v,
+                ]
+            },
+            [-n[0], -n[1], 0.0],
+            FaceSpan {
+                u: (wall, len - wall),
+                v: (g.z_cavity_floor, g.z_rim),
+                inset,
+            },
+            holes,
+            true,
+        );
+        for h in holes {
+            tunnel(&mut b, o, dir, n, wall, h, holes);
+        }
+    }
+
+    b.ring(g.outer, g.groove_outer, g.z_rim, true);
+    b.band(g.groove_outer, g.z_groove_bottom, g.z_rim, false);
+    b.ring(g.groove_outer, g.groove_inner, g.z_groove_bottom, true);
+    b.band(g.groove_inner, g.z_groove_bottom, g.z_rim, true);
+    b.ring(g.groove_inner, g.cavity, g.z_rim, true);
+
+    // Cavity floor, punched wherever a standoff rises out of it.
+    let holes: Vec<Hole> = feet
+        .iter()
+        .map(|r| Hole {
+            u0: r.x0,
+            v0: r.y0,
+            u1: r.x1,
+            v1: r.y1,
+        })
+        .collect();
+    b.punched_face(
+        |u, v| [u, v, g.z_cavity_floor],
+        [0.0, 0.0, 1.0],
+        FaceSpan {
+            u: (g.cavity.x0, g.cavity.x1),
+            v: (g.cavity.y0, g.cavity.y1),
+            inset,
+        },
+        &holes,
+        false,
+    );
+    let x_cuts: Vec<f32> = holes.iter().flat_map(|h| [h.u0, h.u1]).collect();
+    let y_cuts: Vec<f32> = holes.iter().flat_map(|h| [h.v0, h.v1]).collect();
+    for f in feet {
+        post(
+            &mut b,
+            *f,
+            g.z_cavity_floor,
+            g.z_cavity_floor + p.standoff_height_mm,
+            &x_cuts,
+            &y_cuts,
+        );
+    }
+
+    b.build()
 }
 
 // ── Binary STL export (std feature) ──────────────────────────────────────────
@@ -1020,7 +1870,7 @@ mod tests {
 
     /// A vertex position quantised to 1 µm.
     type VertexKey = (i64, i64, i64);
-    /// An undirected edge, stored with its endpoints in sorted order.
+    /// A directed edge, from its first endpoint to its second.
     type EdgeKey = (VertexKey, VertexKey);
 
     /// Quantise a vertex to 1 µm so shared corners compare equal despite being
@@ -1030,25 +1880,66 @@ mod tests {
         (q(v[0]), q(v[1]), q(v[2]))
     }
 
-    /// Every undirected edge of a closed manifold is shared by exactly two
-    /// triangles. Anything else means a hole or a duplicate face — a mesh a
-    /// slicer would reject.
+    /// Signed volume via the divergence theorem.
+    ///
+    /// Positive exactly when a closed surface's faces wind outward, so it is
+    /// the one check that catches a globally inside-out solid — a mesh that
+    /// passes every local test and slices as a hollow of itself.
+    fn signed_volume(m: &Mesh) -> f32 {
+        let mut vol = 0.0f64;
+        for t in &m.triangles {
+            let (a, b, c) = (
+                m.vertices[t[0] as usize],
+                m.vertices[t[1] as usize],
+                m.vertices[t[2] as usize],
+            );
+            let cross = [
+                (b[1] * c[2] - b[2] * c[1]) as f64,
+                (b[2] * c[0] - b[0] * c[2]) as f64,
+                (b[0] * c[1] - b[1] * c[0]) as f64,
+            ];
+            vol += (a[0] as f64 * cross[0] + a[1] as f64 * cross[1] + a[2] as f64 * cross[2]) / 6.0;
+        }
+        vol as f32
+    }
+
+    /// Assert the mesh is a closed, consistently outward-oriented solid.
+    ///
+    /// The test is that every *directed* edge occurs exactly once. That is
+    /// strictly stronger than the undirected parity a slicer needs: parity
+    /// alone is satisfied by two adjacent faces wound the same way, which reads
+    /// as a crease with the material on both sides. Directed uniqueness also
+    /// rules out T-junctions, where a subdivided edge meets an unsubdivided
+    /// one — the failure mode every punched face is built to avoid.
+    ///
+    /// Vertices are quantised to 1 µm before comparison because faces
+    /// duplicate their corners to keep flat normals.
     fn assert_watertight(m: &Mesh) {
         let mut edges: HashMap<EdgeKey, usize> = HashMap::new();
         for tri in &m.triangles {
             for k in 0..3 {
                 let a = key(m.vertices[tri[k] as usize]);
                 let b = key(m.vertices[tri[(k + 1) % 3] as usize]);
-                let e = if a <= b { (a, b) } else { (b, a) };
-                *edges.entry(e).or_insert(0) += 1;
+                assert_ne!(a, b, "degenerate triangle edge at {a:?}");
+                *edges.entry((a, b)).or_insert(0) += 1;
             }
         }
         for (edge, count) in &edges {
             assert_eq!(
-                *count, 2,
-                "edge {edge:?} shared by {count} triangles, expected 2"
+                *count, 1,
+                "directed edge {edge:?} used {count} times, expected once — \
+                 the surface is open, doubled, or inconsistently wound"
+            );
+            assert!(
+                edges.contains_key(&(edge.1, edge.0)),
+                "directed edge {edge:?} has no opposing twin — the surface has a hole"
             );
         }
+        assert!(
+            signed_volume(m) > 0.0,
+            "signed volume {} is not positive — the solid is inside out",
+            signed_volume(m)
+        );
     }
 
     #[test]
@@ -1358,6 +2249,491 @@ mod tests {
             u32::from_le_bytes([glb[8], glb[9], glb[10], glb[11]]) as usize,
             glb.len()
         );
+    }
+
+    // ── Cutouts and standoffs ────────────────────────────────────────────────
+
+    use fiducial_geometry::{connector_opening, Side};
+    use std::string::ToString;
+
+    /// A case tall enough for every connector these tests place to clear the
+    /// gasket groove. The default 5 mm of headroom is not.
+    fn roomy() -> Case {
+        Case::new(board()).with_params(CaseParams::from_outline(&board()).with_headroom(10.0))
+    }
+
+    fn usb_c(offset_mm: f32) -> Cutout {
+        let o = connector_opening("usb-c").unwrap();
+        Cutout::new("J1", Side::South, offset_mm, o.width_mm, o.height_mm)
+    }
+
+    fn qwiic(side: Side, offset_mm: f32) -> Cutout {
+        let o = connector_opening("qwiic").unwrap();
+        Cutout::new("J3", side, offset_mm, o.width_mm, o.height_mm)
+    }
+
+    #[test]
+    fn an_unfeatured_case_is_byte_identical_to_before_cutouts() {
+        // The punched-face path must collapse to a single quad when there are
+        // no holes, or every existing case silently gains triangles.
+        let o = board();
+        let p = CaseParams::from_outline(&o);
+        let plain = generate_case_base(&o, &p);
+        let via_case = Case::new(o).base();
+        assert_eq!(plain.triangle_count(), 60);
+        assert_eq!(via_case.triangle_count(), 60);
+        assert_eq!(to_stl_binary(&plain), to_stl_binary(&via_case));
+    }
+
+    #[test]
+    fn one_cutout_keeps_the_base_watertight() {
+        let case = roomy().with_cutouts(std::vec![usb_c(20.0)]);
+        case.validate().expect("declaration must be valid");
+        assert_watertight(&case.base());
+    }
+
+    #[test]
+    fn a_cutout_removes_material() {
+        // A hole that does not reduce the solid's volume is not a hole.
+        let plain = signed_volume(&roomy().base());
+        let punched = signed_volume(&roomy().with_cutouts(std::vec![usb_c(20.0)]).base());
+        assert!(
+            punched < plain,
+            "punched volume {punched} should be below solid {plain}"
+        );
+    }
+
+    #[test]
+    fn several_cutouts_on_one_wall_stay_watertight() {
+        let case = roomy().with_cutouts(std::vec![
+            usb_c(15.0),
+            qwiic(Side::South, 45.0),
+            Cutout::new("J4", Side::South, 75.0, 7.8, 6.0),
+        ]);
+        case.validate().expect("declaration must be valid");
+        assert_watertight(&case.base());
+    }
+
+    #[test]
+    fn cutouts_at_different_heights_on_one_wall_stay_watertight() {
+        // This is the case the tunnel subdivision exists for: the taller
+        // opening's jambs are split by the shorter opening's rim, and an
+        // unsplit tunnel would meet the wall at a T-junction.
+        let case = roomy().with_cutouts(std::vec![
+            usb_c(20.0),
+            qwiic(Side::South, 50.0).with_z_offset(1.5),
+        ]);
+        case.validate().expect("declaration must be valid");
+        assert_watertight(&case.base());
+    }
+
+    #[test]
+    fn cutouts_on_every_wall_stay_watertight() {
+        let case = roomy().with_cutouts(std::vec![
+            usb_c(20.0),
+            qwiic(Side::East, 30.0),
+            qwiic(Side::North, 60.0),
+            qwiic(Side::West, 25.0),
+        ]);
+        case.validate().expect("declaration must be valid");
+        assert_watertight(&case.base());
+    }
+
+    #[test]
+    fn the_opening_clears_the_connector_body() {
+        // The declaration names the body; the opening must exceed it by one
+        // process tolerance on every side or the part will not pass through.
+        let case = roomy().with_cutouts(std::vec![usb_c(20.0)]);
+        let p = case.params();
+        let g = CaseGeometry::new(&board(), p);
+        let h = case.hole_for(&case.cutouts()[0], &g);
+        let body = connector_opening("usb-c").unwrap();
+        assert!(
+            (h.u1 - h.u0 - (body.width_mm + 2.0 * p.fit_clearance_mm)).abs() < 1e-4,
+            "opening width {} should be body + 2 tolerances",
+            h.u1 - h.u0
+        );
+        assert!(
+            (h.v1 - h.v0 - (body.height_mm + 2.0 * p.fit_clearance_mm)).abs() < 1e-4,
+            "opening height {} should be body + 2 tolerances",
+            h.v1 - h.v0
+        );
+        assert!(h.u1 - h.u0 > body.width_mm);
+    }
+
+    #[test]
+    fn opposite_walls_measure_offsets_from_the_same_board_corner() {
+        // A connector 20 mm along the south edge and one 20 mm along the north
+        // edge sit at the same board x — otherwise every north-wall offset
+        // would have to be worked out by hand.
+        let case = roomy();
+        let g = CaseGeometry::new(&board(), case.params());
+        let south = case.hole_for(&usb_c(20.0), &g);
+        let north = case.hole_for(&Cutout::new("J9", Side::North, 20.0, 8.94, 3.26), &g);
+        // South runs +x from x = 0; north runs -x from x = outer width.
+        let south_x = (south.u0 + south.u1) * 0.5;
+        let north_x = g.outer.width() - (north.u0 + north.u1) * 0.5;
+        assert!(
+            (south_x - north_x).abs() < 1e-3,
+            "south centre {south_x} and north centre {north_x} should agree"
+        );
+    }
+
+    #[test]
+    fn tolerance_class_drives_the_opening_size() {
+        let body = connector_opening("usb-c").unwrap();
+        let width_for = |t: ToleranceClass| {
+            let o = BoardOutline::new(100.0, 60.0).with_tolerance(t);
+            let case = Case::new(o).with_params(CaseParams::from_outline(&o).with_headroom(10.0));
+            let g = CaseGeometry::new(&o, case.params());
+            let h = case.hole_for(
+                &Cutout::new("J1", Side::South, 20.0, body.width_mm, body.height_mm),
+                &g,
+            );
+            h.u1 - h.u0
+        };
+        assert!(
+            width_for(ToleranceClass::Cnc) < width_for(ToleranceClass::Fdm),
+            "a tighter process should cut a tighter opening"
+        );
+    }
+
+    #[test]
+    fn a_cutout_that_reaches_the_groove_is_rejected() {
+        // The default 5 mm of headroom leaves a wall too short to pass a USB-C
+        // receptacle below the seal. Generating it anyway produces a case that
+        // slices perfectly and leaks.
+        let case = Case::new(board()).with_cutouts(std::vec![usb_c(20.0)]);
+        match case.validate() {
+            Err(CaseError::SealBreached {
+                label,
+                top_mm,
+                limit_mm,
+            }) => {
+                assert_eq!(label, "J1");
+                assert!(top_mm > limit_mm);
+            }
+            other => panic!("expected SealBreached, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn raising_headroom_admits_the_cutout_the_shallow_case_rejected() {
+        let shallow = Case::new(board()).with_cutouts(std::vec![usb_c(20.0)]);
+        assert!(shallow.validate().is_err());
+        assert!(roomy()
+            .with_cutouts(std::vec![usb_c(20.0)])
+            .validate()
+            .is_ok());
+    }
+
+    #[test]
+    fn a_cutout_running_off_its_wall_is_rejected() {
+        let case = roomy().with_cutouts(std::vec![usb_c(99.0)]);
+        assert!(matches!(case.validate(), Err(CaseError::OffWall { .. })));
+    }
+
+    #[test]
+    fn a_cutout_below_the_cavity_floor_is_rejected() {
+        let case = roomy().with_cutouts(std::vec![usb_c(20.0).with_z_offset(-20.0)]);
+        assert!(matches!(
+            case.validate(),
+            Err(CaseError::BelowCavity { .. })
+        ));
+    }
+
+    #[test]
+    fn a_cutout_below_the_minimum_feature_is_rejected() {
+        let case = roomy().with_cutouts(std::vec![Cutout::new("J9", Side::South, 20.0, 0.1, 0.1)]);
+        assert!(matches!(case.validate(), Err(CaseError::TooSmall { .. })));
+    }
+
+    #[test]
+    fn overlapping_cutouts_are_rejected() {
+        // Two openings that merge leave no material between them: one wide
+        // slot, silently watertight and structurally wrong.
+        let case = roomy().with_cutouts(std::vec![usb_c(20.0), qwiic(Side::South, 22.0)]);
+        match case.validate() {
+            Err(CaseError::Overlap { a, b }) => {
+                assert_eq!((a.as_str(), b.as_str()), ("J1", "J3"));
+            }
+            other => panic!("expected Overlap, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn cutouts_on_different_walls_never_overlap() {
+        let case = roomy().with_cutouts(std::vec![usb_c(20.0), qwiic(Side::East, 20.0)]);
+        assert!(case.validate().is_ok());
+    }
+
+    #[test]
+    fn case_errors_name_the_cutout_and_say_what_to_change() {
+        let err = Case::new(board())
+            .with_cutouts(std::vec![usb_c(20.0)])
+            .validate()
+            .unwrap_err();
+        let msg = std::format!("{err}");
+        assert!(msg.contains("J1"), "message must name the cutout: {msg}");
+        assert!(
+            msg.contains("headroom_mm"),
+            "message must say what to change: {msg}"
+        );
+    }
+
+    #[test]
+    fn standoffs_keep_the_base_watertight() {
+        let o = board();
+        let case = Case::new(o).with_params(CaseParams::from_outline(&o).with_standoffs(3.0, 5.0));
+        case.validate().expect("standoffs must be valid");
+        assert_watertight(&case.base());
+    }
+
+    #[test]
+    fn standoffs_add_material_rather_than_removing_it() {
+        let o = board();
+        let plain = signed_volume(&Case::new(o).base());
+        let raised = Case::new(o)
+            .with_params(CaseParams::from_outline(&o).with_standoffs(3.0, 5.0))
+            .base();
+        assert!(signed_volume(&raised) > plain, "posts must add volume");
+    }
+
+    #[test]
+    fn standoffs_raise_the_board_and_the_rim_with_it() {
+        // Headroom is measured above the board, so lifting the board must lift
+        // the rim — otherwise standoffs silently eat the component clearance.
+        let o = board();
+        let plain = CaseParams::from_outline(&o);
+        let raised = plain.with_standoffs(3.0, 5.0);
+        let (_, _, flat_d) = case_extents(&o, &plain);
+        let (_, _, tall_d) = case_extents(&o, &raised);
+        assert!(
+            (tall_d - flat_d - 3.0).abs() < 1e-4,
+            "case grew by {} not 3.0",
+            tall_d - flat_d
+        );
+        let g = CaseGeometry::new(&o, &raised);
+        assert!((g.z_board_top - g.z_cavity_floor - 3.0 - o.thickness_mm).abs() < 1e-4);
+    }
+
+    #[test]
+    fn standoffs_and_cutouts_coexist() {
+        // Cutout heights are measured from the board's top surface, so posts
+        // must move the openings up with the board.
+        let o = board();
+        let p = CaseParams::from_outline(&o)
+            .with_headroom(10.0)
+            .with_standoffs(2.0, 5.0);
+        let case = Case::new(o)
+            .with_params(p)
+            .with_cutouts(std::vec![usb_c(20.0), qwiic(Side::East, 30.0)]);
+        case.validate().expect("declaration must be valid");
+        assert_watertight(&case.base());
+
+        let g = CaseGeometry::new(&o, &p);
+        let h = case.hole_for(&case.cutouts()[0], &g);
+        assert!(
+            h.v0 > g.z_cavity_floor + 2.0,
+            "opening floor {} must sit above the raised board",
+            h.v0
+        );
+    }
+
+    #[test]
+    fn standoffs_too_large_for_the_board_are_rejected() {
+        let o = BoardOutline::new(12.0, 12.0);
+        let case = Case::new(o).with_params(CaseParams::from_outline(&o).with_standoffs(3.0, 6.0));
+        assert!(matches!(
+            case.validate(),
+            Err(CaseError::StandoffsTooLarge { .. })
+        ));
+    }
+
+    #[test]
+    fn a_featured_case_still_exports_and_the_lid_stays_plain() {
+        let case = roomy().with_cutouts(std::vec![usb_c(20.0), qwiic(Side::East, 30.0)]);
+        let parts = case.parts();
+        assert_watertight(&parts.base);
+        assert_watertight(&parts.lid);
+        assert_watertight(&parts.gasket);
+        // A hole in the lid is a hole inside the gasket line, so the lid never
+        // carries cutouts however many the base has.
+        assert_eq!(parts.lid.triangle_count(), 44);
+        assert!(parts.base.triangle_count() > 60);
+
+        let glb = to_glb(&case.exploded());
+        assert_eq!(&glb[0..4], b"glTF");
+        let stl = to_stl_binary(&parts.base);
+        assert_eq!(stl.len(), 84 + 50 * parts.base.triangle_count());
+    }
+
+    // ── Solid membership ─────────────────────────────────────────────────────
+
+    /// Count ray/triangle crossings ahead of `origin` (Möller–Trumbore).
+    fn ray_crossings(m: &Mesh, origin: [f32; 3], dir: [f32; 3]) -> usize {
+        let sub = |a: [f32; 3], b: [f32; 3]| [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+        let cross = |a: [f32; 3], b: [f32; 3]| {
+            [
+                a[1] * b[2] - a[2] * b[1],
+                a[2] * b[0] - a[0] * b[2],
+                a[0] * b[1] - a[1] * b[0],
+            ]
+        };
+        let dot = |a: [f32; 3], b: [f32; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+        let mut hits = 0;
+        for t in &m.triangles {
+            let (a, b, c) = (
+                m.vertices[t[0] as usize],
+                m.vertices[t[1] as usize],
+                m.vertices[t[2] as usize],
+            );
+            let (e1, e2) = (sub(b, a), sub(c, a));
+            let pv = cross(dir, e2);
+            let det = dot(e1, pv);
+            if det.abs() < 1e-9 {
+                continue;
+            }
+            let inv = 1.0 / det;
+            let tv = sub(origin, a);
+            let u = dot(tv, pv) * inv;
+            if u < 0.0 || u > 1.0 {
+                continue;
+            }
+            let qv = cross(tv, e1);
+            let v = dot(dir, qv) * inv;
+            if v < 0.0 || u + v > 1.0 {
+                continue;
+            }
+            if dot(e2, qv) * inv > 1e-6 {
+                hits += 1;
+            }
+        }
+        hits
+    }
+
+    /// Whether a point lies in the mesh's material.
+    ///
+    /// A ray from inside a closed solid leaves it an odd number of times. This
+    /// is the only test that actually answers "is there a hole here" — edge
+    /// parity and volume both pass on a case whose openings were punched in
+    /// the wrong place, or not punched through.
+    fn inside(m: &Mesh, p: [f32; 3]) -> bool {
+        ray_crossings(m, p, [0.371, 0.553, 0.746]) % 2 == 1
+    }
+
+    #[test]
+    fn a_cutout_is_a_through_hole_where_it_was_declared() {
+        let case = roomy().with_cutouts(std::vec![usb_c(20.0), qwiic(Side::East, 30.0)]);
+        case.validate().unwrap();
+        let base = case.base();
+        let p = case.params();
+        let g = CaseGeometry::new(&board(), p);
+        let wall = p.wall_mm();
+        let inboard = wall + p.clearance_mm;
+
+        // Mid-wall, mid-opening: inside the south wall's footprint, but in the
+        // void the cutout carved.
+        let z = g.z_board_top + 1.5;
+        assert!(
+            !inside(&base, [inboard + 20.0, wall * 0.5, z]),
+            "the declared opening is still solid"
+        );
+        // The same depth, further along the same wall: material.
+        assert!(
+            inside(&base, [inboard + 60.0, wall * 0.5, z]),
+            "the wall beside the opening should be solid"
+        );
+        // Directly below and above the opening: material. The upper probe stops
+        // below the groove, because mid-wall at rim height is the groove itself
+        // — void by design, and the reason a cutout may not reach that far.
+        assert!(inside(
+            &base,
+            [inboard + 20.0, wall * 0.5, g.z_cavity_floor + 0.3]
+        ));
+        assert!(inside(
+            &base,
+            [inboard + 20.0, wall * 0.5, g.z_groove_bottom - 0.3]
+        ));
+        // And the east wall's opening, on the other axis.
+        assert!(!inside(&base, [g.outer.x1 - wall * 0.5, inboard + 30.0, z]));
+        assert!(inside(&base, [g.outer.x1 - wall * 0.5, inboard + 55.0, z]));
+    }
+
+    #[test]
+    fn a_standoff_is_solid_and_the_floor_beside_it_is_not() {
+        let o = board();
+        let p = CaseParams::from_outline(&o).with_standoffs(3.0, 5.0);
+        let case = Case::new(o).with_params(p);
+        case.validate().unwrap();
+        let base = case.base();
+        let g = CaseGeometry::new(&o, &p);
+        let z = g.z_cavity_floor + 1.5;
+
+        let feet = case.standoff_feet(&g);
+        assert_eq!(feet.len(), 4, "four corner posts");
+        for f in &feet {
+            let c = [(f.x0 + f.x1) * 0.5, (f.y0 + f.y1) * 0.5, z];
+            assert!(inside(&base, c), "post at {c:?} should be solid");
+        }
+        // The middle of the cavity, at the same height, is where the board goes.
+        let mid = [
+            (g.cavity.x0 + g.cavity.x1) * 0.5,
+            (g.cavity.y0 + g.cavity.y1) * 0.5,
+            z,
+        ];
+        assert!(!inside(&base, mid), "the cavity must stay open");
+        // The posts stop where they were told to.
+        let f = feet[0];
+        let above = [
+            (f.x0 + f.x1) * 0.5,
+            (f.y0 + f.y1) * 0.5,
+            g.z_cavity_floor + 3.0 + 0.5,
+        ];
+        assert!(!inside(&base, above), "post is taller than 3 mm");
+    }
+
+    #[test]
+    fn the_cavity_and_the_underside_stay_where_they_were() {
+        // Punching walls must not disturb the parts of the base that carry the
+        // board or the seal.
+        let case = roomy().with_cutouts(std::vec![usb_c(20.0)]);
+        let base = case.base();
+        let g = CaseGeometry::new(&board(), case.params());
+        assert!(
+            inside(
+                &base,
+                [g.outer.x1 * 0.5, g.outer.y1 * 0.5, g.z_cavity_floor * 0.5]
+            ),
+            "the floor beneath the board must stay solid"
+        );
+        let (mn, mx) = base.aabb();
+        assert!((mx[0] - mn[0] - g.outer.width()).abs() < 1e-3);
+        assert!((mx[1] - mn[1] - g.outer.height()).abs() < 1e-3);
+        assert!((mx[2] - mn[2] - g.z_rim).abs() < 1e-3);
+    }
+
+    #[test]
+    fn every_connector_family_has_a_printable_envelope() {
+        for c in fiducial_geometry::CONNECTOR_OPENINGS {
+            assert!(
+                c.width_mm > 0.0 && c.height_mm > 0.0,
+                "{} has a degenerate envelope",
+                c.name
+            );
+            assert_eq!(connector_opening(c.name).map(|o| o.name), Some(c.name));
+        }
+        assert!(connector_opening("db25").is_none());
+    }
+
+    #[test]
+    fn side_names_round_trip() {
+        for s in Side::ALL {
+            assert_eq!(Side::from_name(s.name()), Some(s));
+        }
+        assert!(Side::from_name("up").is_none());
+        assert_eq!("J1".to_string(), "J1");
     }
 
     #[test]

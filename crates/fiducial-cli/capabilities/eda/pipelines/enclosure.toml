@@ -1,8 +1,14 @@
 # Enclosure mesh pipeline — derives printable geometry from the board outline.
 #
 # Reads the `outline` block declared in board/board.interface.json and generates
-# a gasket-sealed two-part case sized by the board's tolerance class. Runs
-# in-process via fiducial-mesh; no CAD tool is required.
+# a gasket-sealed two-part case sized by the board's tolerance class. Every
+# connector that declares a `mount` is punched through the base wall it faces,
+# and `outline.enclosure.standoff_height_mm` lifts the board onto corner posts.
+# Runs in-process via fiducial-mesh; no CAD tool is required.
+#
+# The declaration is validated before anything is written: an opening that
+# reaches the gasket groove fails the pipeline rather than shipping a case that
+# slices cleanly and leaks.
 #
 #   fid derive           regenerate every output below, record hashes
 #   fid derive --check   fail if any output is stale

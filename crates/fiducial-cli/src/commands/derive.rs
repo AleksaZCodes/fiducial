@@ -15,10 +15,9 @@ use std::{
 };
 
 use fiducial_eda::validate as validate_board_interface;
-use fiducial_geometry::{BoardOutline, ToleranceClass};
+use fiducial_geometry::{BoardOutline, Side, ToleranceClass};
 use fiducial_mesh::{
-    case_exploded, enclosure_for, extrude_board, generate_case_base, generate_case_lid,
-    generate_gasket, to_glb, to_stl_binary, CaseParams,
+    enclosure_for, extrude_board, to_glb, to_stl_binary, Case, CaseParams, Cutout,
 };
 
 use crate::{
@@ -279,6 +278,11 @@ const MESH_PARTS: &[&str] = &["case-base", "case-lid", "gasket", "case", "board"
 /// | `board` | the bare PCB, extruded |
 /// | `tray` | simple open tray, no seal |
 ///
+/// Connectors that declare a `mount` are punched through the base walls, sized
+/// from their `type`'s body envelope. The declaration is validated before any
+/// geometry is written: an opening that reaches the gasket groove fails the
+/// pipeline rather than shipping a case that slices cleanly and leaks.
+///
 /// Runs in-process — no CAD tool required in CI.
 fn run_fid_mesh(pipeline: &PipelineToml, working_dir: &Path) -> Result<()> {
     let source = pipeline
@@ -323,7 +327,38 @@ fn run_fid_mesh(pipeline: &PipelineToml, working_dir: &Path) -> Result<()> {
         if let Some(v) = e.gasket_compression {
             params.gasket_compression = v;
         }
+        if let Some(v) = e.standoff_height_mm {
+            params.standoff_height_mm = v;
+        }
+        if let Some(v) = e.standoff_size_mm {
+            params.standoff_size_mm = v;
+        }
     }
+
+    // Every connector that declares a mount becomes an opening. Size comes
+    // from the connector's family unless the declaration overrides it —
+    // validate() already rejected a mount whose family implies nothing, so
+    // the envelope is present here.
+    let mut cutouts: Vec<Cutout> = Vec::new();
+    for c in &bi.connectors {
+        let Some(m) = &c.mount else { continue };
+        let (w, h) = m
+            .envelope(&c.kind)
+            .ok_or_else(|| anyhow::anyhow!("{source}: connector {} has no body envelope", c.id))?;
+        let side = Side::from_name(&m.side)
+            .ok_or_else(|| anyhow::anyhow!("{source}: connector {} has an unknown side", c.id))?;
+        cutouts.push(
+            Cutout::new(&c.id, side, m.offset_mm, w, h).with_z_offset(m.z_offset_mm.unwrap_or(0.0)),
+        );
+    }
+
+    let case = Case::new(outline).with_params(params).with_cutouts(cutouts);
+
+    // Validate before writing anything. A cutout that breaches the seal or
+    // runs off its wall produces geometry a slicer accepts, so the only place
+    // it can still be reported against the declaration is here.
+    case.validate()
+        .map_err(|e| anyhow::anyhow!("{source}: {e}"))?;
 
     for out in &pipeline.outputs {
         let path = Path::new(out);
@@ -333,10 +368,10 @@ fn run_fid_mesh(pipeline: &PipelineToml, working_dir: &Path) -> Result<()> {
             .ok_or_else(|| anyhow::anyhow!("fid-mesh: output `{out}` has no file name"))?;
 
         let mesh = match stem {
-            "case-base" => generate_case_base(&outline, &params),
-            "case-lid" => generate_case_lid(&outline, &params),
-            "gasket" => generate_gasket(&outline, &params),
-            "case" => case_exploded(&outline, &params),
+            "case-base" => case.base(),
+            "case-lid" => case.lid(),
+            "gasket" => case.gasket(),
+            "case" => case.exploded(),
             "board" => extrude_board(&outline),
             "tray" => enclosure_for(&outline),
             other => bail!(

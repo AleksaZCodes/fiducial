@@ -9,7 +9,12 @@
     "width_mm": 100.0,
     "height_mm": 60.0,
     "thickness_mm": 1.6,
-    "tolerance": "fdm"
+    "tolerance": "fdm",
+    "enclosure": {
+      "headroom_mm": 10.0,
+      "standoff_height_mm": 3.0,
+      "standoff_size_mm": 5.0
+    }
   },
   "connectors": [
     {
@@ -23,7 +28,8 @@
         { "number": 4, "name": "D-",    "net": "USB_DM",  "direction": "bidirectional" },
         { "number": 5, "name": "CC1",   "net": "USB_CC1", "direction": "bidirectional" },
         { "number": 6, "name": "CC2",   "net": "USB_CC2", "direction": "bidirectional" }
-      ]
+      ],
+      "mount": { "side": "south", "offset_mm": 20.0 }
     },
     {
       "id": "J2",
@@ -47,7 +53,8 @@
         { "number": 2, "name": "VCC",  "net": "PWR_3V3", "direction": "power_out" },
         { "number": 3, "name": "SDA",  "net": "I2C_SDA", "direction": "bidirectional" },
         { "number": 4, "name": "SCL",  "net": "I2C_SCL", "direction": "output" }
-      ]
+      ],
+      "mount": { "side": "east", "offset_mm": 30.0 }
     }
   ],
   "net_classes": [

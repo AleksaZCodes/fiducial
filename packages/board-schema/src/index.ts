@@ -25,6 +25,48 @@ export interface Pin {
   direction: PinDirection
 }
 
+/** Which board edge — and so which case wall — a feature sits on. */
+export type Side = 'north' | 'south' | 'east' | 'west'
+
+/**
+ * Body envelopes for the connector families `type` may name, in millimetres.
+ *
+ * Mirrors `fiducial_geometry::CONNECTOR_OPENINGS`. These are body dimensions,
+ * not opening dimensions — the process clearance is added when the hole is cut.
+ */
+export const CONNECTOR_OPENINGS: Record<string, { width_mm: number; height_mm: number }> = {
+  'usb-c': { width_mm: 8.94, height_mm: 3.26 },
+  'micro-usb': { width_mm: 7.5, height_mm: 2.9 },
+  'usb-a': { width_mm: 13.2, height_mm: 5.8 },
+  swd: { width_mm: 10.16, height_mm: 8.5 },
+  qwiic: { width_mm: 6.25, height_mm: 4.25 },
+  'jst-ph': { width_mm: 7.8, height_mm: 6.0 },
+  microsd: { width_mm: 12.0, height_mm: 1.6 },
+  rj45: { width_mm: 15.9, height_mm: 13.5 },
+  'barrel-jack': { width_mm: 9.0, height_mm: 11.0 },
+}
+
+/**
+ * Where a connector meets the case wall.
+ *
+ * `side` and `offset_mm` are in board coordinates: the board sits in the first
+ * quadrant and `offset_mm` is measured along the named edge from the board's
+ * origin corner. Positioning by the board means the declaration never has to
+ * know how thick the seal made the wall.
+ */
+export interface Mount {
+  /** Board edge the connector faces. */
+  side: Side
+  /** Centre of the connector along that edge, from the board's origin corner. */
+  offset_mm: number
+  /** Body width across the edge. Defaults to the family envelope. */
+  width_mm?: number
+  /** Body height. Defaults to the family envelope. */
+  height_mm?: number
+  /** Opening floor above the board's top surface; negative for mid-mount. */
+  z_offset_mm?: number
+}
+
 /** A connector or port on the board. */
 export interface Connector {
   /** Reference designator (e.g. "J1"). */
@@ -35,6 +77,32 @@ export interface Connector {
   type: string
   /** All pins on this connector. */
   pins: Pin[]
+  /**
+   * Where this connector meets the case wall, when it needs an opening.
+   *
+   * Optional: a header meant to be reached with the lid off has no mount and
+   * gets no hole. Omitting it is the safe default — an unnecessary opening is
+   * a leak.
+   */
+  mount?: Mount
+}
+
+/**
+ * Body envelope for a mount: the declaration if given, otherwise the family
+ * default for `kind`.
+ *
+ * Returns `undefined` when neither is available — the caller must then reject
+ * the declaration rather than guess a size for an unknown family.
+ */
+export function mountEnvelope(
+  mount: Mount,
+  kind: string
+): { width_mm: number; height_mm: number } | undefined {
+  const fallback = CONNECTOR_OPENINGS[kind]
+  const width_mm = mount.width_mm ?? fallback?.width_mm
+  const height_mm = mount.height_mm ?? fallback?.height_mm
+  if (width_mm === undefined || height_mm === undefined) return undefined
+  return { width_mm, height_mm }
 }
 
 /** A named group of related signal nets. */
@@ -66,6 +134,16 @@ export interface EnclosureOptions {
   gasket_height_mm?: number
   /** Fraction of gasket height squeezed when closed. Must be in (0, 1). */
   gasket_compression?: number
+  /**
+   * Height of the posts the board rests on, in millimetres.
+   *
+   * Omit and the board sits on the cavity floor. Declaring a height raises the
+   * board onto four corner posts and grows the case by the same amount,
+   * because headroom is measured above the board.
+   */
+  standoff_height_mm?: number
+  /** Footprint of each standoff post, square, in millimetres. */
+  standoff_size_mm?: number
 }
 
 /**
@@ -73,7 +151,8 @@ export interface EnclosureOptions {
  *
  * When present, `fid derive` generates the sealed case parts from it
  * (`case-base.stl`, `case-lid.stl`, `gasket.stl`, `case.glb`), sized by
- * `tolerance`.
+ * `tolerance`, with an opening punched for every connector that declares a
+ * `mount`.
  */
 export interface Outline {
   /** Board width in millimetres. */
@@ -149,6 +228,8 @@ export function parseBoardInterface(json: string): BoardInterface {
         'lid_thickness_mm',
         'gasket_width_mm',
         'gasket_height_mm',
+        'standoff_height_mm',
+        'standoff_size_mm',
       ] as const) {
         const v = e[field]
         if (v !== undefined && !(v > 0)) {
@@ -162,5 +243,42 @@ export function parseBoardInterface(json: string): BoardInterface {
       }
     }
   }
+
+  const SIDES: Side[] = ['north', 'south', 'east', 'west']
+  for (const c of bi.connectors) {
+    const m = c.mount
+    if (!m) continue
+    // An outline is what a mount is measured against; a mount without one has
+    // nothing to cut and would be silently dropped.
+    if (!bi.outline) {
+      throw new Error(`connector ${c.id} declares a mount but the board declares no outline`)
+    }
+    if (!SIDES.includes(m.side)) {
+      throw new Error(
+        `connector ${c.id}: unknown side ${JSON.stringify(m.side)} (expected north, south, east or west)`
+      )
+    }
+    if (!(m.offset_mm >= 0)) {
+      throw new Error(`connector ${c.id}: offset_mm must be >= 0, got ${m.offset_mm}`)
+    }
+    for (const field of ['width_mm', 'height_mm'] as const) {
+      const v = m[field]
+      if (v !== undefined && !(v > 0)) {
+        throw new Error(`connector ${c.id}: mount.${field} must be > 0, got ${v}`)
+      }
+    }
+    if (m.z_offset_mm !== undefined && Number.isNaN(m.z_offset_mm)) {
+      throw new Error(`connector ${c.id}: mount.z_offset_mm is not a number`)
+    }
+    // A family with no entry in the opening table cannot imply a size, so the
+    // declaration has to supply one rather than have one guessed.
+    if (!mountEnvelope(m, c.type)) {
+      throw new Error(
+        `connector ${c.id}: no body envelope known for type ${JSON.stringify(c.type)} — ` +
+          `declare mount.width_mm and mount.height_mm`
+      )
+    }
+  }
+
   return bi
 }

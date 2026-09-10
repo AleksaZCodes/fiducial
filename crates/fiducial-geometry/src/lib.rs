@@ -308,6 +308,123 @@ pub mod polygon {
 #[cfg(feature = "alloc")]
 pub use polygon::Polygon;
 
+// ── Board edges ───────────────────────────────────────────────────────────────
+
+/// Which edge of a board — and so which wall of its case — a feature sits on.
+///
+/// Named in board coordinates, where the board occupies the first quadrant:
+/// `South` is the `y = 0` edge, `North` the `y = height` edge, `West` `x = 0`,
+/// and `East` `x = width`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Side {
+    /// The `y = 0` edge.
+    South,
+    /// The `x = width` edge.
+    East,
+    /// The `y = height` edge.
+    North,
+    /// The `x = 0` edge.
+    West,
+}
+
+impl Side {
+    /// Parse a declared side name (`"north"`, `"south"`, `"east"`, `"west"`).
+    ///
+    /// Case-insensitive in the sense that only lowercase is accepted, matching
+    /// every other enumerated name in a declaration.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "south" => Some(Self::South),
+            "east" => Some(Self::East),
+            "north" => Some(Self::North),
+            "west" => Some(Self::West),
+            _ => None,
+        }
+    }
+
+    /// The declared name, the inverse of [`Side::from_name`].
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::South => "south",
+            Self::East => "east",
+            Self::North => "north",
+            Self::West => "west",
+        }
+    }
+
+    /// Every side, in the order case walls are generated.
+    pub const ALL: [Side; 4] = [Side::South, Side::East, Side::North, Side::West];
+
+    /// Length of this edge on a board `width` × `height`.
+    ///
+    /// Answers "how far along can a feature on this edge sit" without the
+    /// caller having to remember which sides run along x.
+    pub fn span_mm(self, width_mm: f32, height_mm: f32) -> f32 {
+        match self {
+            Self::South | Self::North => width_mm,
+            Self::East | Self::West => height_mm,
+        }
+    }
+}
+
+// ── Connector openings ────────────────────────────────────────────────────────
+
+/// The envelope a connector family needs punched through a case wall.
+///
+/// These are **body dimensions**, not opening dimensions: the process
+/// clearance is added by whoever cuts the hole, so the same table serves an FDM
+/// case and a CNC one. Sizes are the widest common variant of each family —
+/// override them in the declaration when a specific part differs.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ConnectorOpening {
+    /// Connector family identifier, matching the declared `type`.
+    pub name: &'static str,
+    /// Body width across the board edge, in millimetres.
+    pub width_mm: f32,
+    /// Body height above the board surface, in millimetres.
+    pub height_mm: f32,
+}
+
+/// Body envelopes for the connector families `type` may name.
+///
+/// Ordered as declared so the error message for an unknown type can list them.
+pub const CONNECTOR_OPENINGS: &[ConnectorOpening] = &[
+    // USB-C receptacle (mid/top mount), 8.94 × 3.26 shell.
+    o("usb-c", 8.94, 3.26),
+    // Micro-B receptacle shell.
+    o("micro-usb", 7.5, 2.9),
+    // Type-A receptacle port aperture.
+    o("usb-a", 13.2, 5.8),
+    // 2×3 0.1" shrouded debug header.
+    o("swd", 10.16, 8.5),
+    // JST-SH 1 mm 4-pin (Qwiic / STEMMA QT).
+    o("qwiic", 6.25, 4.25),
+    // JST-PH 2 mm 2-pin.
+    o("jst-ph", 7.8, 6.0),
+    // Push-push microSD socket.
+    o("microsd", 12.0, 1.6),
+    // 8P8C modular jack.
+    o("rj45", 15.9, 13.5),
+    // 5.5 / 2.1 mm DC barrel jack.
+    o("barrel-jack", 9.0, 11.0),
+];
+
+const fn o(name: &'static str, width_mm: f32, height_mm: f32) -> ConnectorOpening {
+    ConnectorOpening {
+        name,
+        width_mm,
+        height_mm,
+    }
+}
+
+/// Look up the body envelope for a connector `type`.
+///
+/// Returns `None` for a family with no entry — the caller must then require
+/// explicit dimensions in the declaration rather than guess.
+pub fn connector_opening(kind: &str) -> Option<&'static ConnectorOpening> {
+    CONNECTOR_OPENINGS.iter().find(|c| c.name == kind)
+}
+
 // ── Board outline ─────────────────────────────────────────────────────────────
 
 /// Manufacturing tolerance class — links geometry to process capability.
@@ -382,9 +499,10 @@ pub fn tolerance_by_name(name: &str) -> Option<&'static ToleranceProfile> {
 
 /// A board outline: a rectangular PCB footprint + thickness + process profile.
 ///
-/// Currently rectangular only. The `tolerance` field is carried for downstream
-/// enclosure generation, which is not yet implemented — `fiducial_mesh` reads
-/// only `width_mm`, `height_mm`, and `thickness_mm`.
+/// Currently rectangular only. `tolerance` is not metadata — `fiducial_mesh`
+/// derives clearance, wall, lip, and gasket fit from its profile, so changing
+/// the class changes the generated case.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BoardOutline {
     /// PCB width in millimetres.
     pub width_mm: f32,
@@ -534,6 +652,70 @@ mod tests {
         let cnc = TOLERANCE_CNC.xy_accuracy_mm;
         assert!(resin < fdm, "resin should be tighter than fdm");
         assert!(cnc < resin, "cnc should be tighter than resin");
+    }
+
+    // ── Sides and connector openings ─────────────────────────────────────────
+
+    #[test]
+    fn side_names_round_trip() {
+        for s in Side::ALL {
+            assert_eq!(Side::from_name(s.name()), Some(s));
+        }
+    }
+
+    #[test]
+    fn unknown_side_names_are_rejected() {
+        for bad in ["up", "down", "North", "", "starboard"] {
+            assert!(Side::from_name(bad).is_none(), "{bad:?} should not parse");
+        }
+    }
+
+    #[test]
+    fn sides_span_the_axis_they_run_along() {
+        assert_eq!(Side::South.span_mm(100.0, 60.0), 100.0);
+        assert_eq!(Side::North.span_mm(100.0, 60.0), 100.0);
+        assert_eq!(Side::East.span_mm(100.0, 60.0), 60.0);
+        assert_eq!(Side::West.span_mm(100.0, 60.0), 60.0);
+    }
+
+    #[test]
+    fn every_connector_envelope_is_printable() {
+        for c in CONNECTOR_OPENINGS {
+            assert!(c.width_mm > 0.0, "{} width", c.name);
+            assert!(c.height_mm > 0.0, "{} height", c.name);
+        }
+    }
+
+    #[test]
+    fn connector_names_are_unique_and_findable() {
+        for (i, c) in CONNECTOR_OPENINGS.iter().enumerate() {
+            assert_eq!(
+                connector_opening(c.name).map(|o| o.name),
+                Some(c.name),
+                "{} must be findable by name",
+                c.name
+            );
+            assert!(
+                !CONNECTOR_OPENINGS[..i].iter().any(|p| p.name == c.name),
+                "duplicate entry for {}",
+                c.name
+            );
+        }
+    }
+
+    #[test]
+    fn an_unlisted_family_implies_no_envelope() {
+        // The caller must then require explicit dimensions rather than guess,
+        // because a guessed opening is one the connector may not fit through.
+        assert!(connector_opening("db25").is_none());
+        assert!(connector_opening("").is_none());
+    }
+
+    #[test]
+    fn usb_c_matches_its_datasheet_shell() {
+        let o = connector_opening("usb-c").unwrap();
+        assert!((o.width_mm - 8.94).abs() < 1e-4);
+        assert!((o.height_mm - 3.26).abs() < 1e-4);
     }
 
     #[test]

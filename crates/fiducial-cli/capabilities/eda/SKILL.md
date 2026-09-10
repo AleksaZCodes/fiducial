@@ -45,6 +45,35 @@ noticeably thicker walls than a plain tray.
 Print the base and lid rigid, the gasket flexible. All three come off the same
 printer.
 
+Nothing clamps the lid down — there are no screw bosses or clips — so the gasket
+is only compressed while something external holds the lid closed. The case is
+splash- and dust-resistant by construction; it carries no IP rating and has not
+been pressure-tested.
+
+### Connector openings
+
+Every connector that declares a `mount` gets a rectangular hole punched through
+the base wall it faces. Openings are sized from the connector's `type`, so a
+`usb-c` port cuts a USB-C-shaped hole without anyone typing a dimension.
+
+An opening may not reach the gasket groove: a hole through the sealing rim is a
+leak, and `fid derive` refuses to generate one. If a connector is too tall for
+the case, raise `headroom_mm` — the error message says so and names the
+connector.
+
+The lid never takes cutouts. A hole in the lid is a hole inside the gasket line,
+and no amount of compression seals that.
+
+### Standoffs
+
+Declare `standoff_height_mm` and the board is lifted onto four posts, one under
+each corner, instead of resting on the cavity floor. The posts are part of the
+base, not separate solids dropped on top of it.
+
+Lifting the board lifts the rim with it — headroom is measured above the board —
+so a 3 mm standoff makes the whole case 3 mm taller rather than eating 3 mm of
+component clearance.
+
 ## Commands
 
 | Command | What it does |
@@ -67,13 +96,14 @@ printer.
     "height_mm": 60.0,
     "thickness_mm": 1.6,
     "tolerance": "fdm",
-    "enclosure": { "headroom_mm": 5.0 }
+    "enclosure": { "headroom_mm": 10.0, "standoff_height_mm": 3.0 }
   },
   "connectors": [{
     "id": "J1",
     "name": "USB-C",
     "type": "usb-c",
-    "pins": [{ "number": 1, "name": "VBUS", "net": "PWR_5V", "direction": "power_in" }]
+    "pins": [{ "number": 1, "name": "VBUS", "net": "PWR_5V", "direction": "power_in" }],
+    "mount": { "side": "south", "offset_mm": 20.0 }
   }],
   "net_classes": [{ "name": "power", "nets": ["PWR_5V", "GND"] }]
 }
@@ -116,6 +146,8 @@ gasket stock you are using.
 | `gasket_width_mm` | `2.0` | Gasket cross-section width. |
 | `gasket_height_mm` | `2.0` | Gasket cross-section height, uncompressed. |
 | `gasket_compression` | `0.25` | Fraction squeezed when closed. Must be strictly between 0 and 1. |
+| `standoff_height_mm` | none | Height of the four corner posts the board rests on. Omit and the board sits on the floor. |
+| `standoff_size_mm` | `4.0` | Footprint of each post, square. |
 
 `gasket_compression` of `0` never squeezes the gasket and `1` crushes it flat;
 both produce a case that does not seal, so both are rejected.
@@ -123,12 +155,76 @@ both produce a case that does not seal, so both are rejected.
 Everything else — clearance, lip width, floor thickness, gasket fit — comes from
 the tolerance class and is not overridable here. Change `tolerance` instead.
 
+## connector.mount — where a connector meets the wall
+
+`mount` is optional, per connector. A connector without one gets no hole — the
+right answer for a debug header you reach with the lid off, and the safe default,
+because an unnecessary opening is a leak.
+
+| Field | Required | Default | Meaning |
+|---|---|---|---|
+| `side` | yes | — | Board edge the connector faces: `north`, `south`, `east`, `west`. |
+| `offset_mm` | yes | — | Centre of the connector along that edge, measured from the board's origin corner. Must be ≥ 0. |
+| `width_mm` | no | family | Body width across the edge. Declare only for a part that differs from its family. |
+| `height_mm` | no | family | Body height. |
+| `z_offset_mm` | no | `0.0` | Opening floor above the board's top surface. Negative for a mid-mount receptacle that hangs below it. |
+
+`side` and `offset_mm` are in **board coordinates**: the board sits in the first
+quadrant, and `offset_mm` runs along the named edge from the board's origin
+corner on every side. A connector 20 mm along the south edge and one 20 mm along
+the north edge sit at the same board *x* — you never work backwards from the
+wall, whose thickness the seal decides.
+
+`width_mm` and `height_mm` are the **connector body**, not the opening. One
+process tolerance is added on each side, so the same declaration cuts a tighter
+hole on `resin` than on `fdm`.
+
+### Connector families
+
+`type` implies the body envelope, in millimetres:
+
+| `type` | Body | Notes |
+|---|---|---|
+| `usb-c` | 8.94 × 3.26 | Receptacle shell |
+| `micro-usb` | 7.5 × 2.9 | Micro-B shell |
+| `usb-a` | 13.2 × 5.8 | Type-A port aperture |
+| `swd` | 10.16 × 8.5 | 2×3 0.1" shrouded header |
+| `qwiic` | 6.25 × 4.25 | JST-SH 1 mm 4-pin |
+| `jst-ph` | 7.8 × 6.0 | JST-PH 2 mm 2-pin |
+| `microsd` | 12.0 × 1.6 | Push-push socket |
+| `rj45` | 15.9 × 13.5 | 8P8C jack |
+| `barrel-jack` | 9.0 × 11.0 | 5.5 / 2.1 mm DC |
+
+A `type` outside this table cannot imply a size, so a mount on one must declare
+`width_mm` and `height_mm`. `fid derive` rejects it rather than guessing —
+a guessed opening is one the connector may not fit through.
+
+Note the seed board mounts its USB-C and Qwiic ports but **not** its SWD header.
+At 8.5 mm tall it would need more than 11.7 mm of headroom to clear the seal on
+the FDM profile, where the seed declares 10 — so that header is reached with the
+lid off. Raise `headroom_mm` past that and the same declaration builds.
+
+### What `fid derive` rejects
+
+Each of these produces geometry a slicer accepts and a product does not, so all
+are caught at the declaration:
+
+| Condition | Why |
+|---|---|
+| Opening reaches the gasket groove | The case would not seal |
+| Opening below the cavity floor | There is no wall there to cut |
+| Opening runs off its wall | Nothing to punch through |
+| Opening smaller than the process minimum feature | The printer cannot resolve it |
+| Two openings on one wall overlap | They merge into a single wide slot |
+| Four standoffs will not fit the board | The posts would run into each other |
+| Unknown `side`, negative `offset_mm`, non-positive size | Not a placeable opening |
+
 ## Rules
 
 - **Never hand-edit `board.interface.json`** — it is generated by atopile from `main.ato`.
   Edit the `.ato` source and run `atopile build && fid derive`.
 - **Never hand-edit anything in `enclosure/`** — every file there is derived from the
-  `outline` block. To change the case, change the declaration and re-derive.
+  `outline` block and the connectors' `mount` blocks. To change the case, change the declaration and re-derive.
   To change *how* geometry is derived from a declaration, change `fiducial-mesh` upstream.
 - If `fid derive --check` fails in CI, a generated artifact was edited without
   regenerating and re-running `fid derive` to update `fiducial.lock`.

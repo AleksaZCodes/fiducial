@@ -25,6 +25,10 @@ std     = ["alloc", "serde/std", "dep:serde_json"]
 # unconditionally, so their derived impls need serde's alloc support on
 # every target — including thumbv6m/thumbv7em/wasm32 with no default features.
 serde      = { version = "1", default-features = false, features = ["derive", "alloc"] }
+# The valid side names and connector families live in one table, in the crate
+# that generates geometry from them — validating against it here keeps the
+# declaration and the mesh from disagreeing about what "usb-c" means.
+fiducial-geometry = { path = "../fiducial-geometry" }
 serde_json = { version = "1", optional = true }
 
 [dev-dependencies]
