@@ -51,7 +51,10 @@ fn status_exits_zero() {
         stderr(&out)
     );
     let text = stdout(&out);
-    assert!(text.contains("wire version"), "expected 'wire version' in output:\n{text}");
+    assert!(
+        text.contains("wire version"),
+        "expected 'wire version' in output:\n{text}"
+    );
 }
 
 // ── check — happy path ────────────────────────────────────────────────────────
@@ -135,7 +138,14 @@ notes   = "Initial."
 
     let out = run(
         tmp.path(),
-        &["release", "protocol", "--bump", "breaking", "--note", "Test breaking bump"],
+        &[
+            "release",
+            "protocol",
+            "--bump",
+            "breaking",
+            "--note",
+            "Test breaking bump",
+        ],
     );
     assert!(
         out.status.success(),
@@ -151,14 +161,18 @@ notes   = "Initial."
     // initial file uses aligned spacing.  Check for "= {new_ver}" anywhere in the
     // [wire] section rather than exact spacing.
     assert!(
-        raw.contains(&format!("current = {new_ver}")) || raw.contains(&format!("current        = {new_ver}")),
+        raw.contains(&format!("current = {new_ver}"))
+            || raw.contains(&format!("current        = {new_ver}")),
         "expected current={new_ver} in updated matrix:\n{raw}"
     );
     assert!(
         raw.contains(&format!("min_compatible = {new_ver}")),
         "expected min_compatible={new_ver} in updated matrix:\n{raw}"
     );
-    assert!(raw.contains("Test breaking bump"), "expected note in history:\n{raw}");
+    assert!(
+        raw.contains("Test breaking bump"),
+        "expected note in history:\n{raw}"
+    );
 
     // The output must remind the author to update WIRE_VERSION.
     let text = stdout(&out);
@@ -191,10 +205,7 @@ notes   = "Initial."
     );
     fs::write(compat_dir.join("matrix.toml"), initial).unwrap();
 
-    let out = run(
-        tmp.path(),
-        &["release", "protocol", "--bump", "compatible"],
-    );
+    let out = run(tmp.path(), &["release", "protocol", "--bump", "compatible"]);
     assert!(
         out.status.success(),
         "`fid release protocol --bump compatible` failed:\n{}",
@@ -205,7 +216,8 @@ notes   = "Initial."
     let new_ver = wire_ver + 1;
     // current incremented (toml::to_string_pretty uses "current = N")
     assert!(
-        raw.contains(&format!("current = {new_ver}")) || raw.contains(&format!("current        = {new_ver}")),
+        raw.contains(&format!("current = {new_ver}"))
+            || raw.contains(&format!("current        = {new_ver}")),
         "expected current={new_ver}:\n{raw}"
     );
     // min_compatible stays at old value
