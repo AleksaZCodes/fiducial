@@ -256,6 +256,30 @@ jobs:
       - name: Enclosure pipeline (end-to-end)
         run: cargo test -p fiducial-cli --test enclosure_pipeline
 
+  # ── Workbench: fid dash renders and stays a read-only view ────────────────
+  #
+  # Phase 16. The tests drive the real binary through new → add → derive → dash
+  # and assert against its JSON, including that dash writes nothing.
+  workbench:
+    name: workbench (fid dash)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      # `--bins`, not `--lib`: fiducial-cli is a binary-only crate, so its unit
+      # tests compile into the `fid` test target.
+      - name: Pipeline discovery is read in one place
+        run: cargo test -p fiducial-cli --bins pipeline
+
+      - name: fid dash end-to-end
+        run: cargo test -p fiducial-cli --test dash
+
   # ── JavaScript / TypeScript ───────────────────────────────────────────────
   js:
     name: JS/TS

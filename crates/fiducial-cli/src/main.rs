@@ -7,6 +7,7 @@ mod config;
 mod guard;
 mod lock;
 mod migration;
+mod pipeline;
 mod templates;
 
 // ── Top-level CLI ────────────────────────────────────────────────────────────
@@ -231,13 +232,59 @@ EXAMPLES
   fid graph --format dot | dot -Tsvg -o graph.svg
   fid graph --format json | jq '.nodes[] | select(.kind == \"artifact\")'
 
-STATUS
-  Not yet implemented (Phase 4)."
+SEE ALSO
+  fid dash    the same graph alongside roadmap, decisions, CI and freshness"
     )]
     Graph {
         /// Output format: text | dot | json
         #[arg(long, default_value = "text", value_name = "FORMAT")]
         format: String,
+    },
+
+    /// The workbench — one read-only view of roadmap, decisions, CI, graph, freshness
+    #[command(
+        long_about = "\
+Render the workbench: everything about this product's state in one view.
+
+The repository is the database; this is a view over it. `fid dash` owns no
+store, caches nothing, and writes nothing — every number is recomputed from
+files already in the repo, so it cannot go stale the way a synced dashboard
+can, and there is nothing to invalidate when the repo changes.
+
+It makes no network calls. CI is reported from the workflow files the repo
+declares, not from a live API: a view that needs a token and a connection to
+render is a view that stops working on a plane, and a cached answer would be a
+private store by another name.
+
+Absence is reported, not treated as an error. A product with no roadmap, no
+decisions, or no pipelines gets a section saying so.
+
+SECTIONS
+  product     name, version, capabilities, guard rules
+  git         branch, head, working tree, upstream divergence
+  roadmap     progress counted from ROADMAP.md or PHASES.md
+  decisions   dated records in docs/specs (or docs/decisions, docs/adr)
+  ci          declared workflows, their triggers, whether any checks freshness
+  graph       pipelines and the artifacts they produce
+  freshness   artifacts re-hashed against fiducial.lock, plus template drift",
+        after_long_help = "\
+EXAMPLES
+  fid dash                        the whole view
+  fid dash --section freshness    just what is stale
+  fid dash --json                 same facts for agents and workbench v1
+  fid dash --json | jq '.freshness.problems'
+
+EXIT CODES
+  0   Rendered. Dash reports problems; it does not fail on them —
+      use `fid derive --check` or `fid doctor` for that."
+    )]
+    Dash {
+        /// Emit JSON instead of text — the same facts, for agents and tooling
+        #[arg(long)]
+        json: bool,
+        /// Render only one section
+        #[arg(long, value_name = "NAME")]
+        section: Option<String>,
     },
 
     /// Check for drift: outdated deps, stale templates, un-applied migrations
@@ -302,6 +349,7 @@ fn main() -> Result<()> {
         Commands::Derive { check, pipeline } => commands::derive::run(check, pipeline),
         Commands::Upgrade { dry_run, portfolio } => commands::upgrade::run(dry_run, portfolio),
         Commands::Graph { format } => commands::graph::run(&format),
+        Commands::Dash { json, section } => commands::dash::run(json, section),
         Commands::Doctor => commands::doctor::run(),
         Commands::GuardCheck => guard::check_from_stdin(),
     }

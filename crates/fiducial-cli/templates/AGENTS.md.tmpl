@@ -8,9 +8,16 @@ re-derive it.
 
 Built on [Fiducial](https://github.com/AleksaZCodes/fiducial) {{version}}.
 
+- `fid dash` — one read-only view of this product's state; start here
 - `fid doctor` — check for drift before starting work
 - `fid derive` — run pipelines; `--check` fails CI on stale artifacts
+- `fid graph` — the facts → pipelines → artifacts DAG
 - `fid upgrade` — pull upstream template and package updates
+
+`fid dash --json` is the machine-readable form of the same facts. Prefer it over
+re-deriving product state by reading files: it already reports what is stale,
+which pipelines exist, what decisions have been recorded, and whether CI guards
+artifact freshness.
 
 ## Product layout
 
