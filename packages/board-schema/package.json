@@ -1,6 +1,6 @@
 {
   "name": "@fiducial/board-schema",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "TypeScript types for board.interface.json — mirrors the Rust fiducial-eda BoardInterface schema",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
