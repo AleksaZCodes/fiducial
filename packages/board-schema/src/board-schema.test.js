@@ -226,8 +226,9 @@ describe('@fiducial/board-schema', () => {
     })
 
     it('leaves the seed debug header deliberately unmounted', () => {
-      // A 2x3 shrouded header is 8.5 mm tall; that opening reaches the gasket
-      // groove on any sanely sized case, so it is reached with the lid off.
+      // A 2x3 shrouded header is 8.5 mm tall, so mounting it needs more than
+      // 11.7 mm of headroom on the FDM profile — more than the seed declares.
+      // It is reached with the lid off instead.
       const bi = parseBoardInterface(SEED_JSON)
       assert.equal(bi.connectors.find(c => c.id === 'J2').mount, undefined)
     })

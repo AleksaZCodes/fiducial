@@ -37,8 +37,11 @@ default has to be the safe one, and the safe one is no hole. A debug header
 reached with the lid off is the common case, not the exception.
 
 The seed board demonstrates this: it mounts its USB-C and Qwiic ports and
-deliberately leaves its SWD header unmounted, because an 8.5 mm tall opening
-reaches the gasket groove on any sanely sized case.
+deliberately leaves its SWD header unmounted. At 8.5 mm tall, mounting it would
+need more than 11.7 mm of headroom on the FDM profile — the body, two process
+tolerances, the groove depth, and the edge margin — where the seed declares 10.
+That is a case you could build; it is not the case the seed describes, and the
+header is reached with the lid off.
 
 ## 3. The declared size is the connector body; the process adds the clearance
 

@@ -570,9 +570,9 @@ mod tests {
 
     #[test]
     fn the_seed_debug_header_is_deliberately_unmounted() {
-        // A 2x3 shrouded header is 8.5 mm tall; an opening that tall reaches
-        // the gasket groove on any sanely sized case. It is reached with the
-        // lid off instead, so it gets no hole.
+        // A 2x3 shrouded header is 8.5 mm tall, so mounting it needs more
+        // than 11.7 mm of headroom on the FDM profile — more than the seed
+        // declares. It is reached with the lid off instead, so it gets no hole.
         let bi = validate(SEED_JSON).unwrap();
         let j2 = bi.connectors.iter().find(|c| c.id == "J2").unwrap();
         assert!(j2.mount.is_none());

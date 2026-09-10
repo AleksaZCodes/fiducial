@@ -200,8 +200,9 @@ A `type` outside this table cannot imply a size, so a mount on one must declare
 a guessed opening is one the connector may not fit through.
 
 Note the seed board mounts its USB-C and Qwiic ports but **not** its SWD header.
-An 8.5 mm tall opening reaches the gasket groove on any sanely sized case, so
-that header is reached with the lid off.
+At 8.5 mm tall it would need more than 11.7 mm of headroom to clear the seal on
+the FDM profile, where the seed declares 10 — so that header is reached with the
+lid off. Raise `headroom_mm` past that and the same declaration builds.
 
 ### What `fid derive` rejects
 
