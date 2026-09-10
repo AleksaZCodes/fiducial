@@ -158,6 +158,7 @@ const RECENT_DECISIONS: usize = 5;
 impl Dash {
     /// Read every section from the repository.
     pub fn collect(root: &Path, config: &Config) -> Result<Self> {
+        let pipelines = pipeline::discover(root, config)?;
         Ok(Self {
             product: ProductView {
                 name: config.product.name.clone(),
@@ -171,13 +172,15 @@ impl Dash {
             roadmap: roadmap_view(root),
             decisions: decisions_view(root),
             ci: ci_view(root),
+            // Read once and shared. Freshness needs the declared outputs as
+            // well as the lock, so it can report an output nothing has derived
+            // yet — invisible if you only look at what the lock tracks. Reading
+            // the declaration twice in one function is the same mistake, one
+            // scope smaller, that `pipeline::discover` exists to fix.
             graph: GraphView {
-                pipelines: summarise(pipeline::discover(root, config)?),
+                pipelines: summarise(&pipelines),
             },
-            // Freshness needs the declared outputs as well as the lock, so it
-            // can report an output nothing has derived yet — invisible if you
-            // only look at what the lock already tracks.
-            freshness: freshness_view(root, &pipeline::discover(root, config)?)?,
+            freshness: freshness_view(root, &pipelines)?,
         })
     }
 }
@@ -259,41 +262,53 @@ fn git_view(root: &Path) -> GitView {
 /// marker is not a roadmap item and is ignored — which is what keeps prose from
 /// being counted.
 fn roadmap_status(line: &str) -> Option<&'static str> {
-    if line.contains("- [x]") || line.contains("- [X]") {
-        return Some("done");
+    let done = line.contains("- [x]") || line.contains("- [X]") || line.contains('✅');
+    let in_progress = line.contains('🟡') || line.contains('🚧');
+    let todo = line.contains("- [ ]") || line.contains('⬜') || line.contains('⏸');
+
+    // A line carrying more than one *distinct* status is a legend or a sentence
+    // about the roadmap, not an item in it. Counting `Legend: ✅ done · 🟡 in
+    // progress · ⬜ not started` as one finished item is the kind of quietly
+    // wrong number a dashboard must not produce.
+    //
+    // Two markers meaning the same thing — `- [x]` and `✅` on one row — are
+    // still one item.
+    match (done, in_progress, todo) {
+        (true, false, false) => Some("done"),
+        (false, true, false) => Some("in_progress"),
+        (false, false, true) => Some("todo"),
+        _ => None,
     }
-    if line.contains("- [ ]") {
-        return Some("todo");
-    }
-    // Emoji markers, checked before the plain-text ones so a row containing
-    // both is counted by its marker.
-    if line.contains('✅') {
-        return Some("done");
-    }
-    if line.contains('🟡') || line.contains("🚧") {
-        return Some("in_progress");
-    }
-    if line.contains('⬜') || line.contains("⏸") {
-        return Some("todo");
-    }
-    None
 }
 
 /// Strip table pipes and markers so an active line reads as a sentence.
 fn tidy_roadmap_line(line: &str) -> String {
-    let cleaned: String = line
-        .replace('|', " ")
-        .replace("- [ ]", " ")
-        .replace("- [x]", " ")
-        .replace('🟡', " ")
-        .replace("🚧", " ")
-        .chars()
-        .collect();
-    let mut out = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
-    if out.len() > 96 {
-        out.truncate(93);
-        out.push_str("...");
+    /// Markers and table syntax that carry no meaning once the line is a
+    /// sentence. The task-list forms are multi-character, so they are removed
+    /// before the single characters.
+    const DROP_STRS: &[&str] = &["- [ ]", "- [x]", "- [X]"];
+    const DROP_CHARS: &[char] = &['|', '🟡', '🚧'];
+
+    let mut cleaned = line.to_string();
+    for pat in DROP_STRS {
+        cleaned = cleaned.replace(pat, " ");
     }
+    cleaned.retain(|c| !DROP_CHARS.contains(&c));
+    let out = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
+    if out.len() <= 96 {
+        return out;
+    }
+    // Cut on a character boundary. `String::truncate(93)` panics when byte 93
+    // is inside a multi-byte character — an em-dash in a long roadmap row was
+    // enough to crash the dashboard.
+    let cut = out
+        .char_indices()
+        .map(|(i, _)| i)
+        .take_while(|i| *i <= 93)
+        .last()
+        .unwrap_or(0);
+    let mut out = out[..cut].to_string();
+    out.push_str("...");
     out
 }
 
@@ -344,11 +359,10 @@ fn roadmap_view(root: &Path) -> RoadmapView {
 
 /// Leading `YYYY-MM-DD` of a filename, when it has one.
 fn date_prefix(name: &str) -> Option<String> {
-    let bytes = name.as_bytes();
-    if bytes.len() < 10 {
-        return None;
-    }
-    let head = &name[..10];
+    // `get`, not `&name[..10]`: that slice panics when byte 10 lands inside a
+    // multi-byte character, so a decision file with a non-ASCII name crashed
+    // the whole dashboard.
+    let head = name.get(..10)?;
     let shaped = head.chars().enumerate().all(|(i, c)| {
         if i == 4 || i == 7 {
             c == '-'
@@ -423,6 +437,120 @@ fn decisions_view(root: &Path) -> DecisionsView {
     }
 }
 
+/// Drop YAML comments from a line.
+///
+/// YAML requires whitespace before an inline `#`, so a `#` at the start of a
+/// line or after a space begins a comment and everything after it is prose.
+/// Anything inside quotes is left alone, which is enough for the two keys read
+/// here.
+fn strip_comment(line: &str) -> &str {
+    let bytes = line.as_bytes();
+    let mut quote: Option<u8> = None;
+    for (i, &b) in bytes.iter().enumerate() {
+        match quote {
+            Some(q) if b == q => quote = None,
+            Some(_) => {}
+            None if b == b'"' || b == b'\'' => quote = Some(b),
+            None if b == b'#' && (i == 0 || bytes[i - 1].is_ascii_whitespace()) => {
+                return &line[..i];
+            }
+            None => {}
+        }
+    }
+    line
+}
+
+/// Indentation of a line, in spaces.
+fn indent_of(line: &str) -> usize {
+    line.len() - line.trim_start().len()
+}
+
+/// The event names a workflow's `on:` key declares.
+///
+/// Reads only that one key, and only the three shapes GitHub accepts:
+///
+/// ```yaml
+/// on: push                          # scalar
+/// on: [push, pull_request]           # flow sequence
+/// on:                                # block
+///   push:
+///     branches: [main]
+/// ```
+///
+/// Deliberately a bounded reader, not a YAML parser. The previous version
+/// substring-searched the whole file, which reported a *job* named `push` as a
+/// trigger and a commented-out `schedule:` as a live one. Scoping to the key
+/// and dropping comments is what makes the answer true; if this ever needs more
+/// of YAML than three shapes, the fix is to put a real parser behind this
+/// function rather than to widen the guesswork.
+fn workflow_triggers(text: &str) -> Vec<String> {
+    /// `on` is a YAML 1.1 boolean, so workflows may legitimately quote the key.
+    fn is_on_key(trimmed: &str) -> Option<&str> {
+        for prefix in ["on:", "\"on\":", "'on':"] {
+            if let Some(rest) = trimmed.strip_prefix(prefix) {
+                return Some(rest);
+            }
+        }
+        None
+    }
+
+    let lines: Vec<&str> = text.lines().map(strip_comment).collect();
+
+    let Some(start) = lines
+        .iter()
+        .position(|l| indent_of(l) == 0 && is_on_key(l.trim()).is_some())
+    else {
+        return Vec::new();
+    };
+
+    let rest = is_on_key(lines[start].trim()).unwrap_or("").trim();
+
+    // `on: [push, pull_request]`
+    if let Some(inner) = rest.strip_prefix('[').and_then(|r| r.strip_suffix(']')) {
+        return inner
+            .split(',')
+            .map(|s| s.trim().trim_matches(['"', '\'']).to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+    }
+
+    // `on: push`
+    if !rest.is_empty() {
+        return vec![rest.trim_matches(['"', '\'']).to_string()];
+    }
+
+    // Block form: the keys, or `-` items, at the first indent under `on:`.
+    let mut events = Vec::new();
+    let mut block_indent = None;
+    for line in &lines[start + 1..] {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let indent = indent_of(line);
+        // A key back at column 0 ends the `on:` block.
+        if indent == 0 {
+            break;
+        }
+        let depth = *block_indent.get_or_insert(indent);
+        if indent > depth {
+            continue; // a trigger's own options, e.g. `branches:`
+        }
+        let item = line.trim();
+        let name = item
+            .strip_prefix("- ")
+            .unwrap_or(item)
+            .split(':')
+            .next()
+            .unwrap_or("")
+            .trim()
+            .trim_matches(['"', '\'']);
+        if !name.is_empty() {
+            events.push(name.to_string());
+        }
+    }
+    events
+}
+
 fn ci_view(root: &Path) -> CiView {
     let dir = root.join(".github/workflows");
     let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
@@ -440,30 +568,33 @@ fn ci_view(root: &Path) -> CiView {
         .filter_map(|p| {
             let text = std::fs::read_to_string(p).ok()?;
             let file = p.file_name()?.to_str()?.to_string();
-            // Parsed by line rather than with a YAML crate: the two fields
-            // needed are top-level, and a workflow whose triggers this misreads
-            // is still reported by name. Pulling in a YAML parser to read two
-            // keys would be the larger mistake.
+            // Read by line rather than with a YAML crate, but *scoped* — see
+            // `workflow_triggers`. Substring-searching the whole file, which is
+            // what this did first, reported job names as triggers.
             let name = text
                 .lines()
-                .find(|l| l.starts_with("name:"))
+                .map(strip_comment)
+                .find(|l| indent_of(l) == 0 && l.trim_start().starts_with("name:"))
                 .map(|l| {
-                    l.trim_start_matches("name:")
+                    l.trim()
+                        .trim_start_matches("name:")
                         .trim()
-                        .trim_matches('"')
+                        .trim_matches(['"', '\''])
                         .to_string()
                 })
                 .unwrap_or_else(|| file.clone());
-            let triggers = ["push", "pull_request", "workflow_dispatch", "schedule"]
-                .iter()
-                .filter(|t| text.contains(&format!("  {t}:")) || text.contains(&format!("{t}:\n")))
-                .map(|t| (*t).to_string())
-                .collect();
+            // Comment-stripped: a commented-out `fid derive --check` used to
+            // report the repository as guarded when it was not, which inverts
+            // the most useful thing this section says.
+            let checks_freshness = text
+                .lines()
+                .map(strip_comment)
+                .any(|l| l.contains("derive --check"));
             Some(Workflow {
-                checks_freshness: text.contains("derive --check"),
+                checks_freshness,
                 file,
                 name,
-                triggers,
+                triggers: workflow_triggers(&text),
             })
         })
         .collect();
@@ -471,13 +602,13 @@ fn ci_view(root: &Path) -> CiView {
     CiView { workflows }
 }
 
-fn summarise(pipelines: Vec<pipeline::Pipeline>) -> Vec<PipelineSummary> {
+fn summarise(pipelines: &[pipeline::Pipeline]) -> Vec<PipelineSummary> {
     pipelines
-        .into_iter()
+        .iter()
         .map(|p| PipelineSummary {
-            name: p.name,
-            executor: p.executor,
-            outputs: p.outputs,
+            name: p.name.clone(),
+            executor: p.executor.clone(),
+            outputs: p.outputs.clone(),
         })
         .collect()
 }
@@ -564,8 +695,22 @@ pub const SECTIONS: &[&str] = &[
     "freshness",
 ];
 
+/// Whether to emit terminal styling.
+///
+/// Only when stdout is a terminal, and never when `NO_COLOR` is set. Styling a
+/// redirected stream writes escape codes into the file, which is what happens
+/// when this output is piped into a log or read by a tool.
+fn styled() -> bool {
+    use std::io::IsTerminal;
+    std::env::var_os("NO_COLOR").is_none() && std::io::stdout().is_terminal()
+}
+
 fn heading(title: &str) {
-    println!("\n\x1b[1m{title}\x1b[0m");
+    if styled() {
+        println!("\n\x1b[1m{title}\x1b[0m");
+    } else {
+        println!("\n{title}");
+    }
 }
 
 fn field(label: &str, value: impl std::fmt::Display) {

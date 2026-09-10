@@ -164,9 +164,15 @@ EXAMPLES
   fid derive --check          fail if any artifact is stale (CI mode)
   fid derive --pipeline eda   run only the EDA pipeline and its dependencies
 
-STATUS
-  Not yet implemented (Phase 4). Run `cargo build` / `wasm-pack build` directly
-  until `fid derive` is wired up."
+EXECUTORS
+  cargo-test     run `cargo test` (used by the built-in types pipeline)
+  shell          run an external tool, e.g. kicad-cli
+  fid-validate   validate an artifact against a schema, in-process
+  fid-mesh       generate case geometry from a board outline, in-process
+
+SEE ALSO
+  fid graph   what each pipeline produces
+  fid dash    the same, alongside what is currently stale"
     )]
     Derive {
         /// Fail if any artifact is stale or any assertion is violated; write nothing
@@ -201,7 +207,8 @@ EXAMPLES
   fid upgrade --portfolio     upgrade all products in the portfolio manifest
 
 STATUS
-  Not yet implemented (Phase 4)."
+  Semver bumps, codemods, and template merging all work. `--portfolio`
+  fan-out across repositories does not; run `fid upgrade` in each product."
     )]
     Upgrade {
         /// Show what would change without writing anything
@@ -296,19 +303,19 @@ Reads `fiducial.toml` and `fiducial.lock`, validates that every tracked template
 file matches its recorded SHA-256 hash, and reports any issues. Exits non-zero
 if any issue is found — safe to run in CI as a pre-flight check.
 
-Phase 3 checks (now):
+Checks:
   - fiducial.toml exists and parses correctly
   - fiducial.lock exists and parses correctly
   - Every template file recorded in the lock is present and unmodified
+  - Template files behind the current platform version
+  - Codemod migrations recorded as pending
 
-Phase 4+ checks (coming):
-  - Available migrations not yet applied
-  - Installed capability versions behind the platform
-  - Stale derived artifacts (runs `fid derive --check` internally)",
+Not checked here: derived-artifact freshness. Run `fid derive --check` for
+that, or `fid dash` to see it alongside everything else.",
         after_long_help = "\
 EXAMPLES
   fid doctor                  check the product in the current directory
-  fid doctor --portfolio      check all products in the portfolio manifest (Phase 4+)
+  fid doctor --portfolio      check every product in the portfolio manifest (not available yet)
 
 EXIT CODES
   0   Clean — no drift detected

@@ -32,7 +32,7 @@ pub fn run(dry_run: bool, portfolio: bool) -> Result<()> {
     if portfolio {
         println!(
             "✦ fid upgrade --portfolio\n\n\
-             Portfolio fan-out is coming in Phase 5.\n\
+             Portfolio fan-out is not available yet.\n\
              Run `fid upgrade` in each product repo individually for now."
         );
         return Ok(());

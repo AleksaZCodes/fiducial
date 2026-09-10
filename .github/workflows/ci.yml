@@ -280,6 +280,9 @@ jobs:
       - name: fid dash end-to-end
         run: cargo test -p fiducial-cli --test dash
 
+      - name: Help text names no phase and claims nothing false
+        run: cargo test -p fiducial-cli --test help_honesty
+
   # ── JavaScript / TypeScript ───────────────────────────────────────────────
   js:
     name: JS/TS

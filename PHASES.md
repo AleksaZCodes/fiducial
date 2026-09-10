@@ -323,6 +323,27 @@ offsetting a non-rectangular outline — the one genuinely absent primitive.
 | CI: `workbench` job — pipeline-discovery unit tests + 21 end-to-end dash tests | ✅ |
 | 21 dash end-to-end, 7 pipeline unit, 24 enclosure, 34 CLI lib tests; clippy + fmt clean | ✅ |
 
+**Phase 16 review (2026-09-11)** — a pass over what had just shipped, decided
+against `MISSION.md`, found six defects:
+
+| Found | Was | Mission line it failed |
+| --- | --- | --- |
+| Non-ASCII decision filename | **Panicked** — byte-sliced a filename at 10 | "indistinguishable in quality from a funded team's" |
+| Em-dash in a long roadmap row | **Panicked** — `String::truncate` mid-character | same |
+| Commented-out `derive --check` | Reported the repo as **guarded when it was not** — inverting dash's most useful finding | "legible to a machine… safe rather than hopeful" |
+| A job named `push` | Reported as a **trigger** of a manual-only workflow | same |
+| A roadmap legend line | Counted as **one completed item** | same |
+| `pipeline::discover` called twice in one function | Two reads of one declaration | principle 1 |
+| ANSI escapes in redirected output | Escape codes written into pipes and logs | quality bar |
+
+Also swept the CLI's own help text, which had drifted the same way `CLAUDE.md`
+had: `fid derive` — the central command of the system — advertised itself as
+"Not yet implemented (Phase 4)" and told readers to run `cargo build` instead;
+`svelte` and `stm32` were labelled "(Phase 3b)" long after they worked; `mobile`
+and `module` promised a phase that had already shipped. **Help text now names no
+phase at all** — a schedule is a fact `PHASES.md` owns, and a second copy of it
+drifts. A `help_honesty` test enforces that, and CI runs it.
+
 **Still open on the workbench** — single repo only (multi-repo is v1 per §10),
 no live CI status (deliberate; would go behind a flag), decisions are listed but
 not read so supersession is undetected, and `briefs` from §10's v0 row is not

@@ -1,7 +1,7 @@
 //! `fid graph [--format text|dot|json]` — emit the facts → pipelines → artifacts DAG.
 //!
 //! Reads `pipelines/*.toml` from the product root and emits the dependency graph
-//! in the requested format. Consumed by `fid dash` (Phase 16) and by agents
+//! in the requested format. Consumed by `fid dash` and by agents
 //! reasoning about what needs to be re-derived.
 
 use anyhow::Result;
