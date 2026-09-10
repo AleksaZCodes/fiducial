@@ -24,7 +24,10 @@
 //! | [`thermal`] | Single-node RC thermal model (junction temperature over time) |
 //! | [`ode`] | Trait definition for ODE systems |
 
-#![cfg_attr(not(feature = "std"), no_std)]
+// fiducial-sim is a `std` crate (see STACK.md §crate-tree: "fiducial-sim/ std").
+// It uses Vec, f64::ceil, and rayon — none of which are available in no_std.
+// WASM compilation disables only the `parallel` feature (rayon), not `std`:
+//   cargo check -p fiducial-sim --target wasm32-unknown-unknown --no-default-features --features std
 
 pub mod ode;
 pub mod rk4;

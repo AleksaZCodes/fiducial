@@ -115,13 +115,6 @@ jobs:
           --target ${{ matrix.target.triple }}
           ${{ matrix.target.features }}
 
-      - name: Check fiducial-sim (${{ matrix.target.triple }})
-        run: >
-          cargo check
-          --package fiducial-sim
-          --target ${{ matrix.target.triple }}
-          --no-default-features
-
   # ── Host: full workspace build + tests ────────────────────────────────────
   rust:
     name: Rust (host)
@@ -420,7 +413,8 @@ jobs:
         run: cargo test -p fiducial-sim
 
       - name: Check fiducial-sim (WASM, no rayon)
-        run: cargo check -p fiducial-sim --target wasm32-unknown-unknown --no-default-features
+        # fiducial-sim is a std crate; disable only `parallel` (rayon), keep `std`.
+        run: cargo check -p fiducial-sim --target wasm32-unknown-unknown --no-default-features --features std
 
   # ── realtime: three contracts ─────────────────────────────────────────────
   #
