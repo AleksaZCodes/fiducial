@@ -11,7 +11,7 @@ import assert from 'node:assert/strict'
 import {
   MAGIC,
   MAX_PAYLOAD,
-  crc8,
+  crc32,
   encode,
   encodedLen,
   EncodeError,
@@ -19,31 +19,36 @@ import {
   AsyncQueue,
 } from '../dist/index.js'
 
-// ── crc8 ──────────────────────────────────────────────────────────────────────
+// ── crc32 ─────────────────────────────────────────────────────────────────────
 
-describe('crc8', () => {
+describe('crc32', () => {
+  // The cross-implementation anchor: this is the CRC-32/ISO-HDLC check value,
+  // asserted identically in the Rust crate. If these two ever disagree, the
+  // TypeScript port has drifted from the wire format.
+  it('standard check value for "123456789"', () => {
+    const data = new TextEncoder().encode('123456789')
+    assert.equal(crc32(data), 0xCBF43926)
+  })
   it('empty input returns 0', () => {
-    assert.equal(crc8(new Uint8Array([])), 0)
+    assert.equal(crc32(new Uint8Array([])), 0)
   })
-  it('single byte is returned as-is', () => {
-    assert.equal(crc8(new Uint8Array([0x42])), 0x42)
+  it('detects byte reordering', () => {
+    const ab = new TextEncoder().encode('ab')
+    const ba = new TextEncoder().encode('ba')
+    assert.notEqual(crc32(ab), crc32(ba))
   })
-  it('two identical bytes XOR to 0', () => {
-    assert.equal(crc8(new Uint8Array([0xAB, 0xAB])), 0)
-  })
-  it('"hi" = h ^ i', () => {
-    const h = 'h'.charCodeAt(0)
-    const i = 'i'.charCodeAt(0)
-    assert.equal(crc8(new Uint8Array([h, i])), h ^ i)
+  it('always returns an unsigned 32-bit value', () => {
+    const data = new Uint8Array([0xFF, 0xFF, 0xFF, 0xFF])
+    assert.ok(crc32(data) >= 0)
   })
 })
 
 // ── encodedLen ────────────────────────────────────────────────────────────────
 
 describe('encodedLen', () => {
-  it('empty payload is 4 bytes', () => assert.equal(encodedLen(0), 4))
-  it('10-byte payload is 14 bytes', () => assert.equal(encodedLen(10), 14))
-  it('100-byte payload is 104 bytes', () => assert.equal(encodedLen(100), 104))
+  it('empty payload is 7 bytes', () => assert.equal(encodedLen(0), 7))
+  it('10-byte payload is 17 bytes', () => assert.equal(encodedLen(10), 17))
+  it('100-byte payload is 107 bytes', () => assert.equal(encodedLen(100), 107))
 })
 
 // ── encode ────────────────────────────────────────────────────────────────────
@@ -53,13 +58,13 @@ describe('encode', () => {
     assert.equal(encode(new Uint8Array([])).at(0), MAGIC)
   })
 
-  it('empty payload: 4 bytes, crc=0', () => {
+  it('empty payload: 7 bytes, crc=0', () => {
     const frame = encode(new Uint8Array([]))
-    assert.equal(frame.length, 4)
+    assert.equal(frame.length, 7)
     assert.equal(frame[0], MAGIC)
     assert.equal(frame[1], 0)
     assert.equal(frame[2], 0)
-    assert.equal(frame[3], 0)
+    assert.deepEqual(Array.from(frame.slice(3, 7)), [0, 0, 0, 0])
   })
 
   it('"hi" payload matches known layout', () => {
@@ -70,7 +75,13 @@ describe('encode', () => {
     assert.equal(frame[2], 0)
     assert.equal(frame[3], 'h'.charCodeAt(0))
     assert.equal(frame[4], 'i'.charCodeAt(0))
-    assert.equal(frame[5], 'h'.charCodeAt(0) ^ 'i'.charCodeAt(0))
+    const crc = crc32(payload)
+    assert.deepEqual(Array.from(frame.slice(5, 9)), [
+      crc & 0xff,
+      (crc >>> 8) & 0xff,
+      (crc >>> 16) & 0xff,
+      (crc >>> 24) & 0xff,
+    ])
   })
 
   it('length field is little-endian', () => {

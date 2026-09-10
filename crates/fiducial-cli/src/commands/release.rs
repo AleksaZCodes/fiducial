@@ -61,16 +61,14 @@ pub const WIRE_VERSION: u8 = fiducial_protocol::WIRE_VERSION;
 #[derive(Subcommand)]
 pub enum ReleaseAction {
     /// Show current platform and wire-protocol versions
-    #[command(
-        long_about = "\
+    #[command(long_about = "\
 Show the versions of the platform components that matter at release time:
 
   • fiducial-cli (this binary) — the platform tool version
   • Wire protocol version      — the version baked into every artifact
   • Compatibility matrix       — the committed policy in docs/compat/matrix.toml
 
-Use this before filing a release PR to confirm the numbers are what you expect."
-    )]
+Use this before filing a release PR to confirm the numbers are what you expect.")]
     Status,
 
     /// Verify the committed matrix matches the baked-in WIRE_VERSION (CI gate)
@@ -80,8 +78,7 @@ Use this before filing a release PR to confirm the numbers are what you expect."
     ///
     /// Run this in CI (the `release` job in ci.yml) to enforce that every
     /// protocol change is reflected in the committed matrix before it merges.
-    #[command(
-        long_about = "\
+    #[command(long_about = "\
 Verify that the committed compatibility matrix is in sync with the baked-in
 wire protocol version.
 
@@ -93,13 +90,11 @@ means either:
   2. `WIRE_VERSION` was not bumped when the matrix was updated.
 
 Both are bugs.  Use `fid release protocol --bump` to change the wire version
-correctly — it updates the constant declaration and the matrix in one step."
-    )]
+correctly — it updates the constant declaration and the matrix in one step.")]
     Check,
 
     /// Bump the wire protocol version and update the compatibility matrix
-    #[command(
-        long_about = "\
+    #[command(long_about = "\
 Bump the wire protocol version and update `docs/compat/matrix.toml`.
 
 Two bump kinds:
@@ -115,8 +110,7 @@ After running this command you must also update the `WIRE_VERSION` constant in
 `crates/fiducial-protocol/src/lib.rs` to match the new `wire.current`.  The
 command prints a reminder with the exact edit required.
 
-`fid release check` fails until both the file and the constant agree."
-    )]
+`fid release check` fails until both the file and the constant agree.")]
     Protocol {
         /// Bump kind: `breaking` (drops old versions) or `compatible` (keeps them)
         #[arg(long, value_name = "KIND")]
@@ -196,9 +190,7 @@ fn check() -> Result<()> {
         );
     }
 
-    println!(
-        "✓ docs/compat/matrix.toml is in sync (wire.current = WIRE_VERSION = {WIRE_VERSION})"
-    );
+    println!("✓ docs/compat/matrix.toml is in sync (wire.current = WIRE_VERSION = {WIRE_VERSION})");
     Ok(())
 }
 
@@ -278,8 +270,7 @@ fn workspace_root() -> PathBuf {
 fn load_matrix() -> Result<(PathBuf, Matrix)> {
     let root = workspace_root();
     let path = root.join(MATRIX_PATH);
-    let raw = fs::read_to_string(&path)
-        .with_context(|| format!("reading {}", path.display()))?;
+    let raw = fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
     let matrix: Matrix =
         toml::from_str(&raw).with_context(|| format!("parsing {}", path.display()))?;
     Ok((path, matrix))
@@ -293,7 +284,8 @@ fn write_matrix(path: &std::path::Path, matrix: &Matrix) -> Result<()> {
                   # `fid release check` verifies wire.current matches WIRE_VERSION in\n\
                   # crates/fiducial-protocol/src/lib.rs.\n\n";
     let body = toml::to_string_pretty(matrix).context("serialising matrix")?;
-    fs::write(path, format!("{header}{body}")).with_context(|| format!("writing {}", path.display()))
+    fs::write(path, format!("{header}{body}"))
+        .with_context(|| format!("writing {}", path.display()))
 }
 
 fn today_iso8601() -> String {
@@ -311,7 +303,10 @@ mod tests {
 
     fn sample_matrix(current: u8, min_compatible: u8) -> Matrix {
         Matrix {
-            wire: WireSection { current, min_compatible },
+            wire: WireSection {
+                current,
+                min_compatible,
+            },
             history: vec![HistoryEntry {
                 version: 1,
                 date: "2026-09-10".into(),

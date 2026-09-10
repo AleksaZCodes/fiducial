@@ -526,6 +526,6 @@ fiducial/
 | **15** | `fiducial-geometry` + `fiducial-mesh` + `viewer3d-*` + tolerance profiles | Board outline → generated enclosure → printable STL and a GLB on a marketing page | ✅ |
 | **16** | Workbench v0: `fid dash` read-only view | Roadmap, status, decisions, CI, graph, freshness in one place | ✅ |
 | **16b** | `fid release` + version-skew assertions | A protocol bump fails any artifact still on the old version; compatibility matrix committed | ✅ |
-| **16c** | Firmware OTA: `embassy-boot` A/B, signing, resumable transfer, staged rollout | Device updates over BLE, self-tests, marks booted — broken image rolls back automatically | ⬜ |
+| **16c** | Firmware OTA: `embassy-boot` A/B, ed25519 signing, resumable transfer, staged rollout | Device updates **over USB serial**, self-tests, marks booted — broken image rolls back automatically ([rescoped from BLE](docs/specs/2026-09-10-phase-16c-ota-transport-rescope.md)) | ⬜ |
 | **17** | `fiducial-sim`, `realtime`, workbench v1 | Simulation runs native and in WASM; realtime's three contracts covered by tests | ⬜ |
 | **18** | ROP migration wave 2 (optional) — eligible rules to L0 Rust | Each differential-tested before the TypeScript is deleted | ⬜ |

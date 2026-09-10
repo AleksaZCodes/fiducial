@@ -1,11 +1,16 @@
 /**
  * TypeScript port of fiducial-protocol — byte-exact with the Rust crate.
  *
- * Frame format: [ MAGIC(1) | LEN_LO(1) | LEN_HI(1) | PAYLOAD(N) | CRC8(1) ]
+ * Frame format: [ MAGIC(1) | LEN_LO(1) | LEN_HI(1) | PAYLOAD(N) | CRC32(4) ]
  *
  * - MAGIC = 0xFD
  * - LEN = payload byte count, 2-byte little-endian
- * - CRC8 = XOR fold of all payload bytes
+ * - CRC32 = CRC-32/ISO-HDLC over the payload, 4-byte little-endian
+ *
+ * Wire version 2. Version 1 used an 8-bit XOR fold, which is a parity byte
+ * rather than a polynomial CRC and is not adequate over a 64 KB payload.
+ * CRC-32/ISO-HDLC is the zlib/gzip/PNG/Ethernet variant, so a frame produced
+ * here verifies against any conforming implementation on any platform.
  */
 
 export const MAGIC = 0xfd as const
@@ -18,14 +23,31 @@ export class EncodeError extends Error {
   }
 }
 
-export function crc8(data: Uint8Array): number {
-  let acc = 0
-  for (const b of data) acc ^= b
-  return acc
+/** Reflected polynomial for CRC-32/ISO-HDLC (0x04C11DB7 reflected). */
+const CRC32_POLY = 0xedb88320
+
+/**
+ * CRC-32/ISO-HDLC — byte-exact with `fiducial_protocol::crc32` in Rust.
+ *
+ * Check value: `crc32(new TextEncoder().encode('123456789')) === 0xCBF43926`.
+ *
+ * All shifts use `>>>` and the result is coerced with `>>> 0` so the value
+ * stays an unsigned 32-bit integer; JavaScript bitwise operators are otherwise
+ * signed and would produce negative numbers here.
+ */
+export function crc32(data: Uint8Array): number {
+  let crc = 0xffffffff
+  for (const b of data) {
+    crc ^= b
+    for (let bit = 0; bit < 8; bit++) {
+      crc = (crc & 1) !== 0 ? (crc >>> 1) ^ CRC32_POLY : crc >>> 1
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0
 }
 
 export function encodedLen(payloadLen: number): number {
-  return payloadLen + 4
+  return payloadLen + 7
 }
 
 export function encode(payload: Uint8Array): Uint8Array {
@@ -35,7 +57,12 @@ export function encode(payload: Uint8Array): Uint8Array {
   out[1] = payload.length & 0xff
   out[2] = (payload.length >> 8) & 0xff
   out.set(payload, 3)
-  out[3 + payload.length] = crc8(payload)
+  const crc = crc32(payload)
+  const base = 3 + payload.length
+  out[base] = crc & 0xff
+  out[base + 1] = (crc >>> 8) & 0xff
+  out[base + 2] = (crc >>> 16) & 0xff
+  out[base + 3] = (crc >>> 24) & 0xff
   return out
 }
 
@@ -44,7 +71,7 @@ type DecodeState =
   | { tag: 'len_lo' }
   | { tag: 'len_hi'; lenLo: number }
   | { tag: 'payload' }
-  | { tag: 'crc' }
+  | { tag: 'crc'; got: number; acc: number }
 
 /**
  * Byte-by-byte frame decoder.
@@ -87,7 +114,7 @@ export class FrameDecoder {
         this.pos = 0
         this.expected = len
         if (len === 0) {
-          this.state = { tag: 'crc' }
+          this.state = { tag: 'crc', got: 0, acc: 0 }
         } else if (len > this.buf.length) {
           this.state = { tag: 'magic' }
         } else {
@@ -99,14 +126,21 @@ export class FrameDecoder {
       case 'payload':
         if (this.pos < this.buf.length) this.buf[this.pos] = byte
         this.pos++
-        if (this.pos >= this.expected) this.state = { tag: 'crc' }
+        if (this.pos >= this.expected) this.state = { tag: 'crc', got: 0, acc: 0 }
         return null
 
       case 'crc': {
+        // Little-endian: first byte received is the least significant.
+        const acc = (s.acc | (byte << (8 * s.got))) >>> 0
+        const got = s.got + 1
+        if (got < 4) {
+          this.state = { tag: 'crc', got, acc }
+          return null
+        }
         const payload = this.buf.slice(0, this.expected)
-        const computed = crc8(payload)
+        const computed = crc32(payload)
         this.state = { tag: 'magic' }
-        return computed === byte ? payload : null
+        return computed === acc ? payload : null
       }
     }
   }

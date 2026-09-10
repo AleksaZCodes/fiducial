@@ -1,30 +1,24 @@
 # Fiducial protocol compatibility matrix
 #
-# This file is the committed record of the wire protocol version policy.
-# It is maintained by `fid release protocol --bump` — do not edit by hand.
-#
-# `fid release check` verifies that `wire.current` matches the `WIRE_VERSION`
-# constant in `crates/fiducial-protocol/src/lib.rs`. A mismatch fails CI.
-#
-# POLICY
-#   current         — the wire version this platform build speaks
-#   min_compatible  — the oldest remote version that will be accepted
-#
-#   An artifact (firmware, desktop, WASM) compiled against a wire version older
-#   than `min_compatible` is rejected at connection time with a VersionSkewError.
-#   This is the enforcement point: bumping `current` with a breaking change means
-#   raising `min_compatible` to match, which causes every old artifact to fail.
+# Maintained by `fid release protocol --bump` — do not edit by hand.
+# `fid release check` verifies wire.current matches WIRE_VERSION in
+# crates/fiducial-protocol/src/lib.rs.
 
 [wire]
-current        = 1
-min_compatible = 1
+current = 2
+min_compatible = 2
 
 [[history]]
 version = 1
-date    = "2026-09-10"
-notes   = """
+date = "2026-09-10"
+notes = """
 Initial wire protocol.
 Frame layout: MAGIC(0xFD, 1B) | LEN_LO(1B) | LEN_HI(1B) | PAYLOAD(N) | CRC8(1B).
 CRC-8 is an XOR fold over all payload bytes.
 Maximum payload: 65 535 bytes.
 """
+
+[[history]]
+version = 2
+date = "2026-09-10"
+notes = "CRC-8 XOR fold replaced with CRC-32/ISO-HDLC. Frame overhead 4 -> 7 bytes. An 8-bit check over a 64 KB payload is inadequate; v1 artifacts cannot parse v2 frames."
