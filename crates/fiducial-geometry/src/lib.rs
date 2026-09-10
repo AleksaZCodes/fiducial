@@ -308,6 +308,12 @@ pub mod polygon {
 #[cfg(feature = "alloc")]
 pub use polygon::Polygon;
 
+#[cfg(feature = "alloc")]
+mod triangulate;
+
+#[cfg(feature = "alloc")]
+pub use triangulate::{circle, circumradius_for_width, triangulate};
+
 // ── Board edges ───────────────────────────────────────────────────────────────
 
 /// Which edge of a board — and so which wall of its case — a feature sits on.

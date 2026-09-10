@@ -83,10 +83,17 @@ minimum wall, and board-to-wall clearance is twice its XY accuracy. The same
 board produces a tighter enclosure on `resin` than on `fdm`.
 
 `outline.enclosure` carries what no process can imply — `headroom_mm`,
-`lid_thickness_mm`, the gasket cross-section, and `standoff_height_mm` /
-`standoff_size_mm`. Declaring a standoff height lifts the board onto four corner
+`lid_thickness_mm`, the gasket cross-section, `standoff_height_mm` /
+`standoff_size_mm`, and `fastener_diameter_mm`. Declaring a standoff height lifts the board onto four corner
 posts and grows the case by the same amount, because headroom is measured above
 the board.
+
+`fastener_diameter_mm` adds the four corner screws that retain the lid; omit it
+and nothing clamps the lid, so the gasket only compresses under external force.
+The screws pass through the outer lip, outboard of the gasket groove — a hole
+inside the gasket line would open the sealed cavity. The lip has to carry that
+hole with a printable wall either side, so declaring a fastener thickens the
+case wall.
 
 ### connector.mount
 

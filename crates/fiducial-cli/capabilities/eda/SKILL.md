@@ -45,10 +45,27 @@ noticeably thicker walls than a plain tray.
 Print the base and lid rigid, the gasket flexible. All three come off the same
 printer.
 
-Nothing clamps the lid down — there are no screw bosses or clips — so the gasket
-is only compressed while something external holds the lid closed. The case is
-splash- and dust-resistant by construction; it carries no IP rating and has not
-been pressure-tested.
+The case is splash- and dust-resistant by construction; it carries no IP rating
+and has not been pressure-tested.
+
+### Fasteners — what actually holds the lid down
+
+Declare `fastener_diameter_mm` and the case gets four corner screws: a
+clearance hole through the lid, a pilot hole in the base for the screw to tap
+its own thread, and material around both. Without them nothing clamps the lid,
+so the gasket only compresses while something external holds it shut — which
+means an unfastened case does not really seal.
+
+The screws pass through the **outer lip**, outboard of the gasket groove. That
+is not a detail: a hole anywhere inside the gasket line would open the sealed
+cavity to the outside, and the case would still print and slice perfectly.
+
+Fasteners have a real cost, which is why they are opt-in. The outer lip has to
+carry a hole with a printable wall on either side, so declaring a 3 mm screw on
+the FDM profile widens that lip from 1.2 mm to about 5.9 mm and thickens the
+wall from 4.8 mm to about 9.5 mm. A 100 x 60 mm board goes from a 110 x 70 mm
+case to roughly 120 x 80 mm. The seal itself is untouched — only the lip
+outboard of it moves.
 
 ### Connector openings
 
@@ -61,8 +78,9 @@ leak, and `fid derive` refuses to generate one. If a connector is too tall for
 the case, raise `headroom_mm` — the error message says so and names the
 connector.
 
-The lid never takes cutouts. A hole in the lid is a hole inside the gasket line,
-and no amount of compression seals that.
+The lid never takes connector cutouts. A cutout there would be inside the gasket
+line, and no amount of compression seals that. Fastener holes are the exception,
+and only because they pass through the outer lip, outboard of the seal.
 
 ### Standoffs
 
@@ -148,6 +166,7 @@ gasket stock you are using.
 | `gasket_compression` | `0.25` | Fraction squeezed when closed. Must be strictly between 0 and 1. |
 | `standoff_height_mm` | none | Height of the four corner posts the board rests on. Omit and the board sits on the floor. |
 | `standoff_size_mm` | `4.0` | Footprint of each post, square. |
+| `fastener_diameter_mm` | none | Screw shaft diameter for the four corner fasteners. Omit and the lid is not retained. |
 
 `gasket_compression` of `0` never squeezes the gasket and `1` crushes it flat;
 both produce a case that does not seal, so both are rejected.
@@ -217,6 +236,7 @@ are caught at the declaration:
 | Opening smaller than the process minimum feature | The printer cannot resolve it |
 | Two openings on one wall overlap | They merge into a single wide slot |
 | Four standoffs will not fit the board | The posts would run into each other |
+| Fastener pilot below the minimum feature | The printer cannot resolve the hole |
 | Unknown `side`, negative `offset_mm`, non-positive size | Not a placeable opening |
 
 ## Rules

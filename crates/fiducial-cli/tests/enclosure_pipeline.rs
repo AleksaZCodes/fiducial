@@ -188,6 +188,18 @@ fn assert_valid_glb(bytes: &[u8], label: &str) {
     );
 }
 
+/// Board-to-wall clearance on the FDM profile: twice its 0.2 mm XY accuracy.
+const FDM_CLEARANCE_MM: f32 = 0.4;
+
+/// Wall thickness of the generated case, recovered from its own footprint.
+///
+/// Derived rather than hardcoded because the wall is derived: the seal sets it,
+/// and declaring a fastener widens it again. A test that hardcodes the number
+/// silently starts probing the wrong place the moment the declaration changes.
+fn wall_from_footprint(outer_mm: f32, board_mm: f32) -> f32 {
+    (outer_mm - board_mm - 2.0 * FDM_CLEARANCE_MM) / 2.0
+}
+
 fn edit_board(root: &Path, from: &str, to: &str) {
     let path = root.join("board/board.interface.json");
     let json = std::fs::read_to_string(&path).unwrap();
@@ -210,7 +222,12 @@ fn derive_generates_every_case_part() {
         read_stl(&root, "case-base.stl").0 > 60,
         "a featured base should carry more than a plain shell"
     );
-    assert_eq!(read_stl(&root, "case-lid.stl").0, 44, "lid triangles");
+    // The seed also retains its lid with four screws, so the lid carries bores
+    // through its outer lip. The gasket never takes features at all.
+    assert!(
+        read_stl(&root, "case-lid.stl").0 > 44,
+        "a fastened lid should carry more than a plain plate"
+    );
     assert_eq!(read_stl(&root, "gasket.stl").0, 32, "gasket triangles");
 
     for part in ["case-base.stl", "case-lid.stl", "gasket.stl"] {
@@ -461,10 +478,15 @@ fn a_declared_mount_becomes_a_through_hole_at_the_declared_position() {
     assert_closed_solid(&bytes, "case-base.stl");
     let tris = stl_triangles(&bytes);
 
-    // Seed geometry: FDM wall 4.8 mm, board clearance 0.4 mm, board top at
-    // 5.8 mm (1.2 floor + 3.0 standoff + 1.6 PCB). J1 is 20 mm along the south
-    // edge, J3 30 mm along the east.
-    let (wall, inboard, z) = (4.8f32, 5.2f32, 7.0f32);
+    // Seed geometry: the board sits 5.8 mm up (1.2 floor + 3.0 standoff + 1.6
+    // PCB), J1 is 20 mm along the south edge and J3 30 mm along the east. The
+    // wall comes from the footprint, so this holds whatever the seal and the
+    // fasteners make it.
+    let [w, h, _] = read_stl(&root, "case-base.stl").1;
+    let wall = wall_from_footprint(w, 100.0);
+    let inboard = wall + FDM_CLEARANCE_MM;
+    let z = 7.0f32;
+
     assert!(
         !in_material(&tris, [inboard + 20.0, wall * 0.5, z]),
         "J1's opening should be void"
@@ -474,13 +496,14 @@ fn a_declared_mount_becomes_a_through_hole_at_the_declared_position() {
         "the wall beside J1 should be solid"
     );
     assert!(
-        !in_material(&tris, [110.4 - wall * 0.5, inboard + 30.0, z]),
+        !in_material(&tris, [w - wall * 0.5, inboard + 30.0, z]),
         "J3's opening should be void"
     );
     assert!(
-        in_material(&tris, [110.4 - wall * 0.5, inboard + 55.0, z]),
+        in_material(&tris, [w - wall * 0.5, inboard + 55.0, z]),
         "the wall beside J3 should be solid"
     );
+    let _ = h;
 }
 
 #[test]
@@ -616,13 +639,15 @@ fn the_opening_scales_with_the_declared_body() {
 
     let wide = |root: &Path| {
         let bytes = std::fs::read(root.join("enclosure/case-base.stl")).unwrap();
+        let (_, [w, _, _]) = (0u32, stl_stats(&bytes).1);
         let tris = stl_triangles(&bytes);
         // How far along the south wall the opening still reads as void.
-        let (wall, inboard, z) = (4.8f32, 5.2f32, 7.0f32);
+        let wall = wall_from_footprint(w, 100.0);
+        let inboard = wall + FDM_CLEARANCE_MM;
         (0..400)
             .filter(|i| {
                 let x = inboard + 20.0 - 10.0 + *i as f32 * 0.05;
-                !in_material(&tris, [x, wall * 0.5, z])
+                !in_material(&tris, [x, wall * 0.5, 7.0])
             })
             .count()
     };
@@ -723,5 +748,103 @@ fn standoffs_too_large_for_the_board_fail_the_pipeline() {
     assert!(
         stderr.contains("standoff"),
         "error should name standoffs: {stderr}"
+    );
+}
+
+// ── Fasteners ────────────────────────────────────────────────────────────────
+
+#[test]
+fn declared_fasteners_bore_through_the_lip_of_base_and_lid() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+
+    for part in ["case-base.stl", "case-lid.stl"] {
+        let bytes = std::fs::read(root.join("enclosure").join(part)).unwrap();
+        assert_closed_solid(&bytes, part);
+    }
+
+    // Seed geometry with a 3 mm screw on the FDM profile: the outer lip is the
+    // tessellated bore plus a printable wall either side, and the fastener sits
+    // at its midpoint in both axes.
+    let [w, h, _] = read_stl(&root, "case-base.stl").1;
+    // Fastener centres sit at the midpoint of the outer lip in both axes. The
+    // lip is the tessellated bore (3.4 mm clearance, widened by 1/cos(pi/16) so
+    // its flats reach that) plus a 1.2 mm wall either side.
+    let c = (3.4f32 / (core::f32::consts::PI / 16.0).cos() + 2.4) / 2.0;
+    let base = stl_triangles(&std::fs::read(root.join("enclosure/case-base.stl")).unwrap());
+    let lid = stl_triangles(&std::fs::read(root.join("enclosure/case-lid.stl")).unwrap());
+
+    for (x, y) in [(c, c), (w - c, c), (w - c, h - c), (c, h - c)] {
+        assert!(
+            !in_material(&base, [x, y, 7.9]),
+            "base bore missing at ({x}, {y})"
+        );
+        assert!(
+            !in_material(&lid, [x, y, 0.85]),
+            "lid bore missing at ({x}, {y})"
+        );
+        // A step outside the bore is still lip material.
+        assert!(
+            in_material(&base, [x + 2.0, y, 7.9]),
+            "the lip beside the bore at ({x}, {y}) should be solid"
+        );
+    }
+}
+
+#[test]
+fn removing_the_fastener_declaration_thins_the_case_back_down() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+    let fastened = read_stl(&root, "case-base.stl").1;
+
+    edit_board(&root, ",\n      \"fastener_diameter_mm\": 3.0", "");
+    assert!(run(&root, &["derive"]).status.success());
+    let plain = read_stl(&root, "case-base.stl").1;
+
+    // The fastener lip has to carry a hole with a printable wall either side,
+    // so dropping it narrows the whole case. That cost is the reason fasteners
+    // are declared rather than assumed.
+    assert!(
+        fastened[0] > plain[0] && fastened[1] > plain[1],
+        "fastened case {fastened:?} should be larger than plain {plain:?}"
+    );
+    let bytes = std::fs::read(root.join("enclosure/case-base.stl")).unwrap();
+    assert_closed_solid(&bytes, "case-base.stl unfastened");
+}
+
+#[test]
+fn a_fastener_too_small_to_print_fails_the_pipeline() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+
+    edit_board(
+        &root,
+        "\"fastener_diameter_mm\": 3.0",
+        "\"fastener_diameter_mm\": 0.2",
+    );
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success(), "an unprintable fastener must fail");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("fastener_diameter_mm"),
+        "error must name the field: {stderr}"
+    );
+}
+
+#[test]
+fn a_non_positive_fastener_is_rejected_at_the_declaration() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    edit_board(
+        &root,
+        "\"fastener_diameter_mm\": 3.0",
+        "\"fastener_diameter_mm\": -1.0",
+    );
+    let out = run(&root, &["derive"]);
+    assert!(
+        !out.status.success(),
+        "a negative diameter must be rejected"
     );
 }
