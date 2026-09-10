@@ -238,6 +238,39 @@ _Read this at the start of every session. Updated manually as phases complete._
 | Web GLB copy is one commented line in `pipelines/enclosure.toml` — opt in, hash-tracked, no copy step | ✅ |
 | 35 mesh tests, 16 eda tests, 10 CLI end-to-end tests, 21 board-schema tests | ✅ |
 
+**Phase 15c — connector cutouts + standoffs ✅ (2026-09-10)**
+
+> Openings punched from the connector declarations, and posts under the board.
+> Closes two of the three gaps `docs/specs/2026-09-08-…` recorded against the case.
+> Spec: `docs/specs/2026-09-10-connector-cutouts-and-standoffs.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| `MeshBuilder::punched_face` — mitred frame fanned from the outer corners around an inset grid, so a hole subdivides only the inside of a face and neighbouring surfaces need no change | ✅ |
+| No-hole short-circuit — an unfeatured case is byte-identical to one generated before cutouts existed (asserted on the STL bytes) | ✅ |
+| `Cutout` + `Case` API — validation separate from generation; `CaseError` names the connector and the field to change | ✅ |
+| `tunnel()` — the prismatic void through a wall, subdivided by neighbouring holes so both ends meet their panels vertex for vertex | ✅ |
+| `post()` — standoffs punched out of the cavity floor and grown upward, so base + posts stay one closed manifold | ✅ |
+| `z_rim` includes standoff height — lifting the board lifts the rim, rather than eating declared headroom | ✅ |
+| `Side` enum + `CONNECTOR_OPENINGS` table in `fiducial-geometry` — 9 families; `type` implies the body envelope | ✅ |
+| `connector.mount` in `BoardInterface` (`side`, `offset_mm`, optional size and `z_offset_mm`); board coordinates, so an offset means the same on every edge | ✅ |
+| `outline.enclosure.standoff_height_mm` / `standoff_size_mm`; absent means the board rests on the floor | ✅ |
+| Declared size is the connector **body** — one process tolerance per side is added, so resin cuts a tighter opening than FDM | ✅ |
+| Validation rejects: seal breach, off-wall, below-cavity, sub-min-feature, overlapping openings, oversized standoffs, unknown side/family | ✅ |
+| Watertightness strengthened to **directed**-edge uniqueness + positive signed volume — catches T-junctions and inverted solids, which parity does not | ✅ |
+| Ray-cast solid-membership tests — the openings are genuinely through-holes at the declared positions and the wall beside them is solid | ✅ |
+| `fid derive` wires mounts into `Case` and validates before writing anything | ✅ |
+| Seed board mounts USB-C + Qwiic and deliberately leaves SWD unmounted (8.5 mm would breach the seal); declares 3 mm standoffs | ✅ |
+| `@fiducial/board-schema` mirrors `Mount`, `Side`, `CONNECTOR_OPENINGS`, `mountEnvelope()` and every validation rule | ✅ |
+| Docs: SKILL.md (mount + family + rejection tables), pipeline toml, rustdoc, board-schema README | ✅ |
+| 63 mesh tests, 30 eda tests, 18 geometry tests, 20 CLI end-to-end tests, 35 board-schema tests | ✅ |
+| 4-target spine (x86_64 / wasm32 / thumbv6m / thumbv7em) green; clippy + fmt clean; STLs verified closed and oriented from the shipped bytes | ✅ |
+
+**Still open on the case** — the lid is not retained (no fasteners), openings are
+rectangular only, and standoff positions are derived rather than declared. All
+three want polygon offsetting or circle tessellation; the spec explains why a
+square pocket where a screw belongs would be worse than the gap.
+
 **Phase 13 — complete ✅ (2026-09-08)**
 
 > Web Serial, WebUSB, and BLE transports — same Fiducial frame codec as the firmware.

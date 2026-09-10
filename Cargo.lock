@@ -297,6 +297,7 @@ version = "0.1.0"
 name = "fiducial-eda"
 version = "0.1.0"
 dependencies = [
+ "fiducial-geometry",
  "serde",
  "serde_json",
 ]

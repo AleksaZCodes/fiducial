@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join, dirname } from 'node:path'
-import { parseBoardInterface } from '../dist/index.js'
+import { parseBoardInterface, mountEnvelope, CONNECTOR_OPENINGS } from '../dist/index.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -198,6 +198,146 @@ describe('@fiducial/board-schema', () => {
 
     it('accepts a sane compression fraction', () => {
       assert.doesNotThrow(() => parseBoardInterface(withEnclosure({ gasket_compression: 0.25 })))
+    })
+  })
+  describe('connector mounts', () => {
+    const withMount = mount =>
+      JSON.stringify({
+        schema_version: '1.0',
+        board: { name: 'x' },
+        outline: { width_mm: 100, height_mm: 60 },
+        connectors: [
+          {
+            id: 'J1',
+            name: 'USB',
+            type: 'usb-c',
+            pins: [{ number: 1, name: 'VBUS', net: 'V', direction: 'power_in' }],
+            mount,
+          },
+        ],
+        net_classes: [],
+      })
+
+    it('reads the mount the seed declares for its USB port', () => {
+      const bi = parseBoardInterface(SEED_JSON)
+      const j1 = bi.connectors.find(c => c.id === 'J1')
+      assert.equal(j1.mount.side, 'south')
+      assert.equal(j1.mount.width_mm, undefined, 'size comes from the family')
+    })
+
+    it('leaves the seed debug header deliberately unmounted', () => {
+      // A 2x3 shrouded header is 8.5 mm tall; that opening reaches the gasket
+      // groove on any sanely sized case, so it is reached with the lid off.
+      const bi = parseBoardInterface(SEED_JSON)
+      assert.equal(bi.connectors.find(c => c.id === 'J2').mount, undefined)
+    })
+
+    it('treats mount as optional', () => {
+      const bi = parseBoardInterface(SEED_JSON)
+      assert.ok(bi.connectors.some(c => c.mount))
+      assert.ok(bi.connectors.some(c => !c.mount))
+    })
+
+    it('falls back to the connector family envelope', () => {
+      assert.deepEqual(mountEnvelope({ side: 'south', offset_mm: 20 }, 'usb-c'), {
+        width_mm: 8.94,
+        height_mm: 3.26,
+      })
+    })
+
+    it('prefers a declared envelope over the family default', () => {
+      assert.deepEqual(
+        mountEnvelope({ side: 'south', offset_mm: 20, width_mm: 12, height_mm: 4 }, 'usb-c'),
+        { width_mm: 12, height_mm: 4 }
+      )
+    })
+
+    it('returns undefined for a family it cannot size', () => {
+      assert.equal(mountEnvelope({ side: 'south', offset_mm: 20 }, 'db25'), undefined)
+    })
+
+    it('rejects an unknown side', () => {
+      assert.throws(
+        () => parseBoardInterface(withMount({ side: 'starboard', offset_mm: 20 })),
+        /unknown side/
+      )
+    })
+
+    it('rejects a negative offset', () => {
+      assert.throws(
+        () => parseBoardInterface(withMount({ side: 'south', offset_mm: -5 })),
+        /offset_mm/
+      )
+    })
+
+    it('rejects a non-positive mount dimension', () => {
+      assert.throws(
+        () => parseBoardInterface(withMount({ side: 'south', offset_mm: 20, width_mm: 0 })),
+        /width_mm/
+      )
+    })
+
+    it('rejects a mount with no outline to measure against', () => {
+      const json = JSON.stringify({
+        schema_version: '1.0',
+        board: { name: 'x' },
+        connectors: [
+          {
+            id: 'J1',
+            name: 'USB',
+            type: 'usb-c',
+            pins: [],
+            mount: { side: 'south', offset_mm: 20 },
+          },
+        ],
+        net_classes: [],
+      })
+      assert.throws(() => parseBoardInterface(json), /no outline/)
+    })
+
+    it('rejects a connector family it cannot size', () => {
+      const json = JSON.stringify({
+        schema_version: '1.0',
+        board: { name: 'x' },
+        outline: { width_mm: 100, height_mm: 60 },
+        connectors: [
+          {
+            id: 'J7',
+            name: 'Mystery',
+            type: 'db25',
+            pins: [],
+            mount: { side: 'south', offset_mm: 20 },
+          },
+        ],
+        net_classes: [],
+      })
+      assert.throws(() => parseBoardInterface(json), /db25/)
+    })
+
+    it('every family envelope is printable', () => {
+      for (const [name, o] of Object.entries(CONNECTOR_OPENINGS)) {
+        assert.ok(o.width_mm > 0, `${name} width`)
+        assert.ok(o.height_mm > 0, `${name} height`)
+      }
+    })
+  })
+
+  describe('standoffs', () => {
+    it('reads the standoffs the seed declares', () => {
+      const e = parseBoardInterface(SEED_JSON).outline.enclosure
+      assert.equal(e.standoff_height_mm, 3)
+      assert.equal(e.standoff_size_mm, 5)
+    })
+
+    it('rejects a non-positive standoff height', () => {
+      const json = JSON.stringify({
+        schema_version: '1.0',
+        board: { name: 'x' },
+        outline: { width_mm: 100, height_mm: 60, enclosure: { standoff_height_mm: 0 } },
+        connectors: [],
+        net_classes: [],
+      })
+      assert.throws(() => parseBoardInterface(json), /standoff_height_mm/)
     })
   })
 })

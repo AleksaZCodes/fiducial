@@ -4,7 +4,12 @@
 //! `fid derive` through the `fid-mesh` executor — the path a user actually
 //! takes. Asserts that the generated case parts are structurally valid, that
 //! the geometry tracks the declared outline, that the parts fit each other,
-//! and that `--check` fails when an artifact goes stale.
+//! that connector mounts become through-holes in the right place, and that
+//! `--check` fails when an artifact goes stale.
+//!
+//! The structural assertions run against the **shipped bytes** rather than the
+//! in-memory mesh. A generator that is correct and a writer that is not still
+//! produces an unprintable file.
 
 use std::{path::Path, process::Command};
 
@@ -55,6 +60,113 @@ fn stl_stats(bytes: &[u8]) -> (u32, [f32; 3]) {
     (n, [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]])
 }
 
+/// A vertex position quantised to 1 µm, so faces that duplicate their corners
+/// for flat normals still compare equal.
+type VertexKey = (i64, i64, i64);
+/// A directed edge, from its first endpoint to its second.
+type EdgeKey = (VertexKey, VertexKey);
+
+/// Every triangle in a binary STL, as three vertices.
+fn stl_triangles(bytes: &[u8]) -> Vec<[[f32; 3]; 3]> {
+    let n = u32::from_le_bytes(bytes[80..84].try_into().unwrap()) as usize;
+    let mut out = Vec::with_capacity(n);
+    for t in 0..n {
+        let base = 84 + 50 * t + 12; // skip the face normal
+        let mut tri = [[0.0f32; 3]; 3];
+        for (v, vertex) in tri.iter_mut().enumerate() {
+            for (axis, coord) in vertex.iter_mut().enumerate() {
+                let o = base + 12 * v + 4 * axis;
+                *coord = f32::from_le_bytes(bytes[o..o + 4].try_into().unwrap());
+            }
+        }
+        out.push(tri);
+    }
+    out
+}
+
+/// Assert the STL is a closed solid whose faces all wind outward.
+///
+/// Every directed edge must occur exactly once — the definition of a
+/// consistently oriented closed manifold, and stronger than the undirected
+/// parity a slicer checks, because it also catches a T-junction where a
+/// punched wall meets an unpunched neighbour.
+fn assert_closed_solid(bytes: &[u8], label: &str) {
+    use std::collections::HashMap;
+    let tris = stl_triangles(bytes);
+    let key = |v: [f32; 3]| -> VertexKey {
+        let q = |x: f32| (x * 1000.0).round() as i64;
+        (q(v[0]), q(v[1]), q(v[2]))
+    };
+    let mut edges: HashMap<EdgeKey, usize> = HashMap::new();
+    let mut volume = 0.0f64;
+    for t in &tris {
+        for k in 0..3 {
+            *edges.entry((key(t[k]), key(t[(k + 1) % 3]))).or_insert(0) += 1;
+        }
+        let (a, b, c) = (t[0], t[1], t[2]);
+        let cr = [
+            (b[1] * c[2] - b[2] * c[1]) as f64,
+            (b[2] * c[0] - b[0] * c[2]) as f64,
+            (b[0] * c[1] - b[1] * c[0]) as f64,
+        ];
+        volume += (a[0] as f64 * cr[0] + a[1] as f64 * cr[1] + a[2] as f64 * cr[2]) / 6.0;
+    }
+    for (e, count) in &edges {
+        assert_eq!(*count, 1, "{label}: directed edge {e:?} used {count} times");
+        assert!(
+            edges.contains_key(&(e.1, e.0)),
+            "{label}: edge {e:?} has no opposing twin — the surface is open"
+        );
+    }
+    assert!(
+        volume > 0.0,
+        "{label}: signed volume {volume} is not positive"
+    );
+}
+
+/// Count ray/triangle crossings ahead of `origin` (Möller–Trumbore).
+fn ray_crossings(tris: &[[[f32; 3]; 3]], origin: [f32; 3], dir: [f32; 3]) -> usize {
+    let sub = |a: [f32; 3], b: [f32; 3]| [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+    let cross = |a: [f32; 3], b: [f32; 3]| {
+        [
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        ]
+    };
+    let dot = |a: [f32; 3], b: [f32; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    let mut hits = 0;
+    for t in tris {
+        let (e1, e2) = (sub(t[1], t[0]), sub(t[2], t[0]));
+        let pv = cross(dir, e2);
+        let det = dot(e1, pv);
+        if det.abs() < 1e-9 {
+            continue;
+        }
+        let inv = 1.0 / det;
+        let tv = sub(origin, t[0]);
+        let u = dot(tv, pv) * inv;
+        if u < 0.0 || u > 1.0 {
+            continue;
+        }
+        let qv = cross(tv, e1);
+        let v = dot(dir, qv) * inv;
+        if v < 0.0 || u + v > 1.0 {
+            continue;
+        }
+        if dot(e2, qv) * inv > 1e-6 {
+            hits += 1;
+        }
+    }
+    hits
+}
+
+/// Whether a point sits in the solid: a ray leaves a closed solid an odd
+/// number of times.
+fn in_material(tris: &[[[f32; 3]; 3]], p: [f32; 3]) -> bool {
+    ray_crossings(tris, p, [0.371, 0.553, 0.746]) % 2 == 1
+}
+
 fn read_stl(root: &Path, name: &str) -> (u32, [f32; 3]) {
     let path = root.join("enclosure").join(name);
     let bytes = std::fs::read(&path).unwrap_or_else(|e| panic!("{name} must exist: {e}"));
@@ -91,9 +203,20 @@ fn derive_generates_every_case_part() {
     let out = run(&root, &["derive"]);
     assert!(out.status.success(), "fid derive failed: {out:?}");
 
-    assert_eq!(read_stl(&root, "case-base.stl").0, 60, "base triangles");
+    // The seed board mounts two connectors and stands the board off its floor,
+    // so the base carries more faces than the 60 of a plain shell. The lid and
+    // gasket never take features, so their counts are fixed.
+    assert!(
+        read_stl(&root, "case-base.stl").0 > 60,
+        "a featured base should carry more than a plain shell"
+    );
     assert_eq!(read_stl(&root, "case-lid.stl").0, 44, "lid triangles");
     assert_eq!(read_stl(&root, "gasket.stl").0, 32, "gasket triangles");
+
+    for part in ["case-base.stl", "case-lid.stl", "gasket.stl"] {
+        let bytes = std::fs::read(root.join("enclosure").join(part)).unwrap();
+        assert_closed_solid(&bytes, part);
+    }
 
     let glb = std::fs::read(root.join("enclosure/case.glb")).expect("case.glb must exist");
     assert_valid_glb(&glb, "case.glb");
@@ -155,17 +278,13 @@ fn declared_headroom_changes_case_depth() {
     let before = read_stl(&root, "case-base.stl").1;
 
     // Tall components are declared, not inferred from the process.
-    edit_board(
-        &root,
-        "\"tolerance\": \"fdm\"",
-        "\"tolerance\": \"fdm\",\n    \"enclosure\": { \"headroom_mm\": 15.0 }",
-    );
+    edit_board(&root, "\"headroom_mm\": 10.0", "\"headroom_mm\": 20.0");
     assert!(run(&root, &["derive"]).status.success());
     let after = read_stl(&root, "case-base.stl").1;
 
     assert!(
         (after[2] - before[2] - 10.0).abs() < 1e-3,
-        "depth should grow 10mm (5 -> 15 headroom): {} -> {}",
+        "depth should grow 10mm (10 -> 20 headroom): {} -> {}",
         before[2],
         after[2]
     );
@@ -317,8 +436,8 @@ fn invalid_gasket_compression_is_rejected() {
     // than emit a case that cannot seal.
     edit_board(
         &root,
-        "\"tolerance\": \"fdm\"",
-        "\"tolerance\": \"fdm\",\n    \"enclosure\": { \"gasket_compression\": 1.0 }",
+        "\"headroom_mm\": 10.0",
+        "\"headroom_mm\": 10.0,\n      \"gasket_compression\": 1.0",
     );
 
     let out = run(&root, &["derive"]);
@@ -327,5 +446,282 @@ fn invalid_gasket_compression_is_rejected() {
     assert!(
         stderr.contains("gasket_compression"),
         "error should name the offending field, got: {stderr}"
+    );
+}
+
+// ── Connector cutouts ────────────────────────────────────────────────────────
+
+#[test]
+fn a_declared_mount_becomes_a_through_hole_at_the_declared_position() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+
+    let bytes = std::fs::read(root.join("enclosure/case-base.stl")).unwrap();
+    assert_closed_solid(&bytes, "case-base.stl");
+    let tris = stl_triangles(&bytes);
+
+    // Seed geometry: FDM wall 4.8 mm, board clearance 0.4 mm, board top at
+    // 5.8 mm (1.2 floor + 3.0 standoff + 1.6 PCB). J1 is 20 mm along the south
+    // edge, J3 30 mm along the east.
+    let (wall, inboard, z) = (4.8f32, 5.2f32, 7.0f32);
+    assert!(
+        !in_material(&tris, [inboard + 20.0, wall * 0.5, z]),
+        "J1's opening should be void"
+    );
+    assert!(
+        in_material(&tris, [inboard + 60.0, wall * 0.5, z]),
+        "the wall beside J1 should be solid"
+    );
+    assert!(
+        !in_material(&tris, [110.4 - wall * 0.5, inboard + 30.0, z]),
+        "J3's opening should be void"
+    );
+    assert!(
+        in_material(&tris, [110.4 - wall * 0.5, inboard + 55.0, z]),
+        "the wall beside J3 should be solid"
+    );
+}
+
+#[test]
+fn removing_a_mount_removes_its_opening() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+    let before = read_stl(&root, "case-base.stl").0;
+
+    // A connector reached with the lid off declares no mount and gets no hole.
+    edit_board(
+        &root,
+        "],\n      \"mount\": { \"side\": \"east\", \"offset_mm\": 30.0 }",
+        "]",
+    );
+    assert!(run(&root, &["derive"]).status.success());
+    let after = read_stl(&root, "case-base.stl").0;
+
+    assert!(
+        after < before,
+        "dropping a mount should drop faces: {before} -> {after}"
+    );
+    let bytes = std::fs::read(root.join("enclosure/case-base.stl")).unwrap();
+    assert_closed_solid(&bytes, "case-base.stl with one fewer opening");
+}
+
+#[test]
+fn a_mount_that_reaches_the_gasket_groove_fails_the_pipeline() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+
+    // Drop the headroom until the wall is too short to pass a USB-C receptacle
+    // below the seal. Generating it anyway yields a case that slices perfectly
+    // and leaks, so the pipeline must refuse.
+    edit_board(&root, "\"headroom_mm\": 10.0", "\"headroom_mm\": 2.0");
+    let out = run(&root, &["derive"]);
+    assert!(
+        !out.status.success(),
+        "a breached seal must fail the pipeline"
+    );
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("J1"),
+        "error must name the connector: {stderr}"
+    );
+    assert!(
+        stderr.contains("seal"),
+        "error must say what breaks: {stderr}"
+    );
+    assert!(
+        stderr.contains("headroom_mm"),
+        "error must say what to change: {stderr}"
+    );
+}
+
+#[test]
+fn a_mount_running_off_its_wall_fails_the_pipeline() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+
+    edit_board(
+        &root,
+        "\"side\": \"south\", \"offset_mm\": 20.0",
+        "\"side\": \"south\", \"offset_mm\": 99.5",
+    );
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success(), "an opening off the wall must fail");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("J1"),
+        "error must name the connector: {stderr}"
+    );
+}
+
+#[test]
+fn an_unknown_mount_side_is_rejected_at_the_declaration() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+
+    edit_board(&root, "\"side\": \"south\"", "\"side\": \"starboard\"");
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success(), "an unknown side must be rejected");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("north") && stderr.contains("west"),
+        "error should list the valid sides: {stderr}"
+    );
+}
+
+#[test]
+fn a_connector_family_with_no_known_envelope_must_declare_its_size() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+
+    // Guessing a size for an unfamiliar part is how a case ships with a hole
+    // the connector does not fit through.
+    edit_board(&root, "\"type\": \"usb-c\"", "\"type\": \"db25\"");
+    let out = run(&root, &["derive"]);
+    assert!(
+        !out.status.success(),
+        "an unsizable family must be rejected"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("db25"),
+        "error must name the type: {stderr}"
+    );
+    assert!(
+        stderr.contains("width_mm"),
+        "error must say what to declare: {stderr}"
+    );
+
+    // Declaring the envelope makes the same board buildable.
+    edit_board(
+        &root,
+        "\"side\": \"south\", \"offset_mm\": 20.0",
+        "\"side\": \"south\", \"offset_mm\": 20.0, \"width_mm\": 12.0, \"height_mm\": 5.0",
+    );
+    assert!(
+        run(&root, &["derive"]).status.success(),
+        "an explicit envelope should be accepted"
+    );
+    let bytes = std::fs::read(root.join("enclosure/case-base.stl")).unwrap();
+    assert_closed_solid(&bytes, "case-base.stl with a declared envelope");
+}
+
+#[test]
+fn the_opening_scales_with_the_declared_body() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+
+    let wide = |root: &Path| {
+        let bytes = std::fs::read(root.join("enclosure/case-base.stl")).unwrap();
+        let tris = stl_triangles(&bytes);
+        // How far along the south wall the opening still reads as void.
+        let (wall, inboard, z) = (4.8f32, 5.2f32, 7.0f32);
+        (0..400)
+            .filter(|i| {
+                let x = inboard + 20.0 - 10.0 + *i as f32 * 0.05;
+                !in_material(&tris, [x, wall * 0.5, z])
+            })
+            .count()
+    };
+    let before = wide(&root);
+
+    edit_board(
+        &root,
+        "\"side\": \"south\", \"offset_mm\": 20.0",
+        "\"side\": \"south\", \"offset_mm\": 20.0, \"width_mm\": 20.0, \"height_mm\": 3.26",
+    );
+    assert!(run(&root, &["derive"]).status.success());
+    let after = wide(&root);
+
+    assert!(
+        after > before,
+        "a wider declared body should cut a wider opening: {before} -> {after}"
+    );
+}
+
+// ── Standoffs ────────────────────────────────────────────────────────────────
+
+#[test]
+fn declared_standoffs_raise_the_board_and_the_case() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+    let raised = read_stl(&root, "case-base.stl").1;
+
+    // Headroom is measured above the board, so removing the posts must lower
+    // the whole case rather than free up clearance.
+    edit_board(&root, "\"standoff_height_mm\": 3.0,", "");
+    assert!(run(&root, &["derive"]).status.success());
+    let flat = read_stl(&root, "case-base.stl").1;
+
+    assert!(
+        (raised[2] - flat[2] - 3.0).abs() < 1e-3,
+        "3 mm of standoff should add 3 mm of case: {} vs {}",
+        flat[2],
+        raised[2]
+    );
+    let bytes = std::fs::read(root.join("enclosure/case-base.stl")).unwrap();
+    assert_closed_solid(&bytes, "case-base.stl without standoffs");
+}
+
+#[test]
+fn standoffs_are_solid_posts_and_the_cavity_stays_open() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+
+    let bytes = std::fs::read(root.join("enclosure/case-base.stl")).unwrap();
+    let tris = stl_triangles(&bytes);
+    // Seed posts: 5 mm square, inset one minimum feature (0.8 mm) from the
+    // board corners, which start 5.2 mm in from the outer wall.
+    let z = 1.2 + 1.5; // mid-post, above the 1.2 mm floor
+    let near = 5.2 + 0.8 + 2.5;
+    assert!(
+        in_material(&tris, [near, near, z]),
+        "the corner post should be solid"
+    );
+    assert!(
+        !in_material(&tris, [55.2, 35.2, z]),
+        "the middle of the cavity is where the board goes"
+    );
+}
+
+#[test]
+fn standoffs_too_large_for_the_board_fail_the_pipeline() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+
+    edit_board(
+        &root,
+        "\"width_mm\": 100.0,\n    \"height_mm\": 60.0",
+        "\"width_mm\": 12.0,\n    \"height_mm\": 12.0",
+    );
+    edit_board(
+        &root,
+        "\"standoff_size_mm\": 5.0",
+        "\"standoff_size_mm\": 6.0",
+    );
+    // The board shrank below its connectors, so unmount them — the standoff
+    // failure is what this test is about. An explicit null is a mount the
+    // declaration deliberately does not have.
+    edit_board(
+        &root,
+        "{ \"side\": \"south\", \"offset_mm\": 20.0 }",
+        "null",
+    );
+    edit_board(&root, "{ \"side\": \"east\", \"offset_mm\": 30.0 }", "null");
+
+    let out = run(&root, &["derive"]);
+    assert!(
+        !out.status.success(),
+        "four posts must not fit a 12 mm board"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("standoff"),
+        "error should name standoffs: {stderr}"
     );
 }
