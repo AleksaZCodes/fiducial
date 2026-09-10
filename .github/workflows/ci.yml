@@ -272,8 +272,10 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
+      # `--bins`, not `--lib`: fiducial-cli is a binary-only crate, so its unit
+      # tests compile into the `fid` test target.
       - name: Pipeline discovery is read in one place
-        run: cargo test -p fiducial-cli --lib pipeline
+        run: cargo test -p fiducial-cli --bins pipeline
 
       - name: fid dash end-to-end
         run: cargo test -p fiducial-cli --test dash
