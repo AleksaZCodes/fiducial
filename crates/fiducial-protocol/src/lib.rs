@@ -62,6 +62,89 @@ pub const MAGIC: u8 = 0xFD;
 /// Maximum payload length in bytes (u16::MAX).
 pub const MAX_PAYLOAD: usize = u16::MAX as usize;
 
+/// Wire protocol version — a monotonically increasing integer embedded in every
+/// artifact (firmware, desktop, WASM) that speaks this protocol.
+///
+/// The version is exchanged during the connection handshake and checked against
+/// the compatibility matrix before any application frames are sent.
+///
+/// This constant is the *only* declaration of the wire version in the Rust
+/// workspace. The committed `docs/compat/matrix.toml` records the same number
+/// plus the range of older versions still accepted — `fid release check`
+/// enforces that they agree.
+pub const WIRE_VERSION: u8 = 1;
+
+// ── Version-skew ──────────────────────────────────────────────────────────────
+
+/// Error returned when two endpoints cannot interoperate due to a protocol
+/// version mismatch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VersionSkewError {
+    /// The wire version this endpoint speaks.
+    pub local: u8,
+    /// The wire version the remote endpoint advertised.
+    pub remote: u8,
+    /// The oldest remote version this endpoint will accept.
+    pub min_compatible: u8,
+}
+
+impl core::fmt::Display for VersionSkewError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "protocol version skew: local={} remote={} (min acceptable={})",
+            self.local, self.remote, self.min_compatible
+        )
+    }
+}
+
+// `core::error::Error` was stabilised in Rust 1.81 (our MSRV is 1.82).
+impl core::error::Error for VersionSkewError {}
+
+/// Check whether a remote endpoint speaking `remote` can interoperate with a
+/// local endpoint speaking `local` that accepts versions down to `min_compatible`.
+///
+/// Returns `Ok(())` when `remote >= min_compatible`, `Err` otherwise.
+///
+/// # Example
+///
+/// ```rust
+/// use fiducial_protocol::{WIRE_VERSION, assert_compatible};
+///
+/// // Same version always works.
+/// assert!(assert_compatible(WIRE_VERSION, WIRE_VERSION, WIRE_VERSION).is_ok());
+///
+/// // A remote on version 1 is rejected when the minimum is 2.
+/// assert!(assert_compatible(2, 1, 2).is_err());
+/// ```
+pub fn assert_compatible(
+    local: u8,
+    remote: u8,
+    min_compatible: u8,
+) -> Result<(), VersionSkewError> {
+    if remote >= min_compatible {
+        Ok(())
+    } else {
+        Err(VersionSkewError {
+            local,
+            remote,
+            min_compatible,
+        })
+    }
+}
+
+/// Convenience form of [`assert_compatible`] using `WIRE_VERSION` as `local` and
+/// `min_compatible`.
+///
+/// This matches the policy recorded in `docs/compat/matrix.toml` when
+/// `min_compatible = current`, i.e. no backward compatibility is declared.
+///
+/// For backward-compatible bumps, call [`assert_compatible`] directly with the
+/// `min_compatible` value from the matrix.
+pub fn is_current_compatible(remote: u8) -> Result<(), VersionSkewError> {
+    assert_compatible(WIRE_VERSION, remote, WIRE_VERSION)
+}
+
 // ── CRC-8 ─────────────────────────────────────────────────────────────────────
 
 /// Compute the CRC-8 of a byte slice (XOR fold).
@@ -315,6 +398,47 @@ mod tests {
         assert_eq!(encoded_len(0), 4);
         assert_eq!(encoded_len(10), 14);
         assert_eq!(encoded_len(100), 104);
+    }
+
+    // ── Version-skew tests ────────────────────────────────────────────────────
+
+    #[test]
+    fn same_version_compatible() {
+        assert!(assert_compatible(1, 1, 1).is_ok());
+        assert!(assert_compatible(WIRE_VERSION, WIRE_VERSION, WIRE_VERSION).is_ok());
+    }
+
+    #[test]
+    fn newer_remote_accepted_when_min_is_old() {
+        // Local speaks v1 but min_compatible=1, remote is v2 — allowed.
+        assert!(assert_compatible(1, 2, 1).is_ok());
+    }
+
+    #[test]
+    fn old_artifact_rejected_after_breaking_bump() {
+        // A device still running protocol v1 connects to a host that has bumped
+        // to v2 with a breaking change (min_compatible=2). It must be rejected.
+        let local: u8 = 2;
+        let remote: u8 = 1; // old artifact
+        let min_compatible: u8 = 2;
+        let err = assert_compatible(local, remote, min_compatible).unwrap_err();
+        assert_eq!(err.local, 2);
+        assert_eq!(err.remote, 1);
+        assert_eq!(err.min_compatible, 2);
+    }
+
+    #[test]
+    fn is_current_compatible_self() {
+        assert!(is_current_compatible(WIRE_VERSION).is_ok());
+    }
+
+    #[test]
+    fn is_current_compatible_rejects_old() {
+        // WIRE_VERSION is 1; any version < 1 (i.e. 0) is rejected.
+        // This also proves that after a breaking bump to N, version N-1 is refused.
+        if WIRE_VERSION > 0 {
+            assert!(is_current_compatible(WIRE_VERSION - 1).is_err());
+        }
     }
 
     #[test]
