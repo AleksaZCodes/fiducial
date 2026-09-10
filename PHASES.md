@@ -219,6 +219,25 @@ _Read this at the start of every session. Updated manually as phases complete._
 | `@fiducial/board-schema` mirrors `Outline` + validation; 5 new tests | ✅ |
 | CI: `mesh-gen` job runs the end-to-end enclosure pipeline test | ✅ |
 
+**Phase 15b — sealed case ✅ (2026-09-10)**
+
+> Gasket-sealed two-part case, replacing the open tray as the default output.
+
+| Deliverable | Status |
+| --- | --- |
+| `MeshBuilder` primitives — `cap` / `ring` / `band` — winding correct by construction | ✅ |
+| `generate_case_base()` — grooved rim, 60 triangles; `generate_case_lid()` — compression tongue in print orientation, 44 triangles | ✅ |
+| `generate_gasket()` — seal ring, 32 triangles; **TPU** documented at every surface (SKILL.md, pipeline toml, rustdoc, page copy) | ✅ |
+| `CaseParams` — groove/tongue/wall all derived; `wall = 2×lip + groove`, so the seal sets wall thickness | ✅ |
+| `Mesh::translated` / `mirrored_z` / `merge`; `case_exploded()` renders base + gasket + lid separated | ✅ |
+| Watertightness (edge parity) asserted on all three parts, and preserved across mirroring | ✅ |
+| Fit tests: lid footprint matches base, gasket narrower than its groove, tongue shallower than groove, compression math | ✅ |
+| `outline.enclosure` — declares only what the process cannot imply (headroom, lid thickness, gasket cross-section, compression) | ✅ |
+| Validation rejects non-positive overrides and compression outside (0, 1), NaN included | ✅ |
+| `fid-mesh` addresses parts by stem, format by extension; unknown stem fails and lists valid names | ✅ |
+| Web GLB copy is one commented line in `pipelines/enclosure.toml` — opt in, hash-tracked, no copy step | ✅ |
+| 35 mesh tests, 16 eda tests, 10 CLI end-to-end tests, 21 board-schema tests | ✅ |
+
 **Phase 13 — complete ✅ (2026-09-08)**
 
 > Web Serial, WebUSB, and BLE transports — same Fiducial frame codec as the firmware.

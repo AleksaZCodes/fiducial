@@ -16,7 +16,10 @@ use std::{
 
 use fiducial_eda::validate as validate_board_interface;
 use fiducial_geometry::{BoardOutline, ToleranceClass};
-use fiducial_mesh::{enclosure_for, to_glb, to_stl_binary};
+use fiducial_mesh::{
+    case_exploded, enclosure_for, extrude_board, generate_case_base, generate_case_lid,
+    generate_gasket, to_glb, to_stl_binary, CaseParams,
+};
 
 use crate::{
     config::{Config, CONFIG_FILE},
@@ -254,12 +257,27 @@ fn run_fid_validate(pipeline: &PipelineToml, working_dir: &Path) -> Result<()> {
 
 // ── Built-in fid-mesh executor ───────────────────────────────────────────────
 
-/// Generate the enclosure mesh declared by a `board.interface.json` outline.
+/// Parts the `fid-mesh` executor can generate, selected by output file stem.
+const MESH_PARTS: &[&str] = &["case-base", "case-lid", "gasket", "case", "board", "tray"];
+
+/// Generate case geometry declared by a `board.interface.json` outline.
 ///
 /// `args[0]` is the path to the board interface JSON (default
-/// `board/board.interface.json`). Outputs are written by extension: `.stl`
-/// receives binary STL, `.glb` receives glTF 2.0 binary. The board's declared
-/// tolerance class drives wall thickness and clearance.
+/// `board/board.interface.json`).
+///
+/// Each output is addressed by **stem** and **extension**, which are
+/// orthogonal: the stem picks the part, the extension picks the format. So
+/// `enclosure/case-base.stl` and `enclosure/case-base.glb` are the same
+/// geometry in two encodings.
+///
+/// | Stem | Part |
+/// |---|---|
+/// | `case-base` | base tray with the gasket groove |
+/// | `case-lid` | lid with the compression tongue (print orientation) |
+/// | `gasket` | gasket ring — **print in TPU** |
+/// | `case` | exploded assembly, for rendering |
+/// | `board` | the bare PCB, extruded |
+/// | `tray` | simple open tray, no seal |
 ///
 /// Runs in-process — no CAD tool required in CI.
 fn run_fid_mesh(pipeline: &PipelineToml, working_dir: &Path) -> Result<()> {
@@ -277,7 +295,8 @@ fn run_fid_mesh(pipeline: &PipelineToml, working_dir: &Path) -> Result<()> {
         anyhow::anyhow!("{source} declares no `outline`; nothing for the mesh pipeline to derive")
     })?;
 
-    // validate() already rejected unknown tolerance names.
+    // validate() already rejected unknown tolerance names and out-of-range
+    // enclosure overrides, so this conversion cannot fail.
     let tolerance = match outline_decl.tolerance.as_str() {
         "resin" => ToleranceClass::Resin,
         "cnc" => ToleranceClass::Cnc,
@@ -287,19 +306,56 @@ fn run_fid_mesh(pipeline: &PipelineToml, working_dir: &Path) -> Result<()> {
         .with_thickness(outline_decl.thickness_mm)
         .with_tolerance(tolerance);
 
-    let mesh = enclosure_for(&outline);
+    let mut params = CaseParams::from_outline(&outline);
+    if let Some(e) = &outline_decl.enclosure {
+        if let Some(v) = e.headroom_mm {
+            params.headroom_mm = v;
+        }
+        if let Some(v) = e.lid_thickness_mm {
+            params.lid_thickness_mm = v;
+        }
+        if let Some(v) = e.gasket_width_mm {
+            params.gasket_width_mm = v;
+        }
+        if let Some(v) = e.gasket_height_mm {
+            params.gasket_height_mm = v;
+        }
+        if let Some(v) = e.gasket_compression {
+            params.gasket_compression = v;
+        }
+    }
 
     for out in &pipeline.outputs {
+        let path = Path::new(out);
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| anyhow::anyhow!("fid-mesh: output `{out}` has no file name"))?;
+
+        let mesh = match stem {
+            "case-base" => generate_case_base(&outline, &params),
+            "case-lid" => generate_case_lid(&outline, &params),
+            "gasket" => generate_gasket(&outline, &params),
+            "case" => case_exploded(&outline, &params),
+            "board" => extrude_board(&outline),
+            "tray" => enclosure_for(&outline),
+            other => bail!(
+                "fid-mesh: unknown part `{other}` in output `{out}` (expected one of: {})",
+                MESH_PARTS.join(", ")
+            ),
+        };
+
+        let bytes = match path.extension().and_then(|e| e.to_str()) {
+            Some("stl") => to_stl_binary(&mesh),
+            Some("glb") => to_glb(&mesh),
+            _ => bail!("fid-mesh: unsupported output `{out}` (expected .stl or .glb)"),
+        };
+
         let abs = working_dir.join(out);
         if let Some(parent) = abs.parent() {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("creating {}", parent.display()))?;
         }
-        let bytes = match Path::new(out).extension().and_then(|e| e.to_str()) {
-            Some("stl") => to_stl_binary(&mesh),
-            Some("glb") => to_glb(&mesh),
-            _ => bail!("fid-mesh: unsupported output `{out}` (expected .stl or .glb)"),
-        };
         std::fs::write(&abs, bytes).with_context(|| format!("writing {out}"))?;
     }
 

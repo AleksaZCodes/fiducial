@@ -109,7 +109,7 @@ pub struct Board {
 /// Physical board outline — the declaration the mesh pipeline derives from.
 ///
 /// Optional so that boards which do not need an enclosure omit it entirely;
-/// when present, `fid derive` generates the enclosure STL and GLB from it.
+/// when present, `fid derive` generates the case parts from it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Outline {
     /// Board width in millimetres.
@@ -122,6 +122,33 @@ pub struct Outline {
     /// Manufacturing process for the generated enclosure: `fdm`, `resin`, or `cnc`.
     #[serde(default = "default_tolerance")]
     pub tolerance: String,
+    /// Case overrides for values the process cannot imply.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enclosure: Option<EnclosureOptions>,
+}
+
+/// Overrides for the generated case.
+///
+/// Everything here defaults from the tolerance profile or from a documented
+/// constant. These are the values a process cannot know: how tall the tallest
+/// component is, and what gasket stock the product uses.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct EnclosureOptions {
+    /// Vertical space above the board, in millimetres. Raise for tall parts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub headroom_mm: Option<f32>,
+    /// Lid plate thickness in millimetres.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lid_thickness_mm: Option<f32>,
+    /// Gasket cross-section width in millimetres.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gasket_width_mm: Option<f32>,
+    /// Gasket cross-section height in millimetres, uncompressed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gasket_height_mm: Option<f32>,
+    /// Fraction of gasket height squeezed when closed. Must be in (0, 1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gasket_compression: Option<f32>,
 }
 
 fn default_thickness() -> f32 {
@@ -211,6 +238,34 @@ pub fn validate(json: &str) -> Result<BoardInterface, ValidationError> {
                 "unknown tolerance {:?} (expected fdm, resin or cnc)",
                 o.tolerance
             )));
+        }
+        if let Some(e) = &o.enclosure {
+            for (name, value) in [
+                ("headroom_mm", e.headroom_mm),
+                ("lid_thickness_mm", e.lid_thickness_mm),
+                ("gasket_width_mm", e.gasket_width_mm),
+                ("gasket_height_mm", e.gasket_height_mm),
+            ] {
+                // NaN is checked explicitly: it compares false against every
+                // bound, so a plain `v <= 0.0` would let it through and produce
+                // a mesh full of NaN coordinates.
+                if let Some(v) = value {
+                    if v.is_nan() || v <= 0.0 {
+                        return Err(ValidationError::InvalidOutline(alloc::format!(
+                            "enclosure.{name} must be > 0, got {v}"
+                        )));
+                    }
+                }
+            }
+            // A compression of 0 never squeezes the gasket and 1 crushes it
+            // flat; both produce a case that does not seal.
+            if let Some(c) = e.gasket_compression {
+                if c.is_nan() || c <= 0.0 || c >= 1.0 {
+                    return Err(ValidationError::InvalidOutline(alloc::format!(
+                        "enclosure.gasket_compression must be between 0 and 1 (exclusive), got {c}"
+                    )));
+                }
+            }
         }
     }
     Ok(bi)

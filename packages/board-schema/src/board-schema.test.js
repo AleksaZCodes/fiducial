@@ -150,4 +150,54 @@ describe('@fiducial/board-schema', () => {
       }
     })
   })
+
+  describe('outline.enclosure', () => {
+    const withEnclosure = enclosure =>
+      JSON.stringify({
+        schema_version: '1.0',
+        board: { name: 'x' },
+        outline: { width_mm: 10, height_mm: 5, enclosure },
+        connectors: [],
+        net_classes: [],
+      })
+
+    it('is optional', () => {
+      const json = JSON.stringify({
+        schema_version: '1.0',
+        board: { name: 'x' },
+        outline: { width_mm: 10, height_mm: 5 },
+        connectors: [],
+        net_classes: [],
+      })
+      assert.equal(parseBoardInterface(json).outline.enclosure, undefined)
+    })
+
+    it('accepts partial overrides', () => {
+      const bi = parseBoardInterface(withEnclosure({ headroom_mm: 15 }))
+      assert.equal(bi.outline.enclosure.headroom_mm, 15)
+      assert.equal(bi.outline.enclosure.gasket_width_mm, undefined)
+    })
+
+    it('rejects a non-positive dimension', () => {
+      assert.throws(() => parseBoardInterface(withEnclosure({ headroom_mm: 0 })), /must be > 0/)
+      assert.throws(
+        () => parseBoardInterface(withEnclosure({ gasket_height_mm: -1 })),
+        /must be > 0/
+      )
+    })
+
+    it('rejects gasket compression outside (0, 1)', () => {
+      // 0 never squeezes the gasket; 1 crushes it flat. Neither seals.
+      for (const c of [0, 1, 1.5, -0.2]) {
+        assert.throws(
+          () => parseBoardInterface(withEnclosure({ gasket_compression: c })),
+          /gasket_compression/
+        )
+      }
+    })
+
+    it('accepts a sane compression fraction', () => {
+      assert.doesNotThrow(() => parseBoardInterface(withEnclosure({ gasket_compression: 0.25 })))
+    })
+  })
 })
