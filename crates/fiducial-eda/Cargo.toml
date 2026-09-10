@@ -1,6 +1,6 @@
 [package]
 name        = "fiducial-eda"
-description = "no_std EDA pipeline types — BoardInterface schema for board.interface.json."
+description = "no_std EDA pipeline types — the BoardInterface schema for board.interface.json, with validation."
 version.workspace     = true
 edition.workspace     = true
 license.workspace     = true

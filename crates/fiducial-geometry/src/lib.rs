@@ -4,10 +4,19 @@
 //!
 //! - [`Point2`] / [`Vec2`] — 2D coordinate arithmetic
 //! - [`Point3`] / [`Vec3`] — 3D coordinate arithmetic
-//! - [`Polygon`] — closed 2D boundary (not yet consumed by the mesh pipeline)
+//! - [`Polygon`] — closed 2D boundary; enclosure sizing reads its bounding box,
+//!   so a non-rectangular outline becomes a change to one method rather than to
+//!   every consumer of `width_mm`
 //! - [`BoardOutline`] — rectangular width/height + PCB thickness + tolerance class
 //! - [`BoundingBox`] — axis-aligned 2D envelope
-//! - [`ToleranceProfile`] — per-process manufacturing tolerances (FDM, Resin)
+//! - [`ToleranceProfile`] — per-process manufacturing tolerances (FDM, resin, CNC)
+//! - [`Side`] — which board edge, and so which case wall, a feature sits on
+//! - [`ConnectorOpening`] / [`connector_opening`] — body envelopes per connector
+//!   family, so a declared `type` implies the size of the hole it needs
+//! - [`triangulate`] / [`circle`] — ear clipping of a polygon with holes, the
+//!   primitive every punched case surface is built from
+//!
+//! `Polygon`, `triangulate`, and `circle` need the `alloc` feature.
 
 #![no_std]
 #![deny(unsafe_code)]

@@ -18,10 +18,15 @@
 //! # Sealed cases with features
 //!
 //! [`Case`] is the full API: a gasket-sealed base, lid, and gasket, with
-//! connector openings punched through the walls and optional standoff posts
-//! under the board. Validate before generating — the meshes are produced
-//! unconditionally, so an opening that breaches the seal yields a case that
-//! slices cleanly and leaks.
+//! connector openings punched through the walls, optional standoff posts under
+//! the board, and optional corner fasteners to retain the lid. Validate before
+//! generating — the meshes are produced unconditionally, so an opening that
+//! breaches the seal yields a case that slices cleanly and leaks.
+//!
+//! Openings and standoffs are free; fasteners are not. A screw has to pass
+//! through the outer lip with a printable wall either side, so declaring one
+//! widens that lip and thickens the whole wall. [`CaseParams::wall_mm`] is
+//! derived for exactly this reason.
 //!
 //! ```rust,ignore
 //! use fiducial_geometry::{BoardOutline, Side, connector_opening};
@@ -32,6 +37,7 @@
 //! let case = Case::new(outline)
 //!     .with_params(CaseParams::from_outline(&outline).with_headroom(10.0))
 //!     .with_cutouts(vec![Cutout::new("J1", Side::South, 20.0, usb.width_mm, usb.height_mm)]);
+//! // .with_params(… .with_fasteners(3.0))  ← four corner screws, thicker wall
 //!
 //! case.validate()?;                    // reports against the declaration
 //! let stl = to_stl_binary(&case.base());

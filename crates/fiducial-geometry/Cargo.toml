@@ -1,6 +1,6 @@
 [package]
 name        = "fiducial-geometry"
-description = "no_std 2D/3D geometry primitives and tolerance profiles for Fiducial."
+description = "no_std geometry for Fiducial: points, tolerance profiles, connector envelopes, and ear-clipping triangulation of polygons with holes."
 version.workspace     = true
 edition.workspace     = true
 license.workspace     = true

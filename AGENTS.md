@@ -33,11 +33,18 @@ complete.
 ```
 fiducial/
 ├── MISSION.md, STACK.md, PHASES.md
-├── crates/fiducial/      Rust crate (crates.io)
-├── packages/fiducial/    JS package (@fiducial/fiducial on npm)
+├── crates/               11 Rust members; no_std spine + `fid` CLI
+│   ├── fiducial-core, -protocol, -quantity, -model
+│   ├── fiducial-geometry, -mesh   geometry + case generation
+│   ├── fiducial-eda               board.interface.json schema
+│   └── fiducial-cli, -wasm, -tauri, fiducial
+├── firmware/             Separate workspace (Embassy; rp2040 + stm32)
+├── packages/             10 JS/TS packages (pnpm + Turborepo)
 ├── docs/specs/           Design decisions (append-only)
 └── .github/workflows/    CI (ci.yml) + release (release.yml)
 ```
+
+`ls crates packages` beats this tree — it is hand-maintained and drifts.
 
 ## Tools — use these before writing library code
 

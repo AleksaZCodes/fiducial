@@ -10,17 +10,44 @@ fiducial/
 ├── STACK.md            Enumerated technology choices
 ├── PHASES.md           Build order and current state — read first each session
 ├── crates/             Rust workspace members (host compilation)
-│   └── fiducial/       crates.io placeholder → growing to fiducial-core etc.
+│   ├── fiducial/           crates.io placeholder
+│   ├── fiducial-core/      no_std spine — DeviceId, version
+│   ├── fiducial-protocol/  no_std frame codec (mirrored in TS)
+│   ├── fiducial-quantity/  no_std units
+│   ├── fiducial-model/     shared domain types
+│   ├── fiducial-geometry/  no_std points, tolerance profiles, triangulation
+│   ├── fiducial-mesh/      no_std case generation, STL + GLB export
+│   ├── fiducial-eda/       no_std board.interface.json schema + validation
+│   ├── fiducial-cli/       the `fid` binary + capability templates
+│   ├── fiducial-wasm/      wasm-bindgen wrapper
+│   └── fiducial-tauri/     desktop host
+├── firmware/           Separate Cargo workspace (Embassy; rp2040 + stm32)
 ├── packages/           JS/TS workspace packages (pnpm + Turborepo)
-│   └── fiducial/       @fiducial/fiducial on npm
+│   ├── board-schema/       TS mirror of fiducial-eda's schema
+│   ├── transport-web/      Web Serial / WebUSB / BLE + frame codec
+│   ├── viewer3d-react/     GLB viewer (Three.js)
+│   ├── ui-react/, ui-svelte/   component registry sources
+│   ├── tokens/, headless/  design tokens, headless logic
+│   ├── wasm-bridge/        generated TS types from Rust
+│   ├── cli/                @fiducial/cli npm shim
+│   └── fiducial/           @fiducial/fiducial on npm
 ├── docs/specs/         Design specs (append-only decisions)
 └── .github/workflows/  CI + release automation
 ```
 
-## Current phase: Phase 3 — `fid` CLI
+Run `ls crates packages` rather than trusting this tree if something looks
+missing — it is hand-maintained, which is exactly why it drifts.
 
-Read `PHASES.md` at the start of every session. The current phase row says what is
-in progress and what "done" means. Do not start Phase N+1 work inside Phase N.
+## Current phase
+
+**`PHASES.md` is the only place the active phase is recorded.** Read it at the
+start of every session: its "Current phase" line says what is in progress, and
+the phase table says what "done" means. Do not start Phase N+1 work inside
+Phase N.
+
+This file deliberately does *not* restate the phase number. It used to, and it
+sat at "Phase 3" until Phase 15d — the same failure the one-declaration rule
+below exists to prevent, in the file that states the rule.
 
 ## Rules
 
