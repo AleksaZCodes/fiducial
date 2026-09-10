@@ -291,9 +291,11 @@ _Read this at the start of every session. Updated manually as phases complete._
 | 76 mesh, 34 geometry, 30 eda, 24 CLI end-to-end tests; 4-target spine, clippy, fmt clean | ✅ |
 
 **Still open on the case** — fastener and standoff positions are derived rather
-than declared, there is no countersink, openings are rectangular only (now a
-small change rather than a missing capability, since `flat_face` takes any loop),
-and the case carries no IP rating. `Polygon::signed_area()` still awaits
+than declared, there is no countersink, openings are rectangular only, and the
+case carries no IP rating. Round openings are further off than they look:
+`flat_face` and `hole_wall` are both XY-plane-only, while a connector opening is
+a vertical face with a horizontal bore, so it needs those primitives
+parameterised the way `punched_face` already is. `Polygon::signed_area()` still awaits
 offsetting a non-rectangular outline — the one genuinely absent primitive.
 
 **Phase 13 — complete ✅ (2026-09-08)**

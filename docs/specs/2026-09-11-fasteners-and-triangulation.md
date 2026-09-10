@@ -122,9 +122,13 @@ kind of changes that quietly alter every case that never asked for a screw.
   is a second concentric hole at a shallower depth — straightforward now the
   primitive exists, but nothing has asked for it.
 - **Openings are still rectangular only.** A round barrel jack or SMA bulkhead
-  gets a square hole slightly larger than it needs. The primitive to fix this now
-  exists — `flat_face` takes any loop, and `circle` generates one — so this is
-  now a small change rather than a missing capability.
+  gets a square hole slightly larger than it needs. Less close than it looks:
+  `flat_face` and `hole_wall` are both hardcoded to the XY plane, and a connector
+  opening is a *vertical* face with a *horizontal* bore. Wall faces also still go
+  through the grid-based `punched_face`, which only knows rectangles. Doing this
+  properly means giving both new primitives a `(u, v) -> [f32; 3]` mapping, the
+  way `punched_face` already has, and letting the bore sweep along an arbitrary
+  direction. That is a real change to three functions, not a new loop shape.
 - **The case is still not pressure-rated.** A compression gasket resists splashes
   and dust. With the lid now actually clamped the seal is real, but nothing here
   has been tested to an IP rating and the geometry claims none.
