@@ -9,6 +9,7 @@ members = [
     "crates/fiducial-eda",
     "crates/fiducial-geometry",
     "crates/fiducial-mesh",
+    "crates/fiducial-ota",
     "crates/fiducial-tauri",
     "crates/fiducial-wasm",
     "crates/fiducial-cli",

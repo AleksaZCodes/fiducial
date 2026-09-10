@@ -108,6 +108,13 @@ jobs:
           --target ${{ matrix.target.triple }}
           ${{ matrix.target.features }}
 
+      - name: Check fiducial-ota (${{ matrix.target.triple }})
+        run: >
+          cargo check
+          --package fiducial-ota
+          --target ${{ matrix.target.triple }}
+          ${{ matrix.target.features }}
+
   # ── Host: full workspace build + tests ────────────────────────────────────
   rust:
     name: Rust (host)
@@ -311,6 +318,47 @@ jobs:
         run: |
           cargo build -p fiducial-cli --bin fid
           ./target/debug/fid release check
+
+      # The cross-implementation anchor. Runs WITHOUT FIDUCIAL_WRITE_VECTORS,
+      # so a wire change that did not regenerate the committed vectors fails
+      # here rather than in the field.
+      - name: Conformance vectors are fresh
+        run: cargo test -p fiducial-protocol --test vectors
+
+  # ── OTA: the first sub-protocol on the waist (Phase 16c) ──────────────────
+  #
+  # Every failure mode in design spec §12.3 is a test. They run on the host
+  # with no hardware because the update path is pure logic -- "never brick"
+  # and "signed, always" are assertions here, not hopes.
+  ota:
+    name: ota (fiducial-ota)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv6m-none-eabi,thumbv7em-none-eabihf,wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Transfer state machine (§12.3 failure modes)
+        run: cargo test -p fiducial-ota
+
+      - name: Real ed25519 signing and verification
+        run: cargo test -p fiducial-ota --features ed25519
+
+      # The OTA state machine must build on every device target, with and
+      # without software crypto -- a device with a hardware PKA implements
+      # SignatureVerifier against that instead.
+      - name: no_std on every device target
+        run: |
+          for t in thumbv6m-none-eabi thumbv7em-none-eabihf wasm32-unknown-unknown; do
+            cargo check -p fiducial-ota --target "$t"
+            cargo check -p fiducial-ota --target "$t" --features ed25519
+          done
 
   # ── JavaScript / TypeScript ───────────────────────────────────────────────
   js:
