@@ -327,6 +327,9 @@ EXIT CODES
         /// Render only one section
         #[arg(long, value_name = "NAME")]
         section: Option<String>,
+        /// Aggregate all products in fiducial.portfolio (workbench v1)
+        #[arg(long)]
+        portfolio: bool,
     },
 
     /// Check for drift: outdated deps, stale templates, un-applied migrations
@@ -392,7 +395,11 @@ fn main() -> Result<()> {
         Commands::Upgrade { dry_run, portfolio } => commands::upgrade::run(dry_run, portfolio),
         Commands::Graph { format } => commands::graph::run(&format),
         Commands::Release { action } => commands::release::run(action),
-        Commands::Dash { json, section } => commands::dash::run(json, section),
+        Commands::Dash {
+            json,
+            section,
+            portfolio,
+        } => commands::dash::run(json, section, portfolio),
         Commands::Doctor => commands::doctor::run(),
         Commands::GuardCheck => guard::check_from_stdin(),
     }

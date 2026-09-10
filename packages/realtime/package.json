@@ -1,0 +1,51 @@
+{
+  "name": "@fiducial/realtime",
+  "version": "0.1.0",
+  "description": "Supabase Realtime typed wrappers — Broadcast, Presence, and Postgres Changes",
+  "license": "MIT",
+  "author": "Aleksa Zdravkovic",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AleksaZCodes/fiducial.git"
+  },
+  "homepage": "https://github.com/AleksaZCodes/fiducial",
+  "keywords": [
+    "realtime",
+    "supabase",
+    "broadcast",
+    "presence",
+    "postgres-changes",
+    "fiducial"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'no linter configured yet'",
+    "test": "node --test src/realtime.test.js"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  },
+  "peerDependencies": {
+    "@supabase/supabase-js": ">=2"
+  },
+  "peerDependenciesMeta": {
+    "@supabase/supabase-js": {
+      "optional": true
+    }
+  }
+}

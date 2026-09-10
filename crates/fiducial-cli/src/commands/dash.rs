@@ -19,7 +19,7 @@
 //! needs a second implementation of the same reads.
 
 use anyhow::{Context, Result};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -902,10 +902,184 @@ impl Dash {
     }
 }
 
+// ── Portfolio (workbench v1) ───────────────────────────────────────────────────
+//
+// A portfolio manifest is a `fiducial.portfolio` TOML file — one file, many
+// repos.  It lists the paths of sibling product repos; `fid dash --portfolio`
+// runs `fid dash --json` in each and aggregates the results.
+//
+// The manifest is declared in one place and read in one place (here).  The
+// upgrade command and doctor command also fan out over the same list; they read
+// the manifest themselves rather than going through this module, which avoids
+// coupling the view to the mutation commands.
+
+/// Name of the portfolio manifest file.
+pub const PORTFOLIO_FILE: &str = "fiducial.portfolio";
+
+/// Parsed portfolio manifest.
+#[derive(Debug, Deserialize)]
+struct Portfolio {
+    products: Vec<PortfolioProduct>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PortfolioProduct {
+    /// Display name shown in the aggregated view.
+    name: String,
+    /// Path to the product repo (absolute, or relative to the manifest file).
+    path: String,
+}
+
+/// One product's entry in the aggregated portfolio view.
+#[derive(Debug, Serialize)]
+pub struct PortfolioEntry {
+    name: String,
+    path: String,
+    /// `null` when `fid dash --json` failed (product not initialised, etc.).
+    dash: Option<serde_json::Value>,
+    /// Non-null when `fid dash --json` exited non-zero or could not be parsed.
+    error: Option<String>,
+}
+
+/// The aggregated portfolio view.
+#[derive(Debug, Serialize)]
+pub struct PortfolioView {
+    products: Vec<PortfolioEntry>,
+}
+
+/// Load and render the portfolio manifest found at `manifest_path`.
+fn run_portfolio(manifest_path: &Path, json: bool) -> Result<()> {
+    let raw = std::fs::read_to_string(manifest_path)
+        .with_context(|| format!("reading {}", manifest_path.display()))?;
+    let portfolio: Portfolio =
+        toml::from_str(&raw).with_context(|| format!("parsing {}", manifest_path.display()))?;
+
+    let manifest_dir = manifest_path.parent().unwrap_or(Path::new("."));
+    let fid_bin = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("fid"));
+
+    let entries: Vec<PortfolioEntry> = portfolio
+        .products
+        .iter()
+        .map(|p| {
+            let abs = if Path::new(&p.path).is_absolute() {
+                PathBuf::from(&p.path)
+            } else {
+                manifest_dir.join(&p.path)
+            };
+
+            let result = Command::new(&fid_bin)
+                .args(["dash", "--json"])
+                .current_dir(&abs)
+                .output();
+
+            match result {
+                Ok(out) if out.status.success() => {
+                    match serde_json::from_slice::<serde_json::Value>(&out.stdout) {
+                        Ok(v) => PortfolioEntry {
+                            name: p.name.clone(),
+                            path: abs.display().to_string(),
+                            dash: Some(v),
+                            error: None,
+                        },
+                        Err(e) => PortfolioEntry {
+                            name: p.name.clone(),
+                            path: abs.display().to_string(),
+                            dash: None,
+                            error: Some(format!("JSON parse error: {e}")),
+                        },
+                    }
+                }
+                Ok(out) => PortfolioEntry {
+                    name: p.name.clone(),
+                    path: abs.display().to_string(),
+                    dash: None,
+                    error: Some(format!(
+                        "fid dash exited {}: {}",
+                        out.status,
+                        String::from_utf8_lossy(&out.stderr).trim()
+                    )),
+                },
+                Err(e) => PortfolioEntry {
+                    name: p.name.clone(),
+                    path: abs.display().to_string(),
+                    dash: None,
+                    error: Some(format!("could not invoke fid: {e}")),
+                },
+            }
+        })
+        .collect();
+
+    let view = PortfolioView { products: entries };
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&view)?);
+    } else {
+        render_portfolio(&view);
+    }
+    Ok(())
+}
+
+fn render_portfolio(view: &PortfolioView) {
+    println!("╭─────────────────────────────────────────────────");
+    println!(
+        "│  Portfolio workbench — {} product(s)",
+        view.products.len()
+    );
+    println!("╰─────────────────────────────────────────────────");
+    println!();
+    for entry in &view.products {
+        println!("┌── {} ({})", entry.name, entry.path);
+        if let Some(e) = &entry.error {
+            println!("│   ! {e}");
+        } else if let Some(dash) = &entry.dash {
+            // Brief summary: version + branch + roadmap progress + problems.
+            let version = dash["product"]["version"]
+                .as_str()
+                .unwrap_or("?")
+                .to_string();
+            let branch = dash["git"]["branch"]
+                .as_str()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "—".to_string());
+            let done = dash["roadmap"]["done"].as_u64().unwrap_or(0);
+            let total = dash["roadmap"]["total"].as_u64().unwrap_or(0);
+            let problems = dash["freshness"]["problems"]
+                .as_array()
+                .map(|a| a.len())
+                .unwrap_or(0);
+            println!("│   version  {version}");
+            println!("│   branch   {branch}");
+            println!("│   roadmap  {done}/{total}");
+            if problems > 0 {
+                println!("│   ! {problems} freshness problem(s)");
+            } else {
+                println!("│   freshness ok");
+            }
+        }
+        println!("└─────────────────────────────────────────────────");
+        println!();
+    }
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-/// Render the workbench view for the product containing the current directory.
-pub fn run(json: bool, section: Option<String>) -> Result<()> {
+/// Render the workbench view for the product containing the current directory,
+/// or for the whole portfolio when `--portfolio` is given.
+pub fn run(json: bool, section: Option<String>, portfolio: bool) -> Result<()> {
+    // ── Portfolio mode ────────────────────────────────────────────────────────
+    if portfolio {
+        // Look for fiducial.portfolio starting from cwd and walking up.
+        let cwd = std::env::current_dir()?;
+        let manifest = find_portfolio(&cwd).with_context(|| {
+            format!(
+                "could not find `{PORTFOLIO_FILE}` in `{}` or any parent directory",
+                cwd.display()
+            )
+        })?;
+        return run_portfolio(&manifest, json);
+    }
+
+    // ── Single-product mode ───────────────────────────────────────────────────
     if let Some(s) = &section {
         if !SECTIONS.contains(&s.as_str()) {
             anyhow::bail!(
@@ -926,4 +1100,18 @@ pub fn run(json: bool, section: Option<String>) -> Result<()> {
         dash.render(section.as_deref());
     }
     Ok(())
+}
+
+/// Walk up from `start` looking for `PORTFOLIO_FILE`.
+fn find_portfolio(start: &Path) -> Option<PathBuf> {
+    let mut dir = start.to_path_buf();
+    loop {
+        let candidate = dir.join(PORTFOLIO_FILE);
+        if candidate.exists() {
+            return Some(candidate);
+        }
+        if !dir.pop() {
+            return None;
+        }
+    }
 }

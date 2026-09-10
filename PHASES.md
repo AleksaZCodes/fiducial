@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 17
+## Current phase: Phase 18
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -349,6 +349,31 @@ no live CI status (deliberate; would go behind a flag), decisions are listed but
 not read so supersession is undetected, and `briefs` from §10's v0 row is not
 built because no product has one yet.
 
+**Phase 17 — complete ✅ (2026-09-10)**
+
+> `fiducial-sim`, `realtime`, workbench v1.
+> Done when: simulation runs native and in WASM; realtime's three contracts covered by tests.
+
+| Deliverable | Status |
+| --- | --- |
+| `crates/fiducial-sim/` — `std` + `parallel` (rayon) on host; `no-default-features` on `wasm32` | ✅ |
+| `ode::OdeSystem<N>` — one trait declaration; all simulations implement it | ✅ |
+| `rk4_step` + `Integrator<S, N>` — 4th-order Runge-Kutta, generic over system and state size | ✅ |
+| `Integrator::run_batch` — parallel with rayon on host, sequential on WASM; API identical | ✅ |
+| `ThermalModel` — single-node RC thermal sim; `steady_state()` and `simulate()` | ✅ |
+| `ThermalSnapshot` — serde round-trips; 7 host tests + 1 doc-test | ✅ |
+| `packages/realtime/` — `@fiducial/realtime` TS package | ✅ |
+| Contract 1: **Broadcast** — typed event map; `send`, `on`, unsubscribe; 5 tests | ✅ |
+| Contract 2: **Presence** — typed per-client state; `track`, `untrack`, `onJoin`, `onLeave`, snapshot; 5 tests | ✅ |
+| Contract 3: **Postgres Changes** — `INSERT`, `UPDATE`, `DELETE`; `on`, `onInsert`, `onUpdate`, `onDelete`; 6 tests | ✅ |
+| 16 realtime tests total — all three contracts, no live Supabase connection | ✅ |
+| `fid dash --portfolio` — reads `fiducial.portfolio` manifest, aggregates `fid dash --json` from each repo | ✅ |
+| Portfolio is a view: it writes nothing (verified by test) | ✅ |
+| Portfolio reports errors per-product without failing the command — same posture as single-product dash | ✅ |
+| `fiducial.portfolio` — `[[products]]` TOML format; name + path per entry | ✅ |
+| 5 portfolio end-to-end tests in `tests/portfolio.rs` | ✅ |
+| CI: `sim`, `realtime`, `portfolio` jobs; `fiducial-sim` in spine matrix | ✅ |
+
 **Phase 16c — complete ✅ (2026-09-10)**
 
 > Firmware OTA: `fiducial-ota` — the first sub-protocol built on the waist.
@@ -567,5 +592,5 @@ fiducial/
 | **16** | Workbench v0: `fid dash` read-only view | Roadmap, status, decisions, CI, graph, freshness in one place | ✅ |
 | **16b** | `fid release` + version-skew assertions | A protocol bump fails any artifact still on the old version; compatibility matrix committed | ✅ |
 | **16c** | Firmware OTA: `fiducial-ota` — signed manifests, resumable transfer, trial boot, staged rollout | Transfer resumes after a drop; unsigned image cannot stage; failed self-test rolls back ([rescoped from BLE](docs/specs/2026-09-10-phase-16c-ota-transport-rescope.md)) | ✅ |
-| **17** | `fiducial-sim`, `realtime`, workbench v1 | Simulation runs native and in WASM; realtime's three contracts covered by tests | ⬜ |
+| **17** | `fiducial-sim`, `realtime`, workbench v1 | Simulation runs native and in WASM; realtime's three contracts covered by tests | ✅ |
 | **18** | ROP migration wave 2 (optional) — eligible rules to L0 Rust | Each differential-tested before the TypeScript is deleted | ⬜ |

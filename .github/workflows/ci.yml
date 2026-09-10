@@ -389,3 +389,72 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+  # ── fiducial-sim: numerical simulation, native + WASM check ──────────────
+  #
+  # Phase 17. `rayon` is disabled on WASM targets (single-threaded default).
+  # The spine matrix already checks that the crate compiles for every target;
+  # this job runs the full test suite plus the WASM no-default-features build.
+  sim:
+    name: sim (fiducial-sim)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable + wasm32 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Test fiducial-sim (native, with rayon)
+        run: cargo test -p fiducial-sim
+
+      - name: Check fiducial-sim (WASM, no rayon)
+        # fiducial-sim is a std crate; disable only `parallel` (rayon), keep `std`.
+        run: cargo check -p fiducial-sim --target wasm32-unknown-unknown --no-default-features --features std
+
+  # ── realtime: three contracts ─────────────────────────────────────────────
+  #
+  # Phase 17. Broadcast, Presence, and Postgres Changes are each covered by
+  # tests. No live Supabase connection — mock adapters only.
+  realtime:
+    name: realtime (@fiducial/realtime)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test @fiducial/realtime
+        run: pnpm --filter @fiducial/realtime test
+
+  # ── portfolio: workbench v1 ───────────────────────────────────────────────
+  #
+  # Phase 17. `fid dash --portfolio` aggregates multiple product repos from a
+  # portfolio manifest. The test scaffolds two products, writes the manifest,
+  # and asserts the aggregated JSON is correct.
+  portfolio:
+    name: portfolio (workbench v1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: fid dash --portfolio end-to-end
+        run: cargo test -p fiducial-cli --test portfolio
