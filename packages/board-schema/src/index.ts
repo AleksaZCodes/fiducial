@@ -144,6 +144,15 @@ export interface EnclosureOptions {
   standoff_height_mm?: number
   /** Footprint of each standoff post, square, in millimetres. */
   standoff_size_mm?: number
+  /**
+   * Screw shaft diameter for the four corner fasteners that retain the lid.
+   *
+   * Omit and nothing clamps the lid down: the gasket only compresses while
+   * something external holds it shut. Declaring a diameter widens the outer lip
+   * enough to carry a hole with a printable wall either side, which thickens
+   * the case wall — so it is opt-in rather than assumed.
+   */
+  fastener_diameter_mm?: number
 }
 
 /**
@@ -230,6 +239,7 @@ export function parseBoardInterface(json: string): BoardInterface {
         'gasket_height_mm',
         'standoff_height_mm',
         'standoff_size_mm',
+        'fastener_diameter_mm',
       ] as const) {
         const v = e[field]
         if (v !== undefined && !(v > 0)) {

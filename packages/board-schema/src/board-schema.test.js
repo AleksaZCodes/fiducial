@@ -323,11 +323,27 @@ describe('@fiducial/board-schema', () => {
     })
   })
 
-  describe('standoffs', () => {
+  describe('standoffs and fasteners', () => {
     it('reads the standoffs the seed declares', () => {
       const e = parseBoardInterface(SEED_JSON).outline.enclosure
       assert.equal(e.standoff_height_mm, 3)
       assert.equal(e.standoff_size_mm, 5)
+    })
+
+    it('reads the fastener the seed declares', () => {
+      const e = parseBoardInterface(SEED_JSON).outline.enclosure
+      assert.equal(e.fastener_diameter_mm, 3)
+    })
+
+    it('rejects a non-positive fastener diameter', () => {
+      const json = JSON.stringify({
+        schema_version: '1.0',
+        board: { name: 'x' },
+        outline: { width_mm: 100, height_mm: 60, enclosure: { fastener_diameter_mm: 0 } },
+        connectors: [],
+        net_classes: [],
+      })
+      assert.throws(() => parseBoardInterface(json), /fastener_diameter_mm/)
     })
 
     it('rejects a non-positive standoff height', () => {

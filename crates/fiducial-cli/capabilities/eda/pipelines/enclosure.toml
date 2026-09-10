@@ -3,7 +3,8 @@
 # Reads the `outline` block declared in board/board.interface.json and generates
 # a gasket-sealed two-part case sized by the board's tolerance class. Every
 # connector that declares a `mount` is punched through the base wall it faces,
-# and `outline.enclosure.standoff_height_mm` lifts the board onto corner posts.
+# `outline.enclosure.standoff_height_mm` lifts the board onto corner posts, and
+# `fastener_diameter_mm` adds the four corner screws that hold the lid down.
 # Runs in-process via fiducial-mesh; no CAD tool is required.
 #
 # The declaration is validated before anything is written: an opening that

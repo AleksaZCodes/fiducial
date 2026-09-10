@@ -13,7 +13,8 @@
     "enclosure": {
       "headroom_mm": 10.0,
       "standoff_height_mm": 3.0,
-      "standoff_size_mm": 5.0
+      "standoff_size_mm": 5.0,
+      "fastener_diameter_mm": 3.0
     }
   },
   "connectors": [

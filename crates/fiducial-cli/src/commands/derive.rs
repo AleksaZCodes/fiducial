@@ -333,6 +333,9 @@ fn run_fid_mesh(pipeline: &PipelineToml, working_dir: &Path) -> Result<()> {
         if let Some(v) = e.standoff_size_mm {
             params.standoff_size_mm = v;
         }
+        if let Some(v) = e.fastener_diameter_mm {
+            params.fastener_diameter_mm = v;
+        }
     }
 
     // Every connector that declares a mount becomes an opening. Size comes

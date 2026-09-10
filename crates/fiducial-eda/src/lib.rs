@@ -12,7 +12,8 @@
 //!   "board": { "name": "my-board", "revision": "A" },
 //!   "outline": {
 //!     "width_mm": 100.0, "height_mm": 60.0, "tolerance": "fdm",
-//!     "enclosure": { "headroom_mm": 10.0, "standoff_height_mm": 3.0 }
+//!     "enclosure": { "headroom_mm": 10.0, "standoff_height_mm": 3.0,
+//!                    "fastener_diameter_mm": 3.0 }
 //!   },
 //!   "connectors": [
 //!     { "id": "J1", "name": "USB-C", "type": "usb-c", "pins": [
@@ -215,6 +216,14 @@ pub struct EnclosureOptions {
     /// Footprint of each standoff post, square, in millimetres.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub standoff_size_mm: Option<f32>,
+    /// Screw shaft diameter for the four corner fasteners that retain the lid.
+    ///
+    /// Omit and nothing clamps the lid down: the gasket only compresses while
+    /// something external holds it shut. Declaring a diameter widens the outer
+    /// lip enough to carry a hole with a printable wall either side, which
+    /// thickens the case wall — so it is opt-in rather than assumed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fastener_diameter_mm: Option<f32>,
 }
 
 fn default_thickness() -> f32 {
@@ -316,6 +325,7 @@ pub fn validate(json: &str) -> Result<BoardInterface, ValidationError> {
                 ("gasket_height_mm", e.gasket_height_mm),
                 ("standoff_height_mm", e.standoff_height_mm),
                 ("standoff_size_mm", e.standoff_size_mm),
+                ("fastener_diameter_mm", e.fastener_diameter_mm),
             ] {
                 // NaN is checked explicitly: it compares false against every
                 // bound, so a plain `v <= 0.0` would let it through and produce

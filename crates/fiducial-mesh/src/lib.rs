@@ -59,7 +59,7 @@ extern crate alloc;
 extern crate std;
 
 use alloc::{string::String, vec::Vec};
-use fiducial_geometry::{BoardOutline, Side};
+use fiducial_geometry::{circle, circumradius_for_width, triangulate, BoardOutline, Point2, Side};
 
 /// Tolerance for comparing generated coordinates, in millimetres.
 ///
@@ -449,6 +449,14 @@ impl Rect {
         self.y1 - self.y0
     }
 
+    /// Corners as a counter-clockwise loop for the triangulator.
+    fn loop_pts(self) -> Vec<Point2> {
+        self.corners()
+            .iter()
+            .map(|c| Point2::new(c[0], c[1]))
+            .collect()
+    }
+
     /// Corners counter-clockwise as seen from +Z.
     fn corners(self) -> [[f32; 2]; 4] {
         [
@@ -747,6 +755,76 @@ impl MeshBuilder {
         self.grid_face(&map, normal, &u_lines, &v_lines, holes, flip);
     }
 
+    /// A flat face at height `z`, triangulated with `holes` punched through it.
+    ///
+    /// `up` faces +Z. Loops are given in the XY plane and must be wound
+    /// counter-clockwise seen from +Z; the triangulator normalises them anyway.
+    ///
+    /// This is the general form of [`MeshBuilder::cap`] and
+    /// [`MeshBuilder::ring`], and unlike them it does not tessellate the face on
+    /// a grid or into mitred trapezoids. That matters for a fastener hole at a
+    /// case corner: the corner is exactly where the mitre of a four-trapezoid
+    /// ring falls, so a hole there straddles two trapezoids and cannot be
+    /// punched piecewise. Triangulating the ring as one polygon has no mitre to
+    /// straddle, and preserves both boundaries so the neighbouring bands need no
+    /// change.
+    fn flat_face(&mut self, outer: &[Point2], holes: &[&[Point2]], z: f32, up: bool) {
+        let tris = triangulate(outer, holes);
+        if tris.is_empty() {
+            return;
+        }
+
+        let mut pts: Vec<Point2> = outer.to_vec();
+        for h in holes {
+            pts.extend_from_slice(h);
+        }
+
+        let base = self.vertices.len() as u32;
+        let n = if up {
+            [0.0, 0.0, 1.0]
+        } else {
+            [0.0, 0.0, -1.0]
+        };
+        for p in &pts {
+            self.vertices.push([p.x, p.y, z]);
+            self.normals.push(n);
+        }
+        for t in tris {
+            if up {
+                self.triangles.push([base + t[0], base + t[1], base + t[2]]);
+            } else {
+                self.triangles.push([base + t[0], base + t[2], base + t[1]]);
+            }
+        }
+    }
+
+    /// The wall of a vertical hole bored through material, from `z_lo` to
+    /// `z_hi`.
+    ///
+    /// `pts` is the hole's cross-section wound counter-clockwise seen from +Z —
+    /// the *same* points the punched faces at either end were given, so the
+    /// tunnel meets them vertex for vertex. Normals point into the bore, since
+    /// the material is outside it.
+    fn hole_wall(&mut self, pts: &[Point2], z_lo: f32, z_hi: f32) {
+        let m = pts.len();
+        for k in 0..m {
+            let (i, j) = (pts[k], pts[(k + 1) % m]);
+            let (dx, dy) = (j.x - i.x, j.y - i.y);
+            let len = libm::sqrtf(dx * dx + dy * dy);
+            if len <= EPS {
+                continue;
+            }
+            // Outward normal of a CCW loop edge is (dy, -dx); the bore is the
+            // loop's interior, so the surface faces the other way.
+            let n = [-dy / len, dx / len, 0.0];
+            let a = [i.x, i.y, z_lo];
+            let b = [j.x, j.y, z_lo];
+            let at = [i.x, i.y, z_hi];
+            let bt = [j.x, j.y, z_hi];
+            self.quad([b, a, at, bt], n);
+        }
+    }
+
     fn build(self) -> Mesh {
         Mesh {
             vertices: self.vertices,
@@ -792,7 +870,26 @@ pub struct CaseParams {
     pub standoff_height_mm: f32,
     /// Footprint of each standoff post, square.
     pub standoff_size_mm: f32,
+    /// Screw shaft diameter for the four corner fasteners that retain the lid.
+    ///
+    /// Zero means no fasteners, and then nothing clamps the lid: the gasket
+    /// only compresses while something external holds it shut. Declaring a
+    /// diameter widens the outer lip enough to carry a hole with a printable
+    /// wall on either side, which thickens the case wall — so it is opt-in
+    /// rather than assumed.
+    pub fastener_diameter_mm: f32,
 }
+
+/// Sides used to approximate a fastener hole.
+///
+/// Sixteen keeps the flat-to-flat error under 2% of the diameter, well inside
+/// the process tolerance the hole is already widened by.
+const FASTENER_SEGMENTS: usize = 16;
+
+/// Pilot hole as a fraction of shaft diameter, for a screw tapping its own
+/// thread in plastic. The usual rule for a self-tapping screw in a printed
+/// boss; a full-diameter hole would give the threads nothing to bite.
+const FASTENER_PILOT_RATIO: f32 = 0.8;
 
 impl CaseParams {
     /// Derive case parameters from the outline's tolerance profile.
@@ -817,6 +914,7 @@ impl CaseParams {
             min_feature_mm: p.min_feature_mm,
             standoff_height_mm: 0.0,
             standoff_size_mm: 4.0,
+            fastener_diameter_mm: 0.0,
         }
     }
 
@@ -825,12 +923,58 @@ impl CaseParams {
         self.gasket_width_mm + 2.0 * self.fit_clearance_mm
     }
 
-    /// Total wall thickness: a lip, the groove, and a second lip.
+    /// Whether this case retains its lid with screws.
+    pub fn has_fasteners(&self) -> bool {
+        self.fastener_diameter_mm > 0.0
+    }
+
+    /// Hole diameter in the lid: the screw passes through freely.
+    pub fn fastener_clearance_diameter_mm(&self) -> f32 {
+        self.fastener_diameter_mm + 2.0 * self.fit_clearance_mm
+    }
+
+    /// Hole diameter in the base: the screw taps its own thread.
+    pub fn fastener_pilot_diameter_mm(&self) -> f32 {
+        self.fastener_diameter_mm * FASTENER_PILOT_RATIO
+    }
+
+    /// Widest extent of the bore actually cut, across its polygon corners.
+    ///
+    /// A tessellated hole is wider at its corners than the circle it
+    /// approximates, and the material around it has to be sized to the hole
+    /// that gets cut rather than the one that was asked for. Sizing to the
+    /// nominal diameter instead leaves the wall thinner than the process
+    /// minimum — by a third of a millimetre here, which is a quarter of the
+    /// wall.
+    fn fastener_bore_extent_mm(&self) -> f32 {
+        2.0 * circumradius_for_width(
+            self.fastener_clearance_diameter_mm() * 0.5,
+            FASTENER_SEGMENTS,
+        )
+    }
+
+    /// Width of the lip outboard of the groove.
+    ///
+    /// Normally one lip, but a fastener has to fit through it with a printable
+    /// wall on either side, so declaring one widens this lip — and with it the
+    /// whole wall. That is the price of a retained lid, and it is why fasteners
+    /// are opt-in.
+    pub fn lip_outer_mm(&self) -> f32 {
+        if self.has_fasteners() {
+            self.lip_mm
+                .max(self.fastener_bore_extent_mm() + 2.0 * self.lip_mm)
+        } else {
+            self.lip_mm
+        }
+    }
+
+    /// Total wall thickness: the outer lip, the groove, and the inner lip.
     ///
     /// The seal is what sets the wall thickness — the wall must be thick enough
-    /// to carry the groove with a printable lip on either side.
+    /// to carry the groove with a printable lip on either side, and thick
+    /// enough again to carry a fastener if one is declared.
     pub fn wall_mm(&self) -> f32 {
-        2.0 * self.lip_mm + self.groove_width_mm()
+        self.lip_outer_mm() + self.groove_width_mm() + self.lip_mm
     }
 
     /// Groove depth. The gasket seats flush, and the tongue does the squeezing.
@@ -869,6 +1013,11 @@ impl CaseParams {
         self.gasket_compression = v;
         self
     }
+    /// Retain the lid with four corner screws of this shaft diameter.
+    pub const fn with_fasteners(mut self, diameter_mm: f32) -> Self {
+        self.fastener_diameter_mm = diameter_mm;
+        self
+    }
     /// Raise the board onto standoff posts of this height.
     ///
     /// The case grows by the same amount: headroom is measured above the board,
@@ -899,6 +1048,38 @@ struct CaseGeometry {
 }
 
 impl CaseGeometry {
+    /// Centres of the four corner fasteners, empty when none are declared.
+    ///
+    /// Each sits at the middle of the outer lip in both axes, which puts it on
+    /// the corner's mitre diagonal — the position that requires the rim to be
+    /// triangulated as one polygon rather than four trapezoids.
+    fn fastener_centres(&self, p: &CaseParams) -> Vec<Point2> {
+        if !p.has_fasteners() {
+            return Vec::new();
+        }
+        let d = p.lip_outer_mm() * 0.5;
+        let r = self.outer;
+        alloc::vec![
+            Point2::new(r.x0 + d, r.y0 + d),
+            Point2::new(r.x1 - d, r.y0 + d),
+            Point2::new(r.x1 - d, r.y1 - d),
+            Point2::new(r.x0 + d, r.y1 - d),
+        ]
+    }
+
+    /// Hole cross-sections of `diameter` at every fastener centre.
+    ///
+    /// The construction radius is corrected so the polygon's flats — not its
+    /// corners — reach the diameter asked for, because that is what the screw
+    /// actually has to pass through.
+    fn fastener_holes(&self, p: &CaseParams, diameter: f32) -> Vec<Vec<Point2>> {
+        let r = circumradius_for_width(diameter * 0.5, FASTENER_SEGMENTS);
+        self.fastener_centres(p)
+            .into_iter()
+            .map(|c| circle(c, r, FASTENER_SEGMENTS))
+            .collect()
+    }
+
     fn new(outline: &BoardOutline, p: &CaseParams) -> Self {
         let bb = outline.to_polygon().bounding_box();
         let wall = p.wall_mm();
@@ -912,11 +1093,11 @@ impl CaseGeometry {
         let z_rim = z_board_top + p.headroom_mm;
         Self {
             outer,
-            groove_outer: outer.inset(p.lip_mm),
-            groove_inner: outer.inset(p.lip_mm + p.groove_width_mm()),
+            groove_outer: outer.inset(p.lip_outer_mm()),
+            groove_inner: outer.inset(p.lip_outer_mm() + p.groove_width_mm()),
             cavity: outer.inset(wall),
-            gasket_outer: outer.inset(p.lip_mm + p.fit_clearance_mm),
-            gasket_inner: outer.inset(p.lip_mm + p.groove_width_mm() - p.fit_clearance_mm),
+            gasket_outer: outer.inset(p.lip_outer_mm() + p.fit_clearance_mm),
+            gasket_inner: outer.inset(p.lip_outer_mm() + p.groove_width_mm() - p.fit_clearance_mm),
             z_cavity_floor: p.floor_mm,
             z_board_top,
             z_rim,
@@ -971,9 +1152,27 @@ pub fn generate_case_lid(outline: &BoardOutline, p: &CaseParams) -> Mesh {
     let tongue_top = t + p.tongue_height_mm();
     let mut b = MeshBuilder::new();
 
-    b.cap(g.outer, 0.0, false);
+    // The screw passes through the lid freely, so the bore is a clearance hole.
+    let bores = g.fastener_holes(p, p.fastener_clearance_diameter_mm());
+    let bore_refs: Vec<&[Point2]> = bores.iter().map(|h| h.as_slice()).collect();
+
+    if bores.is_empty() {
+        b.cap(g.outer, 0.0, false);
+    } else {
+        b.flat_face(&g.outer.loop_pts(), &bore_refs, 0.0, false);
+    }
     b.band(g.outer, 0.0, t, true);
-    b.ring(g.outer, g.groove_outer, t, true);
+    if bores.is_empty() {
+        b.ring(g.outer, g.groove_outer, t, true);
+    } else {
+        let inner = g.groove_outer.loop_pts();
+        let mut holes: Vec<&[Point2]> = alloc::vec![inner.as_slice()];
+        holes.extend(bore_refs.iter().copied());
+        b.flat_face(&g.outer.loop_pts(), &holes, t, true);
+        for hole in &bores {
+            b.hole_wall(hole, 0.0, t);
+        }
+    }
     b.band(g.groove_outer, t, tongue_top, true);
     b.ring(g.groove_outer, g.groove_inner, tongue_top, true);
     b.band(g.groove_inner, t, tongue_top, false);
@@ -1119,6 +1318,13 @@ pub enum CaseError {
         /// Second cutout label.
         b: String,
     },
+    /// A fastener was requested that the process cannot resolve.
+    FastenerTooSmall {
+        /// Declared shaft diameter.
+        diameter_mm: f32,
+        /// The process minimum feature size.
+        min_feature_mm: f32,
+    },
     /// Standoffs were requested but four of them will not fit on the board.
     StandoffsTooLarge {
         /// Requested post footprint.
@@ -1164,6 +1370,14 @@ impl core::fmt::Display for CaseError {
                 f,
                 "cutouts `{a}` and `{b}` overlap on the same wall — they would merge into one \
                  opening"
+            ),
+            Self::FastenerTooSmall {
+                diameter_mm,
+                min_feature_mm,
+            } => write!(
+                f,
+                "fastener_diameter_mm is {diameter_mm:.2} mm, and its pilot hole would fall \
+                 below the {min_feature_mm:.2} mm this process can resolve — use a larger screw"
             ),
             Self::StandoffsTooLarge { size_mm, span_mm } => write!(
                 f,
@@ -1287,6 +1501,16 @@ impl Case {
             }
         }
 
+        if p.has_fasteners() {
+            let pilot = p.fastener_pilot_diameter_mm();
+            if pilot.is_nan() || pilot < p.min_feature_mm {
+                return Err(CaseError::FastenerTooSmall {
+                    diameter_mm: p.fastener_diameter_mm,
+                    min_feature_mm: p.min_feature_mm,
+                });
+            }
+        }
+
         if p.standoff_height_mm > 0.0 {
             let span = self.outline.width_mm.min(self.outline.height_mm);
             if 2.0 * (p.standoff_size_mm + margin) + margin >= span {
@@ -1374,8 +1598,10 @@ impl Case {
 
     /// Lid with the compression tongue, in print orientation.
     ///
-    /// The lid carries no features: a hole in the lid is a hole inside the
-    /// gasket line, and no amount of compression seals that.
+    /// The lid takes no connector cutouts: a cutout there would be inside the
+    /// gasket line, and no amount of compression seals that. Fastener holes are
+    /// the exception, and only because they pass through the outer lip, which is
+    /// outboard of the seal.
     pub fn lid(&self) -> Mesh {
         generate_case_lid(&self.outline, &self.params)
     }
@@ -1544,7 +1770,18 @@ fn case_base(p: &CaseParams, g: &CaseGeometry, walls: &[Vec<Hole>; 4], feet: &[R
     let inset = p.min_feature_mm * 0.5;
     let mut b = MeshBuilder::new();
 
-    b.cap(g.outer, 0.0, false);
+    // The screw taps its own thread in the base, so the bore is a pilot.
+    let bores = g.fastener_holes(p, p.fastener_pilot_diameter_mm());
+    let bore_refs: Vec<&[Point2]> = bores.iter().map(|h| h.as_slice()).collect();
+
+    // Underside. Kept as a single quad when there is nothing to punch, so an
+    // unfastened case is byte-identical to one generated before fasteners
+    // existed.
+    if bores.is_empty() {
+        b.cap(g.outer, 0.0, false);
+    } else {
+        b.flat_face(&g.outer.loop_pts(), &bore_refs, 0.0, false);
+    }
 
     for (k, holes) in walls.iter().enumerate() {
         let (o, dir, n, len) = wall_frame(g.outer, k);
@@ -1586,7 +1823,22 @@ fn case_base(p: &CaseParams, g: &CaseGeometry, walls: &[Vec<Hole>; 4], feet: &[R
         }
     }
 
-    b.ring(g.outer, g.groove_outer, g.z_rim, true);
+    // Rim. The fasteners sit on the corner mitres, so with holes present the
+    // rim has to be one triangulated polygon rather than four trapezoids.
+    if bores.is_empty() {
+        b.ring(g.outer, g.groove_outer, g.z_rim, true);
+    } else {
+        let inner = g.groove_outer.loop_pts();
+        let mut holes: Vec<&[Point2]> = alloc::vec![inner.as_slice()];
+        holes.extend(bore_refs.iter().copied());
+        b.flat_face(&g.outer.loop_pts(), &holes, g.z_rim, true);
+        // The bore runs the full height of the lip, so it opens on the
+        // underside rather than into the cavity — a hole through the sealing
+        // rim would be a leak, and this one never crosses the gasket line.
+        for hole in &bores {
+            b.hole_wall(hole, 0.0, g.z_rim);
+        }
+    }
     b.band(g.groove_outer, g.z_groove_bottom, g.z_rim, false);
     b.ring(g.groove_outer, g.groove_inner, g.z_groove_bottom, true);
     b.band(g.groove_inner, g.z_groove_bottom, g.z_rim, true);
@@ -2712,6 +2964,252 @@ mod tests {
         assert!((mx[0] - mn[0] - g.outer.width()).abs() < 1e-3);
         assert!((mx[1] - mn[1] - g.outer.height()).abs() < 1e-3);
         assert!((mx[2] - mn[2] - g.z_rim).abs() < 1e-3);
+    }
+
+    // ── Fasteners ────────────────────────────────────────────────────────────
+
+    fn fastened() -> (BoardOutline, CaseParams) {
+        let o = board();
+        let p = CaseParams::from_outline(&o).with_fasteners(3.0);
+        (o, p)
+    }
+
+    #[test]
+    fn a_fastened_base_and_lid_are_watertight() {
+        let (o, p) = fastened();
+        let case = Case::new(o).with_params(p);
+        case.validate().expect("plain fasteners must be valid");
+        assert_watertight(&case.base());
+        assert_watertight(&case.lid());
+        assert_watertight(&case.gasket());
+    }
+
+    #[test]
+    fn fasteners_bore_through_the_lip_and_leave_it_solid_beside() {
+        let (o, p) = fastened();
+        let base = Case::new(o).with_params(p).base();
+        let g = CaseGeometry::new(&o, &p);
+        let c = g.fastener_centres(&p);
+        assert_eq!(c.len(), 4, "four corner fasteners");
+
+        let r = p.fastener_pilot_diameter_mm() * 0.5;
+        for centre in &c {
+            // Down the middle of the bore, at three heights: void throughout,
+            // so the screw can actually pass.
+            for f in [0.15, 0.5, 0.85] {
+                let z = g.z_rim * f;
+                assert!(
+                    !inside(&base, [centre.x, centre.y, z]),
+                    "bore at {centre:?} is solid at z={z}"
+                );
+            }
+            // A step outside the bore, still within the lip: material.
+            assert!(
+                inside(
+                    &base,
+                    [centre.x + r + p.lip_mm * 0.5, centre.y, g.z_rim * 0.5]
+                ),
+                "the lip beside the bore at {centre:?} must be solid"
+            );
+        }
+    }
+
+    #[test]
+    fn the_lid_bore_lines_up_with_the_base_bore() {
+        let (o, p) = fastened();
+        let case = Case::new(o).with_params(p);
+        let lid = case.lid();
+        let g = CaseGeometry::new(&o, &p);
+        // The lid is modelled tongue-up, so its bores run 0..lid_thickness.
+        for centre in g.fastener_centres(&p) {
+            assert!(
+                !inside(&lid, [centre.x, centre.y, p.lid_thickness_mm * 0.5]),
+                "lid bore missing at {centre:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_lid_hole_clears_the_screw_and_the_base_hole_grips_it() {
+        // A clearance hole in the lid lets the screw pull the lid down; a pilot
+        // in the base gives the thread something to bite. Equal holes would
+        // either not grip or not pull.
+        let (_, p) = fastened();
+        assert!(
+            p.fastener_clearance_diameter_mm() > p.fastener_diameter_mm,
+            "lid hole must clear the shaft"
+        );
+        assert!(
+            p.fastener_pilot_diameter_mm() < p.fastener_diameter_mm,
+            "base hole must be undersized to tap"
+        );
+    }
+
+    #[test]
+    fn a_fastener_never_breaches_the_gasket_line() {
+        // The whole reason fasteners go in the outer lip. A bore that reached
+        // the groove would open the sealed cavity to the outside, and the case
+        // would still slice and print perfectly.
+        let (o, p) = fastened();
+        let g = CaseGeometry::new(&o, &p);
+        let r = circumradius_for_width(p.fastener_clearance_diameter_mm() * 0.5, FASTENER_SEGMENTS);
+        for c in g.fastener_centres(&p) {
+            // Distance from the bore's edge to the groove's outer wall, on both
+            // axes, must stay positive with a printable wall to spare.
+            let dx = (c.x - g.groove_outer.x0)
+                .abs()
+                .min((c.x - g.groove_outer.x1).abs());
+            let dy = (c.y - g.groove_outer.y0)
+                .abs()
+                .min((c.y - g.groove_outer.y1).abs());
+            assert!(
+                dx - r >= p.lip_mm - 1e-4 && dy - r >= p.lip_mm - 1e-4,
+                "bore at {c:?} leaves only ({}, {}) mm to the groove",
+                dx - r,
+                dy - r
+            );
+        }
+    }
+
+    #[test]
+    fn a_fastener_bore_stays_clear_of_the_outer_surface() {
+        // Break out of the outer wall and the screw has no material to grip.
+        let (o, p) = fastened();
+        let g = CaseGeometry::new(&o, &p);
+        let r = circumradius_for_width(p.fastener_clearance_diameter_mm() * 0.5, FASTENER_SEGMENTS);
+        for c in g.fastener_centres(&p) {
+            let dx = (c.x - g.outer.x0).abs().min((c.x - g.outer.x1).abs());
+            let dy = (c.y - g.outer.y0).abs().min((c.y - g.outer.y1).abs());
+            assert!(
+                dx - r >= p.lip_mm - 1e-4 && dy - r >= p.lip_mm - 1e-4,
+                "bore at {c:?} is too close to the outside"
+            );
+        }
+    }
+
+    #[test]
+    fn declaring_fasteners_thickens_the_wall_and_the_case() {
+        // The honest cost of a retained lid: the outer lip has to carry a hole
+        // with a printable wall either side, and the wall grows with it.
+        let o = board();
+        let plain = CaseParams::from_outline(&o);
+        let (_, screwed) = fastened();
+        assert!(
+            screwed.lip_outer_mm() > plain.lip_outer_mm(),
+            "the outer lip must widen"
+        );
+        assert!(screwed.wall_mm() > plain.wall_mm(), "the wall must thicken");
+        let (pw, ..) = case_extents(&o, &plain);
+        let (sw, ..) = case_extents(&o, &screwed);
+        assert!(sw > pw, "the case footprint must grow: {pw} -> {sw}");
+        // The seal itself is unchanged — only the lip outboard of it moved.
+        assert!((screwed.groove_width_mm() - plain.groove_width_mm()).abs() < 1e-6);
+        assert!((screwed.groove_depth_mm() - plain.groove_depth_mm()).abs() < 1e-6);
+    }
+
+    #[test]
+    fn an_unfastened_case_is_untouched_by_the_fastener_code() {
+        // Byte-identical, so adding fasteners cannot have quietly changed the
+        // geometry of every case that does not use them.
+        let o = board();
+        let p = CaseParams::from_outline(&o);
+        assert!(!p.has_fasteners());
+        let base = Case::new(o).with_params(p).base();
+        assert_eq!(base.triangle_count(), 60);
+        assert_eq!(
+            to_stl_binary(&base),
+            to_stl_binary(&generate_case_base(&o, &p))
+        );
+        assert_eq!(Case::new(o).with_params(p).lid().triangle_count(), 44);
+    }
+
+    #[test]
+    fn fasteners_cutouts_and_standoffs_coexist() {
+        let o = board();
+        let p = CaseParams::from_outline(&o)
+            .with_headroom(10.0)
+            .with_standoffs(2.0, 5.0)
+            .with_fasteners(3.0);
+        let case = Case::new(o)
+            .with_params(p)
+            .with_cutouts(std::vec![usb_c(20.0), qwiic(Side::East, 30.0)]);
+        case.validate().expect("declaration must be valid");
+        assert_watertight(&case.base());
+        assert_watertight(&case.lid());
+
+        // And every feature is still there.
+        let g = CaseGeometry::new(&o, &p);
+        let base = case.base();
+        for c in g.fastener_centres(&p) {
+            assert!(!inside(&base, [c.x, c.y, g.z_rim * 0.5]), "bore lost");
+        }
+        let inboard = p.wall_mm() + p.clearance_mm;
+        assert!(
+            !inside(
+                &base,
+                [inboard + 20.0, p.wall_mm() * 0.5, g.z_board_top + 1.5]
+            ),
+            "connector opening lost"
+        );
+    }
+
+    #[test]
+    fn a_fastener_below_the_minimum_feature_is_rejected() {
+        let o = board();
+        let case = Case::new(o).with_params(CaseParams::from_outline(&o).with_fasteners(0.2));
+        assert!(matches!(
+            case.validate(),
+            Err(CaseError::FastenerTooSmall { .. })
+        ));
+    }
+
+    #[test]
+    fn fastener_errors_say_what_to_change() {
+        let o = board();
+        let err = Case::new(o)
+            .with_params(CaseParams::from_outline(&o).with_fasteners(0.2))
+            .validate()
+            .unwrap_err();
+        let msg = std::format!("{err}");
+        assert!(
+            msg.contains("fastener_diameter_mm"),
+            "message must name the field: {msg}"
+        );
+    }
+
+    #[test]
+    fn tolerance_class_drives_the_fastener_hole() {
+        let width_for = |t: ToleranceClass| {
+            let o = BoardOutline::new(100.0, 60.0).with_tolerance(t);
+            CaseParams::from_outline(&o)
+                .with_fasteners(3.0)
+                .fastener_clearance_diameter_mm()
+        };
+        assert!(
+            width_for(ToleranceClass::Cnc) < width_for(ToleranceClass::Fdm),
+            "a tighter process should cut a tighter clearance hole"
+        );
+    }
+
+    #[test]
+    fn the_bore_polygon_passes_the_screw_it_names() {
+        // An inscribed polygon is narrower than its circle, so a naive circle
+        // would cut a hole a 3 mm screw does not fit through.
+        let (_, p) = fastened();
+        for (label, dia) in [
+            ("clearance", p.fastener_clearance_diameter_mm()),
+            ("pilot", p.fastener_pilot_diameter_mm()),
+        ] {
+            let r = circumradius_for_width(dia * 0.5, FASTENER_SEGMENTS);
+            let pts = circle(Point2::new(0.0, 0.0), r, FASTENER_SEGMENTS);
+            let mid = Point2::new((pts[0].x + pts[1].x) * 0.5, (pts[0].y + pts[1].y) * 0.5);
+            let apothem = libm::sqrtf(mid.x * mid.x + mid.y * mid.y);
+            assert!(
+                (apothem * 2.0 - dia).abs() < 1e-3,
+                "{label} hole measures {} across, not {dia}",
+                apothem * 2.0
+            );
+        }
     }
 
     #[test]

@@ -266,10 +266,35 @@ _Read this at the start of every session. Updated manually as phases complete._
 | 63 mesh tests, 30 eda tests, 18 geometry tests, 20 CLI end-to-end tests, 35 board-schema tests | ✅ |
 | 4-target spine (x86_64 / wasm32 / thumbv6m / thumbv7em) green; clippy + fmt clean; STLs verified closed and oriented from the shipped bytes | ✅ |
 
-**Still open on the case** — the lid is not retained (no fasteners), openings are
-rectangular only, and standoff positions are derived rather than declared. All
-three want polygon offsetting or circle tessellation; the spec explains why a
-square pocket where a screw belongs would be worse than the gap.
+**Phase 15d — fasteners + polygon triangulation ✅ (2026-09-11)**
+
+> Four corner screws that actually retain the lid, and the primitive they needed.
+> Closes the "lid is not retained" gap. Spec:
+> `docs/specs/2026-09-11-fasteners-and-triangulation.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| `fiducial-geometry::triangulate` — ear clipping of a polygon with holes, with **exact** bridge visibility instead of earcut's ray-cast/tangent heuristic | ✅ |
+| Bridges validated against **not-yet-merged** holes; a vertex already carrying a bridge cannot be a second target; an ear must have a valid **diagonal** — all three found by fuzzing, each silently dropped part of a surface | ✅ |
+| Bridge duplicates get fresh indices for unambiguous topology, resolved back to input indices so callers only see the points they passed | ✅ |
+| `circle()` + `circumradius_for_width()` — corrects for a polygon being inscribed, so a hole's *flats* reach the diameter named | ✅ |
+| Verified by area conservation, per-triangle winding, and boundary-edge equality vs the input loops over 3000 fuzz cases + swept annulus rims and walls | ✅ |
+| `MeshBuilder::flat_face` / `hole_wall` — a triangulated face with holes, and the bore through it | ✅ |
+| Rim triangulated as one polygon when fastened: a corner screw sits exactly on the mitre of the four-trapezoid `ring()` and cannot be punched piecewise | ✅ |
+| Clearance hole in the lid, 0.8× pilot in the base, both through the **outer lip** — outboard of the gasket, because a hole inside the gasket line opens the cavity | ✅ |
+| `lip_outer_mm()` derived from the **tessellated bore's corner extent**, not the nominal diameter — sizing to nominal left 1.17 mm of wall against a 1.2 mm process minimum | ✅ |
+| Wall cost stated, not hidden: a 3 mm screw on FDM widens the lip 1.2 → 5.87 mm and the wall 4.8 → 9.47 mm, so a 100×60 board's case goes 110×70 → 120×80. Opt-in for that reason | ✅ |
+| `outline.enclosure.fastener_diameter_mm`; validation rejects a pilot below the process minimum feature | ✅ |
+| An **unfastened** case is byte-identical to one generated before fasteners existed, asserted on the STL bytes | ✅ |
+| Ray-probed on shipped STL bytes: 20 probes — every bore void through its full depth, lip beside it solid, in base and lid | ✅ |
+| `@fiducial/board-schema` mirrors `fastener_diameter_mm` + validation; 37 tests | ✅ |
+| 76 mesh, 34 geometry, 30 eda, 24 CLI end-to-end tests; 4-target spine, clippy, fmt clean | ✅ |
+
+**Still open on the case** — fastener and standoff positions are derived rather
+than declared, there is no countersink, openings are rectangular only (now a
+small change rather than a missing capability, since `flat_face` takes any loop),
+and the case carries no IP rating. `Polygon::signed_area()` still awaits
+offsetting a non-rectangular outline — the one genuinely absent primitive.
 
 **Phase 13 — complete ✅ (2026-09-08)**
 
