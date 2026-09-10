@@ -131,19 +131,75 @@ which is not on any hot path.
 
 ---
 
+## 10. The case seals with a compression gasket, printed as a separate part
+
+The generated enclosure is a base with a grooved rim, a gasket ring, and a lid
+with a matching tongue. Three files, not one.
+
+**Why three parts rather than a printed-in seal.** The seal has to compress and
+the shell has to be rigid — one object cannot be both. Splitting them lets the
+base and lid print in PLA/PETG/ABS and the gasket in TPU, on the same printer,
+without multi-material hardware.
+
+**Why a groove rather than a flat face gasket.** A flat gasket squeezed between
+two flat rims squirms out sideways under compression. A groove captures it, so
+compression goes into sealing instead of extrusion.
+
+**Why the gasket seats flush and the tongue does the squeezing.** Groove depth
+equals gasket height, and the tongue penetrates by
+`gasket_height × gasket_compression`. That makes compression a single dimensionless
+knob with an obvious physical meaning, instead of three interacting depths.
+Compression is rejected at 0 (never squeezes) and 1 (crushes flat).
+
+**The consequence worth knowing.** The seal now sets the wall thickness: a wall
+must carry a lip, the groove, and a second lip. Sealed cases therefore have
+visibly thicker walls than the plain tray, and `wall_mm` is derived rather than
+configured.
+
+## 11. `outline.enclosure` carries only what the process cannot imply
+
+Headroom, lid thickness, and gasket cross-section are declared. Clearance, lip
+width, floor thickness, and gasket fit are derived from the tolerance class and
+are deliberately *not* overridable there.
+
+**Why the split.** A manufacturing process implies how accurately it can hold a
+dimension; it cannot know how tall your tallest capacitor is. Letting the
+declaration override process-derived values would let a product silently
+specify a wall thinner than the printer can produce.
+
+## 12. Mesh outputs are addressed by stem and extension independently
+
+`enclosure/case-base.stl` and `enclosure/case-base.glb` are the same geometry in
+two encodings; the stem selects the part, the extension the format.
+
+**Why not a `parts = [...]` key.** Outputs already have to be listed for
+`fiducial.lock` to track them. A separate parts list would be a second place to
+declare the same thing, and the two could disagree. An unknown stem fails the
+pipeline and prints the valid set.
+
+**What this buys.** Writing the preview into a web app is adding one path to
+`outputs` — no copy step, and the copy is hash-tracked like every other
+artifact, so `--check` catches it going stale. It ships commented out, because a
+product with no web app should not get a stray file.
+
+---
+
 ## Known gaps
 
 Recorded so they are not rediscovered as surprises.
 
-- **The enclosure is a tray, not a case.** No lid, standoffs, connector cutouts,
-  or fastener bosses. Connector positions are declared in
-  `board.interface.json` but nothing consumes them geometrically yet — that is
-  the obvious next derivation.
+- **No connector cutouts, standoffs, or fastener bosses.** Connector positions
+  are declared in `board.interface.json` but nothing consumes them
+  geometrically. Cutouts are the obvious next derivation, and the one that makes
+  the case usable for a real product rather than a sealed box.
+- **The case is not pressure-rated.** A compression gasket resists splashes and
+  dust. Nothing here has been tested to an IP rating, and the geometry makes no
+  claim to one.
+- **The lid is not retained.** Nothing clamps it down — no screw bosses, clips,
+  or latches — so the gasket is only compressed if something external holds the
+  lid closed.
 - **`Polygon::signed_area()` has no consumer.** It exists for the winding checks
   that offsetting a non-rectangular outline will need.
-- **The marketing page is a capability template.** It expects
-  `enclosure/board.glb` to be copied into the app's public directory; no build
-  step automates the copy.
 - **`fid derive --check` detects tampering with an artifact, not staleness
   against an input.** It works for the board today only because
   `board.interface.json` is itself a tracked artifact of the `eda` pipeline. A

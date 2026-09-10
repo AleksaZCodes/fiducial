@@ -1,12 +1,42 @@
 # Enclosure mesh pipeline — derives printable geometry from the board outline.
 #
 # Reads the `outline` block declared in board/board.interface.json and generates
-# a watertight enclosure tray sized by the board's tolerance class. Runs
+# a gasket-sealed two-part case sized by the board's tolerance class. Runs
 # in-process via fiducial-mesh; no CAD tool is required.
 #
-#   fid derive           regenerate enclosure/*.stl and *.glb, record hashes
-#   fid derive --check   fail if either output is stale
+#   fid derive           regenerate every output below, record hashes
+#   fid derive --check   fail if any output is stale
+#
+# Each output is addressed by stem and extension, which are independent: the
+# stem picks the part, the extension picks the format (.stl or .glb).
+#
+#   case-base  base tray with the gasket groove       print rigid
+#   case-lid   lid with the compression tongue        print rigid
+#   gasket     the seal                               PRINT IN TPU
+#   case       exploded assembly, for rendering
+#   board      the bare PCB, extruded
+#   tray       simple open tray, no seal
+#
+# The gasket must be printed in TPU or another flexible filament. A rigid
+# gasket cannot compress, so the case will not seal.
 name     = "enclosure"
 executor = "fid-mesh"
 args     = ["board/board.interface.json"]
-outputs  = ["enclosure/board.stl", "enclosure/board.glb"]
+
+outputs = [
+  "enclosure/case-base.stl",
+  "enclosure/case-lid.stl",
+  "enclosure/gasket.stl",
+  "enclosure/case.glb",
+
+  # ── Optional: serve the preview from the web app ─────────────────────────
+  # Uncomment the line below if you installed the `web-next` capability. It
+  # writes the exploded-case GLB straight into the app's public directory, so
+  # /board renders current geometry with no copy step and no stale file — the
+  # artifact is tracked in fiducial.lock like any other, so `fid derive --check`
+  # catches it drifting.
+  #
+  # Leave it commented if you have no web app; nothing else depends on it.
+  #
+  # "apps/web/public/case.glb",
+]

@@ -49,10 +49,31 @@ export interface NetClass {
 export type ToleranceClass = 'fdm' | 'resin' | 'cnc'
 
 /**
+ * Overrides for the generated case.
+ *
+ * These are the values a manufacturing process cannot imply: how tall the
+ * tallest component is, and what gasket stock the product uses. Everything
+ * else is derived from the tolerance class.
+ */
+export interface EnclosureOptions {
+  /** Vertical space above the board, in millimetres. Raise for tall parts. */
+  headroom_mm?: number
+  /** Lid plate thickness in millimetres. */
+  lid_thickness_mm?: number
+  /** Gasket cross-section width in millimetres. */
+  gasket_width_mm?: number
+  /** Gasket cross-section height in millimetres, uncompressed. */
+  gasket_height_mm?: number
+  /** Fraction of gasket height squeezed when closed. Must be in (0, 1). */
+  gasket_compression?: number
+}
+
+/**
  * Physical board outline — the declaration the mesh pipeline derives from.
  *
- * When present, `fid derive` generates `enclosure/board.stl` and
- * `enclosure/board.glb` from it, sized by `tolerance`.
+ * When present, `fid derive` generates the sealed case parts from it
+ * (`case-base.stl`, `case-lid.stl`, `gasket.stl`, `case.glb`), sized by
+ * `tolerance`.
  */
 export interface Outline {
   /** Board width in millimetres. */
@@ -63,6 +84,8 @@ export interface Outline {
   thickness_mm?: number
   /** Enclosure manufacturing process (defaults to "fdm" when omitted). */
   tolerance?: ToleranceClass
+  /** Case overrides the process cannot imply. */
+  enclosure?: EnclosureOptions
 }
 
 /** Board identity block. */
@@ -117,6 +140,26 @@ export function parseBoardInterface(json: string): BoardInterface {
     }
     if (tolerance !== undefined && !['fdm', 'resin', 'cnc'].includes(tolerance)) {
       throw new Error(`unknown tolerance ${JSON.stringify(tolerance)} (expected fdm, resin or cnc)`)
+    }
+
+    const e = bi.outline.enclosure
+    if (e) {
+      for (const field of [
+        'headroom_mm',
+        'lid_thickness_mm',
+        'gasket_width_mm',
+        'gasket_height_mm',
+      ] as const) {
+        const v = e[field]
+        if (v !== undefined && !(v > 0)) {
+          throw new Error(`enclosure.${field} must be > 0, got ${v}`)
+        }
+      }
+      // 0 never squeezes the gasket and 1 crushes it flat; neither seals.
+      const c = e.gasket_compression
+      if (c !== undefined && !(c > 0 && c < 1)) {
+        throw new Error(`enclosure.gasket_compression must be between 0 and 1 (exclusive), got ${c}`)
+      }
     }
   }
   return bi
