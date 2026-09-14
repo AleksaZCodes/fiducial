@@ -31,6 +31,7 @@ $ fid new demo-product
   wrote  MISSION.md
   wrote  AGENTS.md
   wrote  README.md
+  wrote  ROADMAP.md
   wrote  .gitignore
   wrote  .claude/settings.json
   wrote  .claude/agents/fiducial-review.md
@@ -93,7 +94,7 @@ $ fid doctor
 ✦ fid doctor — /home/you/dev/demo-product
 
   ✓ fiducial.toml valid  (product: demo-product, vX.Y.Z)
-  ✓ fiducial.lock valid  (10 template(s) tracked, 0 migration(s) applied)
+  ✓ fiducial.lock valid  (11 template(s) tracked, 0 migration(s) applied)
   ✓ all template files unmodified
   ✓ templates up to date with platform vX.Y.Z
   ✓ no pending codemod migrations

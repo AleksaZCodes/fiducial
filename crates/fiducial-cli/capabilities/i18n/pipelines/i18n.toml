@@ -1,0 +1,21 @@
+name     = "i18n"
+executor = "fid-i18n"
+# args = ["messages"]   # only to override [i18n] messages_dir
+outputs  = ["src/generated/messages.ts"]
+
+# Message catalogs in, typed keys out.
+#
+# `messages/<locale>.json` is the declaration. `src/generated/messages.ts` is
+# derived from it and must never be hand-edited — it is guard-blocked and
+# rewritten on every `fid derive`.
+#
+# The generated module exports a `MessageKey` union, so a mistyped key is a
+# COMPILE ERROR rather than a string rendered to a reader.
+#
+# `fid derive --check` fails when a locale is missing a key the default locale
+# has, or when a placeholder differs between locales. It reports — without
+# failing — a value identical to the default (likely untranslated) and a key the
+# default does not have (likely leftover).
+#
+# The default locale comes from [i18n] in fiducial.toml. Change `outputs` to put
+# the generated module where your app imports from.

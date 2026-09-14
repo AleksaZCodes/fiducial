@@ -1,0 +1,35 @@
+# fiducial.toml — the platform, as a product.
+#
+# Fiducial is not a scaffolded product and does not become one by having this
+# file. What this buys is level 2 of the self-hosting boundary
+# (docs/specs/2026-09-14-self-hosting-boundary.md): `fid dash` and `fid doctor`
+# read a repository, they do not produce what builds it, so there is no
+# bootstrap problem and the cost is this file.
+#
+# Before it existed, every signal `fid dash` was built to give was unavailable
+# in the repository that built it.
+#
+# Deliberately NOT adopted: `fid derive` over this repo's generated artifacts.
+# The protocol vectors and the terminal captures are gated by Rust tests on
+# purpose — those gates must fire even when `fid` is broken, and a gate that
+# runs through the tool it gates is blind exactly where it matters.
+
+[product]
+name    = "fiducial"
+version = "0.1.0"
+
+[spine]
+# The L0 crates are built here rather than consumed.
+enabled = false
+
+[capabilities]
+# Capabilities are authored here, not installed here.
+enabled = []
+
+[guard]
+# The rules products get are the rules we work under.
+rules = [
+    "no-direct-main-push",
+    "no-hand-edit-generated",
+    "no-unpinned-cli-fetch",
+]

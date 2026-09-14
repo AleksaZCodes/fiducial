@@ -59,7 +59,7 @@ jobs:
       # derivation. Before Phase 18 this job repeated one near-identical block
       # per crate — nine copies of a list — and the drift was already there:
       # `fiducial-sim` had been added to the workspace without a tenth block,
-      # and PHASES.md recorded it as covered when it was not. (Sim is correctly
+      # and SHIPPED.md recorded it as covered when it was not. (Sim is correctly
       # absent: it uses Vec and rayon and is not `no_std`. The bug was that
       # nothing checked.)
       #

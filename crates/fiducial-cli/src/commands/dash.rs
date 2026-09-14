@@ -147,7 +147,18 @@ struct FreshnessView {
 // ── Collection ────────────────────────────────────────────────────────────────
 
 /// Roadmap files looked for, in order of preference.
-const ROADMAP_FILES: &[&str] = &["ROADMAP.md", "PHASES.md", "docs/ROADMAP.md"];
+///
+/// One file is read, never several — `ROADMAP.md` (what is intended) wins over
+/// `SHIPPED.md` (what was built) when a repository keeps both, because the
+/// roadmap is the forward-looking one and that is what a dashboard is for.
+const ROADMAP_FILES: &[&str] = &[
+    "ROADMAP.md",
+    "SHIPPED.md",
+    // Retained: `SHIPPED.md` was called `PHASES.md` until 2026-09-14, and a
+    // rename in the platform must not silently stop reading a product's file.
+    "PHASES.md",
+    "docs/ROADMAP.md",
+];
 
 /// Directories a product may keep dated decision records in.
 const DECISION_DIRS: &[&str] = &["docs/specs", "docs/decisions", "docs/adr"];

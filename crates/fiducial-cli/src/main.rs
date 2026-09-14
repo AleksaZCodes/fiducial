@@ -5,6 +5,7 @@ mod capability;
 mod commands;
 mod config;
 mod guard;
+mod i18n;
 mod lock;
 mod migration;
 mod pipeline;
@@ -304,7 +305,7 @@ decisions, or no pipelines gets a section saying so.
 SECTIONS
   product     name, version, capabilities, guard rules
   git         branch, head, working tree, upstream divergence
-  roadmap     progress counted from ROADMAP.md or PHASES.md
+  roadmap     progress counted from ROADMAP.md or SHIPPED.md
   decisions   dated records in docs/specs (or docs/decisions, docs/adr)
   ci          declared workflows, their triggers, whether any checks freshness
   graph       pipelines and the artifacts they produce

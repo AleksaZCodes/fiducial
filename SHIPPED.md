@@ -1,10 +1,17 @@
-# Fiducial — Build Order & Current State
+# Fiducial — What Shipped
 
-_Read this at the start of every session. Updated manually as phases complete._
+_The record of what was **built**, phase by phase. For what is **intended**, see
+[`ROADMAP.md`](ROADMAP.md)._
+
+_Formerly `PHASES.md`. Renamed 2026-09-14 — the name read as a plan, which is the
+roadmap's job. See `docs/specs/2026-09-14-phases-renamed-to-shipped.md`. Phase
+numbering is unchanged._
 
 ---
 
-## Current phase: Phase 22
+## Current phase: between phases — next is the capability taxonomy
+
+> Build order beyond this phase: [`ROADMAP.md`](ROADMAP.md).
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -312,7 +319,7 @@ offsetting a non-rectangular outline — the one genuinely absent primitive.
 | Absence is a finding: no roadmap / no decisions / no pipelines each render a "not declared" line and still exit 0 | ✅ |
 | Exits 0 even on findings — gating is `fid derive --check` and `fid doctor`; a dashboard must be runnable casually | ✅ |
 | Freshness re-hashes artifacts (fresh / stale / missing / **never derived**) and reports hand-edited templates as drift | ✅ |
-| Roadmap counted from `✅ 🟡 ⬜` and task-list markers in `ROADMAP.md` or `PHASES.md`; unmarked prose counts as nothing | ✅ |
+| Roadmap counted from `✅ 🟡 ⬜` and task-list markers in `ROADMAP.md` or `SHIPPED.md`; unmarked prose counts as nothing | ✅ |
 | Decisions read from `docs/specs` (or `docs/decisions`, `docs/adr`), newest first by date-prefixed filename, titled from the first heading | ✅ |
 | Git handles the unborn HEAD a fresh `fid new` leaves — `is_repo` is tracked separately, because inferring it from a missing branch called every new product un-versioned | ✅ |
 | `--json` — same facts for agents and workbench v1, so neither reimplements these reads | ✅ |
@@ -341,13 +348,36 @@ had: `fid derive` — the central command of the system — advertised itself as
 "Not yet implemented (Phase 4)" and told readers to run `cargo build` instead;
 `svelte` and `stm32` were labelled "(Phase 3b)" long after they worked; `mobile`
 and `module` promised a phase that had already shipped. **Help text now names no
-phase at all** — a schedule is a fact `PHASES.md` owns, and a second copy of it
+phase at all** — a schedule is a fact `SHIPPED.md` owns, and a second copy of it
 drifts. A `help_honesty` test enforces that, and CI runs it.
 
 **Still open on the workbench** — single repo only (multi-repo is v1 per §10),
 no live CI status (deliberate; would go behind a flag), decisions are listed but
 not read so supersession is undetected, and `briefs` from §10's v0 row is not
 built because no product has one yet.
+
+**Phase 22 — i18n: localized by construction ✅ (2026-09-14)**
+
+> Principle **1c** made mechanical. Spec: `ROADMAP.md` § i18n.
+
+| Deliverable | Status |
+| --- | --- |
+| `MISSION.md` **1c** — a user-visible string is a fact; every locale a derivation that must exist. Generated into every scaffolded product's `AGENTS.md` | ✅ |
+| `@fiducial/i18n` — locale negotiation, strict lookup, money, dates, timezones, plurals, relative time. Native `Intl` only, so it runs on server, client and edge | ✅ |
+| **Money is a fact that carries its unit** — integer minor units, currency independent of locale, cross-currency arithmetic refuses, `allocate()` loses nothing. `JPY` has 0 minor digits and `KWD` has 3 | ✅ |
+| Timezone inverse solved by **offset probing**, not arithmetic — a zone's offset depends on the instant, which is circular across a DST boundary. Verified through both EU transitions | ✅ |
+| `fid add i18n` — JSON catalogs, pipeline, and a `SKILL.md` at a **vendor-neutral path** | ✅ |
+| `fid-i18n` executor — catalogs in, a typed `MessageKey` union out. A mistyped key is a compile error | ✅ |
+| **The gate:** a missing translation fails `fid derive --check`, naming the file and the key | ✅ |
+| **Reference is the union of all keys, not the default locale's.** Hand-testing found that using the default as reference let a key deleted *from the default* pass as another locale's "extra" — the ROP failure with the locales swapped | ✅ |
+| Placeholder mismatch fatal; reordered placeholders accepted, because languages order words differently | ✅ |
+| Untranslated-looking values reported, never fatal — failing there would block a legitimate `"Wi-Fi"` | ✅ |
+| Installing a capability **seeds the declaration it needs**; a pipeline with an empty declaration fails on the next derive | ✅ |
+| 43 runtime tests, 10 comparison unit tests, 10 end-to-end. 395 across the workspace | ✅ |
+
+**Still open on i18n** — the hardcoded-string detector (warns, reported in `fid
+doctor` / `fid dash --json`) and `fid new` taking locales up front are not built.
+Tracked in `ROADMAP.md`.
 
 **Phase 21b — namespaced agents ✅ (2026-09-14)**
 
@@ -434,7 +464,7 @@ built because no product has one yet.
 | `git init` without `--initial-branch` | Products born on `master` while the guard rule (`no-direct-main-push`), the review agent (`git diff main...HEAD`) and CI all named `main` | Forces `main`, `symbolic-ref` fallback for git < 2.28 |
 | `ui-svelte` typecheck | An **`echo`** — and its tsconfig excluded the only file it would have checked. Unchecked for two phases while `pnpm typecheck` reported green | Real `svelte-check`; first run found an a11y defect in `Dialog.svelte` whose handler was also dead code |
 | CI spine matrix | **Nine copies of one list**; `fiducial-sim` was already missing a tenth block | List **derived** from `#![no_std]` — the attribute is the declaration, the grep is the derivation |
-| `fiducial-sim` "in spine matrix" | PHASES.md claimed it; it never was, and **cannot be** (uses `Vec` + rayon, not `no_std`) | Record corrected rather than quietly satisfied; sim checked on host + `wasm32` |
+| `fiducial-sim` "in spine matrix" | SHIPPED.md claimed it; it never was, and **cannot be** (uses `Vec` + rayon, not `no_std`) | Record corrected rather than quietly satisfied; sim checked on host + `wasm32` |
 | 13 crates, 0 READMEs | Every published crate had a bare crates.io page | 17 READMEs written; each crate's is **run as a doctest**, which immediately caught a wrong method name |
 | `CLAUDE.md` / `AGENTS.md` trees | Both stale (missing ota, sim, realtime; AGENTS miscounted 11/10 vs 13/11) and both carrying a disclaimer to run `ls` instead | Corrected; a disclaimer is not a fix, so a test now fails the build on a missing entry |
 | pnpm workspace globs | `apps/*`, `workbench`, `cli` — none had ever existed; a stale glob is silent | Removed; a test asserts every glob resolves |
@@ -617,7 +647,7 @@ fiducial/
 ├── LICENSE             MIT
 ├── IP-POLICY.md
 ├── README.md
-├── PHASES.md           ← this file
+├── SHIPPED.md           ← this file
 ├── turbo.json          Turborepo pipeline
 ├── Cargo.toml          host workspace
 ├── package.json        pnpm workspace root (private)
@@ -702,4 +732,13 @@ fiducial/
 | **19** | The harvest feature — `fid harvest` + skill + docs | A repo or folder yields reusable assets a new product can adopt without being overridden | ✅ |
 | **20** | Catalogue ROP's reusable assets | Every reusable asset inventoried with an extraction recipe | ✅ |
 | **21** | The documentation layer | Step-by-step guides for humans and agents; terminal captures checked by CI | ✅ |
-| **22** | ROP migration wave 2 (optional) — eligible rules to L0 Rust | Each differential-tested before the TypeScript is deleted | ⬜ |
+| **21b** | Namespaced agents — `fiducial-design` / `-review` / `-implement` | A subagent's filename is its identity; a colliding name is silently unavailable | ✅ |
+| **22** | i18n — localized by construction | A missing translation fails `fid derive --check` | ✅ |
+
+**What comes next is not recorded here.** This file is the record of what was
+*built*; [`ROADMAP.md`](ROADMAP.md) holds what is *intended* and in what order.
+Naming the next items in both places was one fact declared twice — briefly gated
+by a test, now simply removed, because a gated duplicate is still a duplicate.
+
+*(ROP migration wave 2 — eligible rules to L0 Rust — remains optional and
+unscheduled, as wave 1 does.)*

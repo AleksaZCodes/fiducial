@@ -8,31 +8,26 @@ This file covers the same ground as `CLAUDE.md` for agent runtimes that read
 
 ## Current phase
 
-Read `PHASES.md` before every session. It states which phase is active and what
+Read `SHIPPED.md` before every session. It states which phase is active and what
 "done" means for it. Do not begin the next phase until the current one is
 complete.
 
-## Core rules (from MISSION.md)
+## Principles
 
-1. **One declaration, many derivations.** A value used in two places is declared
-   once. If you are typing the same value into a second file, stop.
+**Read [`MISSION.md`](MISSION.md).** It is in this repository, it is where the
+principles are authored, and there is no summary of it here on purpose — a
+summary is a second declaration that drifts from the thing it summarises.
 
-2. **Artifacts are generated, never hand-edited.** Changing a derived file by
-   hand is an error. Change the upstream declaration and re-run the pipeline.
+(A scaffolded *product* does get the text, because its own `MISSION.md` states
+what the product is for rather than the platform's rules. It is generated into
+the product's `AGENTS.md` from this file at scaffold time — see
+`crates/fiducial-cli/build.rs`.)
 
-3. **Decisions are appended, not edited.** New decisions go in `docs/specs/`
-   with a date. Old decisions are never modified.
-
-4. **The mission is the tiebreaker.** When ambiguous, `MISSION.md` resolves it.
-
-5. **No capability without a real need.** The Rule of Two (§16 of the design
-   spec): generalize only when a second real product needs it.
-
-## Repo layout
+## Repo layout## Repo layout
 
 ```
 fiducial/
-├── MISSION.md, STACK.md, PHASES.md
+├── MISSION.md, STACK.md, SHIPPED.md
 ├── crates/               13 Rust members
 │   ├── fiducial-core         no_std spine — DeviceId, version
 │   ├── fiducial-protocol     no_std frame codec — the waist
@@ -48,13 +43,14 @@ fiducial/
 │   ├── fiducial-tauri        serial transport for the desktop host
 │   └── fiducial              crates.io name claim + signpost
 ├── firmware/             Separate workspace (Embassy; rp2040 + stm32)
-├── packages/             11 JS/TS packages (pnpm + Turborepo)
+├── packages/             12 JS/TS packages (pnpm + Turborepo)
 │   ├── tokens, headless      design tokens, Result<T,E>, OfflineQueue
 │   ├── ui-react, ui-svelte   component registry sources (copy-in)
 │   ├── board-schema          TS mirror of fiducial-eda
 │   ├── transport-web         Web Serial / WebUSB / BLE + codec
 │   ├── viewer3d-react        GLB viewer (Three.js)
 │   ├── realtime              broadcast, presence, postgres-changes
+│   ├── i18n                  locales, messages, money, dates, plurals
 │   ├── wasm-bridge           GENERATED TS types — never hand-edit
 │   ├── cli                   @fiducial/cli npm shim
 │   └── fiducial              @fiducial/fiducial npm name claim
@@ -120,11 +116,77 @@ along with their work. See `docs/guides/harvesting.md`.
 
 ## Build
 
+A fresh clone builds with **no setup step**. Verified by cloning and running
+cold: 375 Rust tests, 29 JS tasks, both freshness gates.
+
 ```sh
-pnpm build       # JS workspace (turbo)
-cargo build      # Rust workspace
-cargo test && pnpm test
+pnpm install --frozen-lockfile
+pnpm build && pnpm typecheck && pnpm test     # JS workspace (turbo)
+cargo build --workspace
+cargo test --workspace --all-features         # includes the freshness gates
 ```
+
+Everything that decides *how* it builds is committed, so a cloud checkout — Claude
+Code on the web, a Codespace, a new contributor — gets the same answers as a
+laptop:
+
+| Pinned by | What |
+|---|---|
+| `rust-toolchain.toml` | channel, `rustfmt`/`clippy`, **and the three cross-compilation targets** the spine check needs |
+| `packageManager` in `package.json` | the exact pnpm version |
+| `.nvmrc` + `engines` | Node |
+| `pnpm-lock.yaml` + `Cargo.lock` | every dependency |
+| `.claude/settings.json` | the plugin, so the guard is active |
+
+The targets line matters: without it, `cargo check --target wasm32-unknown-unknown`
+fails on a fresh machine and looks like a code problem rather than a missing
+`rustup target add`.
+
+**What a cloud session does not get, by design:** `.claude/settings.local.json`
+is gitignored because it holds personal tool permissions. Its absence means more
+permission prompts, not a broken environment.
+
+## The `fid` commands
+
+Listed here rather than only in a Claude Code skill, because this file is the
+context **every** agent reads — Codex, Copilot Workspace and Cursor included.
+An agent that does not know `fid derive --check` exists cannot honour the one
+rule that matters most.
+
+| Command | Does |
+|---|---|
+| `fid dash [--json]` | The whole product in one view. `--json` is for you. Start here |
+| `fid doctor` | Config, lock, template integrity, pending migrations |
+| `fid derive` | Run the pipelines; record every artifact hash |
+| `fid derive --check` | **Fail when an artifact drifted from its declaration.** The CI gate |
+| `fid graph` | Every pipeline: inputs → executor → outputs. Use it to find which declaration produced a file |
+| `fid new <name>` | Scaffold a product |
+| `fid add <capability>` | Install a capability |
+| `fid upgrade [--dry-run]` | 3-way merge upstream template changes; apply codemods |
+| `fid harvest <path>` | Survey another codebase for reusable work |
+| `fid release check` | Fail when the compatibility matrix and `WIRE_VERSION` disagree |
+| `fid capability list` | What is installed and what is available |
+
+Every command takes `--help`, and the help names no phase numbers on purpose —
+a schedule is a fact `SHIPPED.md` owns, and a second copy of it drifts.
+
+## Skills this repository authors
+
+| File | Invoked as (Claude Code) | Does |
+|---|---|---|
+| `commands/platform.md` | `/fiducial:platform` | Load platform context at session start |
+| `commands/harvest.md` | `/fiducial:harvest` | Extract reusable work from another codebase |
+| `crates/fiducial-cli/capabilities/*/SKILL.md` | installed per capability | How to use that capability |
+
+**The content is portable; only discovery is not.** These are plain Markdown
+instructions — an agent without Claude Code's slash commands can read the file
+directly and follow it. Capability instructions install to
+`.fiducial/skills/<id>.md` in a product for exactly that reason, with a pointer
+at `.claude/skills/<id>.md` for Claude's auto-discovery.
+
+Generating the per-vendor wrappers from one authored source is roadmap item
+**agent portability**; today the wrapper for Claude is written by hand and there
+is none for anyone else.
 
 ## What not to do
 

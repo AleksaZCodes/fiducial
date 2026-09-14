@@ -1,0 +1,13 @@
+{
+  "nav": {
+    "home": "Početna",
+    "settings": "Podešavanja"
+  },
+  "action": {
+    "save": "Sačuvaj izmene",
+    "cancel": "Otkaži"
+  },
+  "cart": {
+    "summary": "{count} stavki, ukupno {total}"
+  }
+}

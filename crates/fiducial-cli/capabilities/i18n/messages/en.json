@@ -1,0 +1,13 @@
+{
+  "nav": {
+    "home": "Home",
+    "settings": "Settings"
+  },
+  "action": {
+    "save": "Save changes",
+    "cancel": "Cancel"
+  },
+  "cart": {
+    "summary": "{count} items, {total} total"
+  }
+}

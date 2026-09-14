@@ -44,7 +44,7 @@ fid dash          # roadmap, decisions, CI, pipelines, freshness — one view
 | `fid guard-check` | PreToolUse hook — shell-aware guard rule enforcement |
 
 Every command has full `--help`. **The help text names no phase**, deliberately:
-a schedule is a fact `PHASES.md` owns, and a second copy of it drifts. A test
+a schedule is a fact `SHIPPED.md` owns, and a second copy of it drifts. A test
 enforces that, and CI runs it.
 
 ## Reusing what you already built
