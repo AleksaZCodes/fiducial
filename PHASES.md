@@ -4,7 +4,9 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 22
+## Current phase: Phase 22 — i18n
+
+> Build order beyond this phase: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -702,4 +704,18 @@ fiducial/
 | **19** | The harvest feature — `fid harvest` + skill + docs | A repo or folder yields reusable assets a new product can adopt without being overridden | ✅ |
 | **20** | Catalogue ROP's reusable assets | Every reusable asset inventoried with an extraction recipe | ✅ |
 | **21** | The documentation layer | Step-by-step guides for humans and agents; terminal captures checked by CI | ✅ |
-| **22** | ROP migration wave 2 (optional) — eligible rules to L0 Rust | Each differential-tested before the TypeScript is deleted | ⬜ |
+| **21b** | Namespaced agents — `fiducial-design` / `-review` / `-implement` | A subagent's filename is its identity; a colliding name is silently unavailable | ✅ |
+| **22** | i18n — localized by construction | A missing translation fails `fid derive --check`; hardcoded strings are reported | 🟡 |
+
+**Beyond Phase 22 the order lives in [`docs/ROADMAP.md`](docs/ROADMAP.md)**, not
+here. That file holds what is *intended* and why; this one holds what was
+*built*. Roadmap items are named rather than numbered, so neither file has to
+renumber because of the other — the two were briefly coupled by number, which is
+one fact declared twice.
+
+Next, by cost of delay rather than by value: **capability taxonomy** → **external
+capabilities** → **context sync** → **brand** → **Cloudflare adapter set** →
+**legal**. The reasoning for that order is in the roadmap.
+
+*(ROP migration wave 2 — eligible rules to L0 Rust — remains optional and
+unscheduled, as wave 1 does.)*

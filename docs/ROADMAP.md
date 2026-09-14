@@ -42,79 +42,141 @@ make. "I want legal pages" is a decision. "I want a button" is a component.
 
 ---
 
+## How this file relates to `PHASES.md`
+
+| File | Holds | Numbering |
+|---|---|---|
+| `docs/ROADMAP.md` (this) | what is **intended**, and why | items have **names**, not numbers |
+| `PHASES.md` | what was **built**, phase by phase | phases are numbered, in build order |
+
+They were briefly coupled — roadmap items numbered 22–35 to shadow phase numbers
+— which is a fact declared twice. It breaks the first time one item spans two
+phases or one phase closes two items. So roadmap items are now **named**, and a
+phase entry in `PHASES.md` names the item it implements. Neither file renumbers
+because of the other.
+
+`fid dash` reads the first of `ROADMAP.md`, `PHASES.md`, `docs/ROADMAP.md` that
+exists — one file, so there is no double count.
+
+---
+
 ## Order of work
 
-Sequenced by **what unblocks what**, then by what a real product needs on day
-one. Two rules drove this ordering:
+Ordered by **cost of delay**, not by value. An item belongs early when *waiting
+makes it more expensive*, which is not the same as wanting it most.
 
-**1 · Build two concrete cases before generalising.** The taxonomy
-(declaration / pipeline / adapter) is not designed abstractly and then filled in.
-i18n and brand are built as real capabilities first; the taxonomy is then
-extracted from what they actually needed. That is the platform's own second-use
-rule applied to its own architecture.
+Three kinds of item, and the order follows from the kind:
 
-**2 · "Add it later, easily" has a prerequisite.** Every capability today is
-compiled into the `fid` binary, so shipping one requires releasing the CLI.
-Until capabilities resolve from *outside* the binary, "we can add that when we
-need it" is not true. That makes item 25 load-bearing for the whole strategy,
-not a mid-list nicety.
-
-### Tier 0 — prove the pattern (two concrete cases)
-
-| # | Item | State | Unlocks |
-|---|---|---|---|
-| 22 | **i18n — localized by construction** | 🟡 | The first declaration → pipeline → gate, on the hardest case. Legal text depends on it. |
-| 23 | **Brand** | ⬜ | The second case, and the widest surface: favicons, app icons, OG images, press kit, social templates, in-theme email. Legal pages depend on it. |
-
-### Tier 1 — make extension real
-
-| # | Item | State | Unlocks |
-|---|---|---|---|
-| 24 | **Taxonomy made real** | ⬜ | Declarations, pipelines and adapters become first-class, generalised from 22 and 23 rather than guessed. |
-| 25 | **External capabilities** | ⬜ | **The keystone.** Capabilities resolve from npm / crates / git instead of the binary. Everything below becomes addable on demand, by anyone, without a platform release. |
-| 26 | **`fid capability extract`** | ⬜ | "It works in my product, now lift it." Mechanizes the second-use rule. |
-
-### Tier 2 — everything a real product needs on day one
-
-After these, `fid new` yields a product that is localized, branded, legally
-furnished and deployable. That is the kickstart.
-
-| # | Item | State | Depends on |
-|---|---|---|---|
-| 27 | **Cloudflare adapter set** | ⬜ | 24 — first real adapters: D1, R2, Workers, Access, Turnstile, Queues |
-| 28 | **Legal & compliance** | ⬜ | 22 + 23 — legal text is localized copy about a declared entity |
-
-### Tier 3 — velocity and correctness
-
-| # | Item | State | Why not earlier |
-|---|---|---|---|
-| 29 | **Context sync** | ⬜ | Improves every later phase, but nothing is blocked on it |
-| 30 | **Fast path** | ⬜ | Matters once there is production to hotfix |
-| 31 | **Claude Design bridge** | ⬜ | Registry source → design-system previews, as a derivation |
-| 31b | **Interactive seeding** | ⬜ | `fid new` asks; or seeds brand, theme, logos and components from an existing Claude Design project |
-
-### Tier 4 — on demand, via item 25
-
-None of these block a product. Each is added when wanted.
-
-| # | Item | State |
+| Kind | Cost of waiting | Goes |
 |---|---|---|
-| 32 | Research & authoring — papers, references, DOIs, templated documents | ⬜ |
-| 33 | Demo & showcase — interactive landing-page demo, Storybook, feature toggles | ⬜ |
-| 34 | Diagnostics — error tracking as an adapter with a no-op default | ⬜ |
-| 35 | Small tools — backlinks, browser-compat banners | ⬜ |
+| **Debt-accruing** | grows with every phase you wait | first |
+| **Multiplying** | makes every later phase cheaper | second |
+| **Terminal** | the same whenever you do it | last, by product value |
 
-### Out of band — urgent regardless of priority
+### 1 · i18n — *localized by construction* 🟡 · in progress
 
-Not ranked by value, ranked by **risk accruing while we wait**.
+The runtime (`@fiducial/i18n`) has shipped. The declaration, pipeline, gate,
+detector and capability remain.
 
-| Item | State | Why now |
-|---|---|---|
-| **CLA** | ⬜ | The repository is public and can accept pull requests. One contribution from a stranger permanently constrains re-licensing. Zero contributions today is the best moment, and it is a small file. |
-| `CITATION.cff`, `CONTRIBUTING.md`, `SECURITY.md` | ⬜ | Small, expected, and prerequisites for being cited correctly |
-| Zenodo DOI on a tagged release | ⬜ | Needed before the paper, and Fiducial is its own first customer for item 32 |
+Also: the **second** declaration→pipeline case. `eda` was the first — it already
+installs `board/board.interface.json` as a declaration plus `eda.toml` and
+`enclosure.toml` as pipelines. That matters for what comes next.
 
-## 22 · i18n — *localized by construction* 🟡
+### 2 · Capability taxonomy, made real — *multiplying*
+
+Declarations, pipelines and adapters become first-class in the CLI.
+
+**Why now and not later:** the second-use rule is satisfied. `eda` and i18n are
+two real declaration→pipeline capabilities, so the taxonomy is *generalized from
+working cases* rather than designed speculatively. Waiting for a third adds
+nothing but delay.
+
+**Why now and not after publishing:** this settles the capability **format**.
+Changing a format after third parties have published against it is a breaking
+change for other people's work. Format first, publishing second — the order is
+not interchangeable.
+
+### 3 · External capabilities — *debt-accruing, and the keystone*
+
+Capabilities resolve from npm / crates / git instead of `include_str!` in the
+`fid` binary.
+
+**This is the item whose cost of delay is highest and most measurable.** Every
+capability built before it exists is one more compiled into the binary that later
+has to be migrated out. The debt is linear in the number of capabilities built
+while waiting — so each phase spent elsewhere makes this one strictly more
+expensive, and nothing else on this list has that property.
+
+It is also the item the whole strategy rests on. "We can add that later, easily"
+is only true once shipping a capability does not require releasing the CLI.
+
+### 4 · Context sync — *multiplying*
+
+Code ↔ documentation ↔ agent context kept in step automatically.
+
+Every phase after this one adds a crate, a package or a capability, and today
+each of those means a hand edit to `CLAUDE.md` and `AGENTS.md` with a test
+catching the omission *after the fact*. Doing it here makes every later phase
+cheaper and removes a recurring drift risk, rather than paying the tax six more
+times first.
+
+### 5 · Brand — *terminal, high value*
+
+One declaration → favicons, app icons, OG images, press kit, social templates,
+in-theme email, sitemap, robots.txt, JSON-LD.
+
+First capability built entirely on the finished system, which makes it the test
+of whether steps 2–4 actually worked. Unblocks **legal** and the **Claude Design
+bridge**. Feeds `@fiducial/tokens`, so the chain is brand → tokens → every
+registry → Claude Design, one source throughout.
+
+### 6 · Cloudflare adapter set — *terminal, product-critical*
+
+D1, R2, Workers, Access, Turnstile, Queues, Workers AI. The first real adapters,
+and the proof that the adapter contract is vendor-neutral rather than a
+Cloudflare-shaped hole.
+
+Low compounding, high product value — correctly placed after the infrastructure
+rather than before it.
+
+### 7 · Legal & compliance — *terminal*
+
+Depends on **i18n** (legal text is long-form localized copy) and **brand** (it is
+copy about a declared entity). A genuine dependency, not a preference: built
+earlier, it gets built twice.
+
+### 8 · `fid capability extract` — *terminal*
+
+"It works in my product, now lift it." Mechanizes the second-use rule. Needs the
+taxonomy and external capabilities to exist first, or there is nothing to extract
+*into*.
+
+### 9 · On demand
+
+None of these block a product; each is added when wanted, through the system
+step 3 delivers.
+
+| Item | Note |
+|---|---|
+| **Claude Design bridge** | Registry source → design-system previews as a derivation. **Resolve first:** `DesignSync` references a `/design-sync` skill for this round trip; if it already exists, this is a thin adapter, not a pipeline |
+| **Fast path** | Matters once there is production to hotfix |
+| **Interactive seeding** | The cherry on top — `fid new` asks, or seeds brand and registry from a Claude Design project |
+| **Research & authoring** | Papers, references, DOIs, templated documents |
+| **Demo & showcase** | Interactive landing-page demo, Storybook, feature toggles |
+| **Diagnostics** | Error tracking as an adapter with a no-op default |
+| **Small tools** | Backlinks, browser-compat banners |
+
+### Out of band — risk, not priority
+
+Not ranked by value. Ranked by **what accrues while we wait.**
+
+| Item | Why it cannot queue |
+|---|---|
+| **`CLA.md`** | The repository is public and can accept pull requests. One contribution from a stranger permanently constrains re-licensing — you would need their permission to ever dual-license. Zero contributions today is the best moment, and it is one small file. |
+| `CITATION.cff`, `CONTRIBUTING.md`, `SECURITY.md` | Small, expected of a public project, and prerequisites for being cited correctly |
+| Zenodo DOI on a tagged release | Needed before the paper; Fiducial is its own first customer for the research tooling |
+
+## i18n — *localized by construction* 🟡
 
 **The principle.** Proposed as `MISSION.md` **1c**, alongside the existing 1b:
 
@@ -223,7 +285,7 @@ Currency is **new work**, not harvested — ROP has none.
 
 ---
 
-## 26 · Brand
+## Brand
 
 One declaration — legal name, trading name, contact email, domain, palette,
 typography, logo — derives:
@@ -239,7 +301,7 @@ Feeds `@fiducial/tokens`, so brand and design system are one source, not two.
 
 ---
 
-## 27 · Cloudflare — the default
+## Cloudflare — the default
 
 **Decided:** Cloudflare is the default target, not one option among equals.
 Vercel, Supabase, Neon and others remain adapters. See
@@ -255,7 +317,7 @@ lock-in; principle 6 is not suspended for a vendor we happen to like.
 
 ---
 
-## 28 · Legal & compliance
+## Legal & compliance
 
 **GDPR compliance is a legal state, not a code state. No tool grants it.**
 
@@ -273,7 +335,7 @@ system.
 
 ---
 
-## 29 · Context sync
+## Context sync
 
 **The problem, stated by the founder:** code, documentation, agent context and
 tooling drift apart, and keeping them together should be the platform's job.
@@ -289,7 +351,7 @@ they cannot drift. The parts that are judgment stay hand-written.
 
 ---
 
-## 30 · Fast path
+## Fast path
 
 **The problem:** an urgent production fix cannot wait on a ten-minute
 end-to-end suite, but skipping CI by hand is how a bad fix ships.
@@ -304,7 +366,7 @@ the fact. A fast path that hides what it skipped is just a broken CI.
 
 ---
 
-## 31 · Open-source bootstrap
+## Open-source bootstrap
 
 One command or skill turns any repository into a properly published
 open-source project:
@@ -319,7 +381,7 @@ own open-source bootstrap — it currently lacks every file in that list.
 
 ---
 
-## 32 · Research & authoring
+## Research & authoring
 
 A Fiducial repository is intended to encapsulate **every aspect of building** —
 not only code, but recording, writing, and the artifacts a venture, a research
@@ -338,7 +400,7 @@ endeavour.*
 
 ---
 
-## 33 · Demo & showcase
+## Demo & showcase
 
 Not simulation in the numerical sense (`fiducial-sim` covers that). **Optional**,
 and primarily an *interactive demo section on a landing page* — a real frontend
@@ -351,7 +413,7 @@ Storybook is part of this and is currently underused.
 
 ---
 
-## 31 · Claude Design bridge
+## Claude Design bridge
 
 Claude Design (`claude.ai/design`) holds design-system projects that sync with a
 local component library **incrementally, one component at a time** — never a
@@ -385,7 +447,7 @@ same tokens, so brand → tokens → every registry → Claude Design is one cha
 **Requires** `/design-login` in the session to authorize the `DesignSync` tool
 against the user's claude.ai account.
 
-## 31b · Interactive seeding
+## Interactive seeding
 
 **The cherry on top**, and deliberately last: it is polish over machinery that
 must exist first.
@@ -420,7 +482,7 @@ list, so either it is gated behind `/design-login` or it is not installed here.
 Resolve before building this item: if the round trip already exists, item 31 is
 a thin adapter over it rather than a pipeline to write.
 
-## 34 · Diagnostics
+## Diagnostics
 
 Error tracking as an **adapter with a no-op default** — wired in from the first
 commit, costing nothing until pointed at a vendor.
@@ -430,7 +492,7 @@ it is not done.
 
 ---
 
-## 35 · Small tools
+## Small tools
 
 Failproof, extensible, customizable, opinionated, working out of the box:
 

@@ -571,3 +571,90 @@ fn scaffolded_principles_match_the_platform_mission() {
          Inherited: {inherited:?}\n"
     );
 }
+
+/// `PHASES.md` and `docs/ROADMAP.md` agree on what comes next.
+///
+/// The two files split one job: the roadmap holds what is *intended*, PHASES
+/// holds what was *built*. They were briefly coupled by number — roadmap items
+/// 22-35 shadowing phase numbers — which is one fact declared twice and breaks
+/// the first time an item spans two phases.
+///
+/// Numbering is decoupled now, but `PHASES.md` still names the next few items in
+/// prose so a reader of that file alone is not misled. That prose is the second
+/// copy, so this asserts it against the roadmap's actual ordering.
+#[test]
+fn phases_and_roadmap_agree_on_what_comes_next() {
+    let root = workspace_root();
+    let phases_raw = std::fs::read_to_string(root.join("PHASES.md")).expect("PHASES.md");
+    // Prose is hard-wrapped, so "external\ncapabilities" must still match
+    // "external capabilities". Collapse all whitespace before searching.
+    let phases = phases_raw.split_whitespace().collect::<Vec<_>>().join(" ");
+    let roadmap = std::fs::read_to_string(root.join("docs/ROADMAP.md")).expect("docs/ROADMAP.md");
+
+    // The roadmap's ordered headings: `### 2 · Capability taxonomy, made real — …`
+    let ordered: Vec<String> = roadmap
+        .lines()
+        .filter_map(|line| {
+            let rest = line.strip_prefix("### ")?;
+            let (_number, title) = rest.split_once(" · ")?;
+            // Trim the trailing `— *kind*` annotation and any status marker.
+            let title = title.split(" — ").next().unwrap_or(title);
+            Some(title.trim().trim_end_matches(" 🟡").to_string())
+        })
+        .collect();
+
+    assert!(
+        ordered.len() >= 5,
+        "expected an ordered roadmap, found {ordered:?} — has the heading format changed?"
+    );
+
+    // PHASES.md names the next items in prose. Read the order they appear in
+    // *that file* — not from a list written here, which would compare the
+    // hardcoded order against itself and pass no matter what PHASES.md said.
+    const EXPECTED: &[&str] = &[
+        "capability taxonomy",
+        "external capabilities",
+        "context sync",
+        "brand",
+        "Cloudflare adapter set",
+        "legal",
+    ];
+
+    let lowered = phases.to_lowercase();
+    let mut named: Vec<(usize, &str)> = EXPECTED
+        .iter()
+        .filter_map(|needle| lowered.find(&needle.to_lowercase()).map(|at| (at, *needle)))
+        .collect();
+
+    assert_eq!(
+        named.len(),
+        EXPECTED.len(),
+        "PHASES.md should name the next {} roadmap items in prose; found {:?}",
+        EXPECTED.len(),
+        named.iter().map(|(_, n)| *n).collect::<Vec<_>>()
+    );
+
+    // Sort by where each one actually appears in PHASES.md.
+    named.sort_by_key(|(at, _)| *at);
+
+    let mut last_position = 0usize;
+    for (_, needle) in &named {
+        let position = ordered
+            .iter()
+            .position(|title| title.to_lowercase().contains(&needle.to_lowercase()))
+            .unwrap_or_else(|| {
+                panic!(
+                    "PHASES.md names `{needle}` as coming next, but the roadmap has no \
+                     such item.\nRoadmap order: {ordered:?}"
+                )
+            });
+        assert!(
+            position >= last_position,
+            "PHASES.md lists `{needle}` out of the roadmap's order.\n\
+             PHASES order:  {:?}\n\
+             Roadmap order: {ordered:?}",
+            named.iter().map(|(_, n)| *n).collect::<Vec<_>>()
+        );
+        last_position = position;
+    }
+}
