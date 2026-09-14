@@ -44,26 +44,74 @@ make. "I want legal pages" is a decision. "I want a button" is a component.
 
 ## Order of work
 
-Sequenced by *what unblocks what*, not by size.
+Sequenced by **what unblocks what**, then by what a real product needs on day
+one. Two rules drove this ordering:
 
-| # | Item | State | Why here |
+**1 · Build two concrete cases before generalising.** The taxonomy
+(declaration / pipeline / adapter) is not designed abstractly and then filled in.
+i18n and brand are built as real capabilities first; the taxonomy is then
+extracted from what they actually needed. That is the platform's own second-use
+rule applied to its own architecture.
+
+**2 · "Add it later, easily" has a prerequisite.** Every capability today is
+compiled into the `fid` binary, so shipping one requires releasing the CLI.
+Until capabilities resolve from *outside* the binary, "we can add that when we
+need it" is not true. That makes item 25 load-bearing for the whole strategy,
+not a mid-list nicety.
+
+### Tier 0 — prove the pattern (two concrete cases)
+
+| # | Item | State | Unlocks |
 |---|---|---|---|
-| 22 | **i18n — localized by construction** | 🟡 | Proves declaration→pipeline→gate end to end on the hardest case. Non-negotiable per the founder. |
-| 23 | **Capability taxonomy, made real** | ⬜ | Declarations, pipelines and adapters become first-class in the CLI. Everything below depends on it. |
-| 24 | **Third-party capabilities** | ⬜ | Capabilities are compiled into the binary today. Until they resolve from outside it, nobody — including us — can publish one without a platform release. |
-| 25 | **`fid capability extract`** | ⬜ | Mechanizes the second-use rule: "it works in my product, now lift it." |
-| 26 | **Brand** | ⬜ | One declaration → favicons, app icons, OG images, press kit, social templates, in-theme email. Biggest surface area of any single declaration. |
-| 27 | **Cloudflare adapter set** | ⬜ | The default target. D1, R2, Workers, Access, Turnstile, Queues, AI. |
-| 28 | **Legal & compliance** | ⬜ | Privacy, terms, cookie policy, imprint, accessibility statement, GDPR mechanisms + the checklist that says what is *not* automatable. |
-| 29 | **Context sync** | ⬜ | Code ↔ docs ↔ agent context kept in step automatically. Today it drifts and a test catches it after the fact. |
-| 30 | **Fast path** | ⬜ | Urgent fixes must not wait on a 10-minute end-to-end suite. |
-| 31 | **Open-source bootstrap** | ⬜ | One command turns any repo into a properly licensed, citable, contributable open-source project. |
-| 32 | **Research & authoring** | ⬜ | Papers, references, DOIs, templated documents that produce a real submittable artifact. |
-| 33 | **Demo & showcase** | ⬜ | Storybook, feature toggles, a deterministic view of the whole surface. |
-| 34 | **Diagnostics** | ⬜ | Error tracking as an adapter with a no-op default. |
-| 35 | **Small tools** | ⬜ | Backlinks, browser-compat banners, and similar. |
+| 22 | **i18n — localized by construction** | 🟡 | The first declaration → pipeline → gate, on the hardest case. Legal text depends on it. |
+| 23 | **Brand** | ⬜ | The second case, and the widest surface: favicons, app icons, OG images, press kit, social templates, in-theme email. Legal pages depend on it. |
 
----
+### Tier 1 — make extension real
+
+| # | Item | State | Unlocks |
+|---|---|---|---|
+| 24 | **Taxonomy made real** | ⬜ | Declarations, pipelines and adapters become first-class, generalised from 22 and 23 rather than guessed. |
+| 25 | **External capabilities** | ⬜ | **The keystone.** Capabilities resolve from npm / crates / git instead of the binary. Everything below becomes addable on demand, by anyone, without a platform release. |
+| 26 | **`fid capability extract`** | ⬜ | "It works in my product, now lift it." Mechanizes the second-use rule. |
+
+### Tier 2 — everything a real product needs on day one
+
+After these, `fid new` yields a product that is localized, branded, legally
+furnished and deployable. That is the kickstart.
+
+| # | Item | State | Depends on |
+|---|---|---|---|
+| 27 | **Cloudflare adapter set** | ⬜ | 24 — first real adapters: D1, R2, Workers, Access, Turnstile, Queues |
+| 28 | **Legal & compliance** | ⬜ | 22 + 23 — legal text is localized copy about a declared entity |
+
+### Tier 3 — velocity and correctness
+
+| # | Item | State | Why not earlier |
+|---|---|---|---|
+| 29 | **Context sync** | ⬜ | Improves every later phase, but nothing is blocked on it |
+| 30 | **Fast path** | ⬜ | Matters once there is production to hotfix |
+| 31 | **Claude Design bridge** | ⬜ | Registry source → design-system previews, as a derivation |
+
+### Tier 4 — on demand, via item 25
+
+None of these block a product. Each is added when wanted.
+
+| # | Item | State |
+|---|---|---|
+| 32 | Research & authoring — papers, references, DOIs, templated documents | ⬜ |
+| 33 | Demo & showcase — interactive landing-page demo, Storybook, feature toggles | ⬜ |
+| 34 | Diagnostics — error tracking as an adapter with a no-op default | ⬜ |
+| 35 | Small tools — backlinks, browser-compat banners | ⬜ |
+
+### Out of band — urgent regardless of priority
+
+Not ranked by value, ranked by **risk accruing while we wait**.
+
+| Item | State | Why now |
+|---|---|---|
+| **CLA** | ⬜ | The repository is public and can accept pull requests. One contribution from a stranger permanently constrains re-licensing. Zero contributions today is the best moment, and it is a small file. |
+| `CITATION.cff`, `CONTRIBUTING.md`, `SECURITY.md` | ⬜ | Small, expected, and prerequisites for being cited correctly |
+| Zenodo DOI on a tagged release | ⬜ | Needed before the paper, and Fiducial is its own first customer for item 32 |
 
 ## 22 · i18n — *localized by construction* 🟡
 
@@ -104,6 +152,11 @@ Item 6 is what makes it a **default** rather than a discipline.
 
 **Keys belong in `no_std` Rust** (principle 2): the same declared keys then serve
 web, desktop, CLI and device-side strings. Not theoretical — `fon` is hardware.
+
+**Catalogs are JSON**, one file per locale (`messages/en.json`, `messages/sr.json`).
+Decided so a translator can edit them without touching a build system — the
+format has to be reachable by someone who is not a developer, which rules out
+Rust consts and TOML embedded in `fiducial.toml`.
 
 **`fid new` takes locales up front**, so there is never a monolingual moment.
 
@@ -230,14 +283,50 @@ endeavour.*
 
 ## 33 · Demo & showcase
 
-Not simulation in the numerical sense (`fiducial-sim` covers that). A **demo**:
-a real frontend with real behaviour, features individually toggleable, so the
-whole surface can be seen and analysed deterministically rather than discovered
-as an edge case in production.
+Not simulation in the numerical sense (`fiducial-sim` covers that). **Optional**,
+and primarily an *interactive demo section on a landing page* — a real frontend
+with real behaviour that a visitor can actually use, with features individually
+toggleable.
 
+The secondary benefit is internal: a surface that can be seen and analysed
+deterministically, rather than having edge cases discovered in production.
 Storybook is part of this and is currently underused.
 
 ---
+
+## 31 · Claude Design bridge
+
+Claude Design (`claude.ai/design`) holds design-system projects that sync with a
+local component library **incrementally, one component at a time** — never a
+wholesale replace. Its format:
+
+| | |
+|---|---|
+| Unit | a preview HTML file, e.g. `components/button/index.html` |
+| Card marker | `<!-- @dsCard group="…" -->` on the **first line** |
+| Index | `_ds_manifest.json`, compiled from those markers by the app's self-check |
+| Card fields | name, subtitle, viewport (width/height), group |
+| Groups | free-form: `Type`, `Colors`, `Spacing`, `Components`, `Brand` |
+| Validation | `.render-check.json` — `total / bad / thin / variantsIdentical` |
+| Protocol | `list → finalize_plan → write`; paths are locked and shown before any write |
+
+**The design insight:** that preview HTML is a *second representation* of a
+component this repository already holds as `packages/ui-react/src/button.tsx`.
+Two representations of one thing is the relationship this platform exists to
+manage — so the registry source is the **declaration** and the Claude Design
+preview is a **derivation**, generated by a pipeline and kept honest by
+`fid derive --check`.
+
+Which means "keeping the projects in sync" stops being a sync problem.
+
+**Why consistency across projects already half-works:** the React and Svelte
+registries both read the CSS custom properties published by `@fiducial/tokens`.
+Adding Claude Design as a third consumer of the same tokens is the natural move,
+rather than a fourth place for design values to live. Brand (item 23) feeds the
+same tokens, so brand → tokens → every registry → Claude Design is one chain.
+
+**Requires** `/design-login` in the session to authorize the `DesignSync` tool
+against the user's claude.ai account.
 
 ## 34 · Diagnostics
 
