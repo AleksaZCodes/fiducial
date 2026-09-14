@@ -349,6 +349,20 @@ no live CI status (deliberate; would go behind a flag), decisions are listed but
 not read so supersession is undetected, and `briefs` from §10's v0 row is not
 built because no product has one yet.
 
+**Phase 21b — namespaced agents ✅ (2026-09-14)**
+
+> A subagent's filename is its identity, and `design` / `review` are names other
+> people use too.
+
+| Deliverable | Status |
+| --- | --- |
+| Scaffolded agents renamed `design` → `fiducial-design`, `review` → `fiducial-review` (file name **and** frontmatter `name:`) — a colliding agent is silently unavailable, not an error | ✅ |
+| `templates::RENAMED_TEMPLATES` — the declaration of what moved. A rename **cannot** be a codemod: `MigrationOp` is a literal search-and-replace within one file, and this is a file moving | ✅ |
+| `fid upgrade` installs the new path and removes the old one — ordered **before** the "added" pass, which would otherwise install the new file and leave the colliding one behind | ✅ |
+| A **locally modified** file at a renamed path is never deleted: both are kept, with a warning naming the fix. Discarding someone's edits to solve a naming problem is the worse outcome | ✅ |
+| Propagated to the real `fon` product and verified clean | ✅ |
+| 2 new end-to-end tests; captures regenerated so the guides show the new names | ✅ |
+
 **Phase 21 — documentation that cannot lie ✅ (2026-09-14)**
 
 > Guides for humans and agents, with terminal output generated from the real

@@ -6,8 +6,8 @@ $ fid new demo-product
   wrote  README.md
   wrote  .gitignore
   wrote  .claude/settings.json
-  wrote  .claude/agents/review.md
-  wrote  .claude/agents/design.md
+  wrote  .claude/agents/fiducial-review.md
+  wrote  .claude/agents/fiducial-design.md
   wrote  .github/workflows/ci.yml
   wrote  .github/workflows/claude-review.yml
   wrote  fiducial.lock
@@ -28,8 +28,8 @@ Initialized empty Git repository in /home/you/dev/demo-product/.git/
   fid doctor            # verify everything is in order
 
   # Agents — Sonnet for implementation, Opus for design/review:
-  /design               # architecture brainstorming
-  /review               # review diff before committing
+  fiducial-design       # architecture brainstorming
+  fiducial-review       # review diff before committing
   # CI auto-reviews every PR (needs ANTHROPIC_API_KEY in repo secrets).
 
   # When you're ready to commit:

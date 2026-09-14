@@ -878,3 +878,95 @@ fn upgrade_does_not_clobber_an_untracked_file_at_a_template_path() {
         "the author's file is untouched"
     );
 }
+
+/// `fid upgrade` renames templates the platform has moved, and removes the old
+/// file — because a subagent's filename *is* its identity, so a leftover
+/// `.claude/agents/design.md` keeps claiming the colliding name that the rename
+/// existed to free.
+#[test]
+fn upgrade_renames_a_moved_template_and_removes_the_old_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+
+    let new_path = root.join(".claude/agents/fiducial-design.md");
+    let old_path = root.join(".claude/agents/design.md");
+    assert!(new_path.is_file(), "scaffold ships the namespaced name");
+
+    // Rebuild the pre-rename state: the old path, tracked in the lock.
+    let content = std::fs::read_to_string(&new_path).unwrap();
+    std::fs::write(&old_path, &content).unwrap();
+    std::fs::remove_file(&new_path).unwrap();
+
+    let lock_path = root.join("fiducial.lock");
+    let lock_text = std::fs::read_to_string(&lock_path).unwrap();
+    let mut lock: toml::Value = toml::from_str(&lock_text).unwrap();
+    let templates = lock
+        .get_mut("templates")
+        .and_then(|t| t.as_table_mut())
+        .unwrap();
+    let record = templates
+        .remove(".claude/agents/fiducial-design.md")
+        .expect("tracked");
+    templates.insert(".claude/agents/design.md".into(), record);
+    std::fs::write(&lock_path, toml::to_string(&lock).unwrap()).unwrap();
+
+    let out = run(&root, &["upgrade"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("renamed: .claude/agents/design.md"),
+        "upgrade should report the rename: {text}"
+    );
+
+    assert!(new_path.is_file(), "the namespaced file now exists");
+    assert!(
+        !old_path.exists(),
+        "the colliding file must be gone — leaving it defeats the rename"
+    );
+
+    let out = run(&root, &["doctor"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("clean"), "doctor after rename: {text}");
+}
+
+/// A locally modified file at a renamed path is never deleted. Silently
+/// discarding someone's edits to fix a naming problem is worse than the naming
+/// problem.
+#[test]
+fn upgrade_keeps_a_locally_modified_file_at_a_renamed_path() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+
+    let new_path = root.join(".claude/agents/fiducial-review.md");
+    let old_path = root.join(".claude/agents/review.md");
+
+    // Pre-rename state, but the product edited its copy.
+    std::fs::write(&old_path, "---\nname: review\n---\n\nMy own edits.\n").unwrap();
+    std::fs::remove_file(&new_path).unwrap();
+
+    let lock_path = root.join("fiducial.lock");
+    let lock_text = std::fs::read_to_string(&lock_path).unwrap();
+    let mut lock: toml::Value = toml::from_str(&lock_text).unwrap();
+    let templates = lock
+        .get_mut("templates")
+        .and_then(|t| t.as_table_mut())
+        .unwrap();
+    let record = templates
+        .remove(".claude/agents/fiducial-review.md")
+        .expect("tracked");
+    templates.insert(".claude/agents/review.md".into(), record);
+    std::fs::write(&lock_path, toml::to_string(&lock).unwrap()).unwrap();
+
+    let out = run(&root, &["upgrade"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("locally modified"),
+        "should say why it kept the file: {text}"
+    );
+
+    assert!(new_path.is_file(), "the namespaced file is installed");
+    assert_eq!(
+        std::fs::read_to_string(&old_path).unwrap(),
+        "---\nname: review\n---\n\nMy own edits.\n",
+        "local edits must survive"
+    );
+}

@@ -15,8 +15,8 @@ const TMPL_MISSION_MD: &str = include_str!("../templates/MISSION.md.tmpl");
 const TMPL_AGENTS_MD: &str = include_str!("../templates/AGENTS.md.tmpl");
 const TMPL_GITIGNORE: &str = include_str!("../templates/gitignore.tmpl");
 const TMPL_CLAUDE_SETTINGS: &str = include_str!("../templates/claude-settings.json.tmpl");
-const TMPL_AGENT_REVIEW: &str = include_str!("../templates/agents-review.md.tmpl");
-const TMPL_AGENT_DESIGN: &str = include_str!("../templates/agents-design.md.tmpl");
+const TMPL_AGENT_REVIEW: &str = include_str!("../templates/agents-fiducial-review.md.tmpl");
+const TMPL_AGENT_DESIGN: &str = include_str!("../templates/agents-fiducial-design.md.tmpl");
 const TMPL_CI_REVIEW: &str = include_str!("../templates/claude-review.yml.tmpl");
 const TMPL_CI: &str = include_str!("../templates/ci.yml.tmpl");
 const TMPL_README: &str = include_str!("../templates/README.md.tmpl");
@@ -137,10 +137,38 @@ pub const SCAFFOLD_FILES: &[(&str, &str)] = &[
     ("README.md", TMPL_README),
     (".gitignore", TMPL_GITIGNORE),
     (".claude/settings.json", TMPL_CLAUDE_SETTINGS),
-    (".claude/agents/review.md", TMPL_AGENT_REVIEW),
-    (".claude/agents/design.md", TMPL_AGENT_DESIGN),
+    (".claude/agents/fiducial-review.md", TMPL_AGENT_REVIEW),
+    (".claude/agents/fiducial-design.md", TMPL_AGENT_DESIGN),
     (".github/workflows/ci.yml", TMPL_CI),
     (".github/workflows/claude-review.yml", TMPL_CI_REVIEW),
+];
+
+// ── Renamed templates ────────────────────────────────────────────────────────
+
+/// Templates that have moved, as `(old path, new path)`.
+///
+/// A subagent's file name is its identity: `.claude/agents/design.md` registers
+/// an agent called `design`, which collides with any other `design` agent the
+/// user already has — from another plugin, another project, or their own global
+/// config. Whichever loses the collision is simply unavailable, silently.
+///
+/// So the scaffolded agents are namespaced. That rename has to reach products
+/// that already exist, and it cannot be a codemod: `MigrationOp` is a literal
+/// search-and-replace within one file, and this is a file moving.
+///
+/// `fid upgrade` reads this list, installs the new path, and removes the old one
+/// **only when it is unmodified** — a product that edited its copy keeps it, with
+/// a warning, because silently deleting someone's edits to fix a naming problem
+/// is a worse outcome than the naming problem.
+pub const RENAMED_TEMPLATES: &[(&str, &str)] = &[
+    (
+        ".claude/agents/design.md",
+        ".claude/agents/fiducial-design.md",
+    ),
+    (
+        ".claude/agents/review.md",
+        ".claude/agents/fiducial-review.md",
+    ),
 ];
 
 // ── Lookup ────────────────────────────────────────────────────────────────────
@@ -156,8 +184,8 @@ pub fn raw(rel_path: &str) -> Option<&'static str> {
         "AGENTS.md" => Some(TMPL_AGENTS_MD),
         ".gitignore" => Some(TMPL_GITIGNORE),
         ".claude/settings.json" => Some(TMPL_CLAUDE_SETTINGS),
-        ".claude/agents/review.md" => Some(TMPL_AGENT_REVIEW),
-        ".claude/agents/design.md" => Some(TMPL_AGENT_DESIGN),
+        ".claude/agents/fiducial-review.md" => Some(TMPL_AGENT_REVIEW),
+        ".claude/agents/fiducial-design.md" => Some(TMPL_AGENT_DESIGN),
         ".github/workflows/ci.yml" => Some(TMPL_CI),
         ".github/workflows/claude-review.yml" => Some(TMPL_CI_REVIEW),
         "README.md" => Some(TMPL_README),

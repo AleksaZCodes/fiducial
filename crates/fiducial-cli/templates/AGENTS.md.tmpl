@@ -35,12 +35,16 @@ Two specialised agents are pre-configured in `.claude/agents/`. Both use Opus.
 
 | Slash command | When to use |
 |---|---|
-| `/design` | Architecture decisions, brainstorming, new capability design |
-| `/review` | Review the current diff before committing or opening a PR |
+| `fiducial-design` | Architecture decisions, brainstorming, new capability design |
+| `fiducial-review` | Review the current diff before committing or opening a PR |
 | `/fiducial:platform` | Load full platform context (via Fiducial plugin) |
 
-The default session model (Sonnet) handles implementation. Switch to `/design`
-or `/review` when the task is judgment, not code.
+The default session model (Sonnet) handles implementation. Switch to
+`fiducial-design` or `fiducial-review` when the task is judgment, not code.
+
+The names are namespaced on purpose: a subagent's filename is its identity, so
+an agent called `design` collides with any other `design` agent you have, and
+the loser is silently unavailable.
 
 A CI job (`claude-review.yml`) runs an Opus review automatically on every PR.
 It requires `ANTHROPIC_API_KEY` in the repository's Actions secrets.

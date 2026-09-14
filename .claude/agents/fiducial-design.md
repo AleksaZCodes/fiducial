@@ -1,5 +1,5 @@
 ---
-name: design
+name: fiducial-design
 description: Architecture and design brainstorming for the Fiducial platform. Uses Opus.
 model: claude-opus-5
 tools:

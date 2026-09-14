@@ -167,8 +167,8 @@ fn print_checklist(name: &str) {
     println!("  fid doctor            # verify everything is in order");
     println!();
     println!("  # Agents — Sonnet for implementation, Opus for design/review:");
-    println!("  /design               # architecture brainstorming");
-    println!("  /review               # review diff before committing");
+    println!("  fiducial-design       # architecture brainstorming");
+    println!("  fiducial-review       # review diff before committing");
     println!("  # CI auto-reviews every PR (needs ANTHROPIC_API_KEY in repo secrets).");
     println!();
     println!("  # When you're ready to commit:");
