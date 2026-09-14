@@ -116,11 +116,35 @@ along with their work. See `docs/guides/harvesting.md`.
 
 ## Build
 
+A fresh clone builds with **no setup step**. Verified by cloning and running
+cold: 375 Rust tests, 29 JS tasks, both freshness gates.
+
 ```sh
-pnpm build       # JS workspace (turbo)
-cargo build      # Rust workspace
-cargo test && pnpm test
+pnpm install --frozen-lockfile
+pnpm build && pnpm typecheck && pnpm test     # JS workspace (turbo)
+cargo build --workspace
+cargo test --workspace --all-features         # includes the freshness gates
 ```
+
+Everything that decides *how* it builds is committed, so a cloud checkout — Claude
+Code on the web, a Codespace, a new contributor — gets the same answers as a
+laptop:
+
+| Pinned by | What |
+|---|---|
+| `rust-toolchain.toml` | channel, `rustfmt`/`clippy`, **and the three cross-compilation targets** the spine check needs |
+| `packageManager` in `package.json` | the exact pnpm version |
+| `.nvmrc` + `engines` | Node |
+| `pnpm-lock.yaml` + `Cargo.lock` | every dependency |
+| `.claude/settings.json` | the plugin, so the guard is active |
+
+The targets line matters: without it, `cargo check --target wasm32-unknown-unknown`
+fails on a fresh machine and looks like a code problem rather than a missing
+`rustup target add`.
+
+**What a cloud session does not get, by design:** `.claude/settings.local.json`
+is gitignored because it holds personal tool permissions. Its absence means more
+permission prompts, not a broken environment.
 
 ## The `fid` commands
 

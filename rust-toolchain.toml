@@ -1,0 +1,24 @@
+# Host toolchain, pinned so every environment agrees.
+#
+# Without this, the toolchain came from whatever the machine happened to have.
+# That is fine on a laptop set up months ago and not fine in a fresh cloud
+# checkout — Claude Code on the web, a Codespace, a new contributor — where the
+# answer is arbitrary and the failure looks like a code problem rather than an
+# environment one.
+#
+# `targets` matters as much as `channel`. The four-target spine check
+# (host / wasm32 / thumbv6m / thumbv7em) needs all of them installed, and
+# listing them here means `cargo check --target …` works on a fresh clone with
+# no `rustup target add` step to remember.
+#
+# `firmware/` carries its own copy because it is a separate Cargo workspace,
+# deliberately excluded from this one.
+
+[toolchain]
+channel = "stable"
+targets = [
+    "wasm32-unknown-unknown", # browser, edge, Workers
+    "thumbv6m-none-eabi",     # RP2040 (Cortex-M0+)
+    "thumbv7em-none-eabihf",  # STM32 (Cortex-M4F with FPU)
+]
+components = ["rustfmt", "clippy"]
