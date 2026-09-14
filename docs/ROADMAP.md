@@ -91,6 +91,7 @@ furnished and deployable. That is the kickstart.
 | 29 | **Context sync** | ⬜ | Improves every later phase, but nothing is blocked on it |
 | 30 | **Fast path** | ⬜ | Matters once there is production to hotfix |
 | 31 | **Claude Design bridge** | ⬜ | Registry source → design-system previews, as a derivation |
+| 31b | **Interactive seeding** | ⬜ | `fid new` asks; or seeds brand, theme, logos and components from an existing Claude Design project |
 
 ### Tier 4 — on demand, via item 25
 
@@ -150,8 +151,17 @@ that **care is the wrong mechanism**.
 
 Item 6 is what makes it a **default** rather than a discipline.
 
-**Keys belong in `no_std` Rust** (principle 2): the same declared keys then serve
-web, desktop, CLI and device-side strings. Not theoretical — `fon` is hardware.
+**TypeScript first; Rust later, as a derivation.** An earlier draft argued this
+catalog should be `no_std` Rust immediately, partly on the grounds of device-side
+strings. `fon` is **headless**, so that argument was weak and is withdrawn.
+
+The honest remaining case is error codes crossing the wire — a device reports a
+code, and the app renders it in the reader's language from the same declared
+keys. Real, but no product needs it yet.
+
+So the JSON catalog is the declaration and TypeScript is the first derivation.
+Adding a Rust derivation later is then a *new derivation* rather than a second
+declaration — the second-use rule applied to our own design.
 
 **Catalogs are JSON**, one file per locale (`messages/en.json`, `messages/sr.json`).
 Decided so a translator can edit them without touching a build system — the
@@ -159,6 +169,11 @@ format has to be reachable by someone who is not a developer, which rules out
 Rust consts and TOML embedded in `fiducial.toml`.
 
 **`fid new` takes locales up front**, so there is never a monolingual moment.
+Default locales: **`sr` and `en`**.
+
+**Hardcoded-string detection fails the build**, with an explicit opt-out marker
+for genuine exceptions — a brand name, a code sample. Decided over a warning,
+because a warning is a thing you scroll past.
 
 **Harvest from ROP:** `resolve-locale.ts`, `config.ts`, `timezone.ts` + datetime
 helpers (native `Intl` only — server, client and edge). **Not** `translate.ts`;
@@ -327,6 +342,41 @@ same tokens, so brand → tokens → every registry → Claude Design is one cha
 
 **Requires** `/design-login` in the session to authorize the `DesignSync` tool
 against the user's claude.ai account.
+
+## 31b · Interactive seeding
+
+**The cherry on top**, and deliberately last: it is polish over machinery that
+must exist first.
+
+Two ways into a new product:
+
+**Ask.** `fid new` becomes interactive — product name, locales, brand basics,
+adapters, capabilities — instead of scaffolding a stub the author then edits by
+hand. Non-interactive flags remain, because CI and agents must still be able to
+run it unattended.
+
+**Or seed from a Claude Design project.** Pull an existing design-system project
+and derive `[brand]`, the token set, the theme, logos and the component registry
+from it — with **strict data structures and stated opinions** about what a proper
+shadcn registry and theme are. Opinionated on purpose: the point is that every
+product looks like it came from the same studio, and that only holds if the
+structure is not negotiable per product.
+
+The intended loop, which is worth stating because it is the actual workflow:
+
+```
+fid new  →  components exist as registry source
+         →  open the repo in Claude Design
+         →  design back and forth there
+         →  fid derive keeps both sides honest
+```
+
+**Open question — is that loop already integrated?** The `DesignSync` tool
+references a `/design-sync` skill for exactly this, incremental and
+component-at-a-time. That skill is not present in the current session's skill
+list, so either it is gated behind `/design-login` or it is not installed here.
+Resolve before building this item: if the round trip already exists, item 31 is
+a thin adapter over it rather than a pipeline to write.
 
 ## 34 · Diagnostics
 
