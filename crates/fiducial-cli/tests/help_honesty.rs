@@ -7,7 +7,7 @@
 //! genuinely do not work promised a phase that had already shipped.
 //!
 //! The cause is the one the platform exists to remove: a schedule is a fact
-//! `PHASES.md` owns, and help text held a second copy of it. So the rule this
+//! `SHIPPED.md` owns, and help text held a second copy of it. So the rule this
 //! test enforces is that help text names no phase at all.
 
 use std::{path::Path, process::Command};
@@ -45,7 +45,7 @@ const SUBCOMMANDS: &[&[&str]] = &[
 #[test]
 fn no_help_page_names_a_phase() {
     // A phase number in help text is a second declaration of the schedule
-    // PHASES.md owns, and it drifts silently — every one of them was wrong by
+    // SHIPPED.md owns, and it drifts silently — every one of them was wrong by
     // the time it was found.
     let phase = regex_lite_phase();
     for args in SUBCOMMANDS {

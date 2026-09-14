@@ -296,7 +296,8 @@ pub fn find(id: &str) -> Option<&'static CapabilityDef> {
 /// Install a capability into the product rooted at `root`.
 ///
 /// 1. Write template files (tracked in `fiducial.lock`).
-/// 2. Write `SKILL.md` to `.claude/skills/<capability-id>.md`.
+/// 2. Write `SKILL.md` to `.fiducial/skills/<capability-id>.md`, plus a pointer
+///    at `.claude/skills/<capability-id>.md` for Claude Code's auto-discovery.
 /// 3. Add capability id to `fiducial.toml [capabilities]`.
 /// 4. Merge capability guard rules into `fiducial.toml [guard]`.
 pub fn install(cap: &CapabilityDef, root: &Path, product_name: &str) -> Result<()> {
@@ -317,15 +318,43 @@ pub fn install(cap: &CapabilityDef, root: &Path, product_name: &str) -> Result<(
         );
     }
 
-    // 2. SKILL.md → .claude/skills/<id>.md
-    let skill_path = format!(".claude/skills/{}.md", cap.id);
+    // 2. SKILL.md → a vendor-neutral path, plus a pointer for Claude Code.
+    //
+    // The instructions used to be written only to `.claude/skills/`, which meant
+    // a Codex, Copilot or Cursor session in this product could install the `eda`
+    // capability and receive no instructions for using it. The content is
+    // ordinary Markdown and portable; only *discovery* is vendor-specific.
+    //
+    // So the content lives once, at a neutral path that `AGENTS.md` points every
+    // agent at, and Claude Code gets a short pointer file so its automatic skill
+    // discovery still works. The pointer carries no instructions of its own —
+    // two copies of the content would be the duplication this platform exists
+    // to delete.
     let skill_content = cap
         .skill_md
         .replace("{{name}}", product_name)
         .replace("{{version}}", PLATFORM_VERSION);
-    write_file(root, &skill_path, &skill_content)?;
-    // Skills are not tracked in the lock — they are platform-owned and upgraded
-    // automatically by the Claude Code plugin, not by `fid upgrade`.
+    write_file(
+        root,
+        &format!(".fiducial/skills/{}.md", cap.id),
+        &skill_content,
+    )?;
+
+    write_file(
+        root,
+        &format!(".claude/skills/{}.md", cap.id),
+        &format!(
+            "---\n\
+             name: fiducial-{id}\n\
+             description: How to use the `{id}` capability in this product.\n\
+             ---\n\n\
+             Read `.fiducial/skills/{id}.md` — the instructions live there so that \
+             every agent can find them, not only Claude Code.\n",
+            id = cap.id
+        ),
+    )?;
+    // Skills are not tracked in the lock — they are platform-owned and rewritten
+    // on every `fid upgrade`, not merged.
 
     // 3 + 4. Update fiducial.toml.
     patch_config(root, cap)?;
@@ -342,8 +371,8 @@ pub fn install(cap: &CapabilityDef, root: &Path, product_name: &str) -> Result<(
     println!("  ✓ {} installed", cap.id);
     println!("  ✓ guard rules added: {}", cap.guard_rules.join(", "));
     println!(
-        "  ✓ skill written → {} (auto-loaded by Claude Code)",
-        skill_path
+        "  ✓ instructions → .fiducial/skills/{}.md (any agent; see AGENTS.md)",
+        cap.id
     );
     Ok(())
 }

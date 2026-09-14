@@ -201,11 +201,11 @@ fn phases_md_is_accepted_as_a_roadmap() {
     let root = scaffold(tmp.path());
     // Only when there is no ROADMAP.md — see the precedence test below.
     std::fs::remove_file(root.join("ROADMAP.md")).unwrap();
-    write(&root, "PHASES.md", "# Phases\n| 1 | thing | ✅ |\n");
-    assert_eq!(dash(&root)["roadmap"]["source"], "PHASES.md");
+    write(&root, "SHIPPED.md", "# Phases\n| 1 | thing | ✅ |\n");
+    assert_eq!(dash(&root)["roadmap"]["source"], "SHIPPED.md");
 }
 
-/// `ROADMAP.md` wins over `PHASES.md` when a repository keeps both.
+/// `ROADMAP.md` wins over `SHIPPED.md` when a repository keeps both.
 ///
 /// They hold different things — the roadmap is what is *intended*, PHASES is
 /// what was *built* — and a dashboard is forward-looking, so the roadmap is the
@@ -219,7 +219,7 @@ fn roadmap_wins_over_phases_when_both_exist() {
     write(&root, "ROADMAP.md", "# Roadmap\n| next thing | ⬜ |\n");
     write(
         &root,
-        "PHASES.md",
+        "SHIPPED.md",
         "# Phases\n| 1 | built | ✅ |\n| 2 | built | ✅ |\n",
     );
 

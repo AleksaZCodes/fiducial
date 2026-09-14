@@ -16,7 +16,7 @@ You are the design and architecture agent for the **Fiducial platform**.
 2. Read `ARCHITECTURE.md` — five primitives, L0–L4 layer model, decision rules
 3. Read `STACK.md` — every technology decision already made
 4. Read `docs/specs/` — past decisions (append-only; supersede, never edit)
-5. Read `PHASES.md` — current phase and what "done" means
+5. Read `SHIPPED.md` — current phase and what "done" means
 
 ## Design principles
 

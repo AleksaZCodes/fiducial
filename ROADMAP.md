@@ -4,7 +4,7 @@
 > **anti-amnesia artifact**: everything that was decided or raised, written down
 > once, so no part of it has to be re-derived from memory or a chat log.
 >
-> `PHASES.md` records what is *built*. This records what is *intended*, and why.
+> `SHIPPED.md` records what is *built*. This records what is *intended*, and why.
 > `fid dash` reads the ⬜ 🟡 ✅ markers below.
 
 ---
@@ -42,20 +42,20 @@ make. "I want legal pages" is a decision. "I want a button" is a component.
 
 ---
 
-## How this file relates to `PHASES.md`
+## How this file relates to `SHIPPED.md`
 
 | File | Holds | Numbering |
 |---|---|---|
 | `ROADMAP.md` (this) | what is **intended**, and why | items have **names**, not numbers |
-| `PHASES.md` | what was **built**, phase by phase | phases are numbered, in build order |
+| `SHIPPED.md` | what was **built**, phase by phase | phases are numbered, in build order |
 
 They were briefly coupled — roadmap items numbered 22–35 to shadow phase numbers
 — which is a fact declared twice. It breaks the first time one item spans two
 phases or one phase closes two items. So roadmap items are now **named**, and a
-phase entry in `PHASES.md` names the item it implements. Neither file renumbers
+phase entry in `SHIPPED.md` names the item it implements. Neither file renumbers
 because of the other.
 
-`fid dash` reads the first of `ROADMAP.md`, `PHASES.md`, `ROADMAP.md` that
+`fid dash` reads the first of `ROADMAP.md`, `SHIPPED.md`, `ROADMAP.md` that
 exists — one file, so there is no double count.
 
 ---

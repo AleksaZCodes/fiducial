@@ -1,6 +1,11 @@
-# Fiducial — Build Order & Current State
+# Fiducial — What Shipped
 
-_Read this at the start of every session. Updated manually as phases complete._
+_The record of what was **built**, phase by phase. For what is **intended**, see
+[`ROADMAP.md`](ROADMAP.md)._
+
+_Formerly `PHASES.md`. Renamed 2026-09-14 — the name read as a plan, which is the
+roadmap's job. See `docs/specs/2026-09-14-phases-renamed-to-shipped.md`. Phase
+numbering is unchanged._
 
 ---
 
@@ -314,7 +319,7 @@ offsetting a non-rectangular outline — the one genuinely absent primitive.
 | Absence is a finding: no roadmap / no decisions / no pipelines each render a "not declared" line and still exit 0 | ✅ |
 | Exits 0 even on findings — gating is `fid derive --check` and `fid doctor`; a dashboard must be runnable casually | ✅ |
 | Freshness re-hashes artifacts (fresh / stale / missing / **never derived**) and reports hand-edited templates as drift | ✅ |
-| Roadmap counted from `✅ 🟡 ⬜` and task-list markers in `ROADMAP.md` or `PHASES.md`; unmarked prose counts as nothing | ✅ |
+| Roadmap counted from `✅ 🟡 ⬜` and task-list markers in `ROADMAP.md` or `SHIPPED.md`; unmarked prose counts as nothing | ✅ |
 | Decisions read from `docs/specs` (or `docs/decisions`, `docs/adr`), newest first by date-prefixed filename, titled from the first heading | ✅ |
 | Git handles the unborn HEAD a fresh `fid new` leaves — `is_repo` is tracked separately, because inferring it from a missing branch called every new product un-versioned | ✅ |
 | `--json` — same facts for agents and workbench v1, so neither reimplements these reads | ✅ |
@@ -343,7 +348,7 @@ had: `fid derive` — the central command of the system — advertised itself as
 "Not yet implemented (Phase 4)" and told readers to run `cargo build` instead;
 `svelte` and `stm32` were labelled "(Phase 3b)" long after they worked; `mobile`
 and `module` promised a phase that had already shipped. **Help text now names no
-phase at all** — a schedule is a fact `PHASES.md` owns, and a second copy of it
+phase at all** — a schedule is a fact `SHIPPED.md` owns, and a second copy of it
 drifts. A `help_honesty` test enforces that, and CI runs it.
 
 **Still open on the workbench** — single repo only (multi-repo is v1 per §10),
@@ -436,7 +441,7 @@ built because no product has one yet.
 | `git init` without `--initial-branch` | Products born on `master` while the guard rule (`no-direct-main-push`), the review agent (`git diff main...HEAD`) and CI all named `main` | Forces `main`, `symbolic-ref` fallback for git < 2.28 |
 | `ui-svelte` typecheck | An **`echo`** — and its tsconfig excluded the only file it would have checked. Unchecked for two phases while `pnpm typecheck` reported green | Real `svelte-check`; first run found an a11y defect in `Dialog.svelte` whose handler was also dead code |
 | CI spine matrix | **Nine copies of one list**; `fiducial-sim` was already missing a tenth block | List **derived** from `#![no_std]` — the attribute is the declaration, the grep is the derivation |
-| `fiducial-sim` "in spine matrix" | PHASES.md claimed it; it never was, and **cannot be** (uses `Vec` + rayon, not `no_std`) | Record corrected rather than quietly satisfied; sim checked on host + `wasm32` |
+| `fiducial-sim` "in spine matrix" | SHIPPED.md claimed it; it never was, and **cannot be** (uses `Vec` + rayon, not `no_std`) | Record corrected rather than quietly satisfied; sim checked on host + `wasm32` |
 | 13 crates, 0 READMEs | Every published crate had a bare crates.io page | 17 READMEs written; each crate's is **run as a doctest**, which immediately caught a wrong method name |
 | `CLAUDE.md` / `AGENTS.md` trees | Both stale (missing ota, sim, realtime; AGENTS miscounted 11/10 vs 13/11) and both carrying a disclaimer to run `ls` instead | Corrected; a disclaimer is not a fix, so a test now fails the build on a missing entry |
 | pnpm workspace globs | `apps/*`, `workbench`, `cli` — none had ever existed; a stale glob is silent | Removed; a test asserts every glob resolves |
@@ -619,7 +624,7 @@ fiducial/
 ├── LICENSE             MIT
 ├── IP-POLICY.md
 ├── README.md
-├── PHASES.md           ← this file
+├── SHIPPED.md           ← this file
 ├── turbo.json          Turborepo pipeline
 ├── Cargo.toml          host workspace
 ├── package.json        pnpm workspace root (private)

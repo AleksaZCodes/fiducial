@@ -62,7 +62,7 @@ EXAMPLES
   fid add module telemetry    device telemetry pipeline
 
 STATUS
-  Not available yet. `PHASES.md` in the platform repository records what is
+  Not available yet. `SHIPPED.md` in the platform repository records what is
   planned; this help does not restate a schedule it would only get wrong."
     )]
     Module {
@@ -182,7 +182,7 @@ fn add_app(target: &str) -> Result<()> {
             println!(
                 "✦ fid add app {target}\n\n\
                  The `{target}` target is not available yet.\n\
-                 See PHASES.md: https://github.com/AleksaZCodes/fiducial/blob/main/PHASES.md"
+                 See SHIPPED.md: https://github.com/AleksaZCodes/fiducial/blob/main/SHIPPED.md"
             );
             return Ok(());
         }
@@ -229,7 +229,7 @@ fn add_module(name: &str) -> Result<()> {
     println!(
         "✦ fid add module {name}\n\n\
          Module scaffolding is not available yet.\n\
-         See PHASES.md: https://github.com/AleksaZCodes/fiducial/blob/main/PHASES.md"
+         See SHIPPED.md: https://github.com/AleksaZCodes/fiducial/blob/main/SHIPPED.md"
     );
     Ok(())
 }

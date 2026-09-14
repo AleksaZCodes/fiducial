@@ -8,7 +8,7 @@ This file covers the same ground as `CLAUDE.md` for agent runtimes that read
 
 ## Current phase
 
-Read `PHASES.md` before every session. It states which phase is active and what
+Read `SHIPPED.md` before every session. It states which phase is active and what
 "done" means for it. Do not begin the next phase until the current one is
 complete.
 
@@ -27,7 +27,7 @@ the product's `AGENTS.md` from this file at scaffold time — see
 
 ```
 fiducial/
-├── MISSION.md, STACK.md, PHASES.md
+├── MISSION.md, STACK.md, SHIPPED.md
 ├── crates/               13 Rust members
 │   ├── fiducial-core         no_std spine — DeviceId, version
 │   ├── fiducial-protocol     no_std frame codec — the waist
@@ -144,7 +144,25 @@ rule that matters most.
 | `fid capability list` | What is installed and what is available |
 
 Every command takes `--help`, and the help names no phase numbers on purpose —
-a schedule is a fact `PHASES.md` owns, and a second copy of it drifts.
+a schedule is a fact `SHIPPED.md` owns, and a second copy of it drifts.
+
+## Skills this repository authors
+
+| File | Invoked as (Claude Code) | Does |
+|---|---|---|
+| `commands/platform.md` | `/fiducial:platform` | Load platform context at session start |
+| `commands/harvest.md` | `/fiducial:harvest` | Extract reusable work from another codebase |
+| `crates/fiducial-cli/capabilities/*/SKILL.md` | installed per capability | How to use that capability |
+
+**The content is portable; only discovery is not.** These are plain Markdown
+instructions — an agent without Claude Code's slash commands can read the file
+directly and follow it. Capability instructions install to
+`.fiducial/skills/<id>.md` in a product for exactly that reason, with a pointer
+at `.claude/skills/<id>.md` for Claude's auto-discovery.
+
+Generating the per-vendor wrappers from one authored source is roadmap item
+**agent portability**; today the wrapper for Claude is written by hand and there
+is none for anyone else.
 
 ## What not to do
 

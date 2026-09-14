@@ -14,7 +14,7 @@
 | [`MISSION.md`](../../MISSION.md) | The reasoning. The tiebreaker for ambiguous decisions. |
 | [`ARCHITECTURE.md`](../../ARCHITECTURE.md) | How the layers fit together. |
 | [`STACK.md`](../../STACK.md) | Every technology choice, enumerated. |
-| [`PHASES.md`](../../PHASES.md) | Build order and current state. |
+| [`SHIPPED.md`](../../SHIPPED.md) | Build order and current state. |
 | [`docs/protocol/`](../protocol/) | The wire specification and conformance vectors. |
 | [`docs/specs/`](../specs/) | Design decisions, append-only, date-stamped. |
 | [`docs/harvest/`](../harvest/) | Catalogues of donor codebases. |
