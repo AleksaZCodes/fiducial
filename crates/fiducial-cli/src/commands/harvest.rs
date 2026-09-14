@@ -1036,10 +1036,7 @@ mod tests {
             "storybook-static",
             "test-results",
         ] {
-            assert!(
-                SKIP_DIRS.contains(&dir),
-                "`{dir}` should never be walked"
-            );
+            assert!(SKIP_DIRS.contains(&dir), "`{dir}` should never be walked");
         }
     }
 

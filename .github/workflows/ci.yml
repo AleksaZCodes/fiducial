@@ -131,6 +131,28 @@ jobs:
       - name: Tests (workspace)
         run: cargo test --workspace --all-features
 
+  # ── Docs: the terminal captures in the guides are real and current ────────
+  docs:
+    name: docs (captures fresh)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      # Runs WITHOUT FIDUCIAL_WRITE_CAPTURES, so the test compares the committed
+      # captures against what the binary prints now instead of overwriting them.
+      # A change to `fid`'s output that skipped regeneration fails here rather
+      # than reaching main as a guide that shows output the CLI does not produce.
+      #
+      # Same freshness gate as docs/protocol/vectors.json, for the same reason.
+      - name: Captures match the binary
+        run: cargo test -p fiducial-cli --test captures
+
   # ── WASM: wasm-pack build ─────────────────────────────────────────────────
   wasm-pack:
     name: wasm-pack (fiducial-wasm)

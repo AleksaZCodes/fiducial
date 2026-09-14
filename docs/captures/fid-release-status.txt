@@ -1,0 +1,8 @@
+$ fid release status
+✦ fid release status
+
+  platform cli    X.Y.Z
+  wire version    2  (WIRE_VERSION in fiducial-protocol)
+
+  ⚠ could not read docs/compat/matrix.toml: reading /home/you/dev/demo-product/docs/compat/matrix.toml
+    Create it with `fid release protocol --bump breaking`.

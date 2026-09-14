@@ -1,0 +1,8 @@
+$ fid graph
+pipeline: eda (fid-validate)
+  → artifact: board/board.interface.json
+pipeline: enclosure (fid-mesh)
+  → artifact: enclosure/case-base.stl
+  → artifact: enclosure/case-lid.stl
+  → artifact: enclosure/gasket.stl
+  → artifact: enclosure/case.glb

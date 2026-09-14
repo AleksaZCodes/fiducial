@@ -75,8 +75,14 @@ outlives every framework above it.
 
 ## Documentation
 
+**New here?** [Start here](./docs/guides/start-here.md) explains what this is and
+why it is shaped that way, then [Your first product](./docs/guides/first-product.md)
+takes you from nothing to a generated enclosure and a CI gate in about twenty
+minutes.
+
 | Read | For |
 |---|---|
+| [**docs/guides/**](./docs/guides/) | Step-by-step guides for humans and agents |
 | [`MISSION.md`](./MISSION.md) | Why this exists. The tiebreaker for ambiguous decisions. |
 | [`ARCHITECTURE.md`](./ARCHITECTURE.md) | How the layers fit together. |
 | [`STACK.md`](./STACK.md) | Every technology choice, enumerated. |

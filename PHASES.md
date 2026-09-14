@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 21
+## Current phase: Phase 22
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -349,6 +349,26 @@ no live CI status (deliberate; would go behind a flag), decisions are listed but
 not read so supersession is undetected, and `briefs` from §10's v0 row is not
 built because no product has one yet.
 
+**Phase 21 — documentation that cannot lie ✅ (2026-09-14)**
+
+> Guides for humans and agents, with terminal output generated from the real
+> binary and gated in CI. Spec: `docs/specs/2026-09-14-phase-21-documentation.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| `docs/guides/start-here.md` — the paradigm, opening with a concrete failure (one connector written down six times, and the fab run that finds out) rather than the thesis | ✅ |
+| `docs/guides/first-product.md` — nothing → board → generated enclosure → CI gate in ~20 min; has the reader **break** `fid derive --check` deliberately, because the guarantee is only believable once seen failing | ✅ |
+| `docs/guides/for-agents.md` — orientation, the five that bite, the finish checklist | ✅ |
+| `docs/guides/README.md` — index, and why the terminal output is generated | ✅ |
+| **Captures generated from the real binary**, same freshness gate as `docs/protocol/vectors.json`; verified adversarially by tampering with one character | ✅ |
+| Captures run **in walkthrough order against one product** — the first harness captured `fid graph` on a bare scaffold and embedded "no pipelines declared" into a section that comes *after* they are installed: real output, faithfully generated, completely misleading | ✅ |
+| Captures **embedded** in the guides, not linked — GitHub renders no transclusion, and output behind a link nobody clicks shows nothing | ✅ |
+| Both tests derive from `render()` rather than one reading files the other writes — the first version had an undeclared ordering dependency, and cargo runs tests in parallel | ✅ |
+| Orphan detection: every declared capture is shown in some guide | ✅ |
+| CI `docs` job; root README opens with a path in for new readers | ✅ |
+| All internal markdown links verified to resolve | ✅ |
+| **Deliberately not done:** no docs site (a second place for docs to drift), no Playwright screenshots (heavy dependency for a CLI-first platform) | ✅ |
+
 **Phase 20 — Ring of Pursuit catalogued ✅ (2026-09-14)**
 
 > `fid harvest` turned on its intended donor. Catalogue:
@@ -667,5 +687,5 @@ fiducial/
 | **18** | Platform audit + cleanup | Every drift found is encoded as an invariant that fails the build | ✅ |
 | **19** | The harvest feature — `fid harvest` + skill + docs | A repo or folder yields reusable assets a new product can adopt without being overridden | ✅ |
 | **20** | Catalogue ROP's reusable assets | Every reusable asset inventoried with an extraction recipe | ✅ |
-| **21** | The documentation layer | Step-by-step guides for humans and agents; terminal captures checked by CI | ⬜ |
+| **21** | The documentation layer | Step-by-step guides for humans and agents; terminal captures checked by CI | ✅ |
 | **22** | ROP migration wave 2 (optional) — eligible rules to L0 Rust | Each differential-tested before the TypeScript is deleted | ⬜ |

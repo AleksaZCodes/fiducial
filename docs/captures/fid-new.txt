@@ -1,0 +1,36 @@
+$ fid new demo-product
+✦ fid new demo-product
+  wrote  fiducial.toml
+  wrote  MISSION.md
+  wrote  AGENTS.md
+  wrote  README.md
+  wrote  .gitignore
+  wrote  .claude/settings.json
+  wrote  .claude/agents/review.md
+  wrote  .claude/agents/design.md
+  wrote  .github/workflows/ci.yml
+  wrote  .github/workflows/claude-review.yml
+  wrote  fiducial.lock
+Initialized empty Git repository in /home/you/dev/demo-product/.git/
+  git    init (branch: main)
+
+✦ demo-product is ready. Next steps:
+
+  cd demo-product
+  # Edit fiducial.toml — set spine.enabled = true if you want the L0 Rust core.
+  # Edit MISSION.md   — one paragraph: what is this product for?
+
+  fid add app next      # add a Next.js web app
+  fid add app svelte    # add a SvelteKit app
+  fid add app tauri     # add a Tauri desktop/mobile app
+  fid add firmware rp2040  # add RP2040 firmware
+
+  fid doctor            # verify everything is in order
+
+  # Agents — Sonnet for implementation, Opus for design/review:
+  /design               # architecture brainstorming
+  /review               # review diff before committing
+  # CI auto-reviews every PR (needs ANTHROPIC_API_KEY in repo secrets).
+
+  # When you're ready to commit:
+  git add -A && git commit -m 'feat: initial scaffold'
