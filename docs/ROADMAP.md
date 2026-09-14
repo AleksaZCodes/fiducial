@@ -165,6 +165,7 @@ step 3 delivers.
 | **Demo & showcase** | Interactive landing-page demo, Storybook, feature toggles |
 | **Diagnostics** | Error tracking as an adapter with a no-op default |
 | **Small tools** | Backlinks, browser-compat banners |
+| **Claude chat plugin** | The making philosophy, as a skill for claude.ai — see below |
 
 ### Out of band — risk, not priority
 
@@ -481,6 +482,35 @@ component-at-a-time. That skill is not present in the current session's skill
 list, so either it is gated behind `/design-login` or it is not installed here.
 Resolve before building this item: if the round trip already exists, item 31 is
 a thin adapter over it rather than a pipeline to write.
+
+## Claude chat plugin — the philosophy, outside Claude Code
+
+Today the platform's way of thinking reaches an agent only inside a scaffolded
+repository: the plugin contributes the guard and `/fiducial:*` commands, and
+`AGENTS.md` carries the principles. **All of that requires a repository.**
+
+Wanted: the same thing usable in an ordinary claude.ai project or chat — where
+much of the actual thinking happens, long before there is a repo. Something that
+knows how the making philosophy goes and uses its vocabulary: *declaration*,
+*derivation*, *staleness*, *cost of delay*, *localized by construction*,
+*capability* in the three-way sense.
+
+**What it should carry:** the principles including 1c and 5c, the
+declaration/pipeline/adapter taxonomy, the anti-goals (especially "the platform
+must never become the project"), the decision-record habit, and the ordering
+rule. Not the commands — there is no `fid` in a chat — but the **reasoning**.
+
+**Open, to resolve before building:** the exact packaging for claude.ai skills
+versus Claude Code plugins, and how much is shared. The two formats are close
+(`SKILL.md` with frontmatter) but the distribution is different, and the honest
+answer is that this has not been verified rather than assumed.
+
+**The thing to avoid:** a second copy of the principles. They are already
+declared in `MISSION.md` and restated in the scaffolded `AGENTS.md`, and that
+duplication is already gated by a test precisely because it was a violation to
+introduce. A third copy for chat makes it three. This should be **generated**
+from `MISSION.md` — which makes it a natural consumer of **context sync**, and a
+reason to keep that item where it is in the order rather than later.
 
 ## Diagnostics
 

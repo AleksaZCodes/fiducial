@@ -106,6 +106,21 @@ is early. The purpose is not thrift for its own sake — it is to drive the marg
 next product toward zero, leaving the budget and the attention for invention rather than
 rebuilding.
 
+**5c · Order work by cost of delay, not by value.**
+An item belongs early when *waiting makes it more expensive* — which is not the
+same as wanting it most. Three kinds, and the order follows from the kind:
+
+- **Debt-accruing** — the cost grows with every cycle you wait, usually because
+  work done meanwhile has to be migrated later. These go first, even when they
+  are not the most wanted.
+- **Multiplying** — they make every later piece of work cheaper. These go second.
+- **Terminal** — they cost the same whenever you do them. These go last, ordered
+  by product value.
+
+Value and urgency are different axes, and ranking by value alone reliably
+schedules the compounding work last, where it costs the most. 5b says spend
+early where it compounds; this says how to find those places.
+
 **6 · Commit to contracts, not to tools.**
 Be opinionated about the interface between domains and permissive about what satisfies it. One
 contract per domain, fixed; the tool behind it, swappable. This is how a system stays sharply
