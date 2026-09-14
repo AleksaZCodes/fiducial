@@ -72,6 +72,12 @@ a currency is the same class of bug as a length without a unit.
 `t()`. **They warn rather than failing** — the detector cannot perfectly tell
 copy from a CSS class or an aria role.
 
+The full list, with a file and a line for each, is machine-readable:
+
+```sh
+fid dash --section i18n --json
+```
+
 They are still worth clearing. **If you are an agent and you see these
 reported, fix them as you go** rather than leaving them for someone else; that
 is what makes localization second nature rather than a later refactor.

@@ -276,3 +276,207 @@ fn the_skill_lands_where_every_agent_can_find_it() {
         "the pointer must not duplicate the content"
     );
 }
+
+// ── `fid new --locales` ───────────────────────────────────────────────────────
+//
+// Principle 1c says monolingual is a state you pass through before the first
+// commit, not one you ship. That is only true if a product is *born* localized,
+// which is what these cover.
+
+#[test]
+fn a_new_product_is_born_localized() {
+    let tmp = tempfile::tempdir().unwrap();
+    assert!(run(tmp.path(), &["new", "p"]).status.success());
+    let root = tmp.path().join("p");
+
+    let config = std::fs::read_to_string(root.join("fiducial.toml")).unwrap();
+    assert!(config.contains("[i18n]"), "no [i18n] block:\n{config}");
+    assert!(config.contains("\"sr\"") && config.contains("\"en\""));
+    assert!(root.join("messages/sr.json").is_file());
+    assert!(root.join("messages/en.json").is_file());
+
+    // Born with a working gate, not just a declaration.
+    assert!(
+        run(&root, &["derive", "--check"]).status.success(),
+        "a fresh product must derive clean"
+    );
+}
+
+#[test]
+fn a_declared_locale_without_a_shipped_catalog_gets_one() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(
+        tmp.path(),
+        &[
+            "new",
+            "p",
+            "--locales",
+            "en,fr,de",
+            "--default-locale",
+            "en",
+        ],
+    );
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for locale in ["en", "fr", "de"] {
+        assert!(
+            root.join(format!("messages/{locale}.json")).is_file(),
+            "messages/{locale}.json missing"
+        );
+    }
+    // The locale set is read from the directory listing, so a catalog for a
+    // locale the product does not declare is a language it silently claims.
+    assert!(
+        !root.join("messages/sr.json").exists(),
+        "sr.json survived a locale set that does not include it"
+    );
+
+    // Seeded from the default, so the work still to do is reported rather than
+    // discovered by a reader.
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(
+        text(&out).contains("untranslated"),
+        "a copy of the default must report as untranslated:\n{}",
+        text(&out)
+    );
+}
+
+#[test]
+fn opting_out_is_explicit_and_leaves_no_half_state() {
+    let tmp = tempfile::tempdir().unwrap();
+    assert!(run(tmp.path(), &["new", "p", "--locales", "none"])
+        .status
+        .success());
+    let root = tmp.path().join("p");
+    assert!(!root.join("messages").exists());
+    let config = std::fs::read_to_string(root.join("fiducial.toml")).unwrap();
+    assert!(
+        !config.contains("locales = ["),
+        "declared locales:\n{config}"
+    );
+}
+
+#[test]
+fn the_fallback_locale_is_never_taken_from_list_order() {
+    let tmp = tempfile::tempdir().unwrap();
+    // `en` is first, and the product is still not created — because which
+    // language a reader falls back to is a decision, not a list position.
+    let out = run(tmp.path(), &["new", "p", "--locales", "en,fr"]);
+    assert!(!out.status.success());
+    assert!(
+        text(&out).contains("--default-locale"),
+        "the error must name the fix:\n{}",
+        text(&out)
+    );
+    assert!(
+        !tmp.path().join("p").exists(),
+        "a failed `fid new` left a directory behind"
+    );
+}
+
+#[test]
+fn a_fallback_outside_the_locale_set_is_refused() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(
+        tmp.path(),
+        &["new", "p", "--locales", "en,fr", "--default-locale", "de"],
+    );
+    assert!(!out.status.success());
+    assert!(text(&out).contains("not in --locales"), "{}", text(&out));
+}
+
+// ── Hardcoded-string detection ────────────────────────────────────────────────
+
+/// A component with three real findings and six things that must not be.
+const COMPONENT: &str = r#"import { t } from '@fiducial/i18n'
+
+export default function Page({ count }: { count: number }) {
+  return (
+    <main className="flex flex-col gap-4" data-testid="home page">
+      <h1>Welcome to the demo</h1>
+      <p>{t('home.intro')}</p>
+      <p>{count} items in your cart</p>
+      <img src="/logo.svg" alt="Company logo" />
+      <a href="https://example.com">https://example.com</a>
+      <button aria-label="Close the dialog">x</button>
+      <span>nav.home</span>
+      <span>{/* i18n-ignore */ "Wi-Fi"}</span>
+    </main>
+  )
+}
+"#;
+
+fn with_component(tmp: &Path) -> PathBuf {
+    assert!(run(tmp, &["new", "p"]).status.success());
+    let root = tmp.join("p");
+    std::fs::create_dir_all(root.join("app")).unwrap();
+    std::fs::write(root.join("app/page.tsx"), COMPONENT).unwrap();
+    root
+}
+
+#[test]
+fn hardcoded_strings_are_reported_and_false_positives_are_not() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = with_component(tmp.path());
+
+    let out = run(&root, &["dash", "--section", "i18n", "--json"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let dash: serde_json::Value = serde_json::from_str(&text(&out)).expect("dash --json");
+    let found = dash["i18n"]["hardcoded"].as_array().expect("hardcoded");
+
+    let texts: Vec<&str> = found
+        .iter()
+        .map(|h| h["text"].as_str().unwrap_or_default())
+        .collect();
+    assert_eq!(
+        texts,
+        vec!["Welcome to the demo", "Company logo", "Close the dialog"],
+        "detector found the wrong set"
+    );
+    assert_eq!(found[0]["file"], "app/page.tsx");
+    assert_eq!(found[0]["line"], 6);
+}
+
+/// The whole design rests on this. Making it fatal means every false positive
+/// blocks someone until the rule is loosened for everyone.
+#[test]
+fn hardcoded_strings_never_fail_a_command() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = with_component(tmp.path());
+
+    let doctor = run(&root, &["doctor"]);
+    assert!(
+        doctor.status.success(),
+        "doctor must not fail on hardcoded strings:\n{}",
+        text(&doctor)
+    );
+    assert!(
+        text(&doctor).contains("hardcoded user-visible string"),
+        "doctor must still report them:\n{}",
+        text(&doctor)
+    );
+    assert!(
+        run(&root, &["derive", "--check"]).status.success(),
+        "the gate must stay about artifacts, not about this warning"
+    );
+}
+
+#[test]
+fn a_product_with_no_locales_is_not_nagged() {
+    let tmp = tempfile::tempdir().unwrap();
+    assert!(run(tmp.path(), &["new", "p", "--locales", "none"])
+        .status
+        .success());
+    let root = tmp.path().join("p");
+    std::fs::create_dir_all(root.join("app")).unwrap();
+    std::fs::write(root.join("app/page.tsx"), COMPONENT).unwrap();
+
+    let out = run(&root, &["doctor"]);
+    assert!(
+        !text(&out).contains("hardcoded"),
+        "a product that never asked for localization was told about strings:\n{}",
+        text(&out)
+    );
+}

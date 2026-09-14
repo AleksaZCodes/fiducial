@@ -75,8 +75,9 @@ Three kinds of item, and the order follows from the kind:
 
 ### 1 · i18n — *localized by construction* ✅
 
-The runtime (`@fiducial/i18n`) has shipped. The declaration, pipeline, gate,
-detector and capability remain.
+Complete. The runtime (`@fiducial/i18n`), the declaration, the pipeline, the
+gate, the hardcoded-string detector and the capability have all shipped, and
+`fid new` takes locales up front.
 
 Also: the **second** declaration→pipeline case. `eda` was the first — it already
 installs `board/board.interface.json` as a declaration plus `eda.toml` and
@@ -165,8 +166,6 @@ step 3 delivers.
 | **Demo & showcase** | Interactive landing-page demo, Storybook, feature toggles |
 | **Diagnostics** | Error tracking as an adapter with a no-op default |
 | **Small tools** | Backlinks, browser-compat banners |
-| **i18n: hardcoded-string detector** | Warns, never fails; reported in `fid doctor` and `fid dash --json` so an agent consumes it as data. Not built |
-| **i18n: `fid new --locales`** | So there is no moment where a product is monolingual. Not built |
 | **Framework currency** | Capability templates must track current majors — Next.js 16, SvelteKit, Tauri. Pinned versions in a scaffold rot silently and a product starts a major behind |
 | **Agent portability** | Skills and guard wiring are Claude-Code-only; author once, generate per vendor — see below |
 | **Rust release versioning** | Changesets drives npm; the thirteen crates move in lockstep at 0.1.0 with nothing driving a bump |

@@ -11,6 +11,8 @@ numbering is unchanged._
 
 ## Current phase: between phases — next is the capability taxonomy
 
+_i18n is closed out (Phase 22b). `ROADMAP.md` item 1 has nothing left open._
+
 > Build order beyond this phase: [`ROADMAP.md`](ROADMAP.md).
 
 **Phase 0 — complete ✅ (2026-09-06)**
@@ -375,9 +377,28 @@ built because no product has one yet.
 | Installing a capability **seeds the declaration it needs**; a pipeline with an empty declaration fails on the next derive | ✅ |
 | 43 runtime tests, 10 comparison unit tests, 10 end-to-end. 395 across the workspace | ✅ |
 
-**Still open on i18n** — the hardcoded-string detector (warns, reported in `fid
-doctor` / `fid dash --json`) and `fid new` taking locales up front are not built.
-Tracked in `ROADMAP.md`.
+**Phase 22b — i18n, closed out ✅ (2026-09-14)**
+
+> The two items Phase 22 left open. Nothing on i18n remains.
+
+| Deliverable | Status |
+| --- | --- |
+| **Hardcoded-string detector** — user-visible literals that never reached a catalog, found in `.tsx` / `.jsx` / `.svelte` / `.vue` / `.astro` | ✅ |
+| **Warns, never fails.** The detector cannot tell prose from a `data-testid` with certainty; making it fatal means every false positive blocks someone until the rule is loosened for everyone | ✅ |
+| **Reported, not logged** — a count and a file:line list in `fid doctor`, a `Localization` section in `fid dash`, and the same facts under `--json` so an agent consumes them as data | ✅ |
+| Kept out of `doctor`'s `warnings`, whose summary line calls them "upgrade hint(s)" — a hardcoded string is not something `fid upgrade` fixes | ✅ |
+| Nine false-positive rules, each of which earned its place: `className`, `data-testid`, `role`, URLs, paths, MIME types, dotted keys, `{t("…")}` call sites, `{count} items` | ✅ |
+| `>text</` required, not `>` … `<` — the first version read `if (a > b && c < d)` as a tag pair | ✅ |
+| `aria-label` no longer also fires as `label`; attribute names must match whole | ✅ |
+| **`i18n-ignore` now does something.** `SKILL.md` had documented the escape hatch since the capability shipped, and nothing honoured it | ✅ |
+| A product declaring no locales is never nagged — noise is the one thing a warning cannot survive | ✅ |
+| **`fid new --locales`** — default `sr,en`; `--locales none` opts out for a CLI or firmware image | ✅ |
+| `--default-locale` is **declared, never taken from list order**; `--locales en,fr` without it fails and names the fix | ✅ |
+| A declared locale with no shipped catalog is seeded from the default, so the gap is *reported as untranslated* rather than silently absent; a catalog for an undeclared locale is removed, because the executor reads the locale set from the directory listing | ✅ |
+| `DEFAULT_LOCALES` / `DEFAULT_LOCALE` declared once and shared by `fid new` and the capability's seeding | ✅ |
+| **`fid new` leaves the scaffold derived** — the CI it also scaffolds runs `fid derive --check`, so a product used to fail its own pipeline on the first commit, before anyone had changed anything | ✅ |
+| `fid new` re-records `fiducial.toml` after patching it, or the product is born reporting its own config as hand-edited | ✅ |
+| 10 detector unit tests, 8 end-to-end; 79 CLI lib tests. Clippy, fmt, full Rust suite and 17 JS tasks green | ✅ |
 
 **Phase 21b — namespaced agents ✅ (2026-09-14)**
 

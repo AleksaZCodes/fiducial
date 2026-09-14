@@ -27,6 +27,17 @@ use crate::{
 pub fn run(check: bool, pipeline_filter: Option<String>) -> Result<()> {
     let cwd = std::env::current_dir()?;
     let root = Config::find_root(&cwd)?;
+    run_in(&root, check, pipeline_filter)
+}
+
+/// Derive inside a known product root.
+///
+/// Split out so `fid new` can leave the scaffold in a derived state. It cannot
+/// call `run`, which resolves the root from the working directory — and a fresh
+/// product whose artifacts have never been derived fails the `fid derive
+/// --check` its own scaffolded CI runs, on the first commit, before anyone has
+/// changed anything.
+pub fn run_in(root: &Path, check: bool, pipeline_filter: Option<String>) -> Result<()> {
     let config_path = root.join(CONFIG_FILE);
     let lock_path = root.join(LOCK_FILE);
 
@@ -37,7 +48,7 @@ pub fn run(check: bool, pipeline_filter: Option<String>) -> Result<()> {
         Lock::new()
     };
 
-    let pipelines = pipeline::discover(&root, &config)?;
+    let pipelines = pipeline::discover(root, &config)?;
 
     let to_run: Vec<&Pipeline> = match &pipeline_filter {
         Some(name) => {
@@ -57,9 +68,9 @@ pub fn run(check: bool, pipeline_filter: Option<String>) -> Result<()> {
     }
 
     if check {
-        run_check(&to_run, &lock, &root)
+        run_check(&to_run, &lock, root)
     } else {
-        run_derive(&to_run, &root, &mut lock, &lock_path)
+        run_derive(&to_run, root, &mut lock, &lock_path)
     }
 }
 

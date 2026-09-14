@@ -251,6 +251,94 @@ fn ident(locale: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    // ── Hardcoded-string detection ───────────────────────────────────────────
+
+    fn texts(src: &str) -> Vec<String> {
+        scan_source("x.tsx", src)
+            .into_iter()
+            .map(|h| h.text)
+            .collect()
+    }
+
+    #[test]
+    fn finds_text_typed_straight_into_an_element() {
+        assert_eq!(texts("<p>Welcome back</p>"), vec!["Welcome back"]);
+        // A single capitalised word is still something a reader sees.
+        assert_eq!(texts("      <a href=\"/x\">Home</a>"), vec!["Home"]);
+    }
+
+    #[test]
+    fn finds_a_visible_attribute() {
+        let found = scan_source("x.tsx", "<img src={logo} alt=\"Company logo\" />");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].text, "Company logo");
+        assert_eq!(found[0].context, "alt=");
+    }
+
+    /// The rules below each exist because their absence produced a false
+    /// positive. A warning that cries wolf is switched off, and then the six
+    /// mechanisms are five.
+    #[test]
+    fn does_not_fire_on_a_correct_call_site() {
+        assert!(texts("<p>{t(\"home.welcome\")}</p>").is_empty());
+        assert!(texts("<p>{count} items</p>").is_empty());
+        assert!(texts("<span title={label}>{value}</span>").is_empty());
+    }
+
+    #[test]
+    fn does_not_fire_on_comparison_operators() {
+        // The bug this caught: `>` … `<` reads as a tag pair unless the close
+        // is required to be `</`.
+        assert!(texts("if (width > height && depth < limit) return null").is_empty());
+        assert!(texts("const ok = a > b && c < d;").is_empty());
+    }
+
+    #[test]
+    fn does_not_fire_on_class_names_ids_or_test_hooks() {
+        assert!(scan_source("x.tsx", "<div className=\"flex items-center gap-2\" />").is_empty());
+        assert!(scan_source("x.tsx", "<div data-testid=\"submit button\" />").is_empty());
+        assert!(scan_source("x.tsx", "<div role=\"navigation\" id=\"main nav\" />").is_empty());
+    }
+
+    #[test]
+    fn does_not_fire_on_urls_paths_or_tokens() {
+        assert!(texts("<a>https://example.com/docs</a>").is_empty());
+        assert!(texts("<code>./scripts/build.sh</code>").is_empty());
+        assert!(texts("<span>application/json</span>").is_empty());
+        assert!(texts("<span>nav.home</span>").is_empty());
+    }
+
+    #[test]
+    fn aria_label_is_not_also_reported_as_label() {
+        let found = scan_source("x.tsx", "<button aria-label=\"Close the dialog\" />");
+        assert_eq!(found.len(), 1, "reported twice: {found:?}");
+        assert_eq!(found[0].context, "aria-label=");
+    }
+
+    #[test]
+    fn honours_the_documented_ignore_marker() {
+        // `SKILL.md` has advertised this escape hatch since the capability
+        // shipped. It documented behaviour nothing implemented.
+        assert!(texts("<span>{/* i18n-ignore */ \"Wi-Fi\"}</span>").is_empty());
+        assert!(scan_source("x.tsx", "<img alt=\"Wi-Fi\" /> // i18n-ignore").is_empty());
+    }
+
+    #[test]
+    fn skips_comments_and_imports() {
+        assert!(texts("// <p>Welcome back</p>").is_empty());
+        assert!(texts(" * <p>Welcome back</p>").is_empty());
+        assert!(texts("import { Thing } from \"./thing\"").is_empty());
+    }
+
+    #[test]
+    fn reports_the_line_it_found() {
+        let src = "const a = 1;\n<p>Second line text</p>\n";
+        let found = scan_source("app/page.tsx", src);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].line, 2);
+        assert_eq!(found[0].file, "app/page.tsx");
+    }
+
     use super::*;
 
     fn catalog(pairs: &[(&str, &str)]) -> Catalog {
@@ -376,5 +464,289 @@ mod tests {
         assert!(placeholders("{unclosed").is_empty());
         assert!(placeholders("{}").is_empty());
         assert!(placeholders("{not a name}").is_empty());
+    }
+}
+
+// ── Hardcoded-string detection ───────────────────────────────────────────────
+//
+// Mechanism 6 of the six in `ROADMAP.md` § i18n, and the one that makes
+// localization a *default* rather than a discipline. The other five make a
+// missing translation impossible; this one addresses the actual complaint,
+// which is *"you miss strings"* — text typed straight into a component and
+// never routed through the catalog at all.
+//
+// **It warns. It never fails the build**, and that is a deliberate trade, not
+// timidity. The detector cannot be perfect about what counts as user-visible
+// text as against a CSS class, a `data-testid`, an ARIA role or a URL, and with
+// failure every false positive blocks a developer until someone loosens the
+// rule for everyone. A warning that is genuinely *seen* beats an error that
+// gets suppressed.
+//
+// So a finding is not printed and forgotten. It is **reported**: a count and a
+// file:line list in `fid doctor`, a section in `fid dash`, and the same facts
+// under `--json` so an agent consumes them as data rather than as terminal
+// noise. The i18n `SKILL.md` tells agents to clear them opportunistically.
+
+/// One string that looks user-visible and is not coming from a catalog.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Hardcoded {
+    /// Path relative to the product root, forward slashes.
+    pub file: String,
+    /// 1-indexed line.
+    pub line: usize,
+    /// The literal, as written.
+    pub text: String,
+    /// Where it was found — element text, or the attribute that carries it.
+    pub context: String,
+}
+
+/// Attributes whose value a reader actually sees.
+///
+/// An allowlist rather than a denylist. `className`, `id`, `href`, `data-*`,
+/// `role` and `key` all carry strings that are not prose, and there are far
+/// more of those than of these — so naming the visible ones is both shorter and
+/// wrong less often.
+const VISIBLE_ATTRIBUTES: &[&str] = &[
+    "alt",
+    "title",
+    "placeholder",
+    "label",
+    "aria-label",
+    "aria-placeholder",
+    "aria-description",
+    "aria-roledescription",
+];
+
+/// File extensions worth scanning.
+///
+/// Markup only. A `.ts` or `.js` file is mostly string literals that are keys,
+/// paths, event names and SQL — scanning those produced far more noise than
+/// findings, and noise is the one thing a warning cannot survive.
+const SCANNED_EXTENSIONS: &[&str] = &["tsx", "jsx", "svelte", "vue", "astro"];
+
+/// Directories never walked.
+const SKIPPED_DIRS: &[&str] = &[
+    "node_modules",
+    ".git",
+    "target",
+    "dist",
+    "build",
+    "out",
+    ".next",
+    ".svelte-kit",
+    ".turbo",
+    ".vercel",
+    ".wrangler",
+    "coverage",
+    "storybook-static",
+];
+
+/// Whether a literal reads as something a person would be shown.
+///
+/// Everything here is a rule that earned its place by producing a false
+/// positive without it.
+fn looks_user_visible(s: &str) -> bool {
+    let t = s.trim();
+
+    // Too short to be a sentence, or has no letters at all: `—`, `1`, `%`.
+    if t.chars().count() < 3 || !t.chars().any(|c| c.is_alphabetic()) {
+        return false;
+    }
+    // Contains an expression, so it is already dynamic — `{t("nav.home")}`,
+    // `{count} items`. Catching these would flag every correct call site.
+    if t.contains('{') || t.contains('}') {
+        return false;
+    }
+    // URLs, paths, anchors and protocols.
+    if t.starts_with("http")
+        || t.starts_with('/')
+        || t.starts_with("./")
+        || t.starts_with("../")
+        || t.starts_with('#')
+        || t.starts_with("mailto:")
+        || t.starts_with("tel:")
+        || t.contains("://")
+    {
+        return false;
+    }
+    // A token rather than prose: no spaces, and nothing but the characters
+    // identifiers use. Covers CSS classes, `data-testid` values, ARIA roles,
+    // event names, MIME types and file names in one rule.
+    if !t.contains(' ')
+        && t.chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "._-:/@".contains(c))
+    {
+        return false;
+    }
+    true
+}
+
+/// Text inside a `<tag>…</tag>` pair that closes on the same line.
+///
+/// The closing `</` is required, not decorative. Matching a bare `>` … `<`
+/// flagged `if (a > b && c < d)` — the comparison operators read as a tag pair.
+fn element_text(line: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let bytes: Vec<char> = line.chars().collect();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == '>' {
+            let start = i + 1;
+            let mut j = start;
+            while j + 1 < bytes.len() {
+                if bytes[j] == '<' && bytes[j + 1] == '/' {
+                    let text: String = bytes[start..j].iter().collect();
+                    if !text.trim().is_empty() {
+                        out.push(text.trim().to_string());
+                    }
+                    break;
+                }
+                if bytes[j] == '<' || bytes[j] == '>' {
+                    break;
+                }
+                j += 1;
+            }
+            i = j.max(start);
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
+/// Values of the visible attributes on one line.
+fn visible_attribute_values(line: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for attr in VISIBLE_ATTRIBUTES {
+        let mut from = 0;
+        while let Some(at) = line[from..].find(attr) {
+            let idx = from + at;
+            from = idx + attr.len();
+
+            // The match must be a whole attribute name, not the tail of
+            // another — `aria-label` must not also fire as `label`.
+            let before_ok = idx == 0
+                || !line[..idx]
+                    .chars()
+                    .next_back()
+                    .is_some_and(|c| c.is_alphanumeric() || c == '-' || c == '_');
+            if !before_ok {
+                continue;
+            }
+
+            let rest = line[from..].trim_start();
+            let Some(rest) = rest.strip_prefix('=') else {
+                continue;
+            };
+            let rest = rest.trim_start();
+            let quote = match rest.chars().next() {
+                Some(q @ ('"' | '\'')) => q,
+                // `title={expr}` is already dynamic.
+                _ => continue,
+            };
+            if let Some(end) = rest[1..].find(quote) {
+                out.push(((*attr).to_string(), rest[1..1 + end].to_string()));
+            }
+        }
+    }
+    out
+}
+
+/// The marker that silences the detector for one line.
+///
+/// The i18n `SKILL.md` has documented this escape hatch since the capability
+/// shipped — a brand name or a code sample is a genuine exception, and a
+/// warning with no way to say so trains people to stop reading it. The marker
+/// was documented before anything honoured it; this is what honours it.
+const IGNORE_MARKER: &str = "i18n-ignore";
+
+/// Whether a line is a comment, an import, or explicitly exempted.
+fn is_ignorable_line(trimmed: &str) -> bool {
+    trimmed.starts_with("//")
+        || trimmed.starts_with("/*")
+        || trimmed.starts_with('*')
+        || trimmed.starts_with("import ")
+        || trimmed.starts_with("export ")
+        || trimmed.contains(IGNORE_MARKER)
+}
+
+/// Scan one file's contents.
+pub fn scan_source(rel_path: &str, contents: &str) -> Vec<Hardcoded> {
+    let mut out = Vec::new();
+    for (i, line) in contents.lines().enumerate() {
+        let trimmed = line.trim();
+        if is_ignorable_line(trimmed) {
+            continue;
+        }
+        for text in element_text(line) {
+            if looks_user_visible(&text) {
+                out.push(Hardcoded {
+                    file: rel_path.to_string(),
+                    line: i + 1,
+                    text,
+                    context: "element text".to_string(),
+                });
+            }
+        }
+        for (attr, value) in visible_attribute_values(line) {
+            if looks_user_visible(&value) {
+                out.push(Hardcoded {
+                    file: rel_path.to_string(),
+                    line: i + 1,
+                    text: value,
+                    context: format!("{attr}="),
+                });
+            }
+        }
+    }
+    out
+}
+
+/// Walk a product for hardcoded user-visible strings.
+///
+/// Returns findings sorted by file then line, so the list is stable between
+/// runs and a diff of two `--json` outputs is readable.
+pub fn scan_product(root: &Path) -> Vec<Hardcoded> {
+    let mut out = Vec::new();
+    walk(root, root, &mut out);
+    out.sort_by(|a, b| a.file.cmp(&b.file).then(a.line.cmp(&b.line)));
+    out
+}
+
+fn walk(root: &Path, dir: &Path, out: &mut Vec<Hardcoded>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if path.is_dir() {
+            if SKIPPED_DIRS.contains(&name.as_ref()) {
+                continue;
+            }
+            walk(root, &path, out);
+            continue;
+        }
+        let ext = path
+            .extension()
+            .map(|e| e.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if !SCANNED_EXTENSIONS.contains(&ext.as_str()) {
+            continue;
+        }
+        // A generated file is not somewhere to fix a string; its declaration is.
+        if name.contains(".generated.") {
+            continue;
+        }
+        let Ok(contents) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let rel = path
+            .strip_prefix(root)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        out.extend(scan_source(&rel, &contents));
     }
 }

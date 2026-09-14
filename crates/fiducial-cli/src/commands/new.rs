@@ -10,15 +10,17 @@ use std::{
     process::Command,
 };
 
-use crate::{lock::Lock, templates};
+use crate::{capability, config, lock::Lock, templates};
 
 /// Current platform version — baked in at compile time.
 const PLATFORM_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
-pub fn run(name: &str) -> Result<()> {
+pub fn run(name: &str, locales: &str, default_locale: Option<&str>) -> Result<()> {
     validate_name(name)?;
+    let locales = parse_locales(locales)?;
+    let default_locale = resolve_default_locale(&locales, default_locale)?;
 
     let dest = PathBuf::from(name);
     if dest.exists() {
@@ -46,10 +48,126 @@ pub fn run(name: &str) -> Result<()> {
         .context("writing fiducial.lock")?;
     println!("  wrote  fiducial.lock");
 
+    // Localized from the first commit, not as a later pass.
+    //
+    // Installing the capability here rather than reimplementing it keeps one
+    // definition of what "this product has i18n" means — `fid new` and
+    // `fid add i18n` produce the same tree.
+    if !locales.is_empty() {
+        let cap = capability::find("i18n").expect("the i18n capability is built in");
+        capability::install(cap, &dest, name)?;
+        seed_locales(&dest, &locales, &default_locale)?;
+        capability::reconcile_i18n_catalogs(&dest, &locales, &default_locale)?;
+
+        // Leave the scaffold derived. The CI `fid new` also scaffolds runs
+        // `fid derive --check`, so a product whose generated messages have
+        // never been produced fails its own pipeline on the first commit,
+        // before anyone has changed anything.
+        println!();
+        super::derive::run_in(&dest, false, None)?;
+    }
+
     // git init
     git_init(&dest)?;
 
     print_checklist(name);
+    Ok(())
+}
+
+/// Split `--locales`, rejecting what cannot be a locale directory name.
+///
+/// `none` is the opt-out. A product with genuinely no user-visible text — a
+/// CLI, a firmware image — should not carry catalogs, and saying so explicitly
+/// is better than leaving an empty list to be read as an oversight.
+fn parse_locales(raw: &str) -> Result<Vec<String>> {
+    if raw.trim().eq_ignore_ascii_case("none") {
+        return Ok(Vec::new());
+    }
+    let mut out = Vec::new();
+    for part in raw.split(',') {
+        let tag = part.trim();
+        if tag.is_empty() {
+            continue;
+        }
+        // A locale becomes `messages/<tag>.json` and a TypeScript identifier,
+        // so it has to survive both.
+        if !tag
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
+            bail!(
+                "`{tag}` is not a usable locale tag.\n\
+                 Use BCP 47 tags such as `en`, `sr`, `pt-BR` — letters, digits, \
+                 `-` and `_` only."
+            );
+        }
+        if !out.iter().any(|l| l == tag) {
+            out.push(tag.to_string());
+        }
+    }
+    if out.is_empty() {
+        bail!(
+            "--locales named no locales.\n\
+             Pass a list such as `--locales en,fr`, or `--locales none` for a \
+             product with no user-visible text."
+        );
+    }
+    Ok(out)
+}
+
+/// The fallback locale: declared, never inferred from list order.
+fn resolve_default_locale(locales: &[String], declared: Option<&str>) -> Result<String> {
+    if locales.is_empty() {
+        return Ok(String::new());
+    }
+    let candidate = declared.unwrap_or(config::DEFAULT_LOCALE);
+    if locales.iter().any(|l| l == candidate) {
+        return Ok(candidate.to_string());
+    }
+    if declared.is_some() {
+        bail!(
+            "--default-locale `{candidate}` is not in --locales {locales:?}.\n\
+             The fallback must be one of the locales the product ships."
+        );
+    }
+    bail!(
+        "--locales {locales:?} does not include the default fallback \
+         `{candidate}`.\n\
+         Name the fallback explicitly: --default-locale <one of {locales:?}>.\n\
+         It is not taken from list order — which language a reader falls back to \
+         is a decision."
+    )
+}
+
+/// Write the declared locale set into the product's `fiducial.toml`.
+///
+/// Runs after `capability::install`, which seeds [`DEFAULT_LOCALES`] when the
+/// block is empty. Overwriting that is cheaper and less brittle than teaching
+/// `install` about a locale set only `fid new` has.
+///
+/// [`DEFAULT_LOCALES`]: crate::config::DEFAULT_LOCALES
+fn seed_locales(root: &Path, locales: &[String], default_locale: &str) -> Result<()> {
+    let path = root.join(config::CONFIG_FILE);
+    let mut cfg = config::Config::load(&path)?;
+    cfg.i18n.locales = locales.to_vec();
+    cfg.i18n.default = Some(default_locale.to_string());
+
+    let raw = toml::to_string_pretty(&cfg).context("serialising fiducial.toml")?;
+    let header = format!(
+        "# fiducial.toml — created by `fid new {}` (fiducial {})\n\n",
+        root.file_name().unwrap_or_default().to_string_lossy(),
+        PLATFORM_VERSION
+    );
+    let content = format!("{header}{raw}");
+    std::fs::write(&path, &content).context("writing fiducial.toml")?;
+
+    // Re-record: the lock holds the hash of what was written, and this just
+    // rewrote it. Without this the product is born reporting its own config as
+    // hand-edited — `fid doctor` failing on a tree `fid new` produced.
+    let lock_path = root.join("fiducial.lock");
+    let mut lock = Lock::load(&lock_path).unwrap_or_else(|_| Lock::new());
+    lock.record("fiducial.toml", content.as_bytes(), PLATFORM_VERSION);
+    lock.save(&lock_path).context("writing fiducial.lock")?;
     Ok(())
 }
 

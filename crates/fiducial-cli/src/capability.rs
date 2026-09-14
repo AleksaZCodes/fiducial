@@ -401,6 +401,70 @@ pub fn install(cap: &CapabilityDef, root: &Path, product_name: &str) -> Result<(
     Ok(())
 }
 
+/// Bring `messages/` in line with a declared locale set.
+///
+/// The `i18n` capability ships catalogs for [`DEFAULT_LOCALES`] only. A product
+/// created with a different set needs a catalog for each locale it declares and
+/// none for a locale it does not — the executor reads the locale set **from the
+/// directory listing**, so a stray catalog is a language the product silently
+/// claims to ship, and a missing one is a language it silently does not.
+///
+/// A locale with no shipped catalog starts as a copy of the default's. That is
+/// deliberately visible rather than convenient: identical values are exactly
+/// what `compare` reports as untranslated, so the work still to do shows up in
+/// the first `fid derive` instead of being discovered by a reader.
+///
+/// [`DEFAULT_LOCALES`]: crate::config::DEFAULT_LOCALES
+pub fn reconcile_i18n_catalogs(root: &Path, locales: &[String], default: &str) -> Result<()> {
+    let dir = root.join("messages");
+    if !dir.is_dir() {
+        return Ok(());
+    }
+    let mut lock = load_or_new_lock(root)?;
+
+    let default_catalog = std::fs::read_to_string(dir.join(format!("{default}.json")))
+        .with_context(|| format!("reading the default catalog messages/{default}.json"))?;
+
+    // Add a catalog for every declared locale that has none.
+    for locale in locales {
+        let path = dir.join(format!("{locale}.json"));
+        if path.exists() {
+            continue;
+        }
+        let rel = format!("messages/{locale}.json");
+        write_file(root, &rel, &default_catalog)?;
+        lock.record(rel, default_catalog.as_bytes(), PLATFORM_VERSION);
+    }
+
+    // Remove the shipped catalogs for locales this product does not declare.
+    for entry in std::fs::read_dir(&dir)
+        .context("reading messages/")?
+        .flatten()
+    {
+        let path = entry.path();
+        if path.extension().is_none_or(|e| e != "json") {
+            continue;
+        }
+        let Some(locale) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if locales.iter().any(|l| l == locale) {
+            continue;
+        }
+        let rel = format!("messages/{locale}.json");
+        // Only ours to remove. A catalog someone added by hand is theirs.
+        if lock.templates.contains_key(&rel) {
+            std::fs::remove_file(&path).with_context(|| format!("removing {rel}"))?;
+            lock.templates.remove(&rel);
+            println!("  removed {rel} (locale not declared)");
+        }
+    }
+
+    lock.save(&root.join("fiducial.lock"))
+        .context("writing fiducial.lock")?;
+    Ok(())
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 fn load_or_new_lock(root: &Path) -> Result<Lock> {
@@ -447,8 +511,11 @@ fn patch_config(root: &Path, cap: &CapabilityDef) -> Result<()> {
     // it also installs fails on the next `fid derive` with an empty block.
     // `i18n` ships en and sr catalogs, so the declaration says so.
     if cap.id == "i18n" && cfg.i18n.locales.is_empty() {
-        cfg.i18n.locales = vec!["sr".into(), "en".into()];
-        cfg.i18n.default = Some("sr".into());
+        cfg.i18n.locales = crate::config::DEFAULT_LOCALES
+            .iter()
+            .map(|l| (*l).to_string())
+            .collect();
+        cfg.i18n.default = Some(crate::config::DEFAULT_LOCALE.to_string());
     }
 
     // Serialise back. We use a structured round-trip here rather than line
