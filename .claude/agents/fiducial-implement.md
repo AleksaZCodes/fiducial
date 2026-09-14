@@ -31,5 +31,5 @@ Default agent for all coding work: new features, refactoring, debugging, tests.
 
 ## When to switch agents
 
-- Architectural decision needed → `/design` (Opus)
-- Ready to review before committing → `/review` (Opus)
+- Architectural decision needed → `fiducial-design` (Opus)
+- Ready to review before committing → `fiducial-review` (Opus)
