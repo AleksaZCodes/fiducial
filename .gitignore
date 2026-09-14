@@ -24,3 +24,8 @@ crates/fiducial-wasm/pkg/
 # OS
 .DS_Store
 Thumbs.db
+
+# svelte-check's generated type scratch. Regenerated on every `pnpm typecheck`,
+# so committing it is committing a derived artifact — the rule this repository
+# spends a whole phase enforcing everywhere else.
+.svelte-check/
