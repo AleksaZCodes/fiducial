@@ -248,23 +248,43 @@ fn ci_reports_declared_workflows_and_whether_any_guards_freshness() {
     let tmp = tempfile::tempdir().unwrap();
     let root = scaffold(tmp.path());
 
-    // The scaffold ships a review workflow that does not check freshness, so a
-    // stale artifact would reach main. Dash should say so — that is the finding.
+    // The scaffold ships a CI workflow that runs `fid derive --check`, so a
+    // fresh product is guarded from its first commit.
+    //
+    // This assertion used to read the other way — it asserted that a scaffold
+    // had NO freshness guard, and that dash reported the gap. That was an
+    // accurate description of a defect: `fid new` generated a product in
+    // precisely the state its own dashboard flags as unsafe, and every product
+    // ever scaffolded inherited it. Phase 18 scaffolds the workflow instead, so
+    // the test now asserts the fixed behaviour.
     let d = dash(&root);
     let workflows = d["ci"]["workflows"].as_array().unwrap();
     assert!(!workflows.is_empty(), "scaffold ships a workflow");
     assert!(
-        workflows.iter().all(|w| w["checks_freshness"] == false),
-        "scaffold has no freshness guard"
+        workflows.iter().any(|w| w["checks_freshness"] == true),
+        "scaffold ships a freshness guard: {workflows:?}"
     );
     let ci_out = run(&root, &["dash", "--section", "ci"]);
     let text = String::from_utf8_lossy(&ci_out.stdout);
     assert!(
-        text.contains("no workflow runs `fid derive --check`"),
-        "the gap should be called out: {text}"
+        !text.contains("no workflow runs `fid derive --check`"),
+        "a scaffolded product is guarded, so the gap must not be reported: {text}"
+    );
+    assert!(
+        text.contains("checks artifact freshness"),
+        "the guard should be visible in the CI section: {text}"
     );
 
-    // Adding one flips it.
+    // The negative case still has to work: the scaffolded review workflow runs
+    // no `fid derive --check`, and must be reported that way.
+    assert!(
+        workflows
+            .iter()
+            .any(|w| w["name"] == "Claude Review" && w["checks_freshness"] == false),
+        "review workflow does not check freshness: {workflows:?}"
+    );
+
+    // Freshness is detected per workflow, not inferred once for the repository.
     write(
         &root,
         ".github/workflows/derive.yml",
@@ -764,4 +784,97 @@ fn text_output_carries_no_escape_codes_when_redirected() {
         "redirected output must be plain text: {text:?}"
     );
     assert!(text.contains("Product"), "headings still present");
+}
+
+// ── Propagation ───────────────────────────────────────────────────────────────
+
+/// `fid upgrade` installs scaffold templates the platform added after a product
+/// was created.
+///
+/// A 3-way merge only updates files already in the lock, so before Phase 18 a
+/// new template reached only products scaffolded afterwards. The workflow that
+/// gates artifact freshness was added in Phase 18 and would have arrived in zero
+/// existing products.
+#[test]
+fn upgrade_installs_templates_added_since_the_product_was_scaffolded() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+
+    let workflow = root.join(".github/workflows/ci.yml");
+    assert!(workflow.is_file(), "scaffold ships the CI workflow");
+
+    // Simulate a product scaffolded before the template existed: remove the file
+    // and drop it from the lock.
+    std::fs::remove_file(&workflow).unwrap();
+    let lock_path = root.join("fiducial.lock");
+    let lock_text = std::fs::read_to_string(&lock_path).unwrap();
+    let mut lock: toml::Value = toml::from_str(&lock_text).unwrap();
+    lock.get_mut("templates")
+        .and_then(|t| t.as_table_mut())
+        .expect("lock has a templates table")
+        .remove(".github/workflows/ci.yml")
+        .expect("the workflow was tracked");
+    std::fs::write(&lock_path, toml::to_string(&lock).unwrap()).unwrap();
+
+    // A dry run reports the addition and writes nothing.
+    let out = run(&root, &["upgrade", "--dry-run"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("would add: .github/workflows/ci.yml"),
+        "dry run should report the addition: {text}"
+    );
+    assert!(!workflow.exists(), "a dry run writes nothing");
+
+    // The real run installs it.
+    let out = run(&root, &["upgrade"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("added: .github/workflows/ci.yml"),
+        "upgrade should install it: {text}"
+    );
+    assert!(workflow.is_file(), "the workflow now exists");
+    assert!(
+        std::fs::read_to_string(&workflow)
+            .unwrap()
+            .contains("fid derive --check"),
+        "the installed workflow gates artifact freshness"
+    );
+
+    // And the product is clean afterwards — the lock tracks what was written.
+    let out = run(&root, &["doctor"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("clean"), "doctor after upgrade: {text}");
+}
+
+/// An untracked file already on disk is never clobbered by the new-template
+/// path — it is reported, and the author reconciles it.
+#[test]
+fn upgrade_does_not_clobber_an_untracked_file_at_a_template_path() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+
+    let workflow = root.join(".github/workflows/ci.yml");
+    let lock_path = root.join("fiducial.lock");
+    let lock_text = std::fs::read_to_string(&lock_path).unwrap();
+    let mut lock: toml::Value = toml::from_str(&lock_text).unwrap();
+    lock.get_mut("templates")
+        .and_then(|t| t.as_table_mut())
+        .unwrap()
+        .remove(".github/workflows/ci.yml");
+    std::fs::write(&lock_path, toml::to_string(&lock).unwrap()).unwrap();
+
+    // The author's own version of that file.
+    std::fs::write(&workflow, "name: MINE\n").unwrap();
+
+    let out = run(&root, &["upgrade"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("untracked") && text.contains("leaving it alone"),
+        "should report rather than overwrite: {text}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&workflow).unwrap(),
+        "name: MINE\n",
+        "the author's file is untouched"
+    );
 }

@@ -23,6 +23,11 @@
     onclose?.();
   }
 
+  // A click on a `<dialog>` that opened with `showModal()` reports coordinates
+  // in the backdrop when it lands outside the dialog's own box. Hit-testing the
+  // rect is therefore enough to tell backdrop from content — no stopPropagation
+  // wrapper is needed, and the one that used to live here was both redundant
+  // and an unlabelled interactive `<div>`.
   function handleBackdropClick(e: MouseEvent) {
     const rect = dialog.getBoundingClientRect();
     const outside =
@@ -32,16 +37,18 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
+<!-- The native `<dialog>` element is the interactive control here: `showModal()`
+     supplies the focus trap, the Escape binding and the backdrop. The click
+     handler only distinguishes backdrop from content, so no extra ARIA role or
+     key handler applies. -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
 <dialog
   bind:this={dialog}
   class={["fid-dialog", className].filter(Boolean).join(" ")}
   onclose={handleClose}
   onclick={handleBackdropClick}
 >
-  <div onclick={(e) => e.stopPropagation()}>
-    {@render children?.()}
-  </div>
+  {@render children?.()}
 </dialog>
 
 <style>

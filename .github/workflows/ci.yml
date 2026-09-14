@@ -52,12 +52,37 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Check fiducial-core (${{ matrix.target.triple }})
-        run: >
-          cargo check
-          --package fiducial-core
-          --target ${{ matrix.target.triple }}
-          ${{ matrix.target.features }}
+      # The spine crate list is DERIVED, not typed.
+      #
+      # A crate belongs on the embedded matrix exactly when it declares
+      # `#![no_std]`, so that attribute is the declaration and this grep is the
+      # derivation. Before Phase 18 this job repeated one near-identical block
+      # per crate — nine copies of a list — and the drift was already there:
+      # `fiducial-sim` had been added to the workspace without a tenth block,
+      # and PHASES.md recorded it as covered when it was not. (Sim is correctly
+      # absent: it uses Vec and rayon and is not `no_std`. The bug was that
+      # nothing checked.)
+      #
+      # Adding a `no_std` crate now enters this matrix automatically.
+      - name: Check the no_std spine (${{ matrix.target.triple }})
+        run: |
+          set -euo pipefail
+          spine=$(grep -l '^#!\[no_std\]' crates/*/src/lib.rs \
+                  | xargs -n1 dirname | xargs -n1 dirname | xargs -n1 basename \
+                  | sort)
+          if [ -z "$spine" ]; then
+            echo "::error::no no_std crates found — has the layout moved?"
+            exit 1
+          fi
+          echo "Spine crates:"; echo "$spine" | sed 's/^/  /'
+          for crate in $spine; do
+            echo "::group::$crate (${{ matrix.target.triple }})"
+            cargo check \
+              --package "$crate" \
+              --target ${{ matrix.target.triple }} \
+              ${{ matrix.target.features }}
+            echo "::endgroup::"
+          done
 
       - name: Check fiducial-wasm (${{ matrix.target.triple }})
         if: matrix.target.check_wasm
@@ -66,54 +91,15 @@ jobs:
           --package fiducial-wasm
           --target ${{ matrix.target.triple }}
 
-      - name: Check fiducial-quantity (${{ matrix.target.triple }})
+      # fiducial-sim is not `no_std`, so it is not on the embedded matrix — but
+      # it does have to keep building for the browser.
+      - name: Check fiducial-sim (${{ matrix.target.triple }})
+        if: matrix.target.check_wasm
         run: >
           cargo check
-          --package fiducial-quantity
+          --package fiducial-sim
           --target ${{ matrix.target.triple }}
-          ${{ matrix.target.features }}
-
-      - name: Check fiducial-model (${{ matrix.target.triple }})
-        run: >
-          cargo check
-          --package fiducial-model
-          --target ${{ matrix.target.triple }}
-          ${{ matrix.target.features }}
-
-      - name: Check fiducial-protocol (${{ matrix.target.triple }})
-        run: >
-          cargo check
-          --package fiducial-protocol
-          --target ${{ matrix.target.triple }}
-          ${{ matrix.target.features }}
-
-      - name: Check fiducial-eda (${{ matrix.target.triple }})
-        run: >
-          cargo check
-          --package fiducial-eda
-          --target ${{ matrix.target.triple }}
-          ${{ matrix.target.features }}
-
-      - name: Check fiducial-geometry (${{ matrix.target.triple }})
-        run: >
-          cargo check
-          --package fiducial-geometry
-          --target ${{ matrix.target.triple }}
-          ${{ matrix.target.features }}
-
-      - name: Check fiducial-mesh (${{ matrix.target.triple }})
-        run: >
-          cargo check
-          --package fiducial-mesh
-          --target ${{ matrix.target.triple }}
-          ${{ matrix.target.features }}
-
-      - name: Check fiducial-ota (${{ matrix.target.triple }})
-        run: >
-          cargo check
-          --package fiducial-ota
-          --target ${{ matrix.target.triple }}
-          ${{ matrix.target.features }}
+          --no-default-features
 
   # ── Host: full workspace build + tests ────────────────────────────────────
   rust:
@@ -139,8 +125,11 @@ jobs:
       - name: Clippy (workspace)
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
+      # `--all-features` matters here: without it the README doctests that need
+      # `std` are silently skipped, and a README example can rot while CI stays
+      # green. Each crate's README is compiled and run as a doctest.
       - name: Tests (workspace)
-        run: cargo test --workspace
+        run: cargo test --workspace --all-features
 
   # ── WASM: wasm-pack build ─────────────────────────────────────────────────
   wasm-pack:

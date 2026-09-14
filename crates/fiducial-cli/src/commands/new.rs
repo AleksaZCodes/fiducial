@@ -10,22 +10,10 @@ use std::{
     process::Command,
 };
 
-use crate::lock::Lock;
+use crate::{lock::Lock, templates};
 
 /// Current platform version — baked in at compile time.
 const PLATFORM_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-// ── Embedded templates ───────────────────────────────────────────────────────
-
-const TMPL_FIDUCIAL_TOML: &str = include_str!("../../templates/fiducial.toml.tmpl");
-const TMPL_MISSION_MD: &str = include_str!("../../templates/MISSION.md.tmpl");
-const TMPL_AGENTS_MD: &str = include_str!("../../templates/AGENTS.md.tmpl");
-const TMPL_GITIGNORE: &str = include_str!("../../templates/gitignore.tmpl");
-const TMPL_CLAUDE_SETTINGS: &str = include_str!("../../templates/claude-settings.json.tmpl");
-const TMPL_README: &str = include_str!("../../templates/README.md.tmpl");
-const TMPL_AGENT_REVIEW: &str = include_str!("../../templates/agents-review.md.tmpl");
-const TMPL_AGENT_DESIGN: &str = include_str!("../../templates/agents-design.md.tmpl");
-const TMPL_CI_REVIEW: &str = include_str!("../../templates/claude-review.yml.tmpl");
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
@@ -46,39 +34,12 @@ pub fn run(name: &str) -> Result<()> {
 
     let mut lock = Lock::new();
 
-    write_template(&dest, "fiducial.toml", TMPL_FIDUCIAL_TOML, name, &mut lock)?;
-    write_template(&dest, "MISSION.md", TMPL_MISSION_MD, name, &mut lock)?;
-    write_template(&dest, "AGENTS.md", TMPL_AGENTS_MD, name, &mut lock)?;
-    write_template(&dest, ".gitignore", TMPL_GITIGNORE, name, &mut lock)?;
-    write_template(
-        &dest,
-        ".claude/settings.json",
-        TMPL_CLAUDE_SETTINGS,
-        name,
-        &mut lock,
-    )?;
-    write_template(
-        &dest,
-        ".claude/agents/review.md",
-        TMPL_AGENT_REVIEW,
-        name,
-        &mut lock,
-    )?;
-    write_template(
-        &dest,
-        ".claude/agents/design.md",
-        TMPL_AGENT_DESIGN,
-        name,
-        &mut lock,
-    )?;
-    write_template(
-        &dest,
-        ".github/workflows/claude-review.yml",
-        TMPL_CI_REVIEW,
-        name,
-        &mut lock,
-    )?;
-    write_template(&dest, "README.md", TMPL_README, name, &mut lock)?;
+    // The scaffold set is declared once, in `templates::SCAFFOLD_FILES`, so
+    // `fid upgrade` can diff it against an existing product's lock and install
+    // whatever the platform has added since.
+    for (rel_path, template) in templates::SCAFFOLD_FILES {
+        write_template(&dest, rel_path, template, name, &mut lock)?;
+    }
 
     // Write fiducial.lock — after all templates are recorded.
     lock.save(&dest.join("fiducial.lock"))
@@ -124,15 +85,43 @@ fn write_template(
 }
 
 /// Run `git init` in the product directory if git is available.
+///
+/// The initial branch is forced to `main`. Without this, the branch name comes
+/// from the user's `init.defaultBranch`, which is still `master` on a default
+/// install — and the scaffold contradicts itself the moment that happens: the
+/// `no-direct-main-push` guard rule guards a branch that does not exist, the
+/// scaffolded review agent tells agents to run `git diff main...HEAD`, which
+/// fails outright, and the CI workflow triggers on a branch that never appears.
+///
+/// `--initial-branch` needs git 2.28 (2020). Older versions get the same result
+/// from `symbolic-ref`, which works on the unborn HEAD a fresh `init` leaves.
 fn git_init(dest: &Path) -> Result<()> {
-    let status = Command::new("git").arg("init").current_dir(dest).status();
+    let status = Command::new("git")
+        .args(["init", "--initial-branch=main"])
+        .current_dir(dest)
+        .status();
 
     match status {
         Ok(s) if s.success() => {
-            println!("  git    init");
+            println!("  git    init (branch: main)");
             Ok(())
         }
-        Ok(s) => bail!("`git init` exited with status {s}"),
+        Ok(_) => {
+            // Pre-2.28 git: init, then point the unborn HEAD at main.
+            let init = Command::new("git").arg("init").current_dir(dest).status();
+            match init {
+                Ok(s) if s.success() => {
+                    let _ = Command::new("git")
+                        .args(["symbolic-ref", "HEAD", "refs/heads/main"])
+                        .current_dir(dest)
+                        .status();
+                    println!("  git    init (branch: main)");
+                    Ok(())
+                }
+                Ok(s) => bail!("`git init` exited with status {s}"),
+                Err(e) => Err(e).context("running `git init`"),
+            }
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             // git not installed — warn but don't fail.
             println!("  ⚠ git not found; skipping git init. Install git and run it manually.");

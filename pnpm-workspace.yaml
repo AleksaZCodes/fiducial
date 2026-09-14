@@ -1,5 +1,22 @@
 packages:
   - "packages/*"
-  - "apps/*"
-  - "workbench"
-  - "cli"
+
+# ── Dependency catalog ──────────────────────────────────────────────────────
+# Principle 1, on the JavaScript side: a version used by two packages is
+# declared once, here, and referenced as `"catalog:"` in each package.json.
+#
+# This block exists because the alternative was measured. Before Phase 18 the
+# TypeScript version was written into ten package.json files as three different
+# answers — `^7.0.2`, `^7.0.0` and `^5.0.0` — while exactly one version was
+# installed. Nothing failed; the declarations had simply stopped describing
+# reality, which is the failure mode this platform exists to delete.
+#
+# `crates/fiducial-cli/tests/workspace_hygiene.rs` fails the build if a
+# dependency is named by two packages without coming from this catalog.
+#
+# Peer dependencies are deliberately NOT catalogued: a peer range states what a
+# consumer must supply, not what this repository installs.
+catalog:
+  typescript: "^7.0.2"
+  "@types/react": "^19.0.0"
+  svelte: "^5.0.0"

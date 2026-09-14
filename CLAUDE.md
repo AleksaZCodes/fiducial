@@ -18,6 +18,8 @@ fiducial/
 │   ├── fiducial-geometry/  no_std points, tolerance profiles, triangulation
 │   ├── fiducial-mesh/      no_std case generation, STL + GLB export
 │   ├── fiducial-eda/       no_std board.interface.json schema + validation
+│   ├── fiducial-ota/       no_std signed, resumable firmware update protocol
+│   ├── fiducial-sim/       ODE simulation — native (rayon) and WASM
 │   ├── fiducial-cli/       the `fid` binary + capability templates
 │   ├── fiducial-wasm/      wasm-bindgen wrapper
 │   └── fiducial-tauri/     desktop host
@@ -29,14 +31,18 @@ fiducial/
 │   ├── ui-react/, ui-svelte/   component registry sources
 │   ├── tokens/, headless/  design tokens, headless logic
 │   ├── wasm-bridge/        generated TS types from Rust
+│   ├── realtime/           broadcast, presence, postgres-changes contracts
 │   ├── cli/                @fiducial/cli npm shim
 │   └── fiducial/           @fiducial/fiducial on npm
 ├── docs/specs/         Design specs (append-only decisions)
 └── .github/workflows/  CI + release automation
 ```
 
-Run `ls crates packages` rather than trusting this tree if something looks
-missing — it is hand-maintained, which is exactly why it drifts.
+This tree is checked by `crates/fiducial-cli/tests/workspace_hygiene.rs`, which
+fails the build when a crate or package is missing from it. It used to carry a
+disclaimer telling you to run `ls` instead — but a disclaimer is not a fix, and
+this file had already drifted past `fiducial-ota`, `fiducial-sim` and
+`packages/realtime` by the time anyone checked.
 
 ## Current phase
 

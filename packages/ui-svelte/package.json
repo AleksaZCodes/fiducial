@@ -1,25 +1,26 @@
 {
   "name": "@fiducial/ui-svelte",
   "version": "0.1.0",
-  "description": "Fiducial component registry source — Svelte. Use `fid add component <name>` to copy components into your product.",
+  "description": "Fiducial component registry source \u2014 Svelte. Use `fid add component <name>` to copy components into your product.",
   "license": "MIT",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "build":     "echo 'Registry source — no build step. Use fid add component.'",
-    "typecheck": "echo 'ui-svelte: .svelte files checked by svelte-check at build time'"
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings --tsgo"
   },
   "peerDependencies": {
     "svelte": ">=5"
   },
   "dependencies": {
-    "@fiducial/tokens":   "workspace:*",
+    "@fiducial/tokens": "workspace:*",
     "@fiducial/headless": "workspace:*"
   },
   "devDependencies": {
-    "svelte":      "^5.0.0",
-    "typescript":  "^7.0.0"
+    "svelte": "catalog:",
+    "svelte-check": "^4.1.0",
+    "typescript": "~6",
+    "@typescript/native": "npm:typescript@7.0.2"
   }
 }

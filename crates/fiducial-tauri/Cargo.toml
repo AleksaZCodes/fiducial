@@ -15,7 +15,7 @@ categories  = ["hardware-support", "embedded"]
 name = "fiducial_tauri"
 
 [dependencies]
-fiducial-protocol = { path = "../fiducial-protocol" }
-serialport = { version = "4", default-features = false }
-thiserror  = "2"
-serde      = { version = "1", features = ["derive"] }
+fiducial-protocol = { workspace = true }
+serialport = { workspace = true }
+thiserror  = { workspace = true }
+serde      = { workspace = true, features = ["derive", "std"] }

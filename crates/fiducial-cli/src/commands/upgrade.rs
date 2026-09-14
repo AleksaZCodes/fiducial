@@ -76,7 +76,53 @@ pub fn run(dry_run: bool, portfolio: bool) -> Result<()> {
             println!("  · {rel_path}: no upstream change");
         }
     }
-    println!();
+
+    // ── 1b. Templates the platform has added since this product was scaffolded ─
+    //
+    // A 3-way merge can only update files the lock already knows about, so
+    // without this a template added to `fid new` reached only products created
+    // afterwards. `.github/workflows/ci.yml` — the workflow that gates artifact
+    // freshness — was added in Phase 18 and would have arrived in no existing
+    // product at all. Principle 7: a fix that cannot propagate is half-finished.
+    let added: Vec<(&str, &str)> = templates::SCAFFOLD_FILES
+        .iter()
+        .copied()
+        .filter(|(rel_path, _)| !lock.templates.contains_key(*rel_path))
+        .collect();
+
+    if !added.is_empty() {
+        println!("  New since this product was scaffolded");
+        for (rel_path, template) in &added {
+            let dest = root.join(rel_path);
+
+            // Never clobber a file the product already wrote by hand; report it
+            // and let the author reconcile.
+            if dest.exists() {
+                println!("  ⚠ {rel_path}: exists on disk but is untracked — leaving it alone");
+                continue;
+            }
+
+            any_changes = true;
+            if dry_run {
+                println!("  ✓ would add: {rel_path}");
+                continue;
+            }
+
+            let content = templates::expand(template, &cfg.product.name, PLATFORM_VERSION);
+            if let Some(parent) = dest.parent() {
+                std::fs::create_dir_all(parent)
+                    .with_context(|| format!("creating parent for `{rel_path}`"))?;
+            }
+            std::fs::write(&dest, &content).with_context(|| format!("writing `{rel_path}`"))?;
+            lock.record(
+                rel_path.replace('\\', "/"),
+                content.as_bytes(),
+                PLATFORM_VERSION,
+            );
+            println!("  ✓ added: {rel_path}");
+        }
+        println!();
+    }
 
     // ── 2. Codemods ───────────────────────────────────────────────────────────
     println!("  Codemods");

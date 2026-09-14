@@ -18,6 +18,7 @@ const TMPL_CLAUDE_SETTINGS: &str = include_str!("../templates/claude-settings.js
 const TMPL_AGENT_REVIEW: &str = include_str!("../templates/agents-review.md.tmpl");
 const TMPL_AGENT_DESIGN: &str = include_str!("../templates/agents-design.md.tmpl");
 const TMPL_CI_REVIEW: &str = include_str!("../templates/claude-review.yml.tmpl");
+const TMPL_CI: &str = include_str!("../templates/ci.yml.tmpl");
 const TMPL_README: &str = include_str!("../templates/README.md.tmpl");
 
 // ── Capability templates ──────────────────────────────────────────────────────
@@ -115,6 +116,33 @@ const CAP_EDA_PIPELINE: &str = include_str!("../capabilities/eda/pipelines/eda.t
 const CAP_EDA_ENCLOSURE_PIPELINE: &str =
     include_str!("../capabilities/eda/pipelines/enclosure.toml");
 
+// ── The scaffold set ─────────────────────────────────────────────────────────
+
+/// Every file `fid new` writes, declared once.
+///
+/// This list is the single declaration of "what a scaffolded product contains".
+/// `commands::new` iterates it to create a product; `commands::upgrade` diffs it
+/// against `fiducial.lock` to find templates the platform has added since a
+/// product was scaffolded, and installs them.
+///
+/// That second consumer is the reason this is a list rather than a sequence of
+/// calls. Before it existed, a template added to `fid new` reached only products
+/// scaffolded *afterwards* — `.github/workflows/ci.yml` would have been added to
+/// the platform and never arrived in a single existing product. Principle 7: a
+/// fix that cannot propagate is only half-finished.
+pub const SCAFFOLD_FILES: &[(&str, &str)] = &[
+    ("fiducial.toml", TMPL_FIDUCIAL_TOML),
+    ("MISSION.md", TMPL_MISSION_MD),
+    ("AGENTS.md", TMPL_AGENTS_MD),
+    ("README.md", TMPL_README),
+    (".gitignore", TMPL_GITIGNORE),
+    (".claude/settings.json", TMPL_CLAUDE_SETTINGS),
+    (".claude/agents/review.md", TMPL_AGENT_REVIEW),
+    (".claude/agents/design.md", TMPL_AGENT_DESIGN),
+    (".github/workflows/ci.yml", TMPL_CI),
+    (".github/workflows/claude-review.yml", TMPL_CI_REVIEW),
+];
+
 // ── Lookup ────────────────────────────────────────────────────────────────────
 
 /// Look up the raw (unexpanded) template for a repo-relative path.
@@ -130,6 +158,7 @@ pub fn raw(rel_path: &str) -> Option<&'static str> {
         ".claude/settings.json" => Some(TMPL_CLAUDE_SETTINGS),
         ".claude/agents/review.md" => Some(TMPL_AGENT_REVIEW),
         ".claude/agents/design.md" => Some(TMPL_AGENT_DESIGN),
+        ".github/workflows/ci.yml" => Some(TMPL_CI),
         ".github/workflows/claude-review.yml" => Some(TMPL_CI_REVIEW),
         "README.md" => Some(TMPL_README),
         // web-next capability

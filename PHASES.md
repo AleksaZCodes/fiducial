@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 18
+## Current phase: Phase 19
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -349,6 +349,40 @@ no live CI status (deliberate; would go behind a flag), decisions are listed but
 not read so supersession is undetected, and `briefs` from §10's v0 row is not
 built because no product has one yet.
 
+**Phase 18 — platform audit + cleanup ✅ (2026-09-14)**
+
+> A pass over the whole platform asking not "what is broken?" but "where does
+> this repository violate the rule it exists to enforce?" — because everything
+> was already green: all tests passing, clippy clean, no TODO in the tree.
+> Spec: `docs/specs/2026-09-14-phase-18-platform-audit.md`.
+
+| Found | Was | Resolved |
+| --- | --- | --- |
+| No `[workspace.dependencies]` | `serde` declared **5×**, `serde_json` 4×, `sha2` 3× — principle 1 violated in the repo that states principle 1 | One declaration, inherited with `{ workspace = true }`; feature sets stay per-crate, deliberately |
+| TypeScript version | Declared in 10 `package.json` files as **three different answers** (`^7.0.2`, `^7.0.0`, `^5.0.0`) with one version installed — drift, already arrived | pnpm `catalog:`; every package references it |
+| `fid new` scaffolded no CI | Every product **born carrying the defect `fid dash` reports** — and a test *asserted* the scaffold had no freshness guard, so the bug was the spec | Scaffolds `ci.yml` running `fid doctor` + `fid derive --check`; test asserts the fix, keeps the negative case |
+| `git init` without `--initial-branch` | Products born on `master` while the guard rule (`no-direct-main-push`), the review agent (`git diff main...HEAD`) and CI all named `main` | Forces `main`, `symbolic-ref` fallback for git < 2.28 |
+| `ui-svelte` typecheck | An **`echo`** — and its tsconfig excluded the only file it would have checked. Unchecked for two phases while `pnpm typecheck` reported green | Real `svelte-check`; first run found an a11y defect in `Dialog.svelte` whose handler was also dead code |
+| CI spine matrix | **Nine copies of one list**; `fiducial-sim` was already missing a tenth block | List **derived** from `#![no_std]` — the attribute is the declaration, the grep is the derivation |
+| `fiducial-sim` "in spine matrix" | PHASES.md claimed it; it never was, and **cannot be** (uses `Vec` + rayon, not `no_std`) | Record corrected rather than quietly satisfied; sim checked on host + `wasm32` |
+| 13 crates, 0 READMEs | Every published crate had a bare crates.io page | 17 READMEs written; each crate's is **run as a doctest**, which immediately caught a wrong method name |
+| `CLAUDE.md` / `AGENTS.md` trees | Both stale (missing ota, sim, realtime; AGENTS miscounted 11/10 vs 13/11) and both carrying a disclaimer to run `ls` instead | Corrected; a disclaimer is not a fix, so a test now fails the build on a missing entry |
+| pnpm workspace globs | `apps/*`, `workbench`, `cli` — none had ever existed; a stale glob is silent | Removed; a test asserts every glob resolves |
+
+| Deliverable | Status |
+| --- | --- |
+| `crates/fiducial-cli/tests/workspace_hygiene.rs` — **7 invariants**, each failing with the exact file and line to change | ✅ |
+| `[workspace.dependencies]` — no crate manifest contains a version literal, asserted | ✅ |
+| `catalog:` in `pnpm-workspace.yaml` — no shared JS dependency declared twice, asserted | ✅ |
+| 13 crate READMEs + 4 package READMEs; every crate README compiled as a doctest | ✅ |
+| `templates/ci.yml.tmpl` — scaffolded CI that gates on artifact freshness | ✅ |
+| CI `spine` job derives its crate list from `#![no_std]` | ✅ |
+| CI host job gains `--all-features` so README doctests are not silently skipped | ✅ |
+| Root `README.md` rewritten from a 20-line stub into a real front page | ✅ |
+| `fon` scaffold brought in line with the corrected templates | ✅ |
+| **No behaviour, API or generated output changed** — geometry, wire format, OTA and dash all byte-identical | ✅ |
+| 4-target spine, clippy, fmt clean; full Rust suite + 30 JS tasks green | ✅ |
+
 **Phase 17 — complete ✅ (2026-09-10)**
 
 > `fiducial-sim`, `realtime`, workbench v1.
@@ -372,7 +406,8 @@ built because no product has one yet.
 | Portfolio reports errors per-product without failing the command — same posture as single-product dash | ✅ |
 | `fiducial.portfolio` — `[[products]]` TOML format; name + path per entry | ✅ |
 | 5 portfolio end-to-end tests in `tests/portfolio.rs` | ✅ |
-| CI: `sim`, `realtime`, `portfolio` jobs; `fiducial-sim` in spine matrix | ✅ |
+| CI: `sim`, `realtime`, `portfolio` jobs | ✅ |
+| ~~`fiducial-sim` in spine matrix~~ — **corrected in Phase 18**: it never was, and cannot be. `fiducial-sim` uses `Vec` and rayon and is not `no_std`. It is checked on host and `wasm32` instead | ⬜ |
 
 **Phase 16c — complete ✅ (2026-09-10)**
 
@@ -593,4 +628,8 @@ fiducial/
 | **16b** | `fid release` + version-skew assertions | A protocol bump fails any artifact still on the old version; compatibility matrix committed | ✅ |
 | **16c** | Firmware OTA: `fiducial-ota` — signed manifests, resumable transfer, trial boot, staged rollout | Transfer resumes after a drop; unsigned image cannot stage; failed self-test rolls back ([rescoped from BLE](docs/specs/2026-09-10-phase-16c-ota-transport-rescope.md)) | ✅ |
 | **17** | `fiducial-sim`, `realtime`, workbench v1 | Simulation runs native and in WASM; realtime's three contracts covered by tests | ✅ |
-| **18** | ROP migration wave 2 (optional) — eligible rules to L0 Rust | Each differential-tested before the TypeScript is deleted | ⬜ |
+| **18** | Platform audit + cleanup | Every drift found is encoded as an invariant that fails the build | ✅ |
+| **19** | The harvest feature — `fid harvest` + skill + docs | A repo or folder yields reusable assets a new product can adopt without being overridden | 🟡 |
+| **20** | Catalogue ROP's reusable assets | Every reusable asset inventoried with an extraction recipe | ⬜ |
+| **21** | The documentation layer | Step-by-step guides for humans and agents; terminal captures checked by CI | ⬜ |
+| **22** | ROP migration wave 2 (optional) — eligible rules to L0 Rust | Each differential-tested before the TypeScript is deleted | ⬜ |
