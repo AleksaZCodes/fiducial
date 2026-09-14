@@ -17,10 +17,11 @@ enabled = false
 enabled = []
 
 [guard]
-# Active portable guard rules. Matches only in command position — never inside
-# quoted strings or arguments (§11 of the design spec).
+# Active portable guard rules. Command names match only in command position —
+# never inside quoted strings or as another command's argument (§11 of the
+# design spec). Every name here must resolve to a rule that can actually fire;
+# `fid doctor` reports one that does not.
 rules = [
     "no-direct-main-push",
-    "no-hand-edit-generated",
     "no-unpinned-cli-fetch",
 ]

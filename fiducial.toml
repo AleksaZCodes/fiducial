@@ -30,6 +30,5 @@ enabled = []
 # The rules products get are the rules we work under.
 rules = [
     "no-direct-main-push",
-    "no-hand-edit-generated",
     "no-unpinned-cli-fetch",
 ]

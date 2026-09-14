@@ -6,7 +6,7 @@ Product
   root           /home/you/dev/demo-product
   spine          disabled
   capabilities   (none)
-  guard rules    3
+  guard rules    2
 
 Git
   branch         main

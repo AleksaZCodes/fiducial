@@ -18,7 +18,7 @@ use fiducial_mesh::{
 
 use crate::{
     config::{Config, CONFIG_FILE},
-    lock::{sha256_hex, Lock, LOCK_FILE},
+    lock::{sha256_hex, short_hash, Lock, LOCK_FILE},
     pipeline::{self, Pipeline},
 };
 
@@ -138,8 +138,8 @@ fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
                         if actual != record.hash {
                             issues.push(format!(
                                 "  {out}: stale (lock:{} file:{}) — run `fid derive`",
-                                &record.hash[..8],
-                                &actual[..8],
+                                short_hash(&record.hash),
+                                short_hash(&actual),
                             ));
                         }
                     }

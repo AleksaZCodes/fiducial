@@ -146,12 +146,16 @@ impl Default for Guard {
     }
 }
 
+/// Guard rules every product starts with.
+///
+/// Only names `guard::rule_by_name` resolves belong here — asserted by
+/// `every_declared_guard_rule_is_implemented`. This list used to carry
+/// `no-hand-edit-generated`, which has never existed: the guard reads Bash
+/// commands, and hand-editing a generated file happens through an editor, not
+/// through a shell. Naming it bought nothing and told `fid dash` to report the
+/// product as guarded by three rules when one worked.
 fn default_rules() -> Vec<String> {
-    vec![
-        "no-direct-main-push".into(),
-        "no-hand-edit-generated".into(),
-        "no-unpinned-cli-fetch".into(),
-    ]
+    vec!["no-direct-main-push".into(), "no-unpinned-cli-fetch".into()]
 }
 
 impl Config {

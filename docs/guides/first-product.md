@@ -94,6 +94,7 @@ $ fid doctor
 ✦ fid doctor — /home/you/dev/demo-product
 
   ✓ fiducial.toml valid  (product: demo-product, vX.Y.Z)
+  ✓ guard: 2 rule(s), all implemented
   ✓ fiducial.lock valid  (11 template(s) tracked, 0 migration(s) applied)
   ✓ all template files unmodified
   ✓ templates up to date with platform vX.Y.Z

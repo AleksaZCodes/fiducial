@@ -28,6 +28,7 @@ use std::{
 
 use crate::{
     config::{Config, CONFIG_FILE},
+    guard,
     lock::{sha256_hex, Lock, LOCK_FILE},
     pipeline,
 };
@@ -53,7 +54,15 @@ struct ProductView {
     root: String,
     spine_enabled: bool,
     capabilities: Vec<String>,
+    /// Declared guard rules that resolve to a rule that can actually fire.
     guard_rules: usize,
+    /// Declared guard rules with no implementation.
+    ///
+    /// Counted separately, and never folded into `guard_rules`, because a name
+    /// with nothing behind it is the opposite of protection: the product
+    /// believes it is guarded, and `fid dash` used to agree. A scaffold shipped
+    /// three names and one working rule, and reported "guard rules 3".
+    guard_rules_unknown: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -177,7 +186,19 @@ impl Dash {
                 root: root.display().to_string(),
                 spine_enabled: config.spine.enabled,
                 capabilities: config.capabilities.enabled.clone(),
-                guard_rules: config.guard.rules.len(),
+                guard_rules: config
+                    .guard
+                    .rules
+                    .iter()
+                    .filter(|r| guard::rule_by_name(r).is_some())
+                    .count(),
+                guard_rules_unknown: config
+                    .guard
+                    .rules
+                    .iter()
+                    .filter(|r| guard::rule_by_name(r).is_none())
+                    .cloned()
+                    .collect(),
             },
             git: git_view(root),
             roadmap: roadmap_view(root),
@@ -758,6 +779,15 @@ impl Dash {
                 },
             );
             field("guard rules", self.product.guard_rules);
+            if !self.product.guard_rules_unknown.is_empty() {
+                field(
+                    "unknown rules",
+                    format!(
+                        "{} — declared but not implemented, so they guard nothing",
+                        self.product.guard_rules_unknown.join(", ")
+                    ),
+                );
+            }
         }
 
         if want("git") {

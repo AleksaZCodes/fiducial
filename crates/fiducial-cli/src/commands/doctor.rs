@@ -15,6 +15,7 @@ use std::{env, path::Path};
 use crate::{
     capability::PLATFORM_VERSION,
     config::{Config, CONFIG_FILE},
+    guard,
     lock::{Lock, LOCK_FILE},
     migration, templates,
 };
@@ -93,6 +94,32 @@ fn check_config(root: &Path, ok: &mut Vec<String>, issues: &mut Vec<String>) -> 
                 "fiducial.toml valid  (product: {}, v{})",
                 cfg.product.name, cfg.product.version
             ));
+
+            // A guard rule name with no implementation is the one thing worse
+            // than no guard rule: the product believes it is protected. This
+            // shipped for five phases — `no-hand-edit-generated` was in every
+            // scaffold and has never existed — so an existing product is told
+            // rather than silently downgraded when the scaffold drops it.
+            let unknown: Vec<&String> = cfg
+                .guard
+                .rules
+                .iter()
+                .filter(|r| guard::rule_by_name(r).is_none())
+                .collect();
+            if unknown.is_empty() {
+                ok.push(format!(
+                    "guard: {} rule(s), all implemented",
+                    cfg.guard.rules.len()
+                ));
+            } else {
+                for name in unknown {
+                    issues.push(format!(
+                        "fiducial.toml [guard]: `{name}` is not an implemented rule — it \
+                         guards nothing. Remove it from `rules`, or run `fid upgrade` to \
+                         take the current list."
+                    ));
+                }
+            }
             Some(cfg)
         }
         Err(e) => {

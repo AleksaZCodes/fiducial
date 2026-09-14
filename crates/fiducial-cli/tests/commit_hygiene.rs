@@ -61,19 +61,39 @@ fn parse(subject: &str) -> Result<(&str, Option<&str>, bool, &str), String> {
     Ok((kind, scope, breaking, rest))
 }
 
+/// The ref to compare against: `origin/main` if it is there, else `main`.
+///
+/// `origin/main` first, because the **local** `main` is whatever the working
+/// copy last checked out and is routinely behind. Resolving it there swept in
+/// commits that were already merged upstream — this gate's first run failed on
+/// the squash-merge commit of the pull request that introduced it, whose
+/// subject GitHub took from the PR title and which nobody can amend. That is
+/// the exact case the doc comment above promises to exclude.
+fn base_ref() -> Option<&'static str> {
+    for candidate in ["origin/main", "main"] {
+        let found = Command::new("git")
+            .args(["rev-parse", "--verify", "--quiet", candidate])
+            .output()
+            .ok()?;
+        if found.status.success() {
+            return Some(candidate);
+        }
+    }
+    // Neither exists — a shallow CI checkout or a fresh clone.
+    None
+}
+
 /// Commits on this branch that are not on `main`.
 fn commits_under_review() -> Option<Vec<(String, String)>> {
-    // `main` may not exist in a shallow CI checkout or a fresh clone.
-    let base = Command::new("git")
-        .args(["rev-parse", "--verify", "--quiet", "main"])
-        .output()
-        .ok()?;
-    if !base.status.success() {
-        return None;
-    }
+    let base = base_ref()?;
 
     let log = Command::new("git")
-        .args(["log", "--no-merges", "--format=%H%x1f%s", "main..HEAD"])
+        .args([
+            "log",
+            "--no-merges",
+            "--format=%H%x1f%s",
+            &format!("{base}..HEAD"),
+        ])
         .output()
         .ok()?;
     if !log.status.success() {

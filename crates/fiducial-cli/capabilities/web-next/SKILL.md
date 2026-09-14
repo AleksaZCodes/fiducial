@@ -29,7 +29,6 @@ pnpm typecheck                     # type-check the whole workspace
 
 | Rule | What it prevents |
 |---|---|
-| `no-direct-schema-migration` | Running raw SQL migrations by hand — use the declared migration pipeline |
 | `no-unpinned-cli-fetch` | `curl | sh` or `wget` without a pinned version |
 
 ## Adding pages

@@ -53,7 +53,7 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
     CapabilityDef {
         id: "web-next",
         description: "Next.js web app with Turborepo wiring, Biome, and Changesets",
-        guard_rules: &["no-direct-schema-migration", "no-unpinned-cli-fetch"],
+        guard_rules: &["no-unpinned-cli-fetch"],
         templates: &[
             (
                 "apps/web/package.json",
@@ -93,7 +93,7 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
     CapabilityDef {
         id: "web-svelte",
         description: "SvelteKit web app with Turborepo wiring, Biome, and Changesets",
-        guard_rules: &["no-direct-schema-migration", "no-unpinned-cli-fetch"],
+        guard_rules: &["no-unpinned-cli-fetch"],
         templates: &[
             (
                 "apps/web/package.json",
@@ -133,7 +133,7 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
     CapabilityDef {
         id: "firmware-rp2040",
         description: "RP2040 Embassy firmware with defmt logging and probe-rs flashing",
-        guard_rules: &["no-direct-flash-without-check", "no-unpinned-cli-fetch"],
+        guard_rules: &["no-unpinned-cli-fetch"],
         templates: &[
             (
                 "firmware/Cargo.toml",
@@ -181,7 +181,7 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
     CapabilityDef {
         id: "firmware-stm32",
         description: "STM32F401 Embassy firmware with defmt logging and probe-rs flashing",
-        guard_rules: &["no-direct-flash-without-check", "no-unpinned-cli-fetch"],
+        guard_rules: &["no-unpinned-cli-fetch"],
         templates: &[
             (
                 "firmware/Cargo.toml",
@@ -263,7 +263,7 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
     CapabilityDef {
         id: "i18n",
         description: "Localized by construction: JSON catalogs in, typed message keys out",
-        guard_rules: &["no-hand-edit-generated-messages"],
+        guard_rules: &[],
         templates: &[
             (
                 "messages/en.json",
@@ -283,7 +283,7 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
     CapabilityDef {
         id: "eda",
         description: "EDA pipeline: atopile → KiCad → board.interface.json tracked by fid derive",
-        guard_rules: &["no-hand-edit-generated-board-interface"],
+        guard_rules: &[],
         templates: &[
             (
                 "board/main.ato",
@@ -389,7 +389,11 @@ pub fn install(cap: &CapabilityDef, root: &Path, product_name: &str) -> Result<(
         .context("writing fiducial.lock")?;
 
     println!("  ✓ {} installed", cap.id);
-    println!("  ✓ guard rules added: {}", cap.guard_rules.join(", "));
+    if cap.guard_rules.is_empty() {
+        println!("  ✓ no guard rules — this capability adds none");
+    } else {
+        println!("  ✓ guard rules added: {}", cap.guard_rules.join(", "));
+    }
     println!(
         "  ✓ instructions → .fiducial/skills/{}.md (any agent; see AGENTS.md)",
         cap.id
