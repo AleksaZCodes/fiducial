@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 20
+## Current phase: Phase 21
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -349,6 +349,22 @@ no live CI status (deliberate; would go behind a flag), decisions are listed but
 not read so supersession is undetected, and `briefs` from §10's v0 row is not
 built because no product has one yet.
 
+**Phase 20 — Ring of Pursuit catalogued ✅ (2026-09-14)**
+
+> `fid harvest` turned on its intended donor. Catalogue:
+> `docs/harvest/ring-of-pursuit.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| Full catalogue of ROP's reusable assets — 8 entries, each with a target, a recipe and the warnings someone would otherwise rediscover | ✅ |
+| An explicit **not worth lifting** list with reasons — as valuable as the first, and shorter to act on | ✅ |
+| **Ratio: 1 extracted, 9 catalogued.** MISSION's two anti-goals pull against each other here; importing everything reusable would satisfy "do not rebuild" and violate "the platform must never become the project" | ✅ |
+| **Extracted:** `OfflineQueue` durability — the one item that had already met the second-use bar, because `@fiducial/headless` had declared it needed this queue and shipped half of it | ✅ |
+| `QueueStorage<T>` adapter (memory + durable), `DEFAULT_BACKOFF_SCHEDULE_MS`, `backoffFor()`, `pending()`; `maxRetries` now *derives* from the schedule instead of being a second declaration of it | ✅ |
+| 7 new headless tests incl. surviving a reload, and one asserting the durable and in-memory paths run identical assertions so they cannot drift | ✅ |
+| Changeset recording the `maxRetries` default change rather than letting it land silently | ✅ |
+| **Defect in `fid harvest` found by dogfooding:** `.vitepress/cache`, `.wrangler/tmp`, `supabase/.temp` were walked, ranking a 13,206-line VitePress dependency chunk as the donor's most valuable business logic. 13 scratch directories added to the skip list; logic 61,560 → 16,887 real lines, contract 142,764 → 9,514 | ✅ |
+
 **Phase 19 — harvest ✅ (2026-09-14)**
 
 > Getting the good parts out of a codebase you already built, without dragging
@@ -650,6 +666,6 @@ fiducial/
 | **17** | `fiducial-sim`, `realtime`, workbench v1 | Simulation runs native and in WASM; realtime's three contracts covered by tests | ✅ |
 | **18** | Platform audit + cleanup | Every drift found is encoded as an invariant that fails the build | ✅ |
 | **19** | The harvest feature — `fid harvest` + skill + docs | A repo or folder yields reusable assets a new product can adopt without being overridden | ✅ |
-| **20** | Catalogue ROP's reusable assets | Every reusable asset inventoried with an extraction recipe | ⬜ |
+| **20** | Catalogue ROP's reusable assets | Every reusable asset inventoried with an extraction recipe | ✅ |
 | **21** | The documentation layer | Step-by-step guides for humans and agents; terminal captures checked by CI | ⬜ |
 | **22** | ROP migration wave 2 (optional) — eligible rules to L0 Rust | Each differential-tested before the TypeScript is deleted | ⬜ |

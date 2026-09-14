@@ -70,6 +70,23 @@ const SKIP_DIRS: &[&str] = &[
     "DerivedData",
     ".terraform",
     "harvest",
+    // Found by running this command on a real monorepo: these hold vendored
+    // dependency caches and tool scratch space, and their contents outranked
+    // every genuine source file in the survey. A 13,000-line VitePress dep
+    // chunk is not the donor's most valuable business logic.
+    ".vitepress",
+    ".wrangler",
+    ".temp",
+    ".tmp",
+    "tmp",
+    ".output",
+    ".vercel",
+    ".astro",
+    "storybook-static",
+    "playwright-report",
+    "test-results",
+    ".nyc_output",
+    "cache",
 ];
 
 /// Files larger than this are inventoried but never staged. A 40 MB PSD is a
@@ -1004,6 +1021,26 @@ mod tests {
         assert_eq!(kind, Kind::Ops);
         let (kind, _) = classify("scripts/deploy.mjs", Path::new("/nonexistent")).unwrap();
         assert_eq!(kind, Kind::Ops);
+    }
+
+    #[test]
+    fn tool_scratch_directories_are_skipped() {
+        // Running this command on a real monorepo put a 13,206-line VitePress
+        // dependency chunk at the top of the "logic" findings, ahead of every
+        // real rule in the codebase. Vendored caches are not the donor's work.
+        for dir in [
+            ".vitepress",
+            ".wrangler",
+            ".temp",
+            "cache",
+            "storybook-static",
+            "test-results",
+        ] {
+            assert!(
+                SKIP_DIRS.contains(&dir),
+                "`{dir}` should never be walked"
+            );
+        }
     }
 
     #[test]
