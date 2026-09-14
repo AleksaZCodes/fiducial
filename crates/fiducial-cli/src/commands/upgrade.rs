@@ -77,6 +77,7 @@ pub fn run(dry_run: bool, portfolio: bool) -> Result<()> {
             println!("  · {rel_path}: no upstream change");
         }
     }
+    println!();
 
     // ── 1a. Templates the platform has renamed ────────────────────────────────
     //
