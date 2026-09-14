@@ -12,6 +12,20 @@ $ fid new demo-product
   wrote  .github/workflows/ci.yml
   wrote  .github/workflows/claude-review.yml
   wrote  fiducial.lock
+✦ fid add i18n — installing into demo-product
+  wrote  messages/en.json
+  wrote  messages/sr.json
+  wrote  pipelines/i18n.toml
+  wrote  .fiducial/skills/i18n.md
+  wrote  .claude/skills/i18n.md
+  patched fiducial.toml
+  ✓ i18n installed
+  ✓ no guard rules — this capability adds none
+  ✓ instructions → .fiducial/skills/i18n.md (any agent; see AGENTS.md)
+
+  ▶ i18n (fid-i18n) ✓
+
+✦ fid derive complete — fiducial.lock updated
 Initialized empty Git repository in /home/you/dev/demo-product/.git/
   git    init (branch: main)
 

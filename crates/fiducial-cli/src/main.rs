@@ -99,6 +99,41 @@ Rules: lowercase ASCII letters, digits, and hyphens. No leading or trailing
 hyphens. Examples: `my-product`, `ring-of-pursuit`, `lora-walkie`."
         )]
         name: String,
+
+        /// Locales this product ships, comma-separated; `none` to opt out
+        #[arg(
+            long,
+            value_name = "LIST",
+            default_value = "sr,en",
+            long_help = "Locales the product ships, comma-separated — for example `en,fr,de`.
+
+The product is created localized. Principle 1c says a user-visible string is a
+fact with one derivation per locale, and monolingual is a state you pass through
+before the first commit, not one you ship: added later, localization is a
+refactoring pass over strings that have already been missed.
+
+A catalog is written for every locale named here. Where the platform ships one
+(sr, en) it is used; otherwise the locale starts as a copy of the default, which
+`fid derive` then reports as untranslated — visible work rather than a silent
+gap.
+
+Pass `--locales none` for a product that genuinely has no user-visible text,
+such as a CLI or a firmware image."
+        )]
+        locales: String,
+
+        /// Locale a reader falls back to; must be one of --locales
+        #[arg(
+            long,
+            value_name = "LOCALE",
+            long_help = "The locale a reader falls back to when lookup fails.
+
+Defaults to `sr`. It is NOT the first entry of --locales: which language a
+product falls back to is a decision, and inferring it from list order is the
+kind of implicit fact this platform exists to delete. Name a locale set other
+than the default and this must be named too."
+        )]
+        default_locale: Option<String>,
     },
 
     /// Add an app, module, or firmware target to this product
@@ -439,7 +474,11 @@ PROTOCOL
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Commands::New { name } => commands::new::run(&name),
+        Commands::New {
+            name,
+            locales,
+            default_locale,
+        } => commands::new::run(&name, &locales, default_locale.as_deref()),
         Commands::Add { target } => commands::add::run(target),
         Commands::Capability { action } => commands::capability::run(action),
         Commands::Derive { check, pipeline } => commands::derive::run(check, pipeline),

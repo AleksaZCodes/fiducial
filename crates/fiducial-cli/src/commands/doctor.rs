@@ -15,6 +15,7 @@ use std::{env, path::Path};
 use crate::{
     capability::PLATFORM_VERSION,
     config::{Config, CONFIG_FILE},
+    guard,
     lock::{Lock, LOCK_FILE},
     migration, templates,
 };
@@ -29,6 +30,10 @@ pub fn run() -> Result<()> {
     let mut issues: Vec<String> = Vec::new();
     let mut warnings: Vec<String> = Vec::new();
     let mut ok: Vec<String> = Vec::new();
+    // Kept apart from `warnings`, which the summary line calls "upgrade
+    // hint(s)". A hardcoded string is not something `fid upgrade` fixes, and
+    // folding it in would make that line untrue.
+    let mut reports: Vec<String> = Vec::new();
 
     // ── 1. fiducial.toml ──────────────────────────────────────────────────
     let cfg = check_config(&root, &mut ok, &mut issues);
@@ -44,6 +49,11 @@ pub fn run() -> Result<()> {
         check_pending_migrations(cfg, lock, &mut warnings, &mut ok);
     }
 
+    // ── 7. Hardcoded user-visible strings ─────────────────────────────────
+    if let Some(cfg) = &cfg {
+        check_hardcoded_strings(&root, cfg, &mut reports, &mut ok);
+    }
+
     // ── Report ────────────────────────────────────────────────────────────
     for msg in &ok {
         println!("  ✓ {msg}");
@@ -55,6 +65,13 @@ pub fn run() -> Result<()> {
         println!();
         for w in &warnings {
             println!("  ⚠ {w}");
+        }
+    }
+
+    if !reports.is_empty() {
+        println!();
+        for r in &reports {
+            println!("  · {r}");
         }
     }
 
@@ -85,6 +102,48 @@ pub fn run() -> Result<()> {
 
 // ── Check helpers ─────────────────────────────────────────────────────────────
 
+/// Report user-visible strings that never reached a catalog.
+///
+/// **Never an issue.** `fid doctor` exits non-zero on issues, and the detector
+/// is a heuristic — it cannot tell prose from a `data-testid` with certainty.
+/// Making it fatal would mean every false positive blocks someone until the
+/// rule gets loosened for everybody. Reported instead, where it cannot be
+/// scrolled past, and carried in `fid dash --json` for an agent to act on.
+fn check_hardcoded_strings(
+    root: &Path,
+    cfg: &Config,
+    reports: &mut Vec<String>,
+    ok: &mut Vec<String>,
+) {
+    if cfg.i18n.is_empty() {
+        return;
+    }
+    let found = crate::i18n::scan_product(root);
+    if found.is_empty() {
+        ok.push("no hardcoded user-visible strings found".to_string());
+        return;
+    }
+    reports.push(format!(
+        "{} hardcoded user-visible string(s) — these warn, they never fail a build:",
+        found.len()
+    ));
+    for h in found.iter().take(MAX_HARDCODED_LISTED) {
+        reports.push(format!(
+            "  {}:{}  {} {:?}",
+            h.file, h.line, h.context, h.text
+        ));
+    }
+    if found.len() > MAX_HARDCODED_LISTED {
+        reports.push(format!(
+            "  … and {} more — `fid dash --section i18n --json` for the full list",
+            found.len() - MAX_HARDCODED_LISTED
+        ));
+    }
+}
+
+/// How many findings `fid doctor` lists before summarising.
+const MAX_HARDCODED_LISTED: usize = 10;
+
 fn check_config(root: &Path, ok: &mut Vec<String>, issues: &mut Vec<String>) -> Option<Config> {
     let path = root.join(CONFIG_FILE);
     match Config::load(&path) {
@@ -93,6 +152,32 @@ fn check_config(root: &Path, ok: &mut Vec<String>, issues: &mut Vec<String>) -> 
                 "fiducial.toml valid  (product: {}, v{})",
                 cfg.product.name, cfg.product.version
             ));
+
+            // A guard rule name with no implementation is the one thing worse
+            // than no guard rule: the product believes it is protected. This
+            // shipped for five phases — `no-hand-edit-generated` was in every
+            // scaffold and has never existed — so an existing product is told
+            // rather than silently downgraded when the scaffold drops it.
+            let unknown: Vec<&String> = cfg
+                .guard
+                .rules
+                .iter()
+                .filter(|r| guard::rule_by_name(r).is_none())
+                .collect();
+            if unknown.is_empty() {
+                ok.push(format!(
+                    "guard: {} rule(s), all implemented",
+                    cfg.guard.rules.len()
+                ));
+            } else {
+                for name in unknown {
+                    issues.push(format!(
+                        "fiducial.toml [guard]: `{name}` is not an implemented rule — it \
+                         guards nothing. Remove it from `rules`, or run `fid upgrade` to \
+                         take the current list."
+                    ));
+                }
+            }
             Some(cfg)
         }
         Err(e) => {

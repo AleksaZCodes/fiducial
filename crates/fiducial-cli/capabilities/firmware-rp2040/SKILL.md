@@ -49,8 +49,15 @@ fiducial-core = { path = "../../crates/fiducial-core" }
 
 | Rule | What it prevents |
 |---|---|
-| `no-direct-flash-without-check` | Flashing firmware that has not passed its build + defmt self-test |
 | `no-unpinned-cli-fetch` | Fetching tools without version pinning |
+
+**Not automated, and it used to say otherwise.** Flashing firmware that has not passed its build and defmt self-test is a real
+hazard, and this table used to name a guard rule for it that had no
+implementation — `fid dash` counted it and nothing enforced it. The guard
+reads Bash commands in command position; expressing this one needs either
+argument patterns it does not yet have or the editor hook path it does not
+yet read. Until then it is your judgement, stated plainly, rather than a
+rule that is not there.
 
 ## Key constraints
 

@@ -34,33 +34,63 @@ struct HookInput {
     tool_input: serde_json::Value,
 }
 
-/// A guard rule: a command name that is forbidden in command position.
+/// What makes a rule fire.
+///
+/// A rule used to be "a list of forbidden `argv[0]` values", and a rule whose
+/// list was empty was accepted, shipped, counted by `fid dash`, and named in
+/// the scaffolded `AGENTS.md` — while firing on nothing. `no-direct-main-push`
+/// sat like that with a comment promising the check lived "at a higher level",
+/// where no such code existed. Making the trigger an enum means every rule has
+/// to say how it fires, and `every_builtin_rule_can_fire` below proves it does.
+#[derive(Debug)]
+pub enum Trigger {
+    /// Fires when `argv[0]` is one of these.
+    CommandName(&'static [&'static str]),
+    /// Fires on `git push` whose destination refspec names one of these
+    /// branches.
+    GitPushTo(&'static [&'static str]),
+}
+
+/// A guard rule.
 #[derive(Debug)]
 pub struct Rule {
     pub name: &'static str,
     pub description: &'static str,
-    /// Command tokens (argv[0] values) that trigger this rule.
-    pub forbidden_commands: &'static [&'static str],
+    /// What makes this rule fire.
+    pub trigger: Trigger,
     /// Human-readable remediation.
     pub remediation: &'static str,
 }
+
+/// Branches a product does not push to directly.
+///
+/// `main` because `fid new` forces it (Phase 18); `master` because a repository
+/// created before that, or by another tool, still has one to protect.
+pub const PROTECTED_BRANCHES: &[&str] = &["main", "master"];
 
 /// Built-in portable rules shipped with the platform.
 pub static BUILTIN_RULES: &[Rule] = &[
     Rule {
         name: "no-unpinned-cli-fetch",
         description: "Prohibits fetching a CLI tool without pinning its version.",
-        forbidden_commands: &["curl", "wget"],
+        trigger: Trigger::CommandName(&["curl", "wget"]),
         remediation: "Pin the version in a lockfile or use a declared dependency instead.",
     },
     Rule {
         name: "no-direct-main-push",
         description: "Prohibits direct git push to the default branch.",
-        // Detected at a higher level via git argument parsing, not argv[0].
-        forbidden_commands: &[],
+        trigger: Trigger::GitPushTo(PROTECTED_BRANCHES),
         remediation: "Open a PR instead of pushing directly to main.",
     },
 ];
+
+/// Look up a built-in rule by the name a product declares in `fiducial.toml`.
+///
+/// Returns `None` for a name with no implementation — which is a finding, not
+/// a shrug: a product listing it believes it is guarded and is not.
+pub fn rule_by_name(name: &str) -> Option<&'static Rule> {
+    BUILTIN_RULES.iter().find(|r| r.name == name)
+}
 
 /// Entry point for `fid guard-check`.
 ///
@@ -101,27 +131,91 @@ pub fn check_from_stdin() -> Result<()> {
     }
 }
 
+/// One command in a pipeline: `argv[0]` and the arguments that follow it.
+struct Argv<'a> {
+    /// Index of `argv[0]` in the token stream, for the block message.
+    position: usize,
+    command: &'a str,
+    args: Vec<&'a str>,
+}
+
+/// Split a token stream into the commands it runs.
+///
+/// A `Command` token opens a new `Argv`; the `Argument` tokens after it belong
+/// to it; an `Operator` closes it. Rules that need to look at arguments — not
+/// just at `argv[0]` — need the grouping, because `git` and `push` and `main`
+/// are three separate tokens and only their combination is the hazard.
+fn split_commands(tokens: &[ShellToken]) -> Vec<Argv<'_>> {
+    let mut out: Vec<Argv> = Vec::new();
+    for (i, token) in tokens.iter().enumerate() {
+        match token.kind {
+            TokenKind::Command => out.push(Argv {
+                position: i,
+                command: &token.text,
+                args: Vec::new(),
+            }),
+            TokenKind::Argument => {
+                if let Some(last) = out.last_mut() {
+                    last.args.push(&token.text);
+                }
+            }
+            TokenKind::Operator => {}
+        }
+    }
+    out
+}
+
+/// The branch a `git push` would write to, if it names one explicitly.
+///
+/// Returns every destination the command names, because `git push origin a b`
+/// pushes both. A bare `git push` names none: which branch it would write is a
+/// property of the working tree, not of the command text, and the guard reads
+/// only text. Blocking it would fire on every feature branch — the §11
+/// false-positive this tokenizer exists to prevent.
+fn git_push_destinations<'a>(argv: &Argv<'a>) -> Vec<&'a str> {
+    if argv.command != "git" {
+        return Vec::new();
+    }
+    let mut positional = argv.args.iter().filter(|a| !a.starts_with('-'));
+    if positional.next().copied() != Some("push") {
+        return Vec::new();
+    }
+    positional
+        .map(|spec| {
+            // `HEAD:main`, `main:main` and `:main` (a delete) all write to the
+            // part after the last colon; a bare `main` writes to itself.
+            let dst = spec.rsplit(':').next().unwrap_or(spec);
+            dst.strip_prefix("refs/heads/").unwrap_or(dst)
+        })
+        .collect()
+}
+
 /// Check a token stream against a rule set.
 ///
 /// Returns `Ok(())` if all rules pass, or `Err` with the block message if a
 /// rule fires. The caller is responsible for printing the message and exiting.
 pub fn check_tokens(tokens: &[ShellToken], rules: &[Rule]) -> Result<()> {
-    for (i, token) in tokens.iter().enumerate() {
-        if token.kind != TokenKind::Command {
-            continue;
-        }
+    for argv in split_commands(tokens) {
         for rule in rules {
-            if rule.forbidden_commands.contains(&token.text.as_str()) {
+            let hit = match &rule.trigger {
+                Trigger::CommandName(names) => names
+                    .contains(&argv.command)
+                    .then(|| argv.command.to_string()),
+                Trigger::GitPushTo(branches) => git_push_destinations(&argv)
+                    .into_iter()
+                    .find(|d| branches.contains(d))
+                    .map(|d| format!("git push … {d}")),
+            };
+            if let Some(what) = hit {
                 anyhow::bail!(
-                    "fid guard [{rule_name}]: `{cmd}` is not allowed in command position.\n\
+                    "fid guard [{rule_name}]: `{what}` is not allowed.\n\
                      Reason: {desc}\n\
                      Remediation: {fix}\n\n\
                      (Position {i} in the parsed token stream — this is not a false positive.)",
                     rule_name = rule.name,
-                    cmd = token.text,
                     desc = rule.description,
                     fix = rule.remediation,
-                    i = i,
+                    i = argv.position,
                 );
             }
         }
@@ -354,6 +448,127 @@ fn is_assignment(word: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    // ── The invariants that make an inert rule impossible ────────────────────
+
+    /// Every built-in rule fires on something.
+    ///
+    /// `no-direct-main-push` shipped for five phases with an empty trigger and
+    /// a comment promising the check lived elsewhere. It was counted by `fid
+    /// dash`, named in every scaffolded `AGENTS.md`, and blocked nothing. A
+    /// rule that cannot fire is not a weak rule; it is a false assurance,
+    /// which is worse than no rule at all.
+    #[test]
+    fn every_builtin_rule_can_fire() {
+        for rule in BUILTIN_RULES {
+            let probe = match &rule.trigger {
+                Trigger::CommandName(names) => {
+                    let first = names.first().expect("CommandName trigger with no names");
+                    format!("{first} something")
+                }
+                Trigger::GitPushTo(branches) => {
+                    let first = branches
+                        .first()
+                        .expect("GitPushTo trigger with no branches");
+                    format!("git push origin {first}")
+                }
+            };
+            let tokens = tokenize_shell(&probe);
+            assert!(
+                check_tokens(&tokens, std::slice::from_ref(rule)).is_err(),
+                "rule `{}` did not fire on `{probe}` — it guards nothing",
+                rule.name
+            );
+        }
+    }
+
+    /// Every rule name the platform hands a product resolves to a real rule.
+    ///
+    /// The scaffold, the `fiducial.toml` template and each capability all name
+    /// rules by name, and nothing checked that a name had an implementation.
+    /// Three of the five names in use did not.
+    #[test]
+    fn every_declared_guard_rule_is_implemented() {
+        let mut declared: Vec<String> = crate::config::Guard::default().rules;
+
+        for cap in crate::capability::BUILTIN_CAPABILITIES {
+            declared.extend(cap.guard_rules.iter().map(|r| r.to_string()));
+        }
+
+        let template = include_str!("../templates/fiducial.toml.tmpl");
+        let in_rules_block = template
+            .split("rules = [")
+            .nth(1)
+            .expect("fiducial.toml.tmpl has no [guard] rules block");
+        for line in in_rules_block.split(']').next().unwrap_or("").lines() {
+            let name = line.trim().trim_end_matches(',').trim_matches('"');
+            if !name.is_empty() {
+                declared.push(name.to_string());
+            }
+        }
+
+        let unknown: Vec<&String> = declared
+            .iter()
+            .filter(|n| rule_by_name(n).is_none())
+            .collect();
+        assert!(
+            unknown.is_empty(),
+            "guard rule names with no implementation: {unknown:?}\n\
+             Either add the rule to BUILTIN_RULES or stop declaring it — a name \
+             with nothing behind it makes a product believe it is guarded."
+        );
+    }
+
+    // ── no-direct-main-push ──────────────────────────────────────────────────
+
+    fn blocks(command: &str) -> bool {
+        check_tokens(&tokenize_shell(command), BUILTIN_RULES).is_err()
+    }
+
+    #[test]
+    fn blocks_a_push_to_a_protected_branch() {
+        assert!(blocks("git push origin main"));
+        assert!(blocks("git push -u origin main"));
+        assert!(blocks("git push origin master"));
+        // Flags anywhere, and a fully-qualified destination refspec.
+        assert!(blocks(
+            "git push --force-with-lease origin HEAD:refs/heads/main"
+        ));
+        // A delete of the default branch is a push to it.
+        assert!(blocks("git push origin :main"));
+        // Past an operator — the hazard does not stop being one after `&&`.
+        assert!(blocks("cargo test && git push origin main"));
+    }
+
+    /// The §11 cases. A guard that cries wolf gets turned off.
+    #[test]
+    fn does_not_fire_on_a_branch_that_merely_starts_with_main() {
+        assert!(!blocks("git push origin main-ui"));
+        assert!(!blocks("git push origin feature/main"));
+        assert!(!blocks("git push origin refs/heads/mainline"));
+    }
+
+    #[test]
+    fn does_not_fire_on_a_bare_push() {
+        // Which branch a bare `git push` writes to is a property of the working
+        // tree, not of the command text. Blocking it would fire on every
+        // feature branch.
+        assert!(!blocks("git push"));
+        assert!(!blocks("git push --dry-run"));
+    }
+
+    #[test]
+    fn does_not_fire_on_main_outside_a_push() {
+        assert!(!blocks("git log --oneline main"));
+        assert!(!blocks("git checkout main"));
+        assert!(!blocks("git diff main...HEAD"));
+    }
+
+    #[test]
+    fn does_not_fire_inside_a_quoted_string() {
+        assert!(!blocks(r#"echo "git push origin main""#));
+        assert!(!blocks("echo 'git push origin main'"));
+    }
+
     use super::*;
 
     fn commands(input: &str) -> Vec<String> {

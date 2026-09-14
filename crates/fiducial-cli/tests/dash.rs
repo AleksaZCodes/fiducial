@@ -135,7 +135,10 @@ fn a_product_with_no_roadmap_or_decisions_still_renders() {
     assert_eq!(d["roadmap"]["done"], 0);
     assert!(d["decisions"]["source"].is_null(), "no decisions yet");
     assert_eq!(d["decisions"]["count"], 0);
-    assert_eq!(d["graph"]["pipelines"].as_array().unwrap().len(), 0);
+    // A scaffold ships the i18n pipeline — `fid new` creates a product that is
+    // already localized, so "no pipelines" is no longer a state a new product
+    // passes through. This test is about an absent roadmap, not about that.
+    assert_eq!(d["graph"]["pipelines"].as_array().unwrap().len(), 1);
 
     // And the text view says so rather than printing an empty heading.
     let out = run(&root, &["dash", "--section", "roadmap"]);
@@ -464,7 +467,11 @@ fn an_output_never_derived_is_distinguished_from_a_stale_one() {
     assert!(run(&root, &["add", "eda"]).status.success());
 
     let d = dash(&root);
-    assert_eq!(d["freshness"]["artifacts_fresh"], 0);
+    // One: the scaffold's own generated messages, which `fid new` derives so a
+    // product does not fail the `fid derive --check` in its own CI on the
+    // first commit. Every `eda` output is still untracked, which is the
+    // distinction under test.
+    assert_eq!(d["freshness"]["artifacts_fresh"], 1);
     assert!(
         d["freshness"]["artifacts_untracked"].as_u64().unwrap() >= 5,
         "nothing has been derived yet: {}",

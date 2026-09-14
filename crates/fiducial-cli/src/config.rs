@@ -55,6 +55,20 @@ pub struct Capabilities {
     pub enabled: Vec<String>,
 }
 
+/// Locales a product is born with.
+///
+/// Declared here once, because `fid new --locales` and the `i18n` capability's
+/// seeding both need them and two copies of a default drift the first time one
+/// is changed.
+pub const DEFAULT_LOCALES: &[&str] = &["sr", "en"];
+
+/// The fallback locale a product is born with.
+///
+/// A separate constant, not `DEFAULT_LOCALES[0]`: which language a reader falls
+/// back to is a decision, and taking it from list order is the implicit fact
+/// `I18n::default_locale` refuses to infer.
+pub const DEFAULT_LOCALE: &str = "sr";
+
 /// `[i18n]` — the locales this product ships.
 ///
 /// Declared rather than inferred. `default` is **not** `locales[0]`: which
@@ -62,9 +76,10 @@ pub struct Capabilities {
 /// order is exactly the kind of implicit fact this platform exists to delete.
 ///
 /// Empty `locales` means the product is not localized. That is a valid state
-/// for a CLI or a firmware image — but `fid new` seeds `sr` and `en`, because a
-/// product that can be built monolingual will be, and principle 1c says
-/// monolingual is a state you pass through before the first commit.
+/// for a CLI or a firmware image, and `fid new --locales none` asks for it — but
+/// `fid new` seeds [`DEFAULT_LOCALES`] otherwise, because a product that can be
+/// built monolingual will be, and principle 1c says monolingual is a state you
+/// pass through before the first commit.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct I18n {
     #[serde(default)]
@@ -146,12 +161,16 @@ impl Default for Guard {
     }
 }
 
+/// Guard rules every product starts with.
+///
+/// Only names `guard::rule_by_name` resolves belong here — asserted by
+/// `every_declared_guard_rule_is_implemented`. This list used to carry
+/// `no-hand-edit-generated`, which has never existed: the guard reads Bash
+/// commands, and hand-editing a generated file happens through an editor, not
+/// through a shell. Naming it bought nothing and told `fid dash` to report the
+/// product as guarded by three rules when one worked.
 fn default_rules() -> Vec<String> {
-    vec![
-        "no-direct-main-push".into(),
-        "no-hand-edit-generated".into(),
-        "no-unpinned-cli-fetch".into(),
-    ]
+    vec!["no-direct-main-push".into(), "no-unpinned-cli-fetch".into()]
 }
 
 impl Config {

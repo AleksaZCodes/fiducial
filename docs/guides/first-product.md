@@ -39,6 +39,20 @@ $ fid new demo-product
   wrote  .github/workflows/ci.yml
   wrote  .github/workflows/claude-review.yml
   wrote  fiducial.lock
+✦ fid add i18n — installing into demo-product
+  wrote  messages/en.json
+  wrote  messages/sr.json
+  wrote  pipelines/i18n.toml
+  wrote  .fiducial/skills/i18n.md
+  wrote  .claude/skills/i18n.md
+  patched fiducial.toml
+  ✓ i18n installed
+  ✓ no guard rules — this capability adds none
+  ✓ instructions → .fiducial/skills/i18n.md (any agent; see AGENTS.md)
+
+  ▶ i18n (fid-i18n) ✓
+
+✦ fid derive complete — fiducial.lock updated
 Initialized empty Git repository in /home/you/dev/demo-product/.git/
   git    init (branch: main)
 
@@ -94,12 +108,15 @@ $ fid doctor
 ✦ fid doctor — /home/you/dev/demo-product
 
   ✓ fiducial.toml valid  (product: demo-product, vX.Y.Z)
-  ✓ fiducial.lock valid  (11 template(s) tracked, 0 migration(s) applied)
+  ✓ guard: 2 rule(s), all implemented
+  ✓ fiducial.lock valid  (14 template(s) tracked, 0 migration(s) applied)
   ✓ all template files unmodified
-  ✓ templates up to date with platform vX.Y.Z
   ✓ no pending codemod migrations
+  ✓ no hardcoded user-visible strings found
 
-✦ fiducial doctor: clean
+  ⚠ fiducial.toml: upstream template updated (installed: X.Y.Z, current: X.Y.Z) — run `fid upgrade`
+
+✦ fiducial doctor: clean (with 1 upgrade hint(s) — run `fid upgrade`)
 ```
 
 <!-- /capture -->
@@ -222,6 +239,8 @@ pipeline: enclosure (fid-mesh)
   → artifact: enclosure/case-lid.stl
   → artifact: enclosure/gasket.stl
   → artifact: enclosure/case.glb
+pipeline: i18n (fid-i18n)
+  → artifact: src/generated/messages.ts
 ```
 
 <!-- /capture -->

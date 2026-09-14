@@ -28,6 +28,7 @@ use std::{
 
 use crate::{
     config::{Config, CONFIG_FILE},
+    guard,
     lock::{sha256_hex, Lock, LOCK_FILE},
     pipeline,
 };
@@ -44,6 +45,24 @@ pub struct Dash {
     ci: CiView,
     graph: GraphView,
     freshness: FreshnessView,
+    i18n: I18nView,
+}
+
+/// Localization: what is declared, and what never reached the catalog.
+///
+/// The hardcoded-string list is the whole reason this section exists. It is a
+/// *warning* — the detector cannot be perfect — and a warning printed to a log
+/// is a warning nobody reads. So it is reported here, counted, and carried in
+/// `--json` so an agent consumes it as data.
+#[derive(Debug, Serialize)]
+struct I18nView {
+    /// Locales the product declares. Empty means it is not localized, which is
+    /// a valid state for a CLI or a firmware image.
+    locales: Vec<String>,
+    /// The fallback locale, when one is declared.
+    default_locale: Option<String>,
+    /// Strings that look user-visible and are not coming from a catalog.
+    hardcoded: Vec<crate::i18n::Hardcoded>,
 }
 
 #[derive(Debug, Serialize)]
@@ -53,7 +72,15 @@ struct ProductView {
     root: String,
     spine_enabled: bool,
     capabilities: Vec<String>,
+    /// Declared guard rules that resolve to a rule that can actually fire.
     guard_rules: usize,
+    /// Declared guard rules with no implementation.
+    ///
+    /// Counted separately, and never folded into `guard_rules`, because a name
+    /// with nothing behind it is the opposite of protection: the product
+    /// believes it is guarded, and `fid dash` used to agree. A scaffold shipped
+    /// three names and one working rule, and reported "guard rules 3".
+    guard_rules_unknown: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -177,7 +204,19 @@ impl Dash {
                 root: root.display().to_string(),
                 spine_enabled: config.spine.enabled,
                 capabilities: config.capabilities.enabled.clone(),
-                guard_rules: config.guard.rules.len(),
+                guard_rules: config
+                    .guard
+                    .rules
+                    .iter()
+                    .filter(|r| guard::rule_by_name(r).is_some())
+                    .count(),
+                guard_rules_unknown: config
+                    .guard
+                    .rules
+                    .iter()
+                    .filter(|r| guard::rule_by_name(r).is_none())
+                    .cloned()
+                    .collect(),
             },
             git: git_view(root),
             roadmap: roadmap_view(root),
@@ -192,6 +231,7 @@ impl Dash {
                 pipelines: summarise(&pipelines),
             },
             freshness: freshness_view(root, &pipelines)?,
+            i18n: i18n_view(root, config),
         })
     }
 }
@@ -695,6 +735,26 @@ fn freshness_view(root: &Path, pipelines: &[pipeline::Pipeline]) -> Result<Fresh
 
 // ── Text rendering ────────────────────────────────────────────────────────────
 
+/// Localization view.
+///
+/// The scan runs only for a product that declares locales. Reporting hardcoded
+/// strings to someone who has not asked for localization is noise, and noise is
+/// what makes a warning unreadable.
+fn i18n_view(root: &Path, config: &Config) -> I18nView {
+    if config.i18n.is_empty() {
+        return I18nView {
+            locales: Vec::new(),
+            default_locale: None,
+            hardcoded: Vec::new(),
+        };
+    }
+    I18nView {
+        locales: config.i18n.locales.clone(),
+        default_locale: config.i18n.default.clone(),
+        hardcoded: crate::i18n::scan_product(root),
+    }
+}
+
 /// Section names `--section` accepts.
 pub const SECTIONS: &[&str] = &[
     "product",
@@ -704,6 +764,7 @@ pub const SECTIONS: &[&str] = &[
     "ci",
     "graph",
     "freshness",
+    "i18n",
 ];
 
 /// Whether to emit terminal styling.
@@ -758,6 +819,15 @@ impl Dash {
                 },
             );
             field("guard rules", self.product.guard_rules);
+            if !self.product.guard_rules_unknown.is_empty() {
+                field(
+                    "unknown rules",
+                    format!(
+                        "{} — declared but not implemented, so they guard nothing",
+                        self.product.guard_rules_unknown.join(", ")
+                    ),
+                );
+            }
         }
 
         if want("git") {
@@ -909,9 +979,45 @@ impl Dash {
             }
         }
 
+        if want("i18n") {
+            heading("Localization");
+            let i = &self.i18n;
+            if i.locales.is_empty() {
+                println!("  not localized — no locales declared in [i18n]");
+            } else {
+                field(
+                    "locales",
+                    match &i.default_locale {
+                        Some(d) => format!("{} (default: {d})", i.locales.join(", ")),
+                        None => i.locales.join(", "),
+                    },
+                );
+                if i.hardcoded.is_empty() {
+                    println!("  no hardcoded user-visible strings found");
+                } else {
+                    field("hardcoded", format!("{} string(s)", i.hardcoded.len()));
+                    // Enough to act on, not so many that the section becomes
+                    // the output. The full list is in `--json`.
+                    for h in i.hardcoded.iter().take(HARDCODED_SHOWN) {
+                        println!("  ! {}:{}  {} {:?}", h.file, h.line, h.context, h.text);
+                    }
+                    if i.hardcoded.len() > HARDCODED_SHOWN {
+                        println!(
+                            "    … and {} more — `fid dash --section i18n --json` for all",
+                            i.hardcoded.len() - HARDCODED_SHOWN
+                        );
+                    }
+                    println!("  these warn; they never fail a build");
+                }
+            }
+        }
+
         println!();
     }
 }
+
+/// How many hardcoded strings a terminal section lists before summarising.
+const HARDCODED_SHOWN: usize = 8;
 
 // ── Portfolio (workbench v1) ───────────────────────────────────────────────────
 //

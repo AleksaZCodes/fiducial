@@ -150,13 +150,13 @@ Product
   version        X.Y.Z
   root           /home/you/dev/demo-product
   spine          disabled
-  capabilities   (none)
-  guard rules    3
+  capabilities   i18n
+  guard rules    2
 
 Git
   branch         main
   head           no commits yet
-  working tree   9 file(s) with uncommitted changes
+  working tree   13 file(s) with uncommitted changes
   upstream       not tracking a remote branch
 
 Roadmap
@@ -172,12 +172,17 @@ CI
   (declared workflows, not live run status — dash makes no network calls)
 
 Graph
-  state          no pipelines declared
+  i18n (fid-i18n)
+    → src/generated/messages.ts
 
 Freshness
-  artifacts      0 fresh, 0 stale, 0 missing, 0 never derived
+  artifacts      1 fresh, 0 stale, 0 missing, 0 never derived
   templates      unmodified
   everything the lock tracks is current
+
+Localization
+  locales        sr, en (default: sr)
+  no hardcoded user-visible strings found
 ```
 
 <!-- /capture -->

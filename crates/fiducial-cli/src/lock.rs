@@ -58,6 +58,17 @@ pub struct TemplateRecord {
     pub base_content: Option<String>,
 }
 
+/// The first eight characters of a hash, for a human-readable drift line.
+///
+/// `chars().take(8)`, not `&h[..8]`. `fiducial.lock` is a text file a person
+/// can open, and the slice panics on any hash shorter than eight bytes or
+/// whose eighth byte lands inside a multi-byte character — crashing `fid
+/// doctor` with exit 101 and no diagnostic, in precisely the branch that
+/// exists to explain what went wrong.
+pub fn short_hash(h: &str) -> String {
+    h.chars().take(8).collect()
+}
+
 impl Lock {
     /// Create a fresh, empty lock at schema version 1.
     pub fn new() -> Self {
@@ -138,8 +149,8 @@ impl Lock {
                             abs,
                             format!(
                                 "stale (lock: {}, file: {}) — run `fid derive`",
-                                &record.hash[..8],
-                                &actual[..8],
+                                short_hash(&record.hash),
+                                short_hash(&actual),
                             ),
                         ));
                     }
@@ -166,8 +177,8 @@ impl Lock {
                             abs,
                             format!(
                                 "modified since scaffold (lock: {}, file: {})",
-                                &record.hash[..8],
-                                &actual[..8],
+                                short_hash(&record.hash),
+                                short_hash(&actual),
                             ),
                         ));
                     }
@@ -281,5 +292,47 @@ mod tests {
         let merged =
             diffy::merge(base, ours, theirs).expect("unmodified local must auto-take upstream");
         assert_eq!(merged, theirs);
+    }
+
+    /// `fiducial.lock` is a text file a person can open, so its hashes are not
+    /// guaranteed to be 64 hex characters just because we wrote them that way.
+    ///
+    /// The old `&record.hash[..8]` panicked with exit 101 and no diagnostic on
+    /// a truncated hash — and only on the mismatch branch, which is the one
+    /// that exists to say what went wrong.
+    #[test]
+    fn short_hash_survives_a_hand_edited_lock() {
+        assert_eq!(short_hash("81b79ea8c6c795fa"), "81b79ea8");
+        assert_eq!(short_hash("81b7"), "81b7");
+        assert_eq!(short_hash(""), "");
+        // Multi-byte: `&h[..8]` splits the fifth character and panics. Taking
+        // *characters* takes eight of them, whatever they cost in bytes.
+        let multibyte = short_hash("ééééééééé");
+        assert_eq!(multibyte.chars().count(), 8);
+    }
+
+    #[test]
+    fn verify_reports_drift_instead_of_panicking_on_a_short_hash() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let file = tmp.path().join("t.txt");
+        std::fs::write(&file, b"real contents").unwrap();
+
+        let mut lock = Lock::new();
+        lock.templates.insert(
+            "t.txt".to_string(),
+            TemplateRecord {
+                source_version: "0.1.0".into(),
+                hash: "81b7".into(),
+                base_content: None,
+            },
+        );
+
+        let issues = lock.verify(tmp.path());
+        assert_eq!(issues.len(), 1, "a mismatched hash must be reported");
+        assert!(
+            issues[0].1.contains("81b7"),
+            "the truncated hash should still appear in the message: {}",
+            issues[0].1
+        );
     }
 }
