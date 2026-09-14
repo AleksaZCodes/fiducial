@@ -1,8 +1,14 @@
 # MISSION
 
-**This file is copied into every repository built on this platform, and is not edited per
-product.** It states what the system is for. When a decision is genuinely ambiguous, this is the
+**This file states what the system is for.** When a decision is genuinely ambiguous, it is the
 tiebreaker.
+
+It is *not* copied verbatim into products — a product writes its own `MISSION.md` saying what
+that product is for. What every product inherits is the **principles**, restated in its
+scaffolded `AGENTS.md` so that agents working there have them without needing this repository.
+
+(This paragraph used to claim the file was copied into every repository. It never was. The claim
+survived because nothing checked it — the same drift the principles below exist to delete.)
 
 ---
 
@@ -49,6 +55,21 @@ stacking tolerances across domains, not by comparing nominal values.
 **1b · A judgment that cannot be derived is still declared.**
 Decisions, and the reasoning behind them, are written down and versioned like any other input.
 Undocumented judgment is re-litigated, by you in six months and by every agent that follows.
+
+**1c · A user-visible string is a fact.**
+It is declared once, and every locale is a derivation that must exist. A missing
+translation is a **missing artifact, not a fallback** — and like any stale
+artifact, it fails the build rather than reaching a reader.
+
+Localization is not a later pass. A system that can be built monolingual will be
+built monolingual, and the strings missed on the way are invisible: they render
+as plausible text in the wrong language, and only a human reading that language
+ever finds them. So the default is **localized by construction** — monolingual is
+a state a product passes through before its first commit, not a state it ships.
+
+The same reasoning covers every other word a person reads: legal text, email
+copy, error messages. Copy is content, content is declared, and declared things
+are derived into every form they are needed in.
 
 **2 · Push behavior down to the layer with the longest reach.**
 Logic placed in a `no_std` Rust core runs in a browser, on a desktop, at the edge, and on a

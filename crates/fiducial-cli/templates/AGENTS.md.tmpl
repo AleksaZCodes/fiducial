@@ -19,6 +19,61 @@ re-deriving product state by reading files: it already reports what is stale,
 which pipelines exist, what decisions have been recorded, and whether CI guards
 artifact freshness.
 
+## Principles
+
+These are the platform's, not this product's. They are restated here because an
+agent working in this repository needs them and should not have to go and find
+the platform to get them.
+
+**1 · Declare each fact once; derive every artifact from it.**
+A value used in two places belongs in one declared location with the second use
+generated. If you are about to type the same value a second time, stop and find
+its declaration. A physical fact carries its **unit** and its **tolerance** —
+the questions that matter are answered by stacking tolerances, not comparing
+nominal values.
+
+**1b · A judgment that cannot be derived is still declared.**
+Decisions and their reasoning go in `docs/specs/`, date-stamped and append-only.
+Undocumented judgment gets re-litigated — by you in six months, and by every
+agent after you.
+
+**1c · A user-visible string is a fact.**
+Declared once; every locale is a derivation that must exist. A missing
+translation is a missing artifact, not a fallback, and it fails the build.
+**Localized by construction** — monolingual is a state this product passed
+through before its first commit, not one it ships.
+
+**2 · Push behavior down to the layer with the longest reach.**
+Logic in a `no_std` Rust core runs in a browser, on a desktop, at the edge and on
+a microcontroller. Logic in a UI framework survives until you change frameworks.
+It costs the same to write.
+
+**3 · No abstraction without an escape hatch.**
+Every generated artifact is human-readable; every high-level declaration has a
+documented override. An abstraction you cannot escape is a trap.
+
+**4 · Everything explicit, in git, legible to a machine.**
+State living only in someone's head, a vendor dashboard or a chat log cannot be
+derived from, reviewed, reverted or reasoned about. This is what makes
+autonomous agent work safe rather than hopeful.
+
+**5 · Cost is a design variable, declared before the design.**
+A cost ceiling is a fact set first, with the assertion failing until the design
+meets it. Constraints are the mechanism of invention, not a tax on it.
+
+**5b · Spend upfront where it compounds down.**
+Effort invested in the system is repaid by every product built on it, so the
+correct time to pay is early — driving the marginal cost of the next product
+toward zero.
+
+**6 · Commit to contracts, not to tools.**
+One contract per domain, fixed; the tool behind it, swappable. This is what
+keeps the system opinionated without being locked in.
+
+**7 · The system compounds.**
+A bug fixed once propagates to every product sharing the code. A fix that cannot
+propagate is only half-finished.
+
 ## Product layout
 
 ```

@@ -504,3 +504,70 @@ fn no_build_output_is_tracked() {
         offenders.join("\n")
     );
 }
+
+/// The principles restated in the scaffolded `AGENTS.md` match the platform's.
+///
+/// Phase 22 put the principle headings in two files: `MISSION.md`, where they are
+/// authored, and `templates/AGENTS.md.tmpl`, where products inherit them. That is
+/// a second declaration of one fact — the exact thing principle 1 forbids —
+/// introduced while writing principle 1c.
+///
+/// The right fix is to *generate* the template section from `MISSION.md`, which is
+/// roadmap item 29 (context sync). Until that exists, this gate makes the
+/// duplication safe: adding, removing or renaming a principle in one file without
+/// the other fails the build.
+///
+/// Recorded rather than quietly tolerated, because a known duplication with a
+/// test is a different thing from an unknown one without.
+#[test]
+fn scaffolded_principles_match_the_platform_mission() {
+    let root = workspace_root();
+
+    let mission = std::fs::read_to_string(root.join("MISSION.md")).expect("MISSION.md");
+    let template =
+        std::fs::read_to_string(root.join("crates/fiducial-cli/templates/AGENTS.md.tmpl"))
+            .expect("AGENTS.md.tmpl");
+
+    /// The identifier of each principle heading: `**1c · A user-visible…` → `1c`.
+    fn principle_ids(text: &str) -> Vec<String> {
+        text.lines()
+            .filter_map(|line| {
+                let rest = line.trim().strip_prefix("**")?;
+                let (id, _) = rest.split_once(" · ")?;
+                // Ids look like `1`, `1b`, `5b`, `7`.
+                let looks_like_id = id.chars().next().is_some_and(|c| c.is_ascii_digit())
+                    && id.len() <= 2
+                    && id.chars().all(|c| c.is_ascii_alphanumeric());
+                looks_like_id.then(|| id.to_string())
+            })
+            .collect()
+    }
+
+    let authored = principle_ids(&mission);
+    let inherited = principle_ids(&template);
+
+    assert!(
+        !authored.is_empty(),
+        "no principles found in MISSION.md — has the heading format changed?"
+    );
+
+    let missing: Vec<&String> = authored
+        .iter()
+        .filter(|id| !inherited.contains(id))
+        .collect();
+    let extra: Vec<&String> = inherited
+        .iter()
+        .filter(|id| !authored.contains(id))
+        .collect();
+
+    assert!(
+        missing.is_empty() && extra.is_empty(),
+        "the principles a scaffolded product inherits have drifted from MISSION.md.\n\
+         Every product's AGENTS.md restates these, so a principle missing there is a \
+         principle that product never learns.\n\n\
+         in MISSION.md but not the template: {missing:?}\n\
+         in the template but not MISSION.md: {extra:?}\n\n\
+         Authored:  {authored:?}\n\
+         Inherited: {inherited:?}\n"
+    );
+}
