@@ -6,7 +6,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ## Current phase: Phase 22 — i18n
 
-> Build order beyond this phase: [`docs/ROADMAP.md`](docs/ROADMAP.md).
+> Build order beyond this phase: [`ROADMAP.md`](ROADMAP.md).
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -707,15 +707,10 @@ fiducial/
 | **21b** | Namespaced agents — `fiducial-design` / `-review` / `-implement` | A subagent's filename is its identity; a colliding name is silently unavailable | ✅ |
 | **22** | i18n — localized by construction | A missing translation fails `fid derive --check`; hardcoded strings are reported | 🟡 |
 
-**Beyond Phase 22 the order lives in [`docs/ROADMAP.md`](docs/ROADMAP.md)**, not
-here. That file holds what is *intended* and why; this one holds what was
-*built*. Roadmap items are named rather than numbered, so neither file has to
-renumber because of the other — the two were briefly coupled by number, which is
-one fact declared twice.
-
-Next, by cost of delay rather than by value: **capability taxonomy** → **external
-capabilities** → **context sync** → **brand** → **Cloudflare adapter set** →
-**legal**. The reasoning for that order is in the roadmap.
+**What comes next is not recorded here.** This file is the record of what was
+*built*; [`ROADMAP.md`](ROADMAP.md) holds what is *intended* and in what order.
+Naming the next items in both places was one fact declared twice — briefly gated
+by a test, now simply removed, because a gated duplicate is still a duplicate.
 
 *(ROP migration wave 2 — eligible rules to L0 Rust — remains optional and
 unscheduled, as wave 1 does.)*

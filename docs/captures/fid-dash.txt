@@ -11,11 +11,12 @@ Product
 Git
   branch         main
   head           no commits yet
-  working tree   8 file(s) with uncommitted changes
+  working tree   9 file(s) with uncommitted changes
   upstream       not tracking a remote branch
 
 Roadmap
-  state          no roadmap found (looked for ROADMAP.md, PHASES.md, docs/ROADMAP.md)
+  source         ROADMAP.md
+  progress       0 done, 0 in progress, 1 to do  (1 tracked)
 
 Decisions
   state          none recorded (looked in docs/specs, docs/decisions, docs/adr)

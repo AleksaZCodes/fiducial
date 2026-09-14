@@ -126,6 +126,9 @@ fn a_product_with_no_roadmap_or_decisions_still_renders() {
     // view useless exactly when it is most wanted.
     let tmp = tempfile::tempdir().unwrap();
     let root = scaffold(tmp.path());
+    // A scaffold now ships a ROADMAP.md, so remove it to get the empty case
+    // this test is actually about.
+    std::fs::remove_file(root.join("ROADMAP.md")).unwrap();
     let d = dash(&root);
 
     assert!(d["roadmap"]["source"].is_null(), "no roadmap file yet");
@@ -196,8 +199,35 @@ fn prose_without_markers_is_not_roadmap_progress() {
 fn phases_md_is_accepted_as_a_roadmap() {
     let tmp = tempfile::tempdir().unwrap();
     let root = scaffold(tmp.path());
+    // Only when there is no ROADMAP.md — see the precedence test below.
+    std::fs::remove_file(root.join("ROADMAP.md")).unwrap();
     write(&root, "PHASES.md", "# Phases\n| 1 | thing | ✅ |\n");
     assert_eq!(dash(&root)["roadmap"]["source"], "PHASES.md");
+}
+
+/// `ROADMAP.md` wins over `PHASES.md` when a repository keeps both.
+///
+/// They hold different things — the roadmap is what is *intended*, PHASES is
+/// what was *built* — and a dashboard is forward-looking, so the roadmap is the
+/// right one to read. Exactly one file is read, so the two can never be counted
+/// together.
+#[test]
+fn roadmap_wins_over_phases_when_both_exist() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+
+    write(&root, "ROADMAP.md", "# Roadmap\n| next thing | ⬜ |\n");
+    write(
+        &root,
+        "PHASES.md",
+        "# Phases\n| 1 | built | ✅ |\n| 2 | built | ✅ |\n",
+    );
+
+    let d = dash(&root);
+    assert_eq!(d["roadmap"]["source"], "ROADMAP.md");
+    // If both were read, done would be 2 rather than 0.
+    assert_eq!(d["roadmap"]["done"], 0, "only one file is counted");
+    assert_eq!(d["roadmap"]["todo"], 1);
 }
 
 // ── Decisions ─────────────────────────────────────────────────────────────────

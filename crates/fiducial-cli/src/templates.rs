@@ -20,6 +20,7 @@ const TMPL_AGENT_DESIGN: &str = include_str!("../templates/agents-fiducial-desig
 const TMPL_CI_REVIEW: &str = include_str!("../templates/claude-review.yml.tmpl");
 const TMPL_CI: &str = include_str!("../templates/ci.yml.tmpl");
 const TMPL_README: &str = include_str!("../templates/README.md.tmpl");
+const TMPL_ROADMAP: &str = include_str!("../templates/ROADMAP.md.tmpl");
 
 // ── Capability templates ──────────────────────────────────────────────────────
 
@@ -116,6 +117,12 @@ const CAP_EDA_PIPELINE: &str = include_str!("../capabilities/eda/pipelines/eda.t
 const CAP_EDA_ENCLOSURE_PIPELINE: &str =
     include_str!("../capabilities/eda/pipelines/enclosure.toml");
 
+/// The platform's principles, extracted from `MISSION.md` by `build.rs`.
+///
+/// One declaration, one derivation. See `build.rs` for why this is generated
+/// rather than a second copy kept honest by a test.
+const PRINCIPLES: &str = include_str!(concat!(env!("OUT_DIR"), "/principles.md"));
+
 // ── The scaffold set ─────────────────────────────────────────────────────────
 
 /// Every file `fid new` writes, declared once.
@@ -135,6 +142,7 @@ pub const SCAFFOLD_FILES: &[(&str, &str)] = &[
     ("MISSION.md", TMPL_MISSION_MD),
     ("AGENTS.md", TMPL_AGENTS_MD),
     ("README.md", TMPL_README),
+    ("ROADMAP.md", TMPL_ROADMAP),
     (".gitignore", TMPL_GITIGNORE),
     (".claude/settings.json", TMPL_CLAUDE_SETTINGS),
     (".claude/agents/fiducial-review.md", TMPL_AGENT_REVIEW),
@@ -189,6 +197,7 @@ pub fn raw(rel_path: &str) -> Option<&'static str> {
         ".github/workflows/ci.yml" => Some(TMPL_CI),
         ".github/workflows/claude-review.yml" => Some(TMPL_CI_REVIEW),
         "README.md" => Some(TMPL_README),
+        "ROADMAP.md" => Some(TMPL_ROADMAP),
         // web-next capability
         "apps/web/package.json" => Some(CAP_WEB_NEXT_PKG),
         "apps/web/next.config.ts" => Some(CAP_WEB_NEXT_CONFIG),
@@ -251,4 +260,9 @@ pub fn expand(raw_template: &str, product_name: &str, platform_version: &str) ->
     raw_template
         .replace("{{name}}", product_name)
         .replace("{{version}}", platform_version)
+        // The principles are authored once, in the platform's MISSION.md, and
+        // extracted by build.rs. A scaffolded product cannot link to that file —
+        // its own MISSION.md says what the product is for — so it receives the
+        // text. Generated, never hand-copied.
+        .replace("{{principles}}", PRINCIPLES)
 }

@@ -12,23 +12,18 @@ Read `PHASES.md` before every session. It states which phase is active and what
 "done" means for it. Do not begin the next phase until the current one is
 complete.
 
-## Core rules (from MISSION.md)
+## Principles
 
-1. **One declaration, many derivations.** A value used in two places is declared
-   once. If you are typing the same value into a second file, stop.
+**Read [`MISSION.md`](MISSION.md).** It is in this repository, it is where the
+principles are authored, and there is no summary of it here on purpose — a
+summary is a second declaration that drifts from the thing it summarises.
 
-2. **Artifacts are generated, never hand-edited.** Changing a derived file by
-   hand is an error. Change the upstream declaration and re-run the pipeline.
+(A scaffolded *product* does get the text, because its own `MISSION.md` states
+what the product is for rather than the platform's rules. It is generated into
+the product's `AGENTS.md` from this file at scaffold time — see
+`crates/fiducial-cli/build.rs`.)
 
-3. **Decisions are appended, not edited.** New decisions go in `docs/specs/`
-   with a date. Old decisions are never modified.
-
-4. **The mission is the tiebreaker.** When ambiguous, `MISSION.md` resolves it.
-
-5. **No capability without a real need.** The Rule of Two (§16 of the design
-   spec): generalize only when a second real product needs it.
-
-## Repo layout
+## Repo layout## Repo layout
 
 ```
 fiducial/

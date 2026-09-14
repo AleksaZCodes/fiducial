@@ -46,7 +46,7 @@ make. "I want legal pages" is a decision. "I want a button" is a component.
 
 | File | Holds | Numbering |
 |---|---|---|
-| `docs/ROADMAP.md` (this) | what is **intended**, and why | items have **names**, not numbers |
+| `ROADMAP.md` (this) | what is **intended**, and why | items have **names**, not numbers |
 | `PHASES.md` | what was **built**, phase by phase | phases are numbered, in build order |
 
 They were briefly coupled — roadmap items numbered 22–35 to shadow phase numbers
@@ -55,7 +55,7 @@ phases or one phase closes two items. So roadmap items are now **named**, and a
 phase entry in `PHASES.md` names the item it implements. Neither file renumbers
 because of the other.
 
-`fid dash` reads the first of `ROADMAP.md`, `PHASES.md`, `docs/ROADMAP.md` that
+`fid dash` reads the first of `ROADMAP.md`, `PHASES.md`, `ROADMAP.md` that
 exists — one file, so there is no double count.
 
 ---
@@ -166,6 +166,7 @@ step 3 delivers.
 | **Diagnostics** | Error tracking as an adapter with a no-op default |
 | **Small tools** | Backlinks, browser-compat banners |
 | **Claude chat plugin** | The making philosophy, as a skill for claude.ai — see below |
+| **`fid dash` freshness detection** | Dash equates "gated" with "a workflow runs `fid derive --check`". This repository gates three artifacts by other means on purpose, so dash reports a false positive. Found by adopting level 2 self-hosting |
 
 ### Out of band — risk, not priority
 
@@ -177,7 +178,7 @@ Not ranked by value. Ranked by **what accrues while we wait.**
 | `CITATION.cff`, `CONTRIBUTING.md`, `SECURITY.md` | Small, expected of a public project, and prerequisites for being cited correctly |
 | Zenodo DOI on a tagged release | Needed before the paper; Fiducial is its own first customer for the research tooling |
 
-## i18n — *localized by construction* 🟡
+## i18n — *localized by construction*
 
 **The principle.** Proposed as `MISSION.md` **1c**, alongside the existing 1b:
 

@@ -76,6 +76,34 @@ weaken them per level 1.
 Revisit only if a derived artifact appears here whose gate does **not** need to
 be independent of `fid`.
 
+## What level 2 surfaced immediately
+
+Adopting it paid within one command. `fid dash` on this repository reports:
+
+```
+CI
+  note: no workflow runs `fid derive --check`, so a stale
+        artifact would reach main unnoticed
+```
+
+**That finding is false here, and the reason it is false is a real defect in
+`fid dash`.**
+
+This repository has three generated artifacts and all three *are* gated —
+`docs/protocol/vectors.json` and `docs/captures/` by Rust tests, and
+`packages/wasm-bridge/src/generated.ts` by a `git diff --exit-code` job. None of
+them go through `fid derive`, because per level 1 above those gates must fire
+even when `fid` is broken.
+
+So dash equates "freshness is gated" with "a workflow runs `fid derive --check`",
+and that is too narrow. A repository can gate staleness by other means, and this
+one deliberately does.
+
+**Recorded, not fixed here** — it is a `fid dash` improvement rather than part of
+this decision. The point worth keeping is that the first command run under level
+2 found a false positive in the dashboard that no product had reported, which is
+the argument for level 2 restated as evidence.
+
 ## The risk worth naming
 
 **If Fiducial's only customer is Fiducial, the platform gets shaped by the needs

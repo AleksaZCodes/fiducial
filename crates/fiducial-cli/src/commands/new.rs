@@ -64,9 +64,11 @@ fn write_template(
     name: &str,
     lock: &mut Lock,
 ) -> Result<()> {
-    let content = template
-        .replace("{{name}}", name)
-        .replace("{{version}}", PLATFORM_VERSION);
+    // One expansion, in `templates::expand`. This function used to inline its own
+    // `.replace()` chain, so a placeholder added to the template — `{{principles}}`
+    // was the one that found it — was substituted by `fid upgrade` and left raw
+    // by `fid new`.
+    let content = templates::expand(template, name, PLATFORM_VERSION);
 
     let dest = root.join(rel_path);
     if let Some(parent) = dest.parent() {

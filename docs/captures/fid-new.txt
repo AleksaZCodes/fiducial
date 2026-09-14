@@ -4,6 +4,7 @@ $ fid new demo-product
   wrote  MISSION.md
   wrote  AGENTS.md
   wrote  README.md
+  wrote  ROADMAP.md
   wrote  .gitignore
   wrote  .claude/settings.json
   wrote  .claude/agents/fiducial-review.md
