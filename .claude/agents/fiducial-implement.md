@@ -1,5 +1,5 @@
 ---
-name: implement
+name: fiducial-implement
 description: Implementation agent — coding, refactoring, debugging. Uses Sonnet 4.6.
 model: claude-sonnet-4-6
 tools:

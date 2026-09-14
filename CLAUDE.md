@@ -109,9 +109,23 @@ cost is avoidable.
 | `code-review` | Review the current diff or a PR for bugs and simplifications |
 | `commit-commands:commit` | Create a well-formed commit |
 | `commit-commands:commit-push-pr` | Commit, push, and open a PR |
+| `fiducial:harvest` | Extract reusable work from another codebase into this one |
 | `run` | Run and screenshot the app to verify a change works |
 | `security-review` | Security audit of changed code |
 | `update-config` | Modify Claude Code settings, hooks, permissions |
+
+### Subagents in this repo (`.claude/agents/`)
+
+| Agent | For |
+|---|---|
+| `fiducial-design` | Architecture and design brainstorming (Opus) |
+| `fiducial-review` | Code review — bugs, simplifications, rule violations (Opus) |
+| `fiducial-implement` | Coding, refactoring, debugging (Sonnet) |
+
+All three are namespaced on purpose. A subagent's **filename is its identity**,
+so an agent called `design` collides with any other `design` agent — from
+another plugin, another project, or global config — and the loser of that
+collision is silently unavailable rather than an error.
 
 ### MCP plugins available
 
@@ -137,6 +151,35 @@ cargo fmt           # format (CI checks)
 pnpm changeset      # create a changeset for a PR
 pnpm version        # apply pending changesets (done by CI)
 pnpm release        # build + publish (done by CI)
+```
+
+## Reusing an existing codebase
+
+```sh
+fid harvest <path> --name <slug>   # survey + stage: classify, detect stack, copy
+/fiducial:harvest <slug>           # extract, with judgment
+```
+
+`harvest/` is a **staging area and never the product** — nothing is wired in and
+nothing is overwritten. Do not paste donor files into the source tree; generalize
+them deliberately. See `docs/guides/harvesting.md`, and
+`docs/harvest/ring-of-pursuit.md` for a worked catalogue.
+
+## Documentation
+
+| Read | For |
+|---|---|
+| `docs/guides/start-here.md` | The paradigm, for someone new to it |
+| `docs/guides/first-product.md` | Nothing → board → generated enclosure → CI gate |
+| `docs/guides/for-agents.md` | **Working here as an agent — read this one** |
+| `docs/guides/harvesting.md` | Getting the good parts out of prior work |
+
+Terminal output in those guides is **generated from the real binary** and gated
+in CI (`crates/fiducial-cli/tests/captures.rs`). Never hand-edit a code block
+showing `fid` output — regenerate it:
+
+```sh
+FIDUCIAL_WRITE_CAPTURES=1 cargo test -p fiducial-cli --test captures
 ```
 
 ## CI

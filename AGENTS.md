@@ -94,6 +94,30 @@ Step 2: `query-docs` with the returned ID and a specific question.
 `mcp__plugin_github_github__*` — search code, read files, create PRs, manage issues.
 Use `get_me` first to confirm current user context.
 
+## Documentation
+
+| Read | For |
+|---|---|
+| `docs/guides/for-agents.md` | **Working here as an agent — start with this** |
+| `docs/guides/start-here.md` | The paradigm, and what it changes about how you work |
+| `docs/guides/first-product.md` | Nothing → board → generated enclosure → CI gate |
+| `docs/guides/harvesting.md` | Getting the good parts out of a codebase already built |
+
+Terminal output in those guides is **generated from the real binary** and gated
+in CI. Never hand-edit a block showing `fid` output — regenerate it with
+`FIDUCIAL_WRITE_CAPTURES=1 cargo test -p fiducial-cli --test captures`.
+
+## Reusing an existing codebase
+
+```sh
+fid harvest <path> --name <slug>   # survey + stage
+```
+
+`harvest/` is a **staging area and never the product**. Nothing is wired in and
+nothing is overwritten. Do not paste donor files into the source tree —
+generalize them deliberately, or you have imported somebody else's assumptions
+along with their work. See `docs/guides/harvesting.md`.
+
 ## Build
 
 ```sh
