@@ -171,13 +171,55 @@ Rust consts and TOML embedded in `fiducial.toml`.
 **`fid new` takes locales up front**, so there is never a monolingual moment.
 Default locales: **`sr` and `en`**.
 
-**Hardcoded-string detection fails the build**, with an explicit opt-out marker
-for genuine exceptions — a brand name, a code sample. Decided over a warning,
-because a warning is a thing you scroll past.
+**Hardcoded-string detection warns; it does not fail the build.** Opportunistic,
+not enforced — but surfaced where it cannot be scrolled past.
+
+The problem with a warning is that it is a log line, and log lines are ignored by
+humans and agents alike. So the finding is not printed and forgotten: it is
+**reported** — a count and a file:line list in `fid doctor`, a section in
+`fid dash`, and a machine-readable form under `--json` so an agent consumes it as
+data rather than as terminal noise. The i18n `SKILL.md` instructs agents to clear
+them opportunistically.
+
+Warning rather than error was chosen deliberately: with failure, every false
+positive blocks a developer, and the detector cannot be perfect about what counts
+as user-visible text versus a CSS class, a `data-testid`, an aria role or a URL.
+A warning that is genuinely *seen* beats an error that gets suppressed.
+
+### Localization is more than translation
+
+Strings are the visible half. The rest is formatting, and it is where correctness
+actually bites:
+
+| Concern | Why it belongs here |
+|---|---|
+| **Dates & times** | Format, order and separators are all locale-dependent |
+| **Timezones** | An absolute instant plus an IANA zone. ROP already solves this well |
+| **Numbers** | Decimal separator and grouping differ — `1,234.56` vs `1.234,56` |
+| **Currency** | See below. Not implemented in ROP; wanted here |
+| **Plurals** | Serbian has three plural forms; English has two |
+| **Relative time** | "2 days ago" is not a string you can interpolate |
+
+**Money is a fact that carries its unit — principle 1, exactly.**
+
+> A physical fact is never a bare number. It carries its **unit** and its
+> **tolerance**.
+
+An amount without a currency is the same class of bug as a length without a unit,
+and it fails the same way: silently, until two of them are added together. So
+money is a **type**, never a number:
+
+- amount held in **integer minor units** (cents), because binary floating point
+  cannot represent `0.10` and money arithmetic must be exact
+- currency is part of the value, not context
+- **currency is independent of locale** — a Serbian reader may pay in EUR, and a
+  system that infers one from the other is wrong for every cross-border product
 
 **Harvest from ROP:** `resolve-locale.ts`, `config.ts`, `timezone.ts` + datetime
 helpers (native `Intl` only — server, client and edge). **Not** `translate.ts`;
-its fallback is the defect.
+its silent fallback is the defect.
+
+Currency is **new work**, not harvested — ROP has none.
 
 ---
 
