@@ -122,6 +122,30 @@ cargo build      # Rust workspace
 cargo test && pnpm test
 ```
 
+## The `fid` commands
+
+Listed here rather than only in a Claude Code skill, because this file is the
+context **every** agent reads — Codex, Copilot Workspace and Cursor included.
+An agent that does not know `fid derive --check` exists cannot honour the one
+rule that matters most.
+
+| Command | Does |
+|---|---|
+| `fid dash [--json]` | The whole product in one view. `--json` is for you. Start here |
+| `fid doctor` | Config, lock, template integrity, pending migrations |
+| `fid derive` | Run the pipelines; record every artifact hash |
+| `fid derive --check` | **Fail when an artifact drifted from its declaration.** The CI gate |
+| `fid graph` | Every pipeline: inputs → executor → outputs. Use it to find which declaration produced a file |
+| `fid new <name>` | Scaffold a product |
+| `fid add <capability>` | Install a capability |
+| `fid upgrade [--dry-run]` | 3-way merge upstream template changes; apply codemods |
+| `fid harvest <path>` | Survey another codebase for reusable work |
+| `fid release check` | Fail when the compatibility matrix and `WIRE_VERSION` disagree |
+| `fid capability list` | What is installed and what is available |
+
+Every command takes `--help`, and the help names no phase numbers on purpose —
+a schedule is a fact `PHASES.md` owns, and a second copy of it drifts.
+
 ## What not to do
 
 - Do not modify `/home/aleksa/dev/rop-reference/` (real secrets).

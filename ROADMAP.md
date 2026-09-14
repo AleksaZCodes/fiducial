@@ -165,6 +165,9 @@ step 3 delivers.
 | **Demo & showcase** | Interactive landing-page demo, Storybook, feature toggles |
 | **Diagnostics** | Error tracking as an adapter with a no-op default |
 | **Small tools** | Backlinks, browser-compat banners |
+| **Agent portability** | Skills and guard wiring are Claude-Code-only; author once, generate per vendor — see below |
+| **Rust release versioning** | Changesets drives npm; the thirteen crates move in lockstep at 0.1.0 with nothing driving a bump |
+| **Tagged releases + Zenodo DOI** | No release exists, so there is nothing to archive or cite |
 | **Claude chat plugin** | The making philosophy, as a skill for claude.ai — see below |
 | **`fid dash` freshness detection** | Dash equates "gated" with "a workflow runs `fid derive --check`". This repository gates three artifacts by other means on purpose, so dash reports a false positive. Found by adopting level 2 self-hosting |
 
@@ -512,6 +515,57 @@ duplication is already gated by a test precisely because it was a violation to
 introduce. A third copy for chat makes it three. This should be **generated**
 from `MISSION.md` — which makes it a natural consumer of **context sync**, and a
 reason to keep that item where it is in the order rather than later.
+
+## Agent portability — author once, generate per vendor
+
+`AGENTS.md` is the cross-vendor convention and now carries the full command
+reference, so a Codex, Copilot or Cursor session in a Fiducial repository knows
+what `fid derive --check` is. That part is done.
+
+**What is still Claude-Code-only:**
+
+| Thing | Portable? |
+|---|---|
+| `AGENTS.md` | ✅ every agent reads it |
+| The `fid` CLI | ✅ any agent can run it |
+| `commands/*.md` (`/fiducial:harvest`, `/fiducial:platform`) | ❌ Claude Code packaging |
+| `.claude-plugin/plugin.json` | ❌ Claude Code only |
+| `PreToolUse` guard **wiring** | ❌ — though `fid guard-check` itself is a CLI any agent can call |
+| 7 capability `SKILL.md` files | ❌ a Codex session installing `eda` gets no instructions |
+
+**The shape of the fix:** make the vendor-neutral thing the declaration and
+generate the wiring. A skill is authored once; `fid` emits the Claude Code
+command file, the `AGENTS.md` section, and whatever another vendor needs. Same
+move as the principles — one author, many derivations — which makes this a
+consumer of **context sync** rather than a separate mechanism.
+
+**Watch for:** the guard is the interesting case. The *rule* is portable because
+`fid guard-check` is a CLI; only the hook that calls it before every shell
+command is Claude-specific. An agent without hooks can still be told to run it,
+which is weaker but not nothing.
+
+## Rust release versioning
+
+Changesets drives the JS side properly — `.changeset/*.md` declares
+minor/patch/major per package and the release workflow opens a Release PR.
+`@fiducial/headless` went 0.2.0 → 0.3.0 that way.
+
+**The thirteen Rust crates have no equivalent.** All inherit
+`version = "0.1.0"` from `[workspace.package]`, so they move in lockstep and
+nothing drives a bump. `release.yml` publishes to crates.io, but the version
+*decision* is manual where the npm one is automated.
+
+Note that `WIRE_VERSION` is **deliberately not SemVer** and is not this gap: it
+is a single integer with a declared minimum-compatible floor in
+`docs/compat/matrix.toml`, gated by `fid release check`, because a protocol
+version answers a different question than a package version. That mechanism is
+already stricter than SemVer and should stay as it is.
+
+## Tagged releases and the DOI
+
+No git tag or GitHub release exists. That blocks the Zenodo DOI, which blocks
+citing the work in the paper. Small, and on the critical path for
+`docs/specs/2026-09-14-disclosure-authorship-and-citation.md`.
 
 ## Diagnostics
 
