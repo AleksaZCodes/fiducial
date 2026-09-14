@@ -5,6 +5,7 @@ pub mod dash;
 pub mod derive;
 pub mod doctor;
 pub mod graph;
+pub mod harvest;
 pub mod new;
 pub mod release;
 pub mod upgrade;

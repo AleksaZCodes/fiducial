@@ -332,6 +332,56 @@ EXIT CODES
         portfolio: bool,
     },
 
+    /// Survey an existing codebase for reusable logic, art, UI and principles
+    #[command(
+        long_about = "\
+Survey a repository or folder for work worth reusing, and stage it for review.
+
+You have built something before, and it contains things you should not build
+again: the business rules you got right, the theme you spent a week tuning, the
+components, the conventions you arrived at the hard way. Rebuilding those in the
+next product is the most expensive habit in independent software work.
+
+This command does the mechanical half. It walks the source, classifies every
+file as logic / ui / theme / art / principle / ops / contract / test, detects the
+donor's stack, and writes two things into `harvest/<name>/`:
+
+  harvest.toml   machine-readable inventory — what an agent reads
+  SURVEY.md      the human survey, ordered by value per unit of risk
+
+It stages readable copies under `harvest/<name>/assets/`.
+
+It does NOT decide what is worth keeping, and it does NOT touch your source
+tree. Whether a function is business logic or incidental framing, whether a
+component generalizes or encodes one product's assumptions — none of that is a
+heuristic. Run `/fiducial:harvest` afterwards for that half.
+
+Nothing is wired in. `harvest/` is a staging area; the donor stays reference
+material until you decide what to lift and how to generalize it.",
+        after_long_help = "\
+EXAMPLES:
+    fid harvest ../old-web-app
+    fid harvest ~/dev/ring-of-pursuit --name rop
+    fid harvest ../donor --json | jq '.summary'
+
+AFTERWARDS:
+    /fiducial:harvest <name>    work through the extraction with an agent"
+    )]
+    Harvest {
+        /// Path to the repository or folder to survey
+        #[arg(value_name = "PATH")]
+        path: String,
+        /// Name for the staging directory (defaults to the source folder name)
+        #[arg(long, value_name = "NAME")]
+        name: Option<String>,
+        /// Where to stage (default: harvest/)
+        #[arg(long, value_name = "DIR")]
+        into: Option<String>,
+        /// Emit JSON instead of text — the same facts, for agents and tooling
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Check for drift: outdated deps, stale templates, un-applied migrations
     #[command(
         long_about = "\
@@ -400,6 +450,12 @@ fn main() -> Result<()> {
             section,
             portfolio,
         } => commands::dash::run(json, section, portfolio),
+        Commands::Harvest {
+            path,
+            name,
+            into,
+            json,
+        } => commands::harvest::run(&path, name, into, json),
         Commands::Doctor => commands::doctor::run(),
         Commands::GuardCheck => guard::check_from_stdin(),
     }

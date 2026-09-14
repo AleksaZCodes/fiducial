@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 19
+## Current phase: Phase 20
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -349,6 +349,26 @@ no live CI status (deliberate; would go behind a flag), decisions are listed but
 not read so supersession is undetected, and `briefs` from §10's v0 row is not
 built because no product has one yet.
 
+**Phase 19 — harvest ✅ (2026-09-14)**
+
+> Getting the good parts out of a codebase you already built, without dragging
+> the rest along. Spec: `docs/specs/2026-09-14-phase-19-harvest.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| `fid harvest <path>` — walks a donor, classifies every file, detects its stack, stages readable copies | ✅ |
+| **Eight kinds** — `logic`, `ui`, `theme`, `art`, `principle`, `ops`, `contract`, `test` — the four the request named plus the three that travel with them | ✅ |
+| Every classification records the **evidence** for itself; the survey prints it, so a wrong guess is correctable rather than authoritative | ✅ |
+| **The staging rule: `harvest/` is never the product.** Nothing wired in, nothing overwritten — asserted by fingerprinting every file outside `harvest/` before and after | ✅ |
+| Survey ordered by **value per unit of risk**, not size: theme → principle → contract → logic → ui → ops → art | ✅ |
+| `.env`, lockfiles and logs never inventoried **or** staged; a secret planted in a test donor is asserted absent from the whole staging tree | ✅ |
+| `node_modules`, `dist`, `target`, `.git` + 18 more never walked | ✅ |
+| Harvesting a tree into itself refused — the first implementation `canonicalize()`d a path that does not exist yet, so the guard was skipped exactly when needed | ✅ |
+| Markup classified as UI — without it the command was useless for the commonest donor there is, a static site | ✅ |
+| `/fiducial:harvest` skill — the judgment half; presents *what is not worth lifting and why* as prominently as what is, then waits for a decision | ✅ |
+| `docs/guides/harvesting.md` — the guide, with a worked landing-page example | ✅ |
+| 10 end-to-end tests + 9 classifier unit tests | ✅ |
+
 **Phase 18 — platform audit + cleanup ✅ (2026-09-14)**
 
 > A pass over the whole platform asking not "what is broken?" but "where does
@@ -629,7 +649,7 @@ fiducial/
 | **16c** | Firmware OTA: `fiducial-ota` — signed manifests, resumable transfer, trial boot, staged rollout | Transfer resumes after a drop; unsigned image cannot stage; failed self-test rolls back ([rescoped from BLE](docs/specs/2026-09-10-phase-16c-ota-transport-rescope.md)) | ✅ |
 | **17** | `fiducial-sim`, `realtime`, workbench v1 | Simulation runs native and in WASM; realtime's three contracts covered by tests | ✅ |
 | **18** | Platform audit + cleanup | Every drift found is encoded as an invariant that fails the build | ✅ |
-| **19** | The harvest feature — `fid harvest` + skill + docs | A repo or folder yields reusable assets a new product can adopt without being overridden | 🟡 |
+| **19** | The harvest feature — `fid harvest` + skill + docs | A repo or folder yields reusable assets a new product can adopt without being overridden | ✅ |
 | **20** | Catalogue ROP's reusable assets | Every reusable asset inventoried with an extraction recipe | ⬜ |
 | **21** | The documentation layer | Step-by-step guides for humans and agents; terminal captures checked by CI | ⬜ |
 | **22** | ROP migration wave 2 (optional) — eligible rules to L0 Rust | Each differential-tested before the TypeScript is deleted | ⬜ |
