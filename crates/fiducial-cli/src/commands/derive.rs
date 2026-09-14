@@ -8,7 +8,7 @@
 //! exits non-zero if any artifact is stale or missing. CI uses this.
 
 use anyhow::{bail, Context, Result};
-use std::{path::Path, process::Command};
+use std::{collections::BTreeMap, path::Path, process::Command};
 
 use fiducial_eda::validate as validate_board_interface;
 use fiducial_geometry::{BoardOutline, Side, ToleranceClass};
@@ -332,6 +332,127 @@ fn run_fid_mesh(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+// ── Built-in fid-i18n executor ───────────────────────────────────────────────
+
+/// Compare every locale catalog against the default, then generate typed keys.
+///
+/// Principle 1c made mechanical: a missing translation is a missing artifact, so
+/// it fails here rather than rendering a key to a reader.
+///
+/// `args[0]` is the messages directory (default `messages`). Outputs are the
+/// TypeScript modules to write — usually one.
+fn run_fid_i18n(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    // The config owns two facts this executor needs: where the catalogs live,
+    // and which locale is the fallback. Loaded once, up front.
+    let config = Config::load(&working_dir.join(crate::config::CONFIG_FILE))
+        .context("fid-i18n needs [i18n] in fiducial.toml")?;
+
+    // `args[0]` overrides the declaration for an unusual layout; the
+    // declaration is the default, so the directory is stated in one place.
+    let dir_name = pipeline
+        .args
+        .first()
+        .map(|s| s.as_str())
+        .unwrap_or_else(|| config.i18n.messages_dir());
+    let dir = working_dir.join(dir_name);
+
+    if !dir.is_dir() {
+        bail!(
+            "fid-i18n: `{dir_name}/` does not exist.\n\
+             Message catalogs live there, one JSON file per locale."
+        );
+    }
+
+    // The catalogs on disk are the declaration; the locale set is read from
+    // them rather than from config, so adding a file is all it takes.
+    let mut catalogs: BTreeMap<String, crate::i18n::Catalog> = BTreeMap::new();
+    for entry in std::fs::read_dir(&dir).with_context(|| format!("reading {dir_name}/"))? {
+        let path = entry?.path();
+        if path.extension().is_none_or(|e| e != "json") {
+            continue;
+        }
+        let Some(locale) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        catalogs.insert(locale.to_string(), crate::i18n::load_catalog(&path)?);
+    }
+
+    if catalogs.is_empty() {
+        bail!("fid-i18n: no `{dir_name}/<locale>.json` catalogs found");
+    }
+
+    // The default locale is declared, not guessed from the directory listing.
+    let default_locale = config.i18n.default_locale()?.to_string();
+
+    if !catalogs.contains_key(&default_locale) {
+        bail!(
+            "fid-i18n: the default locale `{default_locale}` has no catalog.\n\
+             Expected {dir_name}/{default_locale}.json"
+        );
+    }
+
+    let findings = crate::i18n::compare(&catalogs, &default_locale)?;
+
+    if findings.is_fatal() {
+        let mut message = String::from("fid-i18n: the catalogs are not complete.\n");
+        for (locale, keys) in &findings.missing {
+            message.push_str(&format!(
+                "\n  {dir_name}/{locale}.json is missing {} key(s):\n",
+                keys.len()
+            ));
+            for key in keys.iter().take(10) {
+                message.push_str(&format!("    {key}\n"));
+            }
+            if keys.len() > 10 {
+                message.push_str(&format!("    … and {} more\n", keys.len() - 10));
+            }
+        }
+        for (locale, keys) in &findings.placeholder_mismatch {
+            message.push_str(&format!(
+                "\n  {dir_name}/{locale}.json has {} key(s) whose placeholders \
+                 differ from {default_locale}:\n",
+                keys.len()
+            ));
+            for key in keys.iter().take(10) {
+                message.push_str(&format!("    {key}\n"));
+            }
+            message.push_str(
+                "    A placeholder in one locale and not the other means a reader\n\
+                 \x20   sees a literal `{name}`, or loses the value entirely.\n",
+            );
+        }
+        message.push_str(
+            "\nA missing translation is a missing artifact, not a fallback \
+             (MISSION.md 1c).\n",
+        );
+        bail!(message);
+    }
+
+    // Non-fatal findings are surfaced but do not stop the build — a legitimate
+    // "Wi-Fi" must not block anyone.
+    for (locale, keys) in &findings.untranslated {
+        println!(
+            "\n    ⚠ {locale}: {} value(s) identical to {default_locale} — likely untranslated",
+            keys.len()
+        );
+        for key in keys.iter().take(5) {
+            println!("      {key}");
+        }
+    }
+
+    let rendered = crate::i18n::render_typescript(&catalogs, &default_locale)?;
+    for out in &pipeline.outputs {
+        let abs = working_dir.join(out);
+        if let Some(parent) = abs.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("creating parent for `{out}`"))?;
+        }
+        std::fs::write(&abs, &rendered).with_context(|| format!("writing {out}"))?;
+    }
+
+    Ok(())
+}
+
 // ── Command execution ─────────────────────────────────────────────────────────
 
 fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
@@ -354,8 +475,10 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             }
             "fid-validate" => return run_fid_validate(pipeline, working_dir),
             "fid-mesh" => return run_fid_mesh(pipeline, working_dir),
+            "fid-i18n" => return run_fid_i18n(pipeline, working_dir),
             other => bail!(
-                "unknown executor `{other}` (supported: cargo-test, shell, fid-validate, fid-mesh)"
+                "unknown executor `{other}` \
+                 (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n)"
             ),
         };
 

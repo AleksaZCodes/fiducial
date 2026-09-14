@@ -24,15 +24,6 @@
 //! to the default locale's (usually untranslated, sometimes a proper noun).
 //! Failing on those would block a legitimate `"Wi-Fi"`.
 
-// Not yet called from `derive.rs` — the `fid-i18n` executor, the `[i18n]`
-// declaration and the `fid add i18n` capability are the remaining half of
-// Phase 22. The comparison and codegen below are complete and tested (12 unit
-// tests); only the wiring is outstanding.
-//
-// Marked rather than left as bare warnings so CI's `-D warnings` stays
-// meaningful, and so this is a stated gap rather than a silent one.
-#![allow(dead_code)]
-
 use anyhow::{bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -45,8 +36,6 @@ pub type Catalog = BTreeMap<String, String>;
 pub struct Findings {
     /// Keys the default locale defines and this one does not. **Fatal.**
     pub missing: BTreeMap<String, Vec<String>>,
-    /// Keys this locale defines and the default does not. Reported.
-    pub extra: BTreeMap<String, Vec<String>>,
     /// Values byte-identical to the default locale's. Reported.
     pub untranslated: BTreeMap<String, Vec<String>>,
     /// Placeholders that differ between a locale and the default. **Fatal.**
@@ -124,57 +113,68 @@ fn placeholders(template: &str) -> BTreeSet<String> {
     found
 }
 
-/// Compare every locale against the default.
+/// Compare every locale against the **union of all keys**.
+///
+/// The reference is the union, not the default locale's catalog. That
+/// distinction is the whole correctness of this check.
+///
+/// With the default as the reference, deleting a key from the default locale
+/// reports the *other* locales as having an extra key, and passes — which is
+/// backwards, and is precisely the Ring of Pursuit failure with the locales
+/// swapped. A key present in any locale and absent from another is a missing
+/// translation regardless of which locale happens to be the fallback.
+///
+/// The default locale's only job is to decide what a reader sees when lookup
+/// fails at runtime. It does not define what the product is supposed to say.
 pub fn compare(catalogs: &BTreeMap<String, Catalog>, default_locale: &str) -> Result<Findings> {
-    let base = catalogs
-        .get(default_locale)
-        .ok_or_else(|| anyhow::anyhow!("no catalog for the default locale `{default_locale}`"))?;
+    if !catalogs.contains_key(default_locale) {
+        anyhow::bail!("no catalog for the default locale `{default_locale}`");
+    }
 
+    let union: BTreeSet<&String> = catalogs.values().flat_map(|c| c.keys()).collect();
+    let base = &catalogs[default_locale];
     let mut findings = Findings::default();
 
     for (locale, catalog) in catalogs {
-        if locale == default_locale {
-            continue;
-        }
-
-        for (key, base_value) in base {
-            match catalog.get(key) {
-                None => findings
+        for key in &union {
+            let Some(value) = catalog.get(*key) else {
+                findings
                     .missing
                     .entry(locale.clone())
                     .or_default()
-                    .push(key.clone()),
-                Some(value) => {
-                    // A placeholder present in one and not the other means a
-                    // reader sees a literal `{count}` or loses a value entirely.
-                    if placeholders(base_value) != placeholders(value) {
-                        findings
-                            .placeholder_mismatch
-                            .entry(locale.clone())
-                            .or_default()
-                            .push(key.clone());
-                    }
-                    // Short strings are frequently identical for good reasons —
-                    // "OK", "Email", a product name — so only flag substantial
-                    // ones, where identity is much more likely to mean forgotten.
-                    if value == base_value && value.chars().count() > 12 {
-                        findings
-                            .untranslated
-                            .entry(locale.clone())
-                            .or_default()
-                            .push(key.clone());
-                    }
-                }
-            }
-        }
+                    .push((*key).clone());
+                continue;
+            };
 
-        for key in catalog.keys() {
-            if !base.contains_key(key) {
+            // The remaining two checks compare against the default locale, which
+            // is the right reference for them: a placeholder set and an
+            // untranslated value are only meaningful relative to the original.
+            if locale == default_locale {
+                continue;
+            }
+            let Some(base_value) = base.get(*key) else {
+                continue;
+            };
+
+            // A placeholder in one and not the other means a reader sees a
+            // literal `{count}`, or loses the value entirely.
+            if placeholders(base_value) != placeholders(value) {
                 findings
-                    .extra
+                    .placeholder_mismatch
                     .entry(locale.clone())
                     .or_default()
-                    .push(key.clone());
+                    .push((*key).clone());
+            }
+
+            // Short strings are often identical for good reasons — "OK",
+            // "Email", "Wi-Fi" — so only flag substantial ones, where identity
+            // much more often means forgotten.
+            if value == base_value && value.chars().count() > 12 {
+                findings
+                    .untranslated
+                    .entry(locale.clone())
+                    .or_default()
+                    .push((*key).clone());
             }
         }
     }
@@ -335,14 +335,19 @@ mod tests {
     }
 
     #[test]
-    fn an_extra_key_is_reported_but_not_fatal() {
+    fn a_key_missing_from_the_default_locale_is_also_fatal() {
+        // The bug this caught: with the default locale as the reference set,
+        // deleting a key FROM the default reported the other locales as having
+        // an "extra" key, and passed. That is the Ring of Pursuit failure with
+        // the locales swapped.
         let mut all = BTreeMap::new();
-        all.insert("en".into(), catalog(&[("a", "A")]));
-        all.insert("sr".into(), catalog(&[("a", "A"), ("leftover", "x")]));
+        all.insert("sr".into(), catalog(&[("a", "A")]));
+        all.insert("en".into(), catalog(&[("a", "A"), ("b", "B")]));
 
-        let found = compare(&all, "en").unwrap();
-        assert!(!found.is_fatal());
-        assert!(found.extra.contains_key("sr"));
+        // `sr` is the default and is the one missing `b`.
+        let found = compare(&all, "sr").unwrap();
+        assert!(found.is_fatal(), "the default locale is not exempt");
+        assert_eq!(found.missing.get("sr").unwrap(), &vec!["b".to_string()]);
     }
 
     #[test]

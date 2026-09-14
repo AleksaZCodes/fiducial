@@ -133,6 +133,29 @@ EXAMPLES
     )]
     Eda,
 
+    /// Add localization — JSON catalogs, typed keys, and the freshness gate
+    #[command(
+        long_about = "\
+Make this product localized by construction.
+
+Installs `messages/<locale>.json` catalogs, a `fid-i18n` pipeline that generates
+a typed MessageKey union from them, and a skill telling agents the rules.
+
+After this, a missing translation FAILS `fid derive --check` rather than
+rendering a key to a reader — MISSION.md principle 1c: a user-visible string is
+a fact, declared once, with every locale a derivation that must exist.
+
+Seeds `en` and `sr`. Add locales by dropping in another JSON file and listing it
+under `[i18n]` in fiducial.toml.",
+        after_long_help = "\
+EXAMPLE:
+    fid add i18n
+    # edit messages/*.json
+    fid derive          # regenerates the typed keys
+    fid derive --check  # fails when a locale is missing a key"
+    )]
+    I18n,
+
     /// Add firmware support for a microcontroller target
     #[command(
         long_about = "\
@@ -169,6 +192,7 @@ pub fn run(target: AddTarget) -> Result<()> {
             crate::commands::component::run(&name, &framework)
         }
         AddTarget::Eda => install_capability("eda"),
+        AddTarget::I18n => install_capability("i18n"),
     }
 }
 

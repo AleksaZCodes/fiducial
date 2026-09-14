@@ -261,6 +261,26 @@ pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
         skill_md: include_str!("../capabilities/worker-cloudflare/SKILL.md"),
     },
     CapabilityDef {
+        id: "i18n",
+        description: "Localized by construction: JSON catalogs in, typed message keys out",
+        guard_rules: &["no-hand-edit-generated-messages"],
+        templates: &[
+            (
+                "messages/en.json",
+                include_str!("../capabilities/i18n/messages/en.json"),
+            ),
+            (
+                "messages/sr.json",
+                include_str!("../capabilities/i18n/messages/sr.json"),
+            ),
+            (
+                "pipelines/i18n.toml",
+                include_str!("../capabilities/i18n/pipelines/i18n.toml"),
+            ),
+        ],
+        skill_md: include_str!("../capabilities/i18n/SKILL.md"),
+    },
+    CapabilityDef {
         id: "eda",
         description: "EDA pipeline: atopile → KiCad → board.interface.json tracked by fid derive",
         guard_rules: &["no-hand-edit-generated-board-interface"],
@@ -417,6 +437,14 @@ fn patch_config(root: &Path, cap: &CapabilityDef) -> Result<()> {
         if !cfg.guard.rules.contains(&rule.to_string()) {
             cfg.guard.rules.push(rule.to_string());
         }
+    }
+
+    // A capability that introduces a DECLARATION must seed it, or the pipeline
+    // it also installs fails on the next `fid derive` with an empty block.
+    // `i18n` ships en and sr catalogs, so the declaration says so.
+    if cap.id == "i18n" && cfg.i18n.locales.is_empty() {
+        cfg.i18n.locales = vec!["sr".into(), "en".into()];
+        cfg.i18n.default = Some("sr".into());
     }
 
     // Serialise back. We use a structured round-trip here rather than line

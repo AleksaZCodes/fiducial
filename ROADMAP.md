@@ -73,10 +73,7 @@ Three kinds of item, and the order follows from the kind:
 | **Multiplying** | makes every later phase cheaper | second |
 | **Terminal** | the same whenever you do it | last, by product value |
 
-### 1 · i18n — *localized by construction* 🟡 · in progress
-
-> **Picking this up?** `docs/PHASE-22-HANDOFF.md` has the checklist, the
-> decisions already made, and the house rules. Start there.
+### 1 · i18n — *localized by construction* ✅
 
 The runtime (`@fiducial/i18n`) has shipped. The declaration, pipeline, gate,
 detector and capability remain.
@@ -168,6 +165,9 @@ step 3 delivers.
 | **Demo & showcase** | Interactive landing-page demo, Storybook, feature toggles |
 | **Diagnostics** | Error tracking as an adapter with a no-op default |
 | **Small tools** | Backlinks, browser-compat banners |
+| **i18n: hardcoded-string detector** | Warns, never fails; reported in `fid doctor` and `fid dash --json` so an agent consumes it as data. Not built |
+| **i18n: `fid new --locales`** | So there is no moment where a product is monolingual. Not built |
+| **Framework currency** | Capability templates must track current majors — Next.js 16, SvelteKit, Tauri. Pinned versions in a scaffold rot silently and a product starts a major behind |
 | **Agent portability** | Skills and guard wiring are Claude-Code-only; author once, generate per vendor — see below |
 | **Rust release versioning** | Changesets drives npm; the thirteen crates move in lockstep at 0.1.0 with nothing driving a bump |
 | **Tagged releases + Zenodo DOI** | No release exists, so there is nothing to archive or cite |

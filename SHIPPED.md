@@ -9,7 +9,7 @@ numbering is unchanged._
 
 ---
 
-## Current phase: Phase 22 — i18n
+## Current phase: between phases — next is the capability taxonomy
 
 > Build order beyond this phase: [`ROADMAP.md`](ROADMAP.md).
 
@@ -355,6 +355,29 @@ drifts. A `help_honesty` test enforces that, and CI runs it.
 no live CI status (deliberate; would go behind a flag), decisions are listed but
 not read so supersession is undetected, and `briefs` from §10's v0 row is not
 built because no product has one yet.
+
+**Phase 22 — i18n: localized by construction ✅ (2026-09-14)**
+
+> Principle **1c** made mechanical. Spec: `ROADMAP.md` § i18n.
+
+| Deliverable | Status |
+| --- | --- |
+| `MISSION.md` **1c** — a user-visible string is a fact; every locale a derivation that must exist. Generated into every scaffolded product's `AGENTS.md` | ✅ |
+| `@fiducial/i18n` — locale negotiation, strict lookup, money, dates, timezones, plurals, relative time. Native `Intl` only, so it runs on server, client and edge | ✅ |
+| **Money is a fact that carries its unit** — integer minor units, currency independent of locale, cross-currency arithmetic refuses, `allocate()` loses nothing. `JPY` has 0 minor digits and `KWD` has 3 | ✅ |
+| Timezone inverse solved by **offset probing**, not arithmetic — a zone's offset depends on the instant, which is circular across a DST boundary. Verified through both EU transitions | ✅ |
+| `fid add i18n` — JSON catalogs, pipeline, and a `SKILL.md` at a **vendor-neutral path** | ✅ |
+| `fid-i18n` executor — catalogs in, a typed `MessageKey` union out. A mistyped key is a compile error | ✅ |
+| **The gate:** a missing translation fails `fid derive --check`, naming the file and the key | ✅ |
+| **Reference is the union of all keys, not the default locale's.** Hand-testing found that using the default as reference let a key deleted *from the default* pass as another locale's "extra" — the ROP failure with the locales swapped | ✅ |
+| Placeholder mismatch fatal; reordered placeholders accepted, because languages order words differently | ✅ |
+| Untranslated-looking values reported, never fatal — failing there would block a legitimate `"Wi-Fi"` | ✅ |
+| Installing a capability **seeds the declaration it needs**; a pipeline with an empty declaration fails on the next derive | ✅ |
+| 43 runtime tests, 10 comparison unit tests, 10 end-to-end. 395 across the workspace | ✅ |
+
+**Still open on i18n** — the hardcoded-string detector (warns, reported in `fid
+doctor` / `fid dash --json`) and `fid new` taking locales up front are not built.
+Tracked in `ROADMAP.md`.
 
 **Phase 21b — namespaced agents ✅ (2026-09-14)**
 
@@ -710,7 +733,7 @@ fiducial/
 | **20** | Catalogue ROP's reusable assets | Every reusable asset inventoried with an extraction recipe | ✅ |
 | **21** | The documentation layer | Step-by-step guides for humans and agents; terminal captures checked by CI | ✅ |
 | **21b** | Namespaced agents — `fiducial-design` / `-review` / `-implement` | A subagent's filename is its identity; a colliding name is silently unavailable | ✅ |
-| **22** | i18n — localized by construction | A missing translation fails `fid derive --check`; hardcoded strings are reported | 🟡 |
+| **22** | i18n — localized by construction | A missing translation fails `fid derive --check` | ✅ |
 
 **What comes next is not recorded here.** This file is the record of what was
 *built*; [`ROADMAP.md`](ROADMAP.md) holds what is *intended* and in what order.
