@@ -75,6 +75,9 @@ Three kinds of item, and the order follows from the kind:
 
 ### 1 · i18n — *localized by construction* 🟡 · in progress
 
+> **Picking this up?** `docs/PHASE-22-HANDOFF.md` has the checklist, the
+> decisions already made, and the house rules. Start there.
+
 The runtime (`@fiducial/i18n`) has shipped. The declaration, pipeline, gate,
 detector and capability remain.
 

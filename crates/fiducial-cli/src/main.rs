@@ -5,6 +5,7 @@ mod capability;
 mod commands;
 mod config;
 mod guard;
+mod i18n;
 mod lock;
 mod migration;
 mod pipeline;
