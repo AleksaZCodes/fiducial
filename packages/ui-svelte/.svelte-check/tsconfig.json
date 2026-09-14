@@ -1,0 +1,29 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDirs": [
+      "..",
+      "svelte"
+    ],
+    "allowArbitraryExtensions": true,
+    "noEmit": true,
+    "incremental": false,
+    "tsBuildInfoFile": "tsbuildinfo.json"
+  },
+  "files": [
+    "../../../node_modules/.pnpm/svelte-check@4.7.6_picomatch@4.0.7_svelte@5.57.0_typescript@6.0.3/node_modules/svelte-check/dist/src/svelte-shims-v4.d.ts",
+    "../../../node_modules/.pnpm/svelte-check@4.7.6_picomatch@4.0.7_svelte@5.57.0_typescript@6.0.3/node_modules/svelte-check/dist/src/svelte-jsx-v4.d.ts"
+  ],
+  "include": [
+    "../src/**/*.ts",
+    "../src/**/*.svelte",
+    "svelte/src/**/*.ts",
+    "svelte/src/**/*.d.svelte.ts"
+  ],
+  "exclude": [
+    "../src/Badge.svelte",
+    "../src/Button.svelte",
+    "../src/Card.svelte",
+    "../src/Dialog.svelte"
+  ]
+}

@@ -20,6 +20,7 @@ Before doing anything else:
 | `fid add <capability>` | Install a built-in or third-party capability |
 | `fid capability list` | Show installed capabilities and their skill status |
 | `fid capability check` | Validate capability conformance |
+| `fid harvest <path>` | Survey an existing codebase for reusable assets (then `/fiducial:harvest`) |
 
 ## Guard
 

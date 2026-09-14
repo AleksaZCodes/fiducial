@@ -25,3 +25,57 @@ repository   = "https://github.com/AleksaZCodes/fiducial"
 homepage     = "https://github.com/AleksaZCodes/fiducial"
 authors      = ["Aleksa Zdravkovic"]
 rust-version = "1.82"
+
+# ── Dependency declarations ─────────────────────────────────────────────────
+# Principle 1: a version used by two crates is declared once, here, and
+# inherited with `dep.workspace = true`. Before this table `serde` carried five
+# independent version declarations and `sha2` three — the same drift this
+# platform exists to delete, in the repository that states the rule.
+#
+# Features are NOT declared here. A version is one fact shared by every
+# consumer; a feature set is a per-crate decision (`fiducial-ota` needs
+# `postcard` without `std`, its dev-dependencies need it with). So each crate
+# still writes `features = [...]`, and only the version is inherited.
+[workspace.dependencies]
+# Serialization — the wire and schema contracts.
+serde      = { version = "1", default-features = false }
+serde_json = { version = "1" }
+postcard   = { version = "1", default-features = false }
+toml       = { version = "0.8" }
+
+# Cryptography — OTA manifest signing and image digests.
+sha2          = { version = "0.10", default-features = false }
+ed25519-dalek = { version = "2", default-features = false }
+
+# Math — `no_std` float functions for the geometry and mesh crates.
+libm = { version = "0.2" }
+
+# Host-only tooling.
+anyhow     = { version = "1" }
+clap       = { version = "4" }
+thiserror  = { version = "2" }
+walkdir    = { version = "2" }
+tempfile   = { version = "3" }
+rayon      = { version = "1" }
+serialport = { version = "4", default-features = false }
+diffy      = { version = "0.4" }
+hex        = { version = "0.4" }
+chrono     = { version = "0.4", default-features = false }
+
+# WASM bindings and TypeScript type generation.
+wasm-bindgen      = { version = "0.2" }
+wasm-bindgen-test = { version = "0.3" }
+ts-rs             = { version = "10" }
+
+# ── Internal crates ─────────────────────────────────────────────────────────
+# Path declared once so moving a crate is a one-line change, not thirteen.
+fiducial-core     = { path = "crates/fiducial-core" }
+fiducial-quantity = { path = "crates/fiducial-quantity" }
+fiducial-model    = { path = "crates/fiducial-model" }
+fiducial-protocol = { path = "crates/fiducial-protocol" }
+fiducial-eda      = { path = "crates/fiducial-eda" }
+fiducial-geometry = { path = "crates/fiducial-geometry" }
+fiducial-mesh     = { path = "crates/fiducial-mesh" }
+fiducial-ota      = { path = "crates/fiducial-ota" }
+fiducial-sim      = { path = "crates/fiducial-sim" }
+fiducial-tauri    = { path = "crates/fiducial-tauri" }

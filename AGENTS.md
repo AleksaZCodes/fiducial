@@ -33,18 +33,42 @@ complete.
 ```
 fiducial/
 ├── MISSION.md, STACK.md, PHASES.md
-├── crates/               11 Rust members; no_std spine + `fid` CLI
-│   ├── fiducial-core, -protocol, -quantity, -model
-│   ├── fiducial-geometry, -mesh   geometry + case generation
-│   ├── fiducial-eda               board.interface.json schema
-│   └── fiducial-cli, -wasm, -tauri, fiducial
+├── crates/               13 Rust members
+│   ├── fiducial-core         no_std spine — DeviceId, version
+│   ├── fiducial-protocol     no_std frame codec — the waist
+│   ├── fiducial-quantity     no_std units + tolerance algebra
+│   ├── fiducial-model        Fact, Decision, PipelineMeta
+│   ├── fiducial-geometry     no_std primitives, tolerance profiles
+│   ├── fiducial-mesh         no_std case generation, STL + GLB
+│   ├── fiducial-eda          board.interface.json schema + validation
+│   ├── fiducial-ota          no_std signed, resumable firmware update
+│   ├── fiducial-sim          ODE simulation — native (rayon) + WASM
+│   ├── fiducial-cli          the `fid` binary + capability templates
+│   ├── fiducial-wasm         wasm-bindgen wrapper
+│   ├── fiducial-tauri        serial transport for the desktop host
+│   └── fiducial              crates.io name claim + signpost
 ├── firmware/             Separate workspace (Embassy; rp2040 + stm32)
-├── packages/             10 JS/TS packages (pnpm + Turborepo)
-├── docs/specs/           Design decisions (append-only)
+├── packages/             11 JS/TS packages (pnpm + Turborepo)
+│   ├── tokens, headless      design tokens, Result<T,E>, OfflineQueue
+│   ├── ui-react, ui-svelte   component registry sources (copy-in)
+│   ├── board-schema          TS mirror of fiducial-eda
+│   ├── transport-web         Web Serial / WebUSB / BLE + codec
+│   ├── viewer3d-react        GLB viewer (Three.js)
+│   ├── realtime              broadcast, presence, postgres-changes
+│   ├── wasm-bridge           GENERATED TS types — never hand-edit
+│   ├── cli                   @fiducial/cli npm shim
+│   └── fiducial              @fiducial/fiducial npm name claim
+├── docs/
+│   ├── specs/            Design decisions (append-only, date-prefixed)
+│   ├── protocol/         Wire spec + conformance vectors
+│   └── compat/           Wire version policy (matrix.toml)
 └── .github/workflows/    CI (ci.yml) + release (release.yml)
 ```
 
-`ls crates packages` beats this tree — it is hand-maintained and drifts.
+This tree is checked by `crates/fiducial-cli/tests/workspace_hygiene.rs`, which
+fails the build when a crate or package is missing from it. It used to carry a
+disclaimer telling you to run `ls` instead; checking is cheaper than
+disclaiming.
 
 ## Tools — use these before writing library code
 
@@ -69,6 +93,30 @@ Step 2: `query-docs` with the returned ID and a specific question.
 
 `mcp__plugin_github_github__*` — search code, read files, create PRs, manage issues.
 Use `get_me` first to confirm current user context.
+
+## Documentation
+
+| Read | For |
+|---|---|
+| `docs/guides/for-agents.md` | **Working here as an agent — start with this** |
+| `docs/guides/start-here.md` | The paradigm, and what it changes about how you work |
+| `docs/guides/first-product.md` | Nothing → board → generated enclosure → CI gate |
+| `docs/guides/harvesting.md` | Getting the good parts out of a codebase already built |
+
+Terminal output in those guides is **generated from the real binary** and gated
+in CI. Never hand-edit a block showing `fid` output — regenerate it with
+`FIDUCIAL_WRITE_CAPTURES=1 cargo test -p fiducial-cli --test captures`.
+
+## Reusing an existing codebase
+
+```sh
+fid harvest <path> --name <slug>   # survey + stage
+```
+
+`harvest/` is a **staging area and never the product**. Nothing is wired in and
+nothing is overwritten. Do not paste donor files into the source tree —
+generalize them deliberately, or you have imported somebody else's assumptions
+along with their work. See `docs/guides/harvesting.md`.
 
 ## Build
 

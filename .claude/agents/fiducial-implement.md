@@ -1,5 +1,5 @@
 ---
-name: implement
+name: fiducial-implement
 description: Implementation agent — coding, refactoring, debugging. Uses Sonnet 4.6.
 model: claude-sonnet-4-6
 tools:
@@ -31,5 +31,5 @@ Default agent for all coding work: new features, refactoring, debugging, tests.
 
 ## When to switch agents
 
-- Architectural decision needed → `/design` (Opus)
-- Ready to review before committing → `/review` (Opus)
+- Architectural decision needed → `fiducial-design` (Opus)
+- Ready to review before committing → `fiducial-review` (Opus)

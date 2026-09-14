@@ -1,0 +1,39 @@
+# The gate. Everything here is a fact the repository can check about itself.
+#
+# `fid derive --check` is the one that matters: it re-hashes every derived
+# artifact against fiducial.lock and fails when one is stale. Without it a
+# hand-edited or forgotten artifact reaches the default branch silently, which
+# is the single failure this platform exists to prevent — so `fid new` scaffolds
+# this workflow rather than leaving it as something to remember later.
+#
+# `fid dash` reports whether any workflow runs that check. If you delete this
+# job, the dashboard will start telling you so.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fiducial:
+    name: fiducial checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install fid
+        run: cargo install fiducial-cli --version {{version}} --locked
+
+      # Config, lock, template integrity, pending migrations.
+      - name: fid doctor
+        run: fid doctor
+
+      # Fails when any derived artifact no longer matches its declaration.
+      - name: fid derive --check
+        run: fid derive --check

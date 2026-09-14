@@ -1,0 +1,34 @@
+$ fid dash
+
+Product
+  name           demo-product
+  version        X.Y.Z
+  root           /home/you/dev/demo-product
+  spine          disabled
+  capabilities   (none)
+  guard rules    3
+
+Git
+  branch         main
+  head           no commits yet
+  working tree   8 file(s) with uncommitted changes
+  upstream       not tracking a remote branch
+
+Roadmap
+  state          no roadmap found (looked for ROADMAP.md, PHASES.md, docs/ROADMAP.md)
+
+Decisions
+  state          none recorded (looked in docs/specs, docs/decisions, docs/adr)
+
+CI
+  CI                           on push, pull_request  [checks artifact freshness]
+  Claude Review                on pull_request
+  (declared workflows, not live run status — dash makes no network calls)
+
+Graph
+  state          no pipelines declared
+
+Freshness
+  artifacts      0 fresh, 0 stale, 0 missing, 0 never derived
+  templates      unmodified
+  everything the lock tracks is current

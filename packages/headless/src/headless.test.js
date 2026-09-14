@@ -14,6 +14,7 @@ import {
   map,
   flatMap,
   OfflineQueue,
+  DEFAULT_BACKOFF_SCHEDULE_MS,
 } from '../dist/index.js'
 
 describe('@fiducial/headless', () => {
@@ -234,18 +235,141 @@ describe('@fiducial/headless', () => {
         assert.equal(q.isEmpty, true)
       })
 
-      it('defaults to maxRetries 3', () => {
+      it('defaults maxRetries to the length of the backoff schedule', () => {
+        // Was a hardcoded 3. Changed in Phase 20, when the backoff schedule was
+        // harvested from Ring of Pursuit: a retry COUNT and a retry SCHEDULE
+        // are two declarations of the same fact, and 3 retries against a
+        // 5-step schedule made the last two delays unreachable. The count now
+        // derives from the schedule, so they cannot disagree.
         const q = new OfflineQueue()
         const action = q.enqueue('a', 'x')
-        q.dequeue()
-        assert.equal(q.retry(action), true)  // retry 1
-        q.dequeue()
-        assert.equal(q.retry(action), true)  // retry 2
-        q.dequeue()
-        assert.equal(q.retry(action), true)  // retry 3
-        q.dequeue()
-        assert.equal(q.retry(action), false) // exhausted
+
+        let attempts = 0
+        while (q.retry(action)) {
+          attempts += 1
+          q.dequeue()
+        }
+        assert.equal(attempts, DEFAULT_BACKOFF_SCHEDULE_MS.length)
+      })
+
+      it('still honours an explicit maxRetries', () => {
+        const q = new OfflineQueue({ maxRetries: 3 })
+        const action = q.enqueue('a', 'x')
+        assert.equal(q.retry(action), true)
+        assert.equal(q.retry(action), true)
+        assert.equal(q.retry(action), true)
+        assert.equal(q.retry(action), false)
       })
     })
+  })
+})
+
+describe('OfflineQueue — durability (harvested from Ring of Pursuit)', () => {
+  it('replays actions at their original timestamp, not at sync time', async () => {
+    const q = new OfflineQueue()
+    const first = q.enqueue('a', { v: 1 })
+    await new Promise((r) => setTimeout(r, 5))
+    q.enqueue('b', { v: 2 })
+
+    const drained = q.drain()
+    assert.equal(drained.length, 2)
+    // Order is enqueue order, and each carries the moment it was captured.
+    assert.equal(drained[0].id, 'a')
+    assert.equal(drained[0].enqueuedAt.getTime(), first.enqueuedAt.getTime())
+    assert.ok(drained[1].enqueuedAt.getTime() >= drained[0].enqueuedAt.getTime())
+  })
+
+  it('defaults maxRetries to the length of the backoff schedule', () => {
+    // A retry count without a matching schedule was the gap in the first
+    // version: three retries against a five-step backoff meant the last two
+    // delays were unreachable.
+    const q = new OfflineQueue()
+    const action = q.enqueue('a', 1)
+    let attempts = 0
+    while (q.retry(action)) attempts += 1
+    assert.equal(attempts, DEFAULT_BACKOFF_SCHEDULE_MS.length)
+  })
+
+  it('returns the scheduled delay for each attempt, then undefined', () => {
+    const q = new OfflineQueue({ backoffScheduleMs: [10, 20, 30] })
+    const action = q.enqueue('a', 1)
+
+    assert.equal(q.backoffFor(action), 10)
+    q.retry(action)
+    assert.equal(q.backoffFor(action), 20)
+    q.retry(action)
+    assert.equal(q.backoffFor(action), 30)
+    q.retry(action)
+    // Exhausted — the caller should surface the failure, not keep waiting.
+    assert.equal(q.backoffFor(action), undefined)
+  })
+
+  it('repeats the final delay when maxRetries exceeds the schedule', () => {
+    const q = new OfflineQueue({ backoffScheduleMs: [10, 20], maxRetries: 4 })
+    const action = q.enqueue('a', 1)
+    q.retry(action)
+    q.retry(action)
+    q.retry(action)
+    assert.equal(q.backoffFor(action), 20)
+  })
+
+  it('pending() reports the queue without draining it', () => {
+    const q = new OfflineQueue()
+    q.enqueue('a', 1)
+    q.enqueue('b', 2)
+
+    assert.equal(q.pending().length, 2)
+    assert.equal(q.size, 2, 'pending() must not consume')
+    // Filterable, which a bare count is not — the donor could only count.
+    assert.equal(q.pending().filter((a) => a.payload === 2).length, 1)
+  })
+
+  it('survives a reload when given durable storage', () => {
+    // The whole point of the second harvest pass: an in-memory queue loses its
+    // contents on the page reload that being offline tends to cause.
+    const backing = []
+    const durable = {
+      all: () => [...backing],
+      push: (a) => backing.push(a),
+      unshift: (a) => backing.unshift(a),
+      shift: () => backing.shift(),
+      clear: () => {
+        backing.length = 0
+      },
+    }
+
+    const before = new OfflineQueue({ storage: durable })
+    before.enqueue('a', { move: 'north' })
+    before.enqueue('b', { move: 'south' })
+
+    // A new queue over the same store — this is what a reload looks like.
+    const after = new OfflineQueue({ storage: durable })
+    assert.equal(after.size, 2)
+    assert.equal(after.dequeue().payload.move, 'north')
+  })
+
+  it('storage is the only difference between the durable and test paths', () => {
+    // Same assertions, both adapters — so the durable path is not a second
+    // implementation that can drift from the tested one.
+    const backing = []
+    const durable = {
+      all: () => [...backing],
+      push: (a) => backing.push(a),
+      unshift: (a) => backing.unshift(a),
+      shift: () => backing.shift(),
+      clear: () => {
+        backing.length = 0
+      },
+    }
+
+    for (const storage of [undefined, durable]) {
+      const q = new OfflineQueue(storage ? { storage } : {})
+      q.enqueue('a', 1)
+      q.enqueue('b', 2)
+      assert.equal(q.size, 2)
+      assert.equal(q.dequeue().id, 'a')
+      assert.equal(q.drain().length, 1)
+      assert.ok(q.isEmpty)
+    }
   })
 })

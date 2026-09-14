@@ -741,3 +741,13 @@ mod tests {
         assert!(tolerance_by_name("laser").is_none());
     }
 }
+
+/// The README's examples, compiled and run as doctests.
+///
+/// A README is documentation, and documentation that is not executed drifts
+/// from the code it describes. `#[cfg(doctest)]` means this item exists only
+/// while doctests are collected, so the README is verified on every
+/// `cargo test` without being rendered a second time on docs.rs.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+pub struct ReadmeDoctests;

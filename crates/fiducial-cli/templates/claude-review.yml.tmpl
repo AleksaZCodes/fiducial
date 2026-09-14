@@ -47,7 +47,7 @@ with open('/tmp/pr.files') as f:
     files = f.read().strip()
 
 truncated = len(diff) >= 24000
-note = "\n\n*(diff truncated to 24 KB — run `/review` locally for the full picture)*" if truncated else ""
+note = "\n\n*(diff truncated to 24 KB — run the fiducial-review agent locally for the full picture)*" if truncated else ""
 
 prompt = (
     "You are reviewing a pull request for {{name}}, a Fiducial platform product.\n\n"
@@ -93,7 +93,7 @@ pr = os.environ["PR_NUMBER"]
 gh_token = os.environ["GH_TOKEN"]
 repo = os.environ.get("GITHUB_REPOSITORY", "")
 
-body = f"## Opus review\n\n{review}\n\n---\n*claude-opus-5 · run `/review` locally for an interactive session*"
+body = f"## Opus review\n\n{review}\n\n---\n*claude-opus-5 · run the fiducial-review agent locally for an interactive session*"
 
 comment_payload = json.dumps({"body": body}).encode()
 comment_req = urllib.request.Request(

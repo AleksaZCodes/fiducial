@@ -1,0 +1,2 @@
+$ fid derive --check
+✦ fid derive --check — all artifacts fresh

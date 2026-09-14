@@ -31,12 +31,9 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "echo 'nothing to build (Phase 0 placeholder)'",
-    "typecheck": "tsc --noEmit",
-    "lint": "echo 'no linter configured yet'",
-    "test": "echo 'no tests yet'"
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "typescript": "^7.0.2"
+    "typescript": "catalog:"
   }
 }

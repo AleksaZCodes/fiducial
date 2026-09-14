@@ -38,7 +38,7 @@
     "test": "node --test src/realtime.test.js"
   },
   "devDependencies": {
-    "typescript": "^7.0.2"
+    "typescript": "catalog:"
   },
   "peerDependencies": {
     "@supabase/supabase-js": ">=2"

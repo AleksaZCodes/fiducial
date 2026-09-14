@@ -22,6 +22,7 @@ use std::env;
 use crate::{
     capability::{self, PLATFORM_VERSION},
     config::{Config, CONFIG_FILE},
+    lock,
     lock::{Lock, LOCK_FILE},
     migration, templates,
 };
@@ -77,6 +78,115 @@ pub fn run(dry_run: bool, portfolio: bool) -> Result<()> {
         }
     }
     println!();
+
+    // ── 1a. Templates the platform has renamed ────────────────────────────────
+    //
+    // Must run BEFORE the "added" pass below, which would otherwise see the new
+    // path as simply missing and install it, leaving the old file behind — and
+    // the old file is the whole problem, because a subagent's filename is its
+    // identity and the stale one keeps claiming the colliding name.
+    let renamed: Vec<(&str, &str)> = templates::RENAMED_TEMPLATES
+        .iter()
+        .copied()
+        .filter(|(old, _)| lock.templates.contains_key(*old) || root.join(old).exists())
+        .collect();
+
+    if !renamed.is_empty() {
+        println!("  Renamed by the platform");
+        for (old, new) in &renamed {
+            let old_path = root.join(old);
+            let new_path = root.join(new);
+
+            // Is the local copy still the one we shipped? If the product edited
+            // it, those edits are theirs and deleting them to fix our naming
+            // problem is the worse outcome.
+            let unmodified = match (std::fs::read(&old_path), lock.templates.get(*old)) {
+                (Ok(bytes), Some(record)) => lock::sha256_hex(&bytes) == record.hash,
+                (Err(_), _) => true, // already gone
+                (Ok(_), None) => false,
+            };
+
+            if dry_run {
+                any_changes = true;
+                if unmodified {
+                    println!("  ✓ would rename: {old} → {new}");
+                } else {
+                    println!("  ⚠ {old}: locally modified — would install {new} and keep both");
+                }
+                continue;
+            }
+
+            // Install the new path from the current template.
+            if let Some(template) = templates::raw(new) {
+                let content = templates::expand(template, &cfg.product.name, PLATFORM_VERSION);
+                if let Some(parent) = new_path.parent() {
+                    std::fs::create_dir_all(parent)
+                        .with_context(|| format!("creating parent for `{new}`"))?;
+                }
+                std::fs::write(&new_path, &content).with_context(|| format!("writing `{new}`"))?;
+                lock.record(new.to_string(), content.as_bytes(), PLATFORM_VERSION);
+            }
+
+            if unmodified {
+                let _ = std::fs::remove_file(&old_path);
+                lock.templates.remove(*old);
+                println!("  ✓ renamed: {old} → {new}");
+            } else {
+                lock.templates.remove(*old);
+                println!("  ⚠ {old}: locally modified — kept, and {new} installed alongside");
+                println!("    Move your changes across, then delete the old file.");
+            }
+            any_changes = true;
+        }
+        println!();
+    }
+
+    // ── 1b. Templates the platform has added since this product was scaffolded ─
+    //
+    // A 3-way merge can only update files the lock already knows about, so
+    // without this a template added to `fid new` reached only products created
+    // afterwards. `.github/workflows/ci.yml` — the workflow that gates artifact
+    // freshness — was added in Phase 18 and would have arrived in no existing
+    // product at all. Principle 7: a fix that cannot propagate is half-finished.
+    let added: Vec<(&str, &str)> = templates::SCAFFOLD_FILES
+        .iter()
+        .copied()
+        .filter(|(rel_path, _)| !lock.templates.contains_key(*rel_path))
+        .collect();
+
+    if !added.is_empty() {
+        println!("  New since this product was scaffolded");
+        for (rel_path, template) in &added {
+            let dest = root.join(rel_path);
+
+            // Never clobber a file the product already wrote by hand; report it
+            // and let the author reconcile.
+            if dest.exists() {
+                println!("  ⚠ {rel_path}: exists on disk but is untracked — leaving it alone");
+                continue;
+            }
+
+            any_changes = true;
+            if dry_run {
+                println!("  ✓ would add: {rel_path}");
+                continue;
+            }
+
+            let content = templates::expand(template, &cfg.product.name, PLATFORM_VERSION);
+            if let Some(parent) = dest.parent() {
+                std::fs::create_dir_all(parent)
+                    .with_context(|| format!("creating parent for `{rel_path}`"))?;
+            }
+            std::fs::write(&dest, &content).with_context(|| format!("writing `{rel_path}`"))?;
+            lock.record(
+                rel_path.replace('\\', "/"),
+                content.as_bytes(),
+                PLATFORM_VERSION,
+            );
+            println!("  ✓ added: {rel_path}");
+        }
+        println!();
+    }
 
     // ── 2. Codemods ───────────────────────────────────────────────────────────
     println!("  Codemods");

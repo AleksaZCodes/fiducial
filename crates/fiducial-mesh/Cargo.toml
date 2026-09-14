@@ -20,5 +20,5 @@ alloc   = []
 std     = ["alloc"]
 
 [dependencies]
-fiducial-geometry = { path = "../fiducial-geometry", features = ["alloc"] }
-libm              = "0.2"
+fiducial-geometry = { workspace = true, features = ["alloc"] }
+libm              = { workspace = true }

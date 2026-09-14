@@ -4,7 +4,7 @@ _Read this at the start of every session. Updated manually as phases complete._
 
 ---
 
-## Current phase: Phase 18
+## Current phase: Phase 22
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
@@ -349,6 +349,110 @@ no live CI status (deliberate; would go behind a flag), decisions are listed but
 not read so supersession is undetected, and `briefs` from §10's v0 row is not
 built because no product has one yet.
 
+**Phase 21b — namespaced agents ✅ (2026-09-14)**
+
+> A subagent's filename is its identity, and `design` / `review` are names other
+> people use too.
+
+| Deliverable | Status |
+| --- | --- |
+| Scaffolded agents renamed `design` → `fiducial-design`, `review` → `fiducial-review` (file name **and** frontmatter `name:`) — a colliding agent is silently unavailable, not an error | ✅ |
+| `templates::RENAMED_TEMPLATES` — the declaration of what moved. A rename **cannot** be a codemod: `MigrationOp` is a literal search-and-replace within one file, and this is a file moving | ✅ |
+| `fid upgrade` installs the new path and removes the old one — ordered **before** the "added" pass, which would otherwise install the new file and leave the colliding one behind | ✅ |
+| A **locally modified** file at a renamed path is never deleted: both are kept, with a warning naming the fix. Discarding someone's edits to solve a naming problem is the worse outcome | ✅ |
+| Propagated to the real `fon` product and verified clean | ✅ |
+| 2 new end-to-end tests; captures regenerated so the guides show the new names | ✅ |
+
+**Phase 21 — documentation that cannot lie ✅ (2026-09-14)**
+
+> Guides for humans and agents, with terminal output generated from the real
+> binary and gated in CI. Spec: `docs/specs/2026-09-14-phase-21-documentation.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| `docs/guides/start-here.md` — the paradigm, opening with a concrete failure (one connector written down six times, and the fab run that finds out) rather than the thesis | ✅ |
+| `docs/guides/first-product.md` — nothing → board → generated enclosure → CI gate in ~20 min; has the reader **break** `fid derive --check` deliberately, because the guarantee is only believable once seen failing | ✅ |
+| `docs/guides/for-agents.md` — orientation, the five that bite, the finish checklist | ✅ |
+| `docs/guides/README.md` — index, and why the terminal output is generated | ✅ |
+| **Captures generated from the real binary**, same freshness gate as `docs/protocol/vectors.json`; verified adversarially by tampering with one character | ✅ |
+| Captures run **in walkthrough order against one product** — the first harness captured `fid graph` on a bare scaffold and embedded "no pipelines declared" into a section that comes *after* they are installed: real output, faithfully generated, completely misleading | ✅ |
+| Captures **embedded** in the guides, not linked — GitHub renders no transclusion, and output behind a link nobody clicks shows nothing | ✅ |
+| Both tests derive from `render()` rather than one reading files the other writes — the first version had an undeclared ordering dependency, and cargo runs tests in parallel | ✅ |
+| Orphan detection: every declared capture is shown in some guide | ✅ |
+| CI `docs` job; root README opens with a path in for new readers | ✅ |
+| All internal markdown links verified to resolve | ✅ |
+| **Deliberately not done:** no docs site (a second place for docs to drift), no Playwright screenshots (heavy dependency for a CLI-first platform) | ✅ |
+
+**Phase 20 — Ring of Pursuit catalogued ✅ (2026-09-14)**
+
+> `fid harvest` turned on its intended donor. Catalogue:
+> `docs/harvest/ring-of-pursuit.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| Full catalogue of ROP's reusable assets — 8 entries, each with a target, a recipe and the warnings someone would otherwise rediscover | ✅ |
+| An explicit **not worth lifting** list with reasons — as valuable as the first, and shorter to act on | ✅ |
+| **Ratio: 1 extracted, 9 catalogued.** MISSION's two anti-goals pull against each other here; importing everything reusable would satisfy "do not rebuild" and violate "the platform must never become the project" | ✅ |
+| **Extracted:** `OfflineQueue` durability — the one item that had already met the second-use bar, because `@fiducial/headless` had declared it needed this queue and shipped half of it | ✅ |
+| `QueueStorage<T>` adapter (memory + durable), `DEFAULT_BACKOFF_SCHEDULE_MS`, `backoffFor()`, `pending()`; `maxRetries` now *derives* from the schedule instead of being a second declaration of it | ✅ |
+| 7 new headless tests incl. surviving a reload, and one asserting the durable and in-memory paths run identical assertions so they cannot drift | ✅ |
+| Changeset recording the `maxRetries` default change rather than letting it land silently | ✅ |
+| **Defect in `fid harvest` found by dogfooding:** `.vitepress/cache`, `.wrangler/tmp`, `supabase/.temp` were walked, ranking a 13,206-line VitePress dependency chunk as the donor's most valuable business logic. 13 scratch directories added to the skip list; logic 61,560 → 16,887 real lines, contract 142,764 → 9,514 | ✅ |
+
+**Phase 19 — harvest ✅ (2026-09-14)**
+
+> Getting the good parts out of a codebase you already built, without dragging
+> the rest along. Spec: `docs/specs/2026-09-14-phase-19-harvest.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| `fid harvest <path>` — walks a donor, classifies every file, detects its stack, stages readable copies | ✅ |
+| **Eight kinds** — `logic`, `ui`, `theme`, `art`, `principle`, `ops`, `contract`, `test` — the four the request named plus the three that travel with them | ✅ |
+| Every classification records the **evidence** for itself; the survey prints it, so a wrong guess is correctable rather than authoritative | ✅ |
+| **The staging rule: `harvest/` is never the product.** Nothing wired in, nothing overwritten — asserted by fingerprinting every file outside `harvest/` before and after | ✅ |
+| Survey ordered by **value per unit of risk**, not size: theme → principle → contract → logic → ui → ops → art | ✅ |
+| `.env`, lockfiles and logs never inventoried **or** staged; a secret planted in a test donor is asserted absent from the whole staging tree | ✅ |
+| `node_modules`, `dist`, `target`, `.git` + 18 more never walked | ✅ |
+| Harvesting a tree into itself refused — the first implementation `canonicalize()`d a path that does not exist yet, so the guard was skipped exactly when needed | ✅ |
+| Markup classified as UI — without it the command was useless for the commonest donor there is, a static site | ✅ |
+| `/fiducial:harvest` skill — the judgment half; presents *what is not worth lifting and why* as prominently as what is, then waits for a decision | ✅ |
+| `docs/guides/harvesting.md` — the guide, with a worked landing-page example | ✅ |
+| 10 end-to-end tests + 9 classifier unit tests | ✅ |
+
+**Phase 18 — platform audit + cleanup ✅ (2026-09-14)**
+
+> A pass over the whole platform asking not "what is broken?" but "where does
+> this repository violate the rule it exists to enforce?" — because everything
+> was already green: all tests passing, clippy clean, no TODO in the tree.
+> Spec: `docs/specs/2026-09-14-phase-18-platform-audit.md`.
+
+| Found | Was | Resolved |
+| --- | --- | --- |
+| No `[workspace.dependencies]` | `serde` declared **5×**, `serde_json` 4×, `sha2` 3× — principle 1 violated in the repo that states principle 1 | One declaration, inherited with `{ workspace = true }`; feature sets stay per-crate, deliberately |
+| TypeScript version | Declared in 10 `package.json` files as **three different answers** (`^7.0.2`, `^7.0.0`, `^5.0.0`) with one version installed — drift, already arrived | pnpm `catalog:`; every package references it |
+| `fid new` scaffolded no CI | Every product **born carrying the defect `fid dash` reports** — and a test *asserted* the scaffold had no freshness guard, so the bug was the spec | Scaffolds `ci.yml` running `fid doctor` + `fid derive --check`; test asserts the fix, keeps the negative case |
+| `git init` without `--initial-branch` | Products born on `master` while the guard rule (`no-direct-main-push`), the review agent (`git diff main...HEAD`) and CI all named `main` | Forces `main`, `symbolic-ref` fallback for git < 2.28 |
+| `ui-svelte` typecheck | An **`echo`** — and its tsconfig excluded the only file it would have checked. Unchecked for two phases while `pnpm typecheck` reported green | Real `svelte-check`; first run found an a11y defect in `Dialog.svelte` whose handler was also dead code |
+| CI spine matrix | **Nine copies of one list**; `fiducial-sim` was already missing a tenth block | List **derived** from `#![no_std]` — the attribute is the declaration, the grep is the derivation |
+| `fiducial-sim` "in spine matrix" | PHASES.md claimed it; it never was, and **cannot be** (uses `Vec` + rayon, not `no_std`) | Record corrected rather than quietly satisfied; sim checked on host + `wasm32` |
+| 13 crates, 0 READMEs | Every published crate had a bare crates.io page | 17 READMEs written; each crate's is **run as a doctest**, which immediately caught a wrong method name |
+| `CLAUDE.md` / `AGENTS.md` trees | Both stale (missing ota, sim, realtime; AGENTS miscounted 11/10 vs 13/11) and both carrying a disclaimer to run `ls` instead | Corrected; a disclaimer is not a fix, so a test now fails the build on a missing entry |
+| pnpm workspace globs | `apps/*`, `workbench`, `cli` — none had ever existed; a stale glob is silent | Removed; a test asserts every glob resolves |
+
+| Deliverable | Status |
+| --- | --- |
+| `crates/fiducial-cli/tests/workspace_hygiene.rs` — **7 invariants**, each failing with the exact file and line to change | ✅ |
+| `[workspace.dependencies]` — no crate manifest contains a version literal, asserted | ✅ |
+| `catalog:` in `pnpm-workspace.yaml` — no shared JS dependency declared twice, asserted | ✅ |
+| 13 crate READMEs + 4 package READMEs; every crate README compiled as a doctest | ✅ |
+| `templates/ci.yml.tmpl` — scaffolded CI that gates on artifact freshness | ✅ |
+| CI `spine` job derives its crate list from `#![no_std]` | ✅ |
+| CI host job gains `--all-features` so README doctests are not silently skipped | ✅ |
+| Root `README.md` rewritten from a 20-line stub into a real front page | ✅ |
+| `fon` scaffold brought in line with the corrected templates | ✅ |
+| **No behaviour, API or generated output changed** — geometry, wire format, OTA and dash all byte-identical | ✅ |
+| 4-target spine, clippy, fmt clean; full Rust suite + 30 JS tasks green | ✅ |
+
 **Phase 17 — complete ✅ (2026-09-10)**
 
 > `fiducial-sim`, `realtime`, workbench v1.
@@ -372,7 +476,8 @@ built because no product has one yet.
 | Portfolio reports errors per-product without failing the command — same posture as single-product dash | ✅ |
 | `fiducial.portfolio` — `[[products]]` TOML format; name + path per entry | ✅ |
 | 5 portfolio end-to-end tests in `tests/portfolio.rs` | ✅ |
-| CI: `sim`, `realtime`, `portfolio` jobs; `fiducial-sim` in spine matrix | ✅ |
+| CI: `sim`, `realtime`, `portfolio` jobs | ✅ |
+| ~~`fiducial-sim` in spine matrix~~ — **corrected in Phase 18**: it never was, and cannot be. `fiducial-sim` uses `Vec` and rayon and is not `no_std`. It is checked on host and `wasm32` instead | ⬜ |
 
 **Phase 16c — complete ✅ (2026-09-10)**
 
@@ -593,4 +698,8 @@ fiducial/
 | **16b** | `fid release` + version-skew assertions | A protocol bump fails any artifact still on the old version; compatibility matrix committed | ✅ |
 | **16c** | Firmware OTA: `fiducial-ota` — signed manifests, resumable transfer, trial boot, staged rollout | Transfer resumes after a drop; unsigned image cannot stage; failed self-test rolls back ([rescoped from BLE](docs/specs/2026-09-10-phase-16c-ota-transport-rescope.md)) | ✅ |
 | **17** | `fiducial-sim`, `realtime`, workbench v1 | Simulation runs native and in WASM; realtime's three contracts covered by tests | ✅ |
-| **18** | ROP migration wave 2 (optional) — eligible rules to L0 Rust | Each differential-tested before the TypeScript is deleted | ⬜ |
+| **18** | Platform audit + cleanup | Every drift found is encoded as an invariant that fails the build | ✅ |
+| **19** | The harvest feature — `fid harvest` + skill + docs | A repo or folder yields reusable assets a new product can adopt without being overridden | ✅ |
+| **20** | Catalogue ROP's reusable assets | Every reusable asset inventoried with an extraction recipe | ✅ |
+| **21** | The documentation layer | Step-by-step guides for humans and agents; terminal captures checked by CI | ✅ |
+| **22** | ROP migration wave 2 (optional) — eligible rules to L0 Rust | Each differential-tested before the TypeScript is deleted | ⬜ |

@@ -38,6 +38,6 @@
     "test": "node --test src/transport-web.test.js"
   },
   "devDependencies": {
-    "typescript": "^7.0.2"
+    "typescript": "catalog:"
   }
 }

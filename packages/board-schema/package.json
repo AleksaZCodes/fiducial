@@ -37,6 +37,6 @@
     "test": "node --test src/board-schema.test.js"
   },
   "devDependencies": {
-    "typescript": "^7.0.2"
+    "typescript": "catalog:"
   }
 }
