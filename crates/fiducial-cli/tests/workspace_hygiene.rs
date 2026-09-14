@@ -435,3 +435,72 @@ fn agent_context_layout_tree_names_every_crate_and_package() {
         missing.join("\n")
     );
 }
+
+/// No tracked file lives inside a build-output directory.
+///
+/// Phase 21b committed nine files from `packages/ui-svelte/.svelte-check/` —
+/// generated type scratch, rewritten on every `pnpm typecheck`. Committing a
+/// derived artifact is the rule this repository spends a whole phase enforcing
+/// everywhere else, and it still happened, because turning on a new tool
+/// introduced a new output directory nobody had thought to ignore.
+///
+/// That is the general shape of the problem: the `.gitignore` is a list someone
+/// maintains by remembering, and the next tool will have a different scratch
+/// directory. So this checks the property instead.
+#[test]
+fn no_build_output_is_tracked() {
+    // Directories that only ever hold generated or vendored content.
+    const BUILD_DIRS: &[&str] = &[
+        "node_modules",
+        "target",
+        "dist",
+        "build",
+        ".next",
+        ".nuxt",
+        ".svelte-kit",
+        ".svelte-check",
+        ".turbo",
+        ".wrangler",
+        ".vitepress",
+        ".astro",
+        ".vercel",
+        ".output",
+        ".cache",
+        "coverage",
+        "storybook-static",
+        "playwright-report",
+        "test-results",
+        "__pycache__",
+    ];
+
+    let root = workspace_root();
+    let output = std::process::Command::new("git")
+        .args(["ls-files"])
+        .current_dir(&root)
+        .output();
+
+    // Not a git checkout (a packaged crate, say) — nothing to check.
+    let Ok(output) = output else { return };
+    if !output.status.success() {
+        return;
+    }
+
+    let tracked = String::from_utf8_lossy(&output.stdout);
+    let mut offenders: Vec<String> = Vec::new();
+
+    for path in tracked.lines() {
+        for segment in path.split('/') {
+            if BUILD_DIRS.contains(&segment) {
+                offenders.push(format!("  {path} — inside `{segment}/`"));
+                break;
+            }
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "generated output is tracked in git. Add the directory to .gitignore and \
+         `git rm --cached` it — a derived artifact is never committed by hand:\n\n{}\n",
+        offenders.join("\n")
+    );
+}
