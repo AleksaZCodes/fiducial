@@ -48,13 +48,14 @@ fiducial/
 │   ├── fiducial-tauri        serial transport for the desktop host
 │   └── fiducial              crates.io name claim + signpost
 ├── firmware/             Separate workspace (Embassy; rp2040 + stm32)
-├── packages/             11 JS/TS packages (pnpm + Turborepo)
+├── packages/             12 JS/TS packages (pnpm + Turborepo)
 │   ├── tokens, headless      design tokens, Result<T,E>, OfflineQueue
 │   ├── ui-react, ui-svelte   component registry sources (copy-in)
 │   ├── board-schema          TS mirror of fiducial-eda
 │   ├── transport-web         Web Serial / WebUSB / BLE + codec
 │   ├── viewer3d-react        GLB viewer (Three.js)
 │   ├── realtime              broadcast, presence, postgres-changes
+│   ├── i18n                  locales, messages, money, dates, plurals
 │   ├── wasm-bridge           GENERATED TS types — never hand-edit
 │   ├── cli                   @fiducial/cli npm shim
 │   └── fiducial              @fiducial/fiducial npm name claim

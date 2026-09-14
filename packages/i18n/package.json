@@ -1,0 +1,30 @@
+{
+  "name": "@fiducial/i18n",
+  "version": "0.1.0",
+  "description": "Localized by construction — typed message keys, locale negotiation, and locale-aware formatting of dates, numbers, plurals and money.",
+  "license": "MIT",
+  "author": "Aleksa Zdravkovic",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AleksaZCodes/fiducial.git"
+  },
+  "homepage": "https://github.com/AleksaZCodes/fiducial",
+  "keywords": ["i18n", "l10n", "intl", "currency", "fiducial"],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test src/*.test.js"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

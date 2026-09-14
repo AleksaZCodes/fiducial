@@ -32,6 +32,7 @@ fiducial/
 │   ├── tokens/, headless/  design tokens, headless logic
 │   ├── wasm-bridge/        generated TS types from Rust
 │   ├── realtime/           broadcast, presence, postgres-changes contracts
+│   ├── i18n/               locales, typed messages, money, dates, plurals
 │   ├── cli/                @fiducial/cli npm shim
 │   └── fiducial/           @fiducial/fiducial on npm
 ├── docs/specs/         Design specs (append-only decisions)
