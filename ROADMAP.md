@@ -171,11 +171,72 @@ Unblocks **legal** and the **Claude Design bridge**. Feeds `@fiducial/tokens`,
 so the chain is brand → tokens → every registry → Claude Design, one source
 throughout — the token feed itself remains future work.
 
+### Cross-platform adapter architecture — *multiplying, must precede real adapters* ⬜
+
+The adapter system today is a **config validator**, not a runtime abstraction.
+`adapter.rs` holds a static registry that validates `[adapters]` in
+`fiducial.toml` and nothing more. There is no Rust trait, no TypeScript
+interface, no WASM binding, no IPC bridge — nothing a product can actually
+call.
+
+That matters because Fiducial's value proposition is *declare once, use
+everywhere*, and "everywhere" means:
+
+| Target | How an adapter is called |
+|---|---|
+| Rust native (server, binary) | Rust trait dispatch — direct |
+| WASM in a browser | JS shim calling a TS implementation |
+| Cloudflare Worker | TS environment; may run WASM or native TS |
+| Tauri (desktop/mobile) | Rust frontend calls backend over IPC; backend holds the impl |
+| SvelteKit / Next.js | Server action or edge handler calling the TS impl |
+| Firmware (RP2040, STM32) | Rust, `no_std`, different surface — may be out of scope but must be stated |
+
+A Cloudflare D1 adapter built without this layer would be a Rust struct
+satisfying a Rust trait, callable from Rust servers but not from a SvelteKit
+endpoint or a WASM Worker. That is not a cross-platform adapter; it is a
+Rust library with a portability hat on.
+
+**The three layers:**
+
+1. **Contract definition.** Each contract (database, storage, email, …) is
+   defined once in a target-neutral form: a Rust trait *and* a TypeScript
+   interface, derived from the same source of truth so they cannot drift.
+   Today neither exists.
+
+2. **Runtime binding layer.** A thin, generated layer per target that routes
+   a call to the right backend:
+   - Native Rust: `dyn Contract` dispatch.
+   - WASM/browser: a JS shim that calls the TS implementation; WASM code calls
+     the JS import.
+   - Tauri: frontend code calls a named Tauri command; the backend holds the
+     implementation and the IPC is the boundary.
+   - Edge/Workers: TS, calling platform bindings (D1, R2, etc.) directly; no
+     WASM involved.
+   - Server actions: same TS implementation, called from Node or Bun.
+
+3. **Capability-level selection.** `fiducial.toml` `[adapters]` already
+   declares the vendor choice. `fid derive` generates the binding-layer glue
+   for each target from that declaration — the same move as every other
+   pipeline, just the target is code rather than a text file.
+
+**Why this is "multiplying":** every real vendor implementation lands on the
+right abstraction. An architecture retrofitted after Cloudflare is built means
+migrating the Cloudflare adapter, the Supabase adapter, and everything else
+that shipped before the retrofit — exactly the cost-of-delay pattern this
+list exists to avoid.
+
+**What ships in this item:** the contract definition format, the binding-layer
+code generation, and a `none` implementation that works end-to-end across at
+least two targets (Rust native and one TypeScript target). Vendor
+implementations are item 7.
+
 ### Cloudflare adapter set — *terminal, product-critical* ⬜
 
 D1, R2, Workers, Access, Turnstile, Queues, Workers AI. The first real adapters,
 and the proof that the adapter contract is vendor-neutral rather than a
 Cloudflare-shaped hole.
+
+**Depends on:** cross-platform adapter architecture above.
 
 Low compounding, high product value — correctly placed after the infrastructure
 rather than before it.
@@ -345,6 +406,63 @@ typography, logo — derives:
 - `sitemap.xml`, `robots.txt`, JSON-LD, `security.txt`
 
 Feeds `@fiducial/tokens`, so brand and design system are one source, not two.
+
+---
+
+## Cross-platform adapter architecture
+
+**The problem, stated by the founder:** "I feel like the adapters should be
+cross-platform themselves for any real platform — be it Rust, WebAssembly,
+web, Svelte, React, whatever."
+
+The current `adapter.rs` is a config validator. It checks that
+`[adapters] database = "supabase"` names a known contract and a selectable
+vendor. That is all it does. A product that declares `database = "d1"` after
+this item ships will be able to call the D1 contract from every target it
+runs on. A product that does so before this item exists will have a
+declaration with nothing behind it.
+
+**Contract definition.** The first decision is the canonical form. Options:
+
+| Form | Pros | Cons |
+|---|---|---|
+| Rust trait → derive TS interface | One source; Rust is already the CLI language | TS interface is derived, not authored; editor support is worse |
+| TS interface → derive Rust trait | TS is the browser/edge native; many contract callers will be TS | Requires a codegen step in Rust, which `build.rs` can do but adds build deps |
+| IDL (Protocol Buffers, Cap'n Proto) | Truly language-neutral | Heavy; no existing dep; overkill for 5 contracts |
+| Hand-author both | No dep; explicit | Two declarations of the same fact — exactly what principle 1 prohibits |
+
+The recommended path: **Rust trait as the source, derive the TypeScript
+interface via `tsify` or a bespoke `build.rs` codegen.** The contracts are
+small (3–6 methods each) and stable; a mechanical derivation is fine, and
+Rust already defines the CLI and the validation side.
+
+**Binding layer.** The generated glue between a caller and the vendor
+implementation. This is the part that actually differs per target:
+
+- **Native Rust:** a `fn build_database() -> Box<dyn Database>` that reads
+  the selected vendor from config and returns the right implementation. No
+  magic; the same pattern `fid-i18n` uses for executor dispatch.
+- **WASM:** the WASM module imports a JS function that satisfies the
+  contract; the generated TS shim wraps the vendor implementation. The
+  boundary is the WASM import table, not a trait object.
+- **Tauri:** the Rust frontend module exposes Tauri commands that match the
+  contract's methods. The backend Rust implementation is loaded in the
+  Tauri subprocess. A generated command map keeps frontend and backend in
+  sync.
+- **Edge/server TS:** a generated `createDatabase(env: Env): Database`
+  factory that picks the D1, Supabase or no-op implementation. Idiomatic TS;
+  no WASM.
+
+**Code generation.** `fid derive` already generates text files. Generating
+TypeScript and Rust glue is the same mechanism: a pipeline reads
+`[adapters]`, the target list, and the contract definitions, and writes the
+binding layer. The output is checked in and gated by `fid derive --check`,
+exactly like `robots.txt` or a translation catalog.
+
+**Scope of this item:** contract definition format, binding-layer codegen for
+at least Rust-native and TypeScript/edge, `none` implementations that
+compile and run in both environments, and the `fid derive` pipeline that
+generates the glue. Vendor implementations are a separate item.
 
 ---
 
