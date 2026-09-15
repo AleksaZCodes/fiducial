@@ -223,6 +223,7 @@ The capabilities this platform ships:
 |---|---|---|
 | `adapters` | declares `adapters`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability adapters` |
 | `brand` | declares `brand`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability brand` |
+| `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
 | `firmware-rp2040` | 10 template file(s) | `fid add capability firmware-rp2040` |
 | `firmware-stm32` | 9 template file(s) | `fid add capability firmware-stm32` |

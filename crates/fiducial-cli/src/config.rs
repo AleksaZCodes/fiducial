@@ -31,6 +31,118 @@ pub struct Config {
     /// added the `brand` capability carries no empty `[brand]` block.
     #[serde(default, skip_serializing_if = "Brand::is_empty")]
     pub brand: Brand,
+    /// `[deploy]` — the facts a deploy target needs that nothing can derive.
+    #[serde(default, skip_serializing_if = "Deploy::is_empty")]
+    pub deploy: Deploy,
+}
+
+/// `[deploy]` — what a deploy config needs that `[adapters]` cannot imply.
+///
+/// The split is the whole point. Which bindings a Worker needs **is** derivable
+/// — `[adapters]` already says `database = "d1"`, and the `D1Database` adapter
+/// already reads a fixed `env.DB`. What is not derivable is everything only the
+/// Cloudflare account knows: the database's id, the bucket's name, the route.
+/// Those live here; the bindings are generated around them.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct Deploy {
+    /// Worker name. Defaults to `<product>-worker` when left empty.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    /// Worker entrypoint, relative to the worker app.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub main: String,
+    /// Wrangler `compatibility_date`. Pinned, never "today": a date that moves
+    /// changes runtime behaviour under a product that did not ask it to.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub compatibility_date: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub compatibility_flags: Vec<String>,
+    /// D1 database id — from `wrangler d1 create`. Only the account knows it.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub d1_database_id: String,
+    /// D1 database name, defaulting to the product name.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub d1_database_name: String,
+    /// R2 bucket name — from `wrangler r2 bucket create`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub r2_bucket_name: String,
+    /// Queue name — from `wrangler queues create`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub queue_name: String,
+    /// Route or custom domain this Worker answers on. Optional: a Worker on
+    /// its `workers.dev` subdomain declares none.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub route: String,
+}
+
+impl Deploy {
+    /// True when the product declares no deploy target at all.
+    pub fn is_empty(&self) -> bool {
+        self.name.is_empty()
+            && self.main.is_empty()
+            && self.compatibility_date.is_empty()
+            && self.compatibility_flags.is_empty()
+            && self.d1_database_id.is_empty()
+            && self.r2_bucket_name.is_empty()
+            && self.queue_name.is_empty()
+            && self.route.is_empty()
+    }
+
+    /// The facts the pipeline needs, each named when it is missing.
+    ///
+    /// `compatibility_date` is the one field with no sensible default: every
+    /// other gap either has a product-derived fallback or belongs to a vendor
+    /// the product did not select. An id placeholder that survived to a real
+    /// derive is named here rather than written into a `wrangler.toml` that
+    /// would fail at `wrangler deploy` with a far less obvious message.
+    pub fn validate(&self, adapters: &Adapters) -> Result<()> {
+        if self.compatibility_date.is_empty() {
+            bail!(
+                "[deploy] compatibility_date is missing. Pin one (e.g. \
+                 \"2025-01-01\") — a date that moves changes runtime behaviour \
+                 under a product that did not ask it to."
+            );
+        }
+
+        // Only demand the ids for vendors this product actually selected.
+        let needs: [(&str, &str, &str, &str); 3] = [
+            (
+                "database",
+                "d1",
+                "d1_database_id",
+                "wrangler d1 create <name>",
+            ),
+            (
+                "storage",
+                "r2",
+                "r2_bucket_name",
+                "wrangler r2 bucket create <name>",
+            ),
+            (
+                "queue",
+                "cloudflare-queues",
+                "queue_name",
+                "wrangler queues create <name>",
+            ),
+        ];
+        for (contract, vendor, field, how) in needs {
+            if adapters.get(contract) != Some(vendor) {
+                continue;
+            }
+            let value = match field {
+                "d1_database_id" => &self.d1_database_id,
+                "r2_bucket_name" => &self.r2_bucket_name,
+                _ => &self.queue_name,
+            };
+            if value.is_empty() || value.starts_with("REPLACE_") {
+                bail!(
+                    "[deploy] {field} is required because [adapters] {contract} = \
+                     \"{vendor}\". Get it from `{how}`."
+                );
+            }
+        }
+        Ok(())
+    }
 }
 
 /// `[adapters]` — which implementation satisfies each contract.

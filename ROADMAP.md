@@ -198,19 +198,28 @@ and the proof that the adapter contract is vendor-neutral rather than a
 Cloudflare-shaped hole.
 
 **Shipped:** `d1` (database), `r2` (storage), `turnstile` (botProtection),
-`cloudflare-queues` (queue) — four of seven, each landing on a contract that
-either already existed (`d1`, `r2`) or was designed narrowly for it this
-round (`botProtection`, `queue`). Wired through `fid derive` exactly as
-`adapter.rs`'s own "adding a vendor" doc describes. Specs:
+`cloudflare-queues` (queue) and `cloudflare` (deploy) — five of seven. Each
+landed on a contract that either already existed (`d1`, `r2`, `deploy`) or
+was designed narrowly for it (`botProtection`, `queue`). Specs:
 `docs/specs/2026-09-15-cloudflare-adapter-set.md`,
-`docs/specs/2026-09-15-turnstile-and-queues.md`.
+`docs/specs/2026-09-15-turnstile-and-queues.md`,
+`docs/specs/2026-09-15-deploy-config-is-derived.md`.
 
-**Not yet:** Workers (as the `deploy` contract, which is currently
-pipeline-shaped, not a runtime trait), Access, Workers AI. Access folded
-into the **Auth** item below rather than staying a Cloudflare-only line —
-Supabase Auth shipped there as the priority vendor, not Access. Workers AI
-folds into the **AI** item below, reframed as one candidate implementation
-of a vendor-neutral contract rather than the contract's namesake.
+**Workers shipped as `deploy`, and it found the platform's own founding
+defect inside the platform.** `wrangler.toml` is now *derived* from
+`[adapters]` + `[deploy]`: selecting `database = "d1"` is what puts a
+`[[d1_databases]]` block there, under the binding name `D1Database`
+actually reads. It had been hand-copied — and the `worker-cloudflare`
+template's own commented example bound `MY_DB` where every adapter reads
+`DB`, so a product following its scaffold got a Worker that threw on its
+first query. One fact, two places, and the copy was wrong.
+
+**Not yet:** Access and Workers AI — and neither stays here. Access folded
+into the **Auth** item below, where Supabase shipped as the priority vendor
+rather than Access. Workers AI folds into the **AI** item below, reframed as
+one candidate implementation of a vendor-neutral contract rather than the
+contract's namesake. What remains under this item is therefore nothing
+Cloudflare-specific; it closes when those two do.
 
 **Depends on:** cross-platform adapter architecture above.
 

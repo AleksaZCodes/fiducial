@@ -434,6 +434,28 @@ built because no product has one yet.
 | Clippy (0 warnings), fmt, full Rust suite (all workspace crates), JS build/typecheck/test/lint all green | ✅ |
 | **Deliberately not done, and said so in `ROADMAP.md` and the spec**: an automated CI typecheck of the generated factory (the bug above was caught by hand, not by a new test — a real, recorded gap), Clerk/Auth.js implementations, a Rust-side `SupabaseAuth`, multi-factor auth, magic links, organizations | ✅ |
 
+**Phase 30 — deploy config is derived ✅ (2026-09-15)**
+
+> Implements the roadmap item **Cloudflare adapter set**'s last Cloudflare
+> piece: Workers, as the `deploy` contract. Spec:
+> `docs/specs/2026-09-15-deploy-config-is-derived.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **The platform's founding defect, found inside the platform.** The `worker-cloudflare` scaffold shipped commented examples binding `MY_DB` and `MY_BUCKET`, while `D1Database` reads `env.DB` and `R2Storage` reads `env.BUCKET`. A product following its own scaffold got a Worker that threw on its first query — one fact declared in two places, and the copy was wrong | ✅ |
+| `apps/worker/wrangler.toml` is now a **derived artifact**: `fid-deploy` generates it from `[adapters]` + `[deploy]`, gated by `fid derive --check` like every other artifact | ✅ |
+| **The split that is the design:** if selecting a vendor implies it, it is derived (which binding blocks exist, each binding's *name*, which secrets to name); if only the Cloudflare account knows it, it is declared in `[deploy]` (database id, bucket name, queue name, `compatibility_date`, route) | ✅ |
+| **Deselecting a vendor removes its block on the next derive** — the property that makes this worth building rather than a nicer template: the file cannot drift from the selection, because it is not stored apart from it | ✅ |
+| **Secrets are named, never written.** An adapter needing one (`turnstile`, `supabase` auth) contributes a comment naming it and the `wrangler secret put` line. A test asserts no secret name ever appears outside a comment — the generator *knowing* which secrets are needed is exactly what makes writing them tempting | ✅ |
+| Validation names the field, and only when it applies: a `REPLACE_…` placeholder is an error **only for a vendor the product actually selected**, or the seeded declaration would be unusable on the first derive | ✅ |
+| `compatibility_date` required with no default — a date that moves changes runtime behaviour under a product that did not ask it to, so "today" would be wrong rather than convenient | ✅ |
+| A non-Cloudflare `deploy` vendor is refused **by name**, rather than emitting a Cloudflare file for a Vercel product | ✅ |
+| `cloudflare` moved from `candidates` to `implementations` on the `deploy` contract; `fid add deploy` added | ✅ |
+| The `worker-cloudflare` template's comment now says bindings are derived — **and says its old examples were wrong and why**. A scaffold that quietly stops mentioning its own bug teaches nobody | ✅ |
+| 11 end-to-end tests covering both halves of the property: a selection creates a binding, an absent selection creates none | ✅ |
+| Clippy, fmt, full Rust suite, JS workspace, captures and agent context all green | ✅ |
+| **Deliberately not done:** no Vercel/Fly implementation (both stay `candidates`), no `fid deploy` command wrapping `wrangler` (the failure it would own is better prevented than wrapped), no environments (`[env.preview]`) until a product has a second one, no KV/Durable Object bindings (no contract selects either) | ✅ |
+
 **Phase 29b — identity at every level, and auth hardened ✅ (2026-09-15)**
 
 > Implements the roadmap item **Identity at every level**, and hardens the

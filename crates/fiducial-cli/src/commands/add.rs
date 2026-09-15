@@ -177,6 +177,29 @@ EXAMPLE:
     )]
     Brand,
 
+    /// Add Cloudflare deploy config, derived from [adapters]
+    #[command(
+        long_about = "\
+Install the deploy capability.
+
+Generates `apps/worker/wrangler.toml` from `[adapters]` + `[deploy]`. Which
+bindings a Worker needs is already declared — `[adapters] database = \"d1\"`
+says the product wants D1, and `D1Database` reads a fixed `env.DB` — so the
+binding blocks are derived rather than hand-copied. `[deploy]` holds only
+what the Cloudflare account knows: a database id, a bucket name, a route.
+
+Takes ownership of `apps/worker/wrangler.toml`: it becomes a derived
+artifact, regenerated on every `fid derive` and gated by `--check`.",
+        after_long_help = "\
+EXAMPLE:
+    fid add deploy
+    # set [adapters] deploy = \"cloudflare\", then fill the ids in [deploy]
+    fid derive          # writes apps/worker/wrangler.toml
+    fid derive --check  # fails if it is stale or hand-edited
+    wrangler deploy"
+    )]
+    Deploy,
+
     /// Add cross-platform adapter contracts (database, storage, email, diagnostics)
     #[command(
         long_about = "\
@@ -276,6 +299,7 @@ pub fn run(target: AddTarget) -> Result<()> {
         AddTarget::Eda => install_capability("eda"),
         AddTarget::I18n => install_capability("i18n"),
         AddTarget::Brand => install_capability("brand"),
+        AddTarget::Deploy => install_capability("deploy"),
         AddTarget::Adapters => install_capability("adapters"),
         AddTarget::Capability { id, from } => match from {
             Some(spec) => install_external(&id, &spec),
