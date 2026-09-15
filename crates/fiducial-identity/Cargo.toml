@@ -22,9 +22,16 @@ name = "fiducial_identity"
 default = []
 alloc   = []
 std     = ["alloc"]
+# Software ed25519. Optional because a device with a hardware crypto
+# accelerator implements `SignatureVerifier` against that and should not link a
+# software implementation it will never call — the same split `fiducial-ota`
+# already makes.
+ed25519 = ["dep:ed25519-dalek"]
 
 [dependencies]
 fiducial-core = { path = "../fiducial-core" }
+ed25519-dalek = { workspace = true, optional = true }
 
 [dev-dependencies]
-serde_json = { workspace = true }
+serde_json    = { workspace = true }
+ed25519-dalek = { workspace = true, features = ["rand_core", "std"] }

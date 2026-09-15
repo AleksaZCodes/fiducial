@@ -510,6 +510,20 @@ jobs:
       - name: Rust — rule, and vectors are fresh
         run: cargo test -p fiducial-identity
 
+      - name: Real ed25519 token issuance and verification
+        run: cargo test -p fiducial-identity --features ed25519
+
+      # A device verifies a token offline, with the same code the Worker runs.
+      # If that stops building for a device target it is not a future concern:
+      # it is the claim this crate exists to make, withdrawn.
+      - name: no_std on every device target, with and without software crypto
+        run: |
+          rustup target add thumbv6m-none-eabi thumbv7em-none-eabihf wasm32-unknown-unknown
+          for t in thumbv6m-none-eabi thumbv7em-none-eabihf wasm32-unknown-unknown; do
+            cargo check -p fiducial-identity --target "$t"
+            cargo check -p fiducial-identity --target "$t" --features ed25519
+          done
+
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4

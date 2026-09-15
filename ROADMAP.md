@@ -335,9 +335,14 @@ Tested against real SQLite.
 
 **Deliberately not done:** No Postgres `database` adapter either: `supabase`/`neon`/`postgres`
 resolve the dialect correctly but remain `candidates`, so such a product
-supplies its own `{ query, execute }`. Also no device/service token issuance
-— how a device *proves* it is that device needs its own pass with real
-cryptographic choices.
+supplies its own `{ query, execute }`. **Device and service token issuance shipped 2026-09-15**
+(`docs/specs/2026-09-15-token-issuance.md`): a fixed-layout,
+domain-separated ed25519 bearer token, 105 bytes, verified `no_std` on every
+device target. Not a JWT — a header that names its own algorithm is how
+`alg: none` happens. Expiry is mandatory and verification fails closed without
+a clock, the same rule grant expiry follows. The format is pinned by
+conformance vectors the TypeScript verifier replays; changing one character of
+the domain separator in TypeScript alone fails 23 checks.
 
 **Grant expiry, delegation, audit and caching shipped 2026-09-15**
 (`docs/specs/2026-09-15-grant-lifecycle.md`). A grant carries an expiry and a

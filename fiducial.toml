@@ -42,6 +42,7 @@ gates = [
     # The wire format, and the decision table both languages replay.
     "cargo test -p fiducial-protocol --test vectors",
     "cargo test -p fiducial-identity",
+    "cargo test -p fiducial-identity --features ed25519",
     # Terminal output in the guides, and the derived blocks in this repo's
     # own agent context.
     "cargo test -p fiducial-cli --test captures",

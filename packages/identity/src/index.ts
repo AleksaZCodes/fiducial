@@ -372,4 +372,6 @@ export type {
 export { MemoryGrantStore, SqlGrantStore } from "./grants.js";
 export type { GrantOptions } from "./grants.js";
 export { AuditLog, DecisionCache } from "./audit.js";
+export { verifyToken, verifyTokenAs, decodeClaims, TOKEN_LEN, CLAIMS_LEN, SIGNATURE_LEN, PUBLIC_KEY_LEN } from "./token.js";
+export type { Claims, TokenError, TokenResult } from "./token.js";
 export type { AuditEntry, AuditDatabase } from "./audit.js";

@@ -290,6 +290,8 @@ impl Role {
     }
 }
 
+pub mod token;
+
 // ── Grants ───────────────────────────────────────────────────────────────────
 
 /// Milliseconds since the Unix epoch.

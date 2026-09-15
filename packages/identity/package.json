@@ -34,7 +34,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'no linter configured yet'",
-    "test": "node --test src/identity.test.js",
+    "test": "node --test src/identity.test.js src/token.test.js",
     "test:schema": "node --test src/grants.test.js src/audit.test.js"
   },
   "devDependencies": {
