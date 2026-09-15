@@ -1,0 +1,46 @@
+{
+  "name": "@fiducial/adapters",
+  "version": "0.1.0",
+  "description": "Cross-platform adapter contracts for Fiducial — database, storage, email, diagnostics.",
+  "license": "MIT",
+  "author": "Aleksa Zdravkovic",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AleksaZCodes/fiducial.git"
+  },
+  "homepage": "https://github.com/AleksaZCodes/fiducial",
+  "keywords": ["adapters", "database", "storage", "email", "fiducial", "cross-platform"],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./database": {
+      "import": "./dist/database.js",
+      "types": "./dist/database.d.ts"
+    },
+    "./storage": {
+      "import": "./dist/storage.js",
+      "types": "./dist/storage.d.ts"
+    },
+    "./email": {
+      "import": "./dist/email.js",
+      "types": "./dist/email.d.ts"
+    },
+    "./diagnostics": {
+      "import": "./dist/diagnostics.js",
+      "types": "./dist/diagnostics.d.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test src/*.test.js"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

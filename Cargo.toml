@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/fiducial",
+    "crates/fiducial-adapters",
     "crates/fiducial-core",
     "crates/fiducial-quantity",
     "crates/fiducial-model",
@@ -56,6 +57,7 @@ clap       = { version = "4" }
 thiserror  = { version = "2" }
 walkdir    = { version = "2" }
 tempfile   = { version = "3" }
+tokio      = { version = "1" }
 rayon      = { version = "1" }
 serialport = { version = "4", default-features = false }
 diffy      = { version = "0.4" }
@@ -69,6 +71,7 @@ ts-rs             = { version = "10" }
 
 # ── Internal crates ─────────────────────────────────────────────────────────
 # Path declared once so moving a crate is a one-line change, not thirteen.
+fiducial-adapters = { path = "crates/fiducial-adapters" }
 fiducial-core     = { path = "crates/fiducial-core" }
 fiducial-quantity = { path = "crates/fiducial-quantity" }
 fiducial-model    = { path = "crates/fiducial-model" }

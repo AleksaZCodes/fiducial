@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 mod adapter;
+mod brand;
 mod capability;
 mod commands;
 mod config;

@@ -464,6 +464,186 @@ fn run_fid_i18n(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+// ── Built-in fid-brand executor ───────────────────────────────────────────────
+
+/// One declaration in, a handful of static artifacts out.
+///
+/// `[brand]` in `fiducial.toml` is the declaration; each output is addressed by
+/// **file name**, the same way `fid-mesh` addresses parts by stem — the name
+/// says which artifact, the pipeline's `outputs` says where it lands.
+///
+/// | File name | Derives |
+/// |---|---|
+/// | `robots.txt` | crawler policy pointing at the sitemap |
+/// | `sitemap.xml` | the domain root — a real route list is a router's declaration, not brand's |
+/// | `site.webmanifest` | app name/colours, pointing at the generated favicon |
+/// | `favicon.svg` | a vector mark from the trading name's initials — no rasterizer required |
+/// | `organization.jsonld` | a `schema.org` `Organization` record |
+///
+/// Rendering itself is pure and lives in `crate::brand`; this function is only
+/// I/O — reading the declaration, and writing what it renders.
+fn run_fid_brand(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    let config = Config::load(&working_dir.join(crate::config::CONFIG_FILE))
+        .context("fid-brand needs [brand] in fiducial.toml")?;
+    let brand = &config.brand;
+
+    if brand.is_empty() {
+        bail!(
+            "fid-brand: [brand] is not declared in fiducial.toml.\n\
+             Add [brand] with legal_name, trading_name, domain and contact_email \
+             (the `brand` capability seeds a placeholder — `fid add brand`)."
+        );
+    }
+    brand.validate()?;
+
+    for out in &pipeline.outputs {
+        let path = Path::new(out);
+        let name = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| anyhow::anyhow!("fid-brand: output `{out}` has no file name"))?;
+
+        let content = match name {
+            "robots.txt" => crate::brand::render_robots(&brand.domain),
+            "sitemap.xml" => crate::brand::render_sitemap(&brand.domain),
+            "site.webmanifest" => crate::brand::render_manifest(
+                &brand.trading_name,
+                brand.primary_color(),
+                brand.background_color(),
+            ),
+            "favicon.svg" => crate::brand::render_favicon_svg(
+                &brand.trading_name,
+                brand.primary_color(),
+                brand.background_color(),
+            ),
+            "organization.jsonld" => crate::brand::render_jsonld(
+                &brand.legal_name,
+                &brand.trading_name,
+                &brand.domain,
+                &brand.contact_email,
+            ),
+            other => bail!(
+                "fid-brand: unknown output `{other}` (supported: robots.txt, sitemap.xml, \
+                 site.webmanifest, favicon.svg, organization.jsonld)"
+            ),
+        };
+
+        let abs = working_dir.join(out);
+        if let Some(parent) = abs.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("creating parent for `{out}`"))?;
+        }
+        std::fs::write(&abs, content).with_context(|| format!("writing {out}"))?;
+    }
+
+    Ok(())
+}
+
+// ── Built-in fid-adapters executor ───────────────────────────────────────────
+
+/// Generate adapter factory code from `[adapters]` in `fiducial.toml`.
+///
+/// Reads the declared vendor for each contract, then writes a TypeScript factory
+/// file at the single output path declared in the pipeline (`outputs[0]`). The
+/// generated file imports the right class for each slot and exports a
+/// `createAdapters(env)` function.
+///
+/// When a vendor's class is not yet implemented (i.e. still `none`), the
+/// factory imports `None*` from `@fiducial/adapters`. When a real vendor lands
+/// (e.g. `d1`), the factory imports `D1Database` instead — no callers change.
+fn run_fid_adapters(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    let config = Config::load(&working_dir.join(crate::config::CONFIG_FILE))
+        .context("fid-adapters needs [adapters] in fiducial.toml")?;
+    let adapters = &config.adapters;
+
+    let db_vendor = adapters.get("database").unwrap_or("none");
+    let storage_vendor = adapters.get("storage").unwrap_or("none");
+    let email_vendor = adapters.get("email").unwrap_or("none");
+    let errors_vendor = adapters.get("errors").unwrap_or("none");
+
+    let db_import = vendor_ts_import("database", db_vendor);
+    let storage_import = vendor_ts_import("storage", storage_vendor);
+    let email_import = vendor_ts_import("email", email_vendor);
+    let errors_import = vendor_ts_import("errors", errors_vendor);
+
+    let db_class = vendor_ts_class("database", db_vendor);
+    let storage_class = vendor_ts_class("storage", storage_vendor);
+    let email_class = vendor_ts_class("email", email_vendor);
+    let errors_class = vendor_ts_class("errors", errors_vendor);
+
+    let content = format!(
+        "// generated by `fid derive` — do not edit\n\
+         // source of truth: [adapters] in fiducial.toml\n\
+         //\n\
+         // To change a vendor: edit fiducial.toml and re-run `fid derive`.\n\
+         // CI gate: `fid derive --check` fails if this file is stale.\n\
+         \n\
+         {db_import}\n\
+         {storage_import}\n\
+         {email_import}\n\
+         {errors_import}\n\
+         import type {{ AdapterSet }} from \"@fiducial/adapters\";\n\
+         \n\
+         // eslint-disable-next-line @typescript-eslint/no-explicit-any\n\
+         export function createAdapters(env?: any): AdapterSet {{\n\
+         {}  return {{\n\
+         {}    database:    new {db_class}(env),\n\
+         {}    storage:     new {storage_class}(env),\n\
+         {}    email:       new {email_class}(env),\n\
+         {}    diagnostics: new {errors_class}(env),\n\
+         {}  }};\n\
+         }}\n",
+        "  ", "  ", "  ", "  ", "  ", "  ",
+    );
+
+    let out = pipeline
+        .outputs
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("fid-adapters: pipeline declares no outputs"))?;
+
+    let abs = working_dir.join(out);
+    if let Some(parent) = abs.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("creating parent for `{out}`"))?;
+    }
+    std::fs::write(&abs, content).with_context(|| format!("writing {out}"))?;
+    Ok(())
+}
+
+/// TypeScript import line for a contract + vendor pair.
+///
+/// Until real vendor implementations ship, every vendor falls through to the
+/// `none` import from `@fiducial/adapters`. As each vendor lands, add it here.
+fn vendor_ts_import(contract: &str, vendor: &str) -> String {
+    let (class, path) = vendor_ts_class_and_path(contract, vendor);
+    format!("import {{ {class} }} from \"{path}\";")
+}
+
+/// TypeScript class name for instantiation in the factory body.
+fn vendor_ts_class(contract: &str, vendor: &str) -> String {
+    vendor_ts_class_and_path(contract, vendor).0
+}
+
+/// `(ClassName, import-path)` for a contract + vendor pair.
+fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
+    let none_class = match contract {
+        "database" => ("NoneDatabase", "@fiducial/adapters/database"),
+        "storage" => ("NoneStorage", "@fiducial/adapters/storage"),
+        "email" => ("NoneEmail", "@fiducial/adapters/email"),
+        "errors" => ("NoneDiagnostics", "@fiducial/adapters/diagnostics"),
+        _ => ("NoneDatabase", "@fiducial/adapters"),
+    };
+
+    // Real vendor implementations extend this match when they ship.
+    // Returning none_class here is intentional: selecting a candidate vendor
+    // that has no implementation yet is caught by `fid doctor`; derive falls
+    // back to none so the file is still generated and the build stays green.
+    if vendor == "none" {
+        return (none_class.0.to_string(), none_class.1.to_string());
+    }
+
+    (none_class.0.to_string(), none_class.1.to_string())
+}
+
 // ── Command execution ─────────────────────────────────────────────────────────
 
 fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
@@ -487,9 +667,11 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             "fid-validate" => return run_fid_validate(pipeline, working_dir),
             "fid-mesh" => return run_fid_mesh(pipeline, working_dir),
             "fid-i18n" => return run_fid_i18n(pipeline, working_dir),
+            "fid-brand" => return run_fid_brand(pipeline, working_dir),
+            "fid-adapters" => return run_fid_adapters(pipeline, working_dir),
             other => bail!(
                 "unknown executor `{other}` \
-                 (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n)"
+                 (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n, fid-brand, fid-adapters)"
             ),
         };
 

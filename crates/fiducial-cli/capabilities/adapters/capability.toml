@@ -1,0 +1,7 @@
+description = "Cross-platform adapter contracts: database, storage, email, diagnostics."
+
+# [adapters] is declared here as the input the pipeline reads.
+# It is already part of every fiducial.toml scaffold (seeded by `fid new`),
+# so no `seed` is provided — the block exists before this capability installs.
+[[declarations.config]]
+block = "adapters"

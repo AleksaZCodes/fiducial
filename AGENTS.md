@@ -44,8 +44,9 @@ the product's `AGENTS.md` from this file at scaffold time — see
 <!-- fid:begin layout -->
 ```
 fiducial/
-├── crates/               13 members
+├── crates/               14 members
 │   ├── fiducial                 Declare each fact once. Derive every artifact from it.
+│   ├── fiducial-adapters        Cross-platform adapter contracts for Fiducial — database, s…
 │   ├── fiducial-cli             fid — the Fiducial platform CLI
 │   ├── fiducial-core            no_std spine: IDs, time primitives, validation, state machi…
 │   ├── fiducial-eda             no_std EDA pipeline types — the BoardInterface schema for b…
@@ -58,7 +59,8 @@ fiducial/
 │   ├── fiducial-sim             Numerical simulation — ODE integration that runs native (wi…
 │   ├── fiducial-tauri           Serial transport and device discovery for Fiducial Tauri apps.
 │   └── fiducial-wasm            WASM bindings for fiducial-core — browser, edge, and Cloudf…
-└── packages/             12 members
+└── packages/             13 members
+    ├── adapters                 Cross-platform adapter contracts for Fiducial — database, s…
     ├── board-schema             TypeScript types for board.interface.json — mirrors the Rus…
     ├── cli                      fid — the Fiducial platform CLI
     ├── fiducial                 Declare each fact once. Derive every artifact from it.
@@ -217,6 +219,8 @@ The capabilities this platform ships:
 <!-- fid:begin capabilities -->
 | Capability | Contributes | Install |
 |---|---|---|
+| `adapters` | declares `adapters`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability adapters` |
+| `brand` | declares `brand`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability brand` |
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
 | `firmware-rp2040` | 10 template file(s) | `fid add capability firmware-rp2040` |
 | `firmware-stm32` | 9 template file(s) | `fid add capability firmware-stm32` |

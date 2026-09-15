@@ -67,7 +67,11 @@ pub enum Declaration {
         /// Block name as it appears in `fiducial.toml`, e.g. `i18n`.
         name: String,
         /// What to write into the block when it is absent or empty.
-        seed: toml::Value,
+        ///
+        /// `None` when the pipeline reads a block that is already present in
+        /// every scaffold (e.g. `[adapters]`) and needs no initial seed. The
+        /// install logic skips writing when this is `None`.
+        seed: Option<toml::Value>,
     },
 }
 
@@ -154,7 +158,8 @@ struct ManifestDeclarations {
 #[serde(deny_unknown_fields)]
 struct ConfigDeclaration {
     block: String,
-    seed: toml::Value,
+    #[serde(default)]
+    seed: Option<toml::Value>,
 }
 
 /// The one required file.
@@ -430,6 +435,7 @@ seed = { currency = "EUR" }
         match &cap.declarations[0] {
             Declaration::ConfigBlock { name, seed } => {
                 assert_eq!(name, "billing");
+                let seed = seed.as_ref().expect("seed present");
                 assert_eq!(seed["currency"].as_str(), Some("EUR"));
             }
             other => panic!("{other:?}"),

@@ -102,8 +102,9 @@ Complete. Declarations, pipelines and adapters are first-class in the CLI; see
 
 **The adapter half shipped as format only** — five contracts, each implementing
 `none` and nothing else, with intended vendors recorded as `candidates` that
-cannot be selected. Contracts get real implementations in item 6; until then a
-selectable vendor would be a name with nothing behind it.
+cannot be selected. Async trait definitions and TypeScript interfaces followed
+in *Cross-platform adapter architecture* (shipped). Vendor implementations
+follow in *Cloudflare adapter set*.
 
 **Why now and not later:** the second-use rule is satisfied. `eda` and i18n are
 two real declaration→pipeline capabilities, so the taxonomy is *generalized from
@@ -146,21 +147,57 @@ catching the omission *after the fact*. Doing it here makes every later phase
 cheaper and removes a recurring drift risk, rather than paying the tax six more
 times first.
 
-### Brand — *terminal, high value* ⬜
+### Brand — *terminal, high value* ✅
 
-One declaration → favicons, app icons, OG images, press kit, social templates,
-in-theme email, sitemap, robots.txt, JSON-LD.
+**Complete for the text/data half.** One declaration — `[brand]`: legal name,
+trading name, domain, contact email, two colours — derives a favicon (SVG,
+vector, no rasterizer required), `site.webmanifest`, `robots.txt`,
+`sitemap.xml` and a `schema.org` JSON-LD record, gated by `fid derive --check`
+exactly like every other pipeline.
 
 First capability built entirely on the finished system, which makes it the test
-of whether steps 2–4 actually worked. Unblocks **legal** and the **Claude Design
-bridge**. Feeds `@fiducial/tokens`, so the chain is brand → tokens → every
-registry → Claude Design, one source throughout.
+of whether steps 2–4 actually worked. It is: `[brand]` is a declaration exactly
+like `[i18n]`, seeded the same way, validated field-by-field the same way, and
+`fid-brand` is a fifth executor next to `fid-i18n` and `fid-mesh` with nothing
+new invented.
+
+**Raster favicons, OG/Twitter card images, a press kit, social templates and
+in-theme email are deferred, not built.** Each needs a rendering step — font
+shaping, rasterization — this pipeline does not carry, and none has a consumer
+yet. Adding one is a new output name in `pipelines/brand.toml` and a new
+branch in `fid-brand`'s match, not a redesign of `[brand]` — the same shape of
+extension `fid-mesh` and `fid-i18n` already went through.
+
+Unblocks **legal** and the **Claude Design bridge**. Feeds `@fiducial/tokens`,
+so the chain is brand → tokens → every registry → Claude Design, one source
+throughout — the token feed itself remains future work.
+
+### Cross-platform adapter architecture — *multiplying, must precede real adapters* ✅
+
+Complete. `crates/fiducial-adapters` defines `Database`, `Storage`, `Email`
+and `Diagnostics` as Rust async trait contracts (using `BoxFuture` for
+object-safe async without the `async-trait` crate); `packages/adapters` mirrors
+each as a TypeScript interface. `None*` no-op implementations on both sides
+work end-to-end. `fid add adapters` installs the capability; `fid derive` runs
+the `fid-adapters` executor and generates `src/adapters.generated.ts` from
+`[adapters]` in `fiducial.toml`, gated by `fid derive --check`.
+
+**Firmware boundary stated and documented:** cloud adapter contracts do not
+apply to `no_std` targets. Firmware uses `embedded-hal` / Embassy HAL and
+`fiducial-ota` for OTA. Tauri bridges both worlds: this crate in the Rust
+backend, `packages/adapters` in the TS frontend. `src/firmware.rs` holds the
+full mapping.
+
+**Vendor implementations** (Supabase, Neon/Postgres, D1, S3/R2, Resend,
+Sentry) are the next item — *Cloudflare adapter set*.
 
 ### Cloudflare adapter set — *terminal, product-critical* ⬜
 
 D1, R2, Workers, Access, Turnstile, Queues, Workers AI. The first real adapters,
 and the proof that the adapter contract is vendor-neutral rather than a
 Cloudflare-shaped hole.
+
+**Depends on:** cross-platform adapter architecture above.
 
 Low compounding, high product value — correctly placed after the infrastructure
 rather than before it.
@@ -330,6 +367,47 @@ typography, logo — derives:
 - `sitemap.xml`, `robots.txt`, JSON-LD, `security.txt`
 
 Feeds `@fiducial/tokens`, so brand and design system are one source, not two.
+
+---
+
+## Cross-platform adapter architecture
+
+**The problem, stated by the founder:** "I feel like the adapters should be
+cross-platform themselves for any real platform — be it Rust, WebAssembly,
+web, Svelte, React, whatever."
+
+**What shipped.** `crates/fiducial-adapters` defines four contracts as Rust
+async traits: `Database`, `Storage`, `Email`, `Diagnostics`. Each uses
+`BoxFuture<'a, T>` — `Pin<Box<dyn Future<...> + Send + 'a>>` — to stay
+object-safe without the `async-trait` crate. `packages/adapters` mirrors each
+as a TypeScript interface with the same method signatures. Both sides ship a
+`None*` no-op implementation (e.g. `NoneDatabase`, `NoneStorage`) so the
+default is always a valid, inert adapter rather than a missing dependency.
+
+`fid add adapters` installs the capability. `fid derive` (the `fid-adapters`
+executor) reads `[adapters]` from `fiducial.toml` and generates
+`src/adapters.generated.ts` — a `createAdapters(env)` factory that returns
+the no-op set by default and is wired to real implementations once vendors are
+selected. The file is checked in and gated by `fid derive --check`, the same
+as every other derived artifact.
+
+**Contract → toml key mapping:**
+
+| Rust trait | TS interface | `[adapters]` key | No-op |
+|---|---|---|---|
+| `Database` | `Database` | `database` | `NoneDatabase` |
+| `Storage` | `Storage` | `storage` | `NoneStorage` |
+| `Email` | `Email` | `email` | `NoneEmail` |
+| `Diagnostics` | `Diagnostics` | `diagnostics` | `NoneDiagnostics` |
+
+**Firmware boundary.** Cloud adapter contracts do not apply to `no_std`
+firmware. Firmware uses `embedded-hal` / Embassy HAL for peripherals and
+`fiducial-ota` for OTA. `crates/fiducial-adapters/src/firmware.rs` holds the
+full mapping. Tauri bridges both worlds: this crate in the Rust backend,
+`packages/adapters` in the TS frontend, `fiducial-tauri` for serial transport.
+
+**Vendor implementations** (Supabase, Neon/Postgres, Cloudflare D1, S3/R2,
+Resend, Sentry) are the next item — *Cloudflare adapter set*.
 
 ---
 
