@@ -1,0 +1,18 @@
+name     = "deploy"
+executor = "fid-deploy"
+outputs  = ["apps/worker/wrangler.toml"]
+
+# `wrangler.toml` is a derivation, not a template.
+#
+# Which bindings a Worker needs is already declared: `[adapters] database =
+# "d1"` says the product wants D1, and `D1Database` reads a fixed `env.DB`.
+# Writing the `[[d1_databases]]` block by hand is stating that fact a second
+# time — and the `worker-cloudflare` template's own commented example got it
+# wrong, binding `MY_DB` where every adapter reads `DB`.
+#
+# So: select vendors in `[adapters]`, put the ids only your Cloudflare account
+# knows in `[deploy]`, and this pipeline writes the file. `fid derive --check`
+# fails when it is stale or hand-edited, the same as every other artifact.
+#
+# Secrets are named in a comment, never written — `wrangler secret put` is the
+# only place their values belong.

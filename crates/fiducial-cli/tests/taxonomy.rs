@@ -194,7 +194,7 @@ fn every_contract_is_listed_whether_selected_or_not() {
     let adapters = d["taxonomy"]["adapters"].as_array().unwrap();
     assert_eq!(
         adapters.len(),
-        5,
+        8,
         "every contract is a fact about the product"
     );
     for a in adapters {
@@ -214,9 +214,29 @@ fn contracts_are_discoverable_and_honest_about_what_works() {
     let t = text(&out);
     assert!(t.contains("ADAPTER CONTRACTS"), "{t}");
     assert!(t.contains("selectable: none"), "{t}");
+    // d1 and r2 shipped as the first real vendors (Cloudflare adapter set) —
+    // selectable now, no longer merely planned.
     assert!(
-        t.contains("planned: d1, supabase"),
-        "planned vendors are named, and kept out of selectable:\n{t}"
+        t.contains("selectable: none, d1") && t.contains("planned: supabase"),
+        "d1 moved from planned to selectable:\n{t}"
+    );
+    assert!(
+        t.contains("selectable: none, r2") && t.contains("planned: s3"),
+        "r2 moved from planned to selectable:\n{t}"
+    );
+    // turnstile and cloudflare-queues followed the same seam.
+    assert!(
+        t.contains("selectable: none, turnstile") && t.contains("planned: recaptcha"),
+        "turnstile moved from planned to selectable:\n{t}"
+    );
+    assert!(
+        t.contains("selectable: none, cloudflare-queues") && t.contains("planned: sqs"),
+        "cloudflare-queues moved from planned to selectable:\n{t}"
+    );
+    // auth is new this round — supabase ships selectable from day one.
+    assert!(
+        t.contains("selectable: none, supabase") && t.contains("planned: clerk"),
+        "auth's supabase should be selectable, clerk still planned:\n{t}"
     );
 }
 

@@ -1,0 +1,7 @@
+description = "Grant storage — the permission rows can() reads, as a derived table"
+
+# The table's shape is derived from the identity model; only its name is a
+# product's to choose, so that is the one thing declared here.
+[[declarations.config]]
+block = "identity"
+seed = { table = "grants" }

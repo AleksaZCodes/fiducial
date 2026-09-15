@@ -456,6 +456,87 @@ jobs:
       - name: Test @fiducial/realtime
         run: pnpm --filter @fiducial/realtime test
 
+  # ── identity: one authorization rule, two implementations ─────────────────
+  #
+  # `can()` exists in Rust (firmware, desktop, CLI) and in TypeScript (Worker,
+  # app). An authorization rule is the worst place for drift — a divergence
+  # does not look like a bug, it looks like access — so the decision table is
+  # generated from the Rust crate into docs/identity/vectors.json and replayed
+  # by both suites.
+  #
+  # This job runs the generator WITHOUT FIDUCIAL_WRITE_VECTORS, so a rule
+  # change that skipped regeneration fails here rather than reaching main with
+  # the two levels quietly disagreeing. Same mechanism as the protocol vectors.
+  identity:
+    name: identity (one rule, both languages)
+    runs-on: ubuntu-latest
+    # The grants schema is generated for two dialects, and node has no
+    # Postgres. Without a real server the Postgres half is only ever asserted
+    # as text — which is how a migration that does not run (`GLOB` is SQLite
+    # syntax) and policies that recurse into themselves both got written and
+    # looked correct. SQLite's half needs no service: `node:sqlite` is built in.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        run: rustup toolchain install stable --profile minimal
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Rust — rule, and vectors are fresh
+        run: cargo test -p fiducial-identity
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the fid binary
+        # The grant-storage tests run the REAL generated schema — they invoke
+        # `fid derive` to produce it rather than checking a copy into the test.
+        run: cargo build -p fiducial-cli --bin fid
+
+      - name: Build @fiducial/identity
+        # The suites import `../dist/index.js` — the built package, the same
+        # entry point a consumer resolves. Without this they fail on a missing
+        # module, which is what they did the first time this job ran.
+        run: pnpm --filter @fiducial/identity build
+
+      - name: TypeScript — same verdict on every vector
+        run: pnpm --filter @fiducial/identity test
+
+      - name: The generated schema, on real SQLite
+        # `test:schema` rather than `test` because it needs the `fid` binary
+        # built above. The generic JS/TS job builds no Rust, so this is the
+        # only job that can run it.
+        run: pnpm --filter @fiducial/identity test:schema
+
+      - name: Postgres — the other dialect, on a real server
+        run: scripts/verify-postgres.sh
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+
   # ── portfolio: workbench v1 ───────────────────────────────────────────────
   #
   # Phase 17. `fid dash --portfolio` aggregates multiple product repos from a

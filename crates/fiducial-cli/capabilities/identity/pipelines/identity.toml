@@ -1,0 +1,26 @@
+name     = "identity"
+executor = "fid-identity"
+outputs  = ["migrations/0001_grants.sql", "src/identity.generated.ts"]
+
+# The grants table is a derivation of the identity model.
+#
+# Its CHECK constraints are the `Principal`, `Resource` and `Role` variants
+# themselves — so adding a role and forgetting the migration is not something
+# that can happen quietly; `fid derive --check` fails instead.
+#
+# THE DIALECT IS DERIVED, NOT DECLARED. `[adapters] database` already names the
+# vendor and the vendor implies the dialect: `d1` is SQLite, `supabase`/`neon`/
+# `postgres` are Postgres. The two are not one language where this touches
+# them — SQLite's `GLOB` is a syntax error on Postgres, and a bound parameter
+# is `?` on one and `$1` on the other — so `src/identity.generated.ts` carries
+# the resolved dialect into TypeScript rather than leaving a product to retype
+# it and find out at runtime.
+#
+# `rls = true` (Postgres only) adds row-level security policies as defence in
+# depth. `can()` stays the rule — it is the one both languages share and the
+# only one firmware can run.
+#
+# THIS IS NOT A MIGRATIONS SYSTEM. It generates the first table. The moment
+# the schema changes you need ordering, idempotency and drift detection
+# against a live database, and none of that exists yet — see
+# `docs/specs/2026-09-15-grant-storage.md`.

@@ -14,10 +14,10 @@
  */
 
 export type { Database, Row, SqlValue, WriteResult } from "./database.js";
-export { DatabaseError, MapRow, NoneDatabase } from "./database.js";
+export { D1Database, DatabaseError, MapRow, NoneDatabase } from "./database.js";
 
 export type { Storage } from "./storage.js";
-export { NoneStorage, StorageError } from "./storage.js";
+export { NoneStorage, R2Storage, StorageError } from "./storage.js";
 
 export type { Email, Message } from "./email.js";
 export { EmailError, NoneEmail } from "./email.js";
@@ -25,14 +25,50 @@ export { EmailError, NoneEmail } from "./email.js";
 export type { Diagnostics, DiagnosticsLevel } from "./diagnostics.js";
 export { NoneDiagnostics } from "./diagnostics.js";
 
+export type { BotProtection, VerifyOutcome } from "./bot-protection.js";
+export {
+  BotProtectionError,
+  NoneBotProtection,
+  Turnstile,
+} from "./bot-protection.js";
+
+export type { Queue } from "./queue.js";
+export { CloudflareQueue, NoneQueue, QueueError } from "./queue.js";
+
+// `Auth` is not part of `AdapterSet` — see its own doc comment in auth.ts for
+// why: every other contract here is env-scoped, and a real Auth
+// implementation is request-scoped (it needs a session store bound to the
+// current request's cookies or Authorization header). `createAuth(env, store)`
+// is a separate factory `fid derive` generates alongside `createAdapters(env)`.
+export type {
+  Auth,
+  AuthKeyValueStore,
+  AuthSession,
+  AuthSessionContext,
+  AuthUser,
+} from "./auth.js";
+export {
+  AuthError,
+  BearerSessionContext,
+  CookieKeyValueStore,
+  CookieSessionContext,
+  MemoryKeyValueStore,
+  NoneAuth,
+  SupabaseAuth,
+} from "./auth.js";
+
 import type { Database } from "./database.js";
 import type { Storage } from "./storage.js";
 import type { Email } from "./email.js";
 import type { Diagnostics } from "./diagnostics.js";
+import type { BotProtection } from "./bot-protection.js";
+import type { Queue } from "./queue.js";
 import { NoneDatabase } from "./database.js";
 import { NoneStorage } from "./storage.js";
 import { NoneEmail } from "./email.js";
 import { NoneDiagnostics } from "./diagnostics.js";
+import { NoneBotProtection } from "./bot-protection.js";
+import { NoneQueue } from "./queue.js";
 
 /**
  * The full adapter set — one of these per product, built from `[adapters]`
@@ -51,6 +87,8 @@ export interface AdapterSet {
   storage: Storage;
   email: Email;
   diagnostics: Diagnostics;
+  botProtection: BotProtection;
+  queue: Queue;
 }
 
 /**
@@ -66,5 +104,7 @@ export function createNoneAdapters(): AdapterSet {
     storage: new NoneStorage(),
     email: new NoneEmail(),
     diagnostics: new NoneDiagnostics(),
+    botProtection: new NoneBotProtection(),
+    queue: new NoneQueue(),
   };
 }

@@ -44,13 +44,14 @@ the product's `AGENTS.md` from this file at scaffold time — see
 <!-- fid:begin layout -->
 ```
 fiducial/
-├── crates/               14 members
+├── crates/               15 members
 │   ├── fiducial                 Declare each fact once. Derive every artifact from it.
 │   ├── fiducial-adapters        Cross-platform adapter contracts for Fiducial — database, s…
 │   ├── fiducial-cli             fid — the Fiducial platform CLI
 │   ├── fiducial-core            no_std spine: IDs, time primitives, validation, state machi…
 │   ├── fiducial-eda             no_std EDA pipeline types — the BoardInterface schema for b…
 │   ├── fiducial-geometry        no_std geometry for Fiducial: points, tolerance profiles, c…
+│   ├── fiducial-identity        no_std identity spine: one Principal across users, devices…
 │   ├── fiducial-mesh            no_std case generation from a board outline: gasket-sealed…
 │   ├── fiducial-model           no_std Fact, Decision and Pipeline contract types.
 │   ├── fiducial-ota             no_std over-the-air firmware update protocol: signed manife…
@@ -59,13 +60,14 @@ fiducial/
 │   ├── fiducial-sim             Numerical simulation — ODE integration that runs native (wi…
 │   ├── fiducial-tauri           Serial transport and device discovery for Fiducial Tauri apps.
 │   └── fiducial-wasm            WASM bindings for fiducial-core — browser, edge, and Cloudf…
-└── packages/             13 members
+└── packages/             14 members
     ├── adapters                 Cross-platform adapter contracts for Fiducial — database, s…
     ├── board-schema             TypeScript types for board.interface.json — mirrors the Rus…
     ├── cli                      fid — the Fiducial platform CLI
     ├── fiducial                 Declare each fact once. Derive every artifact from it.
     ├── headless                 Framework-agnostic headless utilities for Fiducial — Result…
     ├── i18n                     Localized by construction — typed message keys, locale nego…
+    ├── identity                 One identity model across users, devices and services — mir…
     ├── realtime                 Supabase Realtime typed wrappers — Broadcast, Presence, and…
     ├── tokens                   Design tokens for Fiducial — OKLCH theme vars, Tailwind v4…
     ├── transport-web            Web Serial, WebUSB, and BLE transports for Fiducial — same…
@@ -140,6 +142,26 @@ pnpm build && pnpm typecheck && pnpm test     # JS workspace (turbo)
 cargo build --workspace
 cargo test --workspace --all-features         # includes the freshness gates
 ```
+
+Two suites run the **real generated schema**, so they need something built
+first and are not part of the default run:
+
+```sh
+cargo build -p fiducial-cli --bin fid
+pnpm --filter @fiducial/identity build            # the tests import ../dist
+pnpm --filter @fiducial/identity test:schema      # the schema on real SQLite
+
+PGHOST=localhost PGUSER=postgres PGPASSWORD=postgres scripts/verify-postgres.sh
+```
+
+`test:schema` generates the grants table with the real `fid` binary and runs
+it on `node:sqlite` — D1 *is* SQLite. `verify-postgres.sh` applies the same
+derivation, RLS policies included, to a real PostgreSQL server. The `identity`
+CI job runs both; the generic JS/TS job builds no Rust and cannot.
+
+They are separate scripts rather than part of `pnpm test` because a suite that
+cannot run is worse than one that is named: the first CI run of these failed
+on a missing binary and a missing `dist/`, saying nothing about either.
 
 Everything that decides *how* it builds is committed, so a cloud checkout — Claude
 Code on the web, a Codespace, a new contributor — gets the same answers as a
@@ -221,10 +243,12 @@ The capabilities this platform ships:
 |---|---|---|
 | `adapters` | declares `adapters`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability adapters` |
 | `brand` | declares `brand`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability brand` |
+| `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
 | `firmware-rp2040` | 10 template file(s) | `fid add capability firmware-rp2040` |
 | `firmware-stm32` | 9 template file(s) | `fid add capability firmware-stm32` |
 | `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
+| `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
 | `tauri` | 5 template file(s) | `fid add capability tauri` |
 | `web-next` | 8 template file(s) | `fid add capability web-next` |
 | `web-svelte` | 8 template file(s) | `fid add capability web-svelte` |

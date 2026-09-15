@@ -28,8 +28,11 @@
 //! adapter registry that lists `supabase` before anything speaks Supabase is
 //! the identical bug with a different noun. A selectable vendor is a promise.
 //!
-//! Roadmap item 6 builds the Cloudflare set. Each vendor moves from
-//! `candidates` to `implementations` when it has something behind it.
+//! The Cloudflare adapter set roadmap item moves vendors from `candidates` to
+//! `implementations` as each gets something behind it. `d1` and `r2` are the
+//! first two — see `docs/specs/2026-09-15-cloudflare-adapter-set.md` for what
+//! shipped and what the rest of the Cloudflare set (Workers as `deploy`,
+//! Access, Turnstile, Queues, Workers AI) still needs before it can move.
 //!
 //! # Why `none` is not a placeholder
 //!
@@ -64,20 +67,20 @@ pub static CONTRACTS: &[Contract] = &[
     Contract {
         name: "database",
         description: "Relational storage: queries, migrations, transactions",
-        implementations: &[NONE],
-        candidates: &["d1", "supabase", "neon", "postgres"],
+        implementations: &[NONE, "d1"],
+        candidates: &["supabase", "neon", "postgres"],
     },
     Contract {
         name: "storage",
         description: "Object storage: put, get, signed URLs",
-        implementations: &[NONE],
-        candidates: &["r2", "s3", "supabase-storage"],
+        implementations: &[NONE, "r2"],
+        candidates: &["s3", "supabase-storage"],
     },
     Contract {
         name: "deploy",
         description: "Where the product ships and how a release is promoted",
-        implementations: &[NONE],
-        candidates: &["cloudflare", "vercel", "fly"],
+        implementations: &[NONE, "cloudflare"],
+        candidates: &["vercel", "fly"],
     },
     Contract {
         name: "email",
@@ -90,6 +93,24 @@ pub static CONTRACTS: &[Contract] = &[
         description: "Error tracking and diagnostics",
         implementations: &[NONE],
         candidates: &["sentry", "workers-analytics"],
+    },
+    Contract {
+        name: "botProtection",
+        description: "Bot / abuse challenge verification",
+        implementations: &[NONE, "turnstile"],
+        candidates: &["recaptcha", "hcaptcha"],
+    },
+    Contract {
+        name: "queue",
+        description: "Asynchronous job/message queue (producer side)",
+        implementations: &[NONE, "cloudflare-queues"],
+        candidates: &["sqs"],
+    },
+    Contract {
+        name: "auth",
+        description: "Users and authentication: sign-up, sign-in, sessions",
+        implementations: &[NONE, "supabase"],
+        candidates: &["clerk", "auth.js"],
     },
 ];
 

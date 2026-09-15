@@ -360,6 +360,178 @@ no live CI status (deliberate; would go behind a flag), decisions are listed but
 not read so supersession is undetected, and `briefs` from §10's v0 row is not
 built because no product has one yet.
 
+**Phase 28 — Cloudflare adapter set: `d1` and `r2` 🟡 (2026-09-15)**
+
+> Implements the roadmap item **Cloudflare adapter set**, first two of seven
+> pieces: `d1` and `r2`, the ones that land on a contract *Cross-platform
+> adapter architecture* already shipped. The other five — Workers as `deploy`,
+> Access, Turnstile, Queues, Workers AI — have no contract to attach to and
+> are scoped, not built. Spec:
+> `docs/specs/2026-09-15-cloudflare-adapter-set.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| `D1Database` — real `Database` implementation reached through a Workers binding (`env.DB`); `execute`/`query`/`queryOne` wrap D1's `prepare().bind().run()/all()/first()`, `batch` wraps `db.batch()` | ✅ |
+| `R2Storage` — real `Storage` implementation reached through `env.BUCKET`; `list` follows R2's cursor across pages instead of silently truncating past 1000 keys | ✅ |
+| **`signedUrl` throws, and says why** — a presigned R2 URL needs SigV4 signing against the S3-compatible API with an R2 API token, credentials the binding does not carry. Throwing beats `NoneStorage`'s silent `""`: an empty URL from a *selected* vendor would read as an R2 bug | ✅ |
+| `d1` and `r2` moved from `candidates` to `implementations` in `adapter::CONTRACTS` — the exact seam Phase 27 left for this | ✅ |
+| `vendor_ts_class_and_path` in `derive.rs` — two new match arms; every other (contract, vendor) pair still falls back to `none`, unchanged | ✅ |
+| **Binding-name convention documented, not inferred**: `fid derive` cannot see a hand-edited `wrangler.toml`, so `D1Database`/`R2Storage` read fixed names (`DB`, `BUCKET`) — stated in both class doc comments and the capability `SKILL.md`, with the escape hatch (pass a differently-shaped `env`, or wrap the class) named alongside it | ✅ |
+| **The Rust/TypeScript "kept in sync" claim narrowed to what is still true**: `d1`/`r2` exist only on the TypeScript side, because a Workers binding is not reachable from a Tauri desktop process — `fiducial-adapters::lib` and the crate README now say so, rather than leaving the old blanket claim standing | ✅ |
+| 20 TypeScript unit tests against fake D1/R2 bindings (`packages/adapters/src/adapters.test.js`) — the package's first test file; its `test` script previously matched no files | ✅ |
+| 4 new end-to-end tests through the real `fid` binary: selecting `d1` alone, `r2` alone, both together, and that an unimplemented candidate (e.g. `supabase`) still fails `fid doctor` with "nothing implements yet" | ✅ |
+| `fid capability list --all` — `database`/`storage` now show `selectable: none, d1` / `none, r2` | ✅ |
+| **Deliberately not done, and said so in `ROADMAP.md`, `SHIPPED.md` and the spec**: Workers-as-`deploy` (needs its own design — `deploy` is pipeline-shaped, not a runtime trait), Access, Turnstile, Queues, Workers AI (no contract exists for any of the four, and designing one against zero consumers is the mistake *capability taxonomy, made real* already corrected once), a Rust-side D1/R2 client (would need Cloudflare's HTTP/S3 API over an API token, not a binding — no Tauri product needs it), a working `signedUrl` | ✅ |
+| Clippy (0 warnings), fmt, full Rust suite (all workspace crates) and the new JS test file all green | ✅ |
+
+**Phase 28b — Turnstile and Cloudflare Queues 🟡 (2026-09-15)**
+
+> Implements the roadmap item **Cloudflare adapter set**, two more of seven
+> pieces: `turnstile` (new `botProtection` contract) and `cloudflare-queues`
+> (new `queue` contract). Requested directly by the founder, alongside
+> **Auth** (Supabase-first) and **AI** (conversational/agentic) — both
+> scoped in `ROADMAP.md` but deliberately not built this round, per the
+> founder's own stated build order. Spec:
+> `docs/specs/2026-09-15-turnstile-and-queues.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **Two new contracts** — `BotProtection` (`verify(token, remoteIp?) -> VerifyOutcome`) and `Queue` (`send`/`sendBatch`, producer side only) — Rust traits + `None*` in `fiducial-adapters`, TS interfaces + `None*` in `@fiducial/adapters` | ✅ |
+| `Turnstile` — real `BotProtection`, a plain HTTPS POST to Cloudflare's `siteverify` endpoint authenticated by `env.TURNSTILE_SECRET_KEY` — the first real vendor reached over HTTP rather than a Workers binding | ✅ |
+| `CloudflareQueue` — real `Queue`, reached through `env.QUEUE`; sends with `contentType: "bytes"` so a consumer gets the same `Uint8Array` back instead of Cloudflare's default JSON round-trip | ✅ |
+| **`NoneBotProtection` fails open, documented loudly as a real security default**: `botProtection = "none"` means no protection at all, not "pending" — stated in the doc comment so it cannot be mistaken for a placeholder | ✅ |
+| **No `receive`/consume method on `Queue`, and said why**: Cloudflare Queues deliver by invoking a consumer's exported handler, not by polling — a pull API would misdescribe delivery and have nothing to bind against on the one real vendor this contract has | ✅ |
+| **Both TypeScript-only, for two different reasons, both stated**: `cloudflare-queues` is binding-only (structural, same boundary as `d1`/`r2`); `turnstile` is a plain HTTPS call with no Rust-side consumer yet (not structural) — the crate doc, README and SKILL.md all distinguish the two rather than flattening them into one excuse | ✅ |
+| `run_fid_adapters` refactored from four hand-duplicated import/class/field triples to a loop over `ADAPTER_SLOTS` — going to six contracts by copy-pasting a fifth and sixth block was the signal to generalize | ✅ |
+| `botProtection` and `queue` added to `adapter::CONTRACTS`, straight to `implementations` alongside their one real vendor each | ✅ |
+| **`ROADMAP.md` gains scoped, unbuilt Auth and AI entries** — full-flow Supabase auth with cookie + bearer sessions; conversational/agentic AI with Workers AI reframed as a candidate, not the contract's namesake — recorded so the founder's scoping decisions survive past this conversation, per the file's own stated purpose as the anti-amnesia artifact | ✅ |
+| 6 new Rust unit tests, 11 new TypeScript tests, 2 new end-to-end CLI tests | ✅ |
+| Docs terminal captures regenerated (`fid capability list --all` / `fid dash` now show 7 contracts) | ✅ |
+| Clippy (0 warnings), fmt, full Rust suite (all workspace crates), JS build/typecheck/test/lint all green | ✅ |
+| **Deliberately not done, and said so in `ROADMAP.md` and the spec**: Auth contract + Supabase implementation, AI contract, Rust-side `Turnstile`, a `receive`/consumer API for `Queue`, `recaptcha`/`hcaptcha`/`sqs` implementations | ✅ |
+
+**Phase 29 — Auth: full flows, Supabase-first ✅ (2026-09-15)**
+
+> Implements the roadmap item **Auth** — the founder's stated top priority,
+> scoped in Phase 28b and built the same day. Closes out the Cloudflare
+> adapter set's Access line by replacing it with a vendor-neutral contract
+> whose priority vendor is Supabase. Spec:
+> `docs/specs/2026-09-15-auth-contract.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **Seventh adapter contract, `Auth`**: `signUp`, `signIn`, `signInWithOAuth`, `exchangeCodeForSession`, `signOut`, `getSession`, `resetPasswordForEmail`, `updatePassword` — Rust trait + `NoneAuth` in `fiducial-adapters`, TS interface + `NoneAuth` + real `SupabaseAuth` in `@fiducial/adapters` | ✅ |
+| **`NoneAuth` fails loudly, not silently** — every write throws, unlike almost every other `None*` type in this system: `auth = "none"` means no auth is configured, and a product should find that out on the first sign-in attempt, not ship believing it has working authentication | ✅ |
+| **`auth` is not a field on `AdapterSet`** — every other contract's vendor is env-scoped; a real `Auth` needs a request-scoped session store. `createAuth(env, store)` is a second, honestly-different factory `fid derive` emits in the same generated file, documented inline so it does not read as an oversight | ✅ |
+| `AuthKeyValueStore` — mirrors `@supabase/supabase-js`'s own `SupportedStorage` extension point exactly, rather than depending on `@supabase/ssr`'s heavier chunked-cookie format built for a larger payload than this contract needs | ✅ |
+| `CookieKeyValueStore` — real PKCE support across the OAuth redirect/callback round trip (web-next/web-svelte) | ✅ |
+| `BearerKeyValueStore` — in-memory, request-lifetime (Tauri / future mobile). **Cannot** carry PKCE state across a redirect without a cookie, so `signInWithOAuth`/`exchangeCodeForSession` throw a clear `AuthError` under it instead of silently losing the verifier; a bearer client does OAuth directly against Supabase and hands this API the resulting session instead | ✅ |
+| `SupabaseAuth` — wraps the plain `@supabase/supabase-js` client (not `@supabase/ssr`) with `storage`/`persistSession`/`flowType: "pkce"` wired to the injected store; errors mapped through `throwIfError` into named `AuthError`s (invalid credentials, rate limited) the same shape `DatabaseError`/`EmailError` already use | ✅ |
+| **Real bug found and fixed, unrelated to Auth**: `NoneEmail`/`NoneDiagnostics` had no explicit constructor, so `new NoneEmail(env)` in the generated factory failed to typecheck under `strict` — invisible since Phase 27 because nothing had ever run real `tsc` against a generated `adapters.generated.ts`, only string `contains()` checks. Fixed; verified by hand against a scaffold with every real vendor selected (zero errors) | ✅ |
+| `auth` added to `adapter::CONTRACTS`, straight to `implementations` with `supabase` | ✅ |
+| 7 new Rust unit tests, 24 new TypeScript tests, 1 new end-to-end CLI test | ✅ |
+| Docs terminal captures regenerated (`fid capability list --all` / `fid dash` now show 8 contracts) | ✅ |
+| Clippy (0 warnings), fmt, full Rust suite (all workspace crates), JS build/typecheck/test/lint all green | ✅ |
+| **Deliberately not done, and said so in `ROADMAP.md` and the spec**: an automated CI typecheck of the generated factory (the bug above was caught by hand, not by a new test — a real, recorded gap), Clerk/Auth.js implementations, a Rust-side `SupabaseAuth`, multi-factor auth, magic links, organizations | ✅ |
+
+**Phase 32 — two SQL dialects, and RLS ✅ (2026-09-15)**
+
+> Corrects the roadmap item **Identity at every level** where Phase 31 shipped
+> it one dialect short: the grants migration was SQLite-only and said so
+> nowhere, so a Postgres product got a migration that does not apply. Adds
+> row-level security as defence in depth, which the previous spec had rejected
+> outright on reasoning that only ruled out RLS *as the rule*.
+> Spec: `docs/specs/2026-09-15-postgres-dialect-and-rls.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **A shipped defect, confirmed against a live server before it was fixed**: `CHECK (principal_id GLOB '*[^0]*')` is SQLite syntax. On PostgreSQL 16 the generated migration fails outright — `ERROR: syntax error at or near "GLOB"` — so a product on Supabase or Neon could not apply its own derived schema | ✅ |
+| **The dialect is derived from the vendor, not declared**: `[adapters] database` already names it (`d1` → SQLite; `supabase`/`neon`/`postgres` → Postgres). `[identity] dialect` is an *override* for what the platform cannot see (`none` in front of the product's own database) | ✅ |
+| Dialect-correct DDL — `GLOB '*[^0]*'` vs `~ '[^0]'`, `TEXT` vs `TIMESTAMPTZ` — and the generated file names its dialect in a header comment, so an applied migration and its engine can be compared by eye | ✅ |
+| **A second latent defect, one level along**: `SqlGrantStore` hard-coded `?` placeholders. A Postgres product would have got a migration that applies and then a syntax error on *every query*, at runtime. The store now takes `{ table, dialect }` and renumbers `?` → `$1, $2` — one copy of each query, because two hand-written variants of one query drift | ✅ |
+| **`src/identity.generated.ts` — a second pipeline output**, carrying `grantsTable`, `sqlDialect` and `grantStore(db)` into TypeScript. Passing the dialect by hand would be the same trap again: a fact declared in `fiducial.toml` and retyped in TS. Fixes the table name's identical hand-copy at the same time. Typechecked against the real built package under `strict` | ✅ |
+| Pipeline outputs are matched **by extension, not by position**, so declaring them in either order works | ✅ |
+| **RLS (Postgres, `rls = true`)**: a principal reads its own grants; an administrator of a resource reads every grant over it; only an admin or owner may write one. Generated from the same model as `can()`, which is what makes a second enforcement point safe rather than a second source of truth | ✅ |
+| **`can()` is still the rule** — the one both languages share, the one `docs/identity/vectors.json` checks, and the only one firmware can run. RLS is defence in depth: a missed check in a handler stops being a data breach | ✅ |
+| **A third defect, found only by running it**: a policy on `grants` whose `EXISTS` reads `grants` re-enters itself — `ERROR: infinite recursion detected in policy for relation "grants"`. It parses, it applies cleanly, and then it refuses every query it guards. The lookup is now a `SECURITY DEFINER` function running as the owner, who is not subject to the policies | ✅ |
+| `SET search_path = ''` with fully-qualified names — a `SECURITY DEFINER` function inheriting the caller's search path is a privilege-escalation shape, not a style question. And **no `FORCE ROW LEVEL SECURITY`**, deliberately: forcing policies onto the owner would put the helper back inside the recursion it exists to break | ✅ |
+| `rls = true` on SQLite is **refused at derive time**, not ignored. A security control that silently does nothing is worse than one you know you do not have | ✅ |
+| `current_user_sql` — defaults to Supabase's `auth.uid()`, normalized to this platform's 32-hex-char id form (`auth.uid()` returns a hyphenated UUID). A product using `current_setting('app.user_id', true)` instead is one declaration | ✅ |
+| **`scripts/verify-postgres.sh` — 14 checks against a real PostgreSQL 16 server**: the migration applies, both `CHECK` constraints bite, all four policies behave from each side, and the store's own SQL runs in the shape Postgres numbers it. The `identity` CI job now starts a `postgres:16` service and runs it on every push | ✅ |
+| **Verified adversarially**: restoring the inlined-`EXISTS` policy turns every read into the recursion error, and the `GLOB` migration fails to apply. Both defects reproduce on demand — neither is visible to a test that only reads the generated text, which is exactly how all three shipped | ✅ |
+| 18 end-to-end CLI tests (was 8), 206 TypeScript tests (was 202), 14 live Postgres checks (was 0); clippy clean, fmt, full workspace suite green | ✅ |
+| **Deliberately not done**: still not a migrations system (turning `rls` on regenerates `0001_grants.sql`, which is the *first* migration — applying it to a live database is the product's problem); no Postgres `database` adapter, so those vendors remain `candidates` and a product supplies its own `{ query, execute }`; policies cover the grants table only, though `grants_administers(kind, id)` is a plain function a product's own policies can call; no `device`/`service` principal in the policies, because `auth.uid()` is a user's id | ✅ |
+
+**Phase 31 — grant storage ✅ (2026-09-15)**
+
+> Implements the roadmap item **Identity at every level**'s open half: the
+> permission rows `can()` reads. Identity shipped as a rule with no
+> persistence, which made it unusable — `can()` took a list nothing produced.
+> Spec: `docs/specs/2026-09-15-grant-storage.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **`SqlGrantStore` is a consumer of the `database` contract, not a ninth contract beside it** — it calls only `query`/`execute`, so it works on D1 today and any future database vendor free. Permissions are not vendor-shaped: there is no "Supabase permissions" vs "D1 permissions", there are rows in whatever database you already picked | ✅ |
+| Takes the database **structurally** (`{ query, execute }`, not an imported `Database`), so `@fiducial/identity` still depends on nothing — same move as `principalFromSession` taking an id rather than an `AuthSession` | ✅ |
+| **The schema is derived from the identity model**: `fid derive` writes `migrations/0001_grants.sql` whose `CHECK` lists *are* the `Principal`/`Resource`/`Role` variants. Add a role and forget the migration → `fid derive --check` fails, instead of a table that silently rejects the new value in production | ✅ |
+| **Two runtime rules enforced by the schema too**: `anonymous` is absent from `principal_kind`'s CHECK, and `principal_id GLOB '*[^0]*'` refuses an all-zero sentinel — so an unprovisioned device cannot hold a grant as "device zero", an identity every unprovisioned device shares. Deliberate double-enforcement, both derived from one model so they cannot disagree | ✅ |
+| `grantsFor` / `grantsOn` / `grant` / `revoke`; one role per (principal, resource) via `ON CONFLICT … DO UPDATE`, with platform-scoped grants as separate rows so `effectiveRole` takes the stronger | ✅ |
+| `MemoryGrantStore` — a real implementation for tests and seeded products, run against the **same suite** as the SQL one, because a difference between them is a bug in whichever one production is not using | ✅ |
+| **Tested against real SQLite (`node:sqlite`) on the real generated schema** — D1 *is* SQLite, so it is the same engine and the same DDL a deployed product runs. The schema is not a checked-in copy: the suite shells out to the real `fid` binary and reads what `fid derive` produced | ✅ |
+| **Verified adversarially:** renaming one column in the store (`principal_id` → `principal_uid`) fails 10 of 35 tests. Against a mocked database every query "works" — a typo'd column, a broken `ON CONFLICT`, a `CHECK` that rejects nothing — which is the failure mode this test design exists to avoid | ✅ |
+| `[identity] table` — the one fact the model cannot imply. It reaches SQL by interpolation (a parameter cannot bind an identifier), so it is validated as an identifier in **both** the executor and `SqlGrantStore`; `table = "grants; DROP TABLE users"` is refused at derive time | ✅ |
+| 35 TypeScript tests, 8 end-to-end CLI tests; the `identity` CI job now builds `fid` first because the schema tests use the real one | ✅ |
+| **Deliberately not done, and the pipeline's own comment says so in capitals:** this is **not a migrations system** — it generates the first table; schema *change* needs ordering, idempotency and drift detection against a live database. Also no Rust counterpart (`no_std`, a device cannot run SQL — it receives grants rather than querying), no expiry, delegation, audit log or caching | ✅ |
+
+**Phase 30 — deploy config is derived ✅ (2026-09-15)**
+
+> Implements the roadmap item **Cloudflare adapter set**'s last Cloudflare
+> piece: Workers, as the `deploy` contract. Spec:
+> `docs/specs/2026-09-15-deploy-config-is-derived.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **The platform's founding defect, found inside the platform.** The `worker-cloudflare` scaffold shipped commented examples binding `MY_DB` and `MY_BUCKET`, while `D1Database` reads `env.DB` and `R2Storage` reads `env.BUCKET`. A product following its own scaffold got a Worker that threw on its first query — one fact declared in two places, and the copy was wrong | ✅ |
+| `apps/worker/wrangler.toml` is now a **derived artifact**: `fid-deploy` generates it from `[adapters]` + `[deploy]`, gated by `fid derive --check` like every other artifact | ✅ |
+| **The split that is the design:** if selecting a vendor implies it, it is derived (which binding blocks exist, each binding's *name*, which secrets to name); if only the Cloudflare account knows it, it is declared in `[deploy]` (database id, bucket name, queue name, `compatibility_date`, route) | ✅ |
+| **Deselecting a vendor removes its block on the next derive** — the property that makes this worth building rather than a nicer template: the file cannot drift from the selection, because it is not stored apart from it | ✅ |
+| **Secrets are named, never written.** An adapter needing one (`turnstile`, `supabase` auth) contributes a comment naming it and the `wrangler secret put` line. A test asserts no secret name ever appears outside a comment — the generator *knowing* which secrets are needed is exactly what makes writing them tempting | ✅ |
+| Validation names the field, and only when it applies: a `REPLACE_…` placeholder is an error **only for a vendor the product actually selected**, or the seeded declaration would be unusable on the first derive | ✅ |
+| `compatibility_date` required with no default — a date that moves changes runtime behaviour under a product that did not ask it to, so "today" would be wrong rather than convenient | ✅ |
+| A non-Cloudflare `deploy` vendor is refused **by name**, rather than emitting a Cloudflare file for a Vercel product | ✅ |
+| `cloudflare` moved from `candidates` to `implementations` on the `deploy` contract; `fid add deploy` added | ✅ |
+| The `worker-cloudflare` template's comment now says bindings are derived — **and says its old examples were wrong and why**. A scaffold that quietly stops mentioning its own bug teaches nobody | ✅ |
+| 11 end-to-end tests covering both halves of the property: a selection creates a binding, an absent selection creates none | ✅ |
+| Clippy, fmt, full Rust suite, JS workspace, captures and agent context all green | ✅ |
+| **Deliberately not done:** no Vercel/Fly implementation (both stay `candidates`), no `fid deploy` command wrapping `wrangler` (the failure it would own is better prevented than wrapped), no environments (`[env.preview]`) until a product has a second one, no KV/Durable Object bindings (no contract selects either) | ✅ |
+
+**Phase 29b — identity at every level, and auth hardened ✅ (2026-09-15)**
+
+> Implements the roadmap item **Identity at every level**, and hardens the
+> roadmap item **Auth** shipped hours earlier in Phase 29 — an audit of that
+> same-day work found two real defects, one of them a security hole. Spec:
+> `docs/specs/2026-09-15-identity-at-every-level.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **Defect 1, security, fixed:** `SupabaseAuth.getSession()` verified *nothing* — it called the SDK's `getSession()`, which reads the session out of storage and checks only `expires_at`. On a server that storage is a **client-supplied cookie**, so a forged one was a valid session with any `user.id` the caller wrote in it. Every path now verifies the access token through `getClaims()` — local JWKS check when the signing key is asymmetric, network `getUser()` fallback otherwise | ✅ |
+| Cookie delivery additionally refuses a session whose **stored user id disagrees with the verified token's subject** — trusting the user object without pinning it to the token it arrived with would re-open the same hole one level down | ✅ |
+| **Defect 2, correctness, fixed:** bearer delivery never worked at all. `BearerKeyValueStore` wrote the raw JWT under `sb-access-token`; `@supabase/auth-js` reads its session from `storageKey` (default `supabase.auth.token`) and expects a **JSON session object**. Every bearer `getSession()` returned `null` — silently, with passing tests, because they asserted the adapter *called* the SDK rather than that the call produced a session | ✅ |
+| `AuthSessionContext` replaces the bare store: `{ storage, bearerToken }`, with `CookieSessionContext` and `BearerSessionContext`. Bearer is now a field the adapter reads, not a value smuggled through a key the SDK never looks at | ✅ |
+| `AuthUser.emailVerified`/`createdAt` and `AuthSession.refreshToken` became nullable — a session verified from a bearer JWT genuinely does not carry them, and `null` ("this delivery model cannot tell you") beats a fabricated `false`/`""` that claims something untrue | ✅ |
+| **`crates/fiducial-identity` (`no_std`)** — one `Principal` spanning `User`, `Device`, `Service`, `Anonymous`, **reusing `fiducial_core::DeviceId`** rather than minting a second device identity. `no_std` so firmware runs the same rule as the edge | ✅ |
+| `can(principal, action, resource, grants)` — the whole authorization rule, one function. Deny by default; `Grant` is the user↔device link that had nowhere to live before; `Role` ordered `Viewer < Member < Admin < Owner` | ✅ |
+| **An unidentified principal is refused** — anonymous, or an all-zero sentinel id. Concretely: a device that has not read its UID out of OTP would otherwise authenticate as "device zero," an identity every unprovisioned device shares | ✅ |
+| **A device may read itself with no grant, but not write itself.** Requiring a grant to read would mean every device needs provisioning before it can send the "I am here, I am unclaimed" message provisioning depends on; allowing the write would let a compromised device rewrite its own configuration and call it self-service | ✅ |
+| `packages/identity` — `@fiducial/identity`, the same rule for the Worker and the app; ids as lowercase hex, `userIdFromUuid()` the single normalizing boundary so one user in two casings is one identity | ✅ |
+| **`docs/identity/vectors.json` — the rule as a conformance artifact.** 2,130 lines, seven scenarios, every principal probed against every action and resource, generated from the Rust crate and replayed by both suites. An authorization divergence does not look like a bug, it looks like access | ✅ |
+| **Both tables verified adversarially**, as the protocol vectors were: letting a device write itself in the TypeScript copy fails 10 of 167 tests; regressing `getSession()` to its unverified form fails 3 adapter tests. Neither table merely passes | ✅ |
+| Bridge kept **structural** — `principalFromSession(session)` / `user_principal(&uuid)` take the id, not the session type, so `@fiducial/identity` depends on nothing and `fiducial-identity` stays `no_std`. An absent or unverified session is `ANONYMOUS`, which `can()` refuses: verification and authorization fail closed together | ✅ |
+| `fiducial-identity` entered the 4-target `no_std` spine matrix **with no CI edit** — that matrix derives its crate list by grepping `#![no_std]`. The Phase 18 derivation paying off | ✅ |
+| New CI job `identity` — the Rust rule, the vectors freshness gate, and the TypeScript conformance replay | ✅ |
+| 19 Rust tests + 2 doctests, 167 TypeScript identity tests, 6 new adapter verification tests; clippy, fmt, full Rust suite and the JS workspace all green | ✅ |
+| **Deliberately not done, and said so in `ROADMAP.md` and the spec**: grant storage (where grants live is a product's decision), device/service token issuance (how a device *proves* it is that device needs its own pass with real cryptographic choices), roles beyond the four, delegation or expiry on grants, and still no automated CI typecheck of the generated factory | ✅ |
+
 **Phase 26 — brand ✅ (2026-09-15)**
 
 > Implements the roadmap item **Brand**: one declaration derives a favicon,

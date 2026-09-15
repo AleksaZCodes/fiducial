@@ -1,0 +1,14 @@
+description = "Cloudflare deploy config derived from [adapters] — wrangler.toml stops being hand-copied"
+
+# `[deploy]` holds only what the Cloudflare account knows and nothing can
+# derive: a database id, a bucket name, a route. The bindings are generated
+# around it from `[adapters]`, because which bindings a Worker needs is
+# already implied by which vendors the product selected.
+#
+# Seeded with a pinned compatibility_date and REPLACE_ placeholders for the
+# ids, so the pipeline this capability also installs does not fail on the very
+# next `fid derive` — and `Deploy::validate` names any placeholder that
+# survived to a real derive, per vendor the product actually selected.
+[[declarations.config]]
+block = "deploy"
+seed = { compatibility_date = "2025-01-01", compatibility_flags = ["nodejs_compat"], main = "src/index.ts", d1_database_id = "REPLACE_WITH_DATABASE_ID", r2_bucket_name = "REPLACE_WITH_BUCKET_NAME", queue_name = "REPLACE_WITH_QUEUE_NAME" }

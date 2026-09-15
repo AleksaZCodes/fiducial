@@ -188,19 +188,217 @@ apply to `no_std` targets. Firmware uses `embedded-hal` / Embassy HAL and
 backend, `packages/adapters` in the TS frontend. `src/firmware.rs` holds the
 full mapping.
 
-**Vendor implementations** (Supabase, Neon/Postgres, D1, S3/R2, Resend,
-Sentry) are the next item — *Cloudflare adapter set*.
+**Vendor implementations** — `d1` and `r2` shipped as the first two; Supabase,
+Neon/Postgres, S3, Resend, Sentry remain — under *Cloudflare adapter set*.
 
-### Cloudflare adapter set — *terminal, product-critical* ⬜
+### Cloudflare adapter set — *terminal, product-critical* 🟡
 
 D1, R2, Workers, Access, Turnstile, Queues, Workers AI. The first real adapters,
 and the proof that the adapter contract is vendor-neutral rather than a
 Cloudflare-shaped hole.
 
+**Shipped:** `d1` (database), `r2` (storage), `turnstile` (botProtection),
+`cloudflare-queues` (queue) and `cloudflare` (deploy) — five of seven. Each
+landed on a contract that either already existed (`d1`, `r2`, `deploy`) or
+was designed narrowly for it (`botProtection`, `queue`). Specs:
+`docs/specs/2026-09-15-cloudflare-adapter-set.md`,
+`docs/specs/2026-09-15-turnstile-and-queues.md`,
+`docs/specs/2026-09-15-deploy-config-is-derived.md`.
+
+**Workers shipped as `deploy`, and it found the platform's own founding
+defect inside the platform.** `wrangler.toml` is now *derived* from
+`[adapters]` + `[deploy]`: selecting `database = "d1"` is what puts a
+`[[d1_databases]]` block there, under the binding name `D1Database`
+actually reads. It had been hand-copied — and the `worker-cloudflare`
+template's own commented example bound `MY_DB` where every adapter reads
+`DB`, so a product following its scaffold got a Worker that threw on its
+first query. One fact, two places, and the copy was wrong.
+
+**Not yet:** Access and Workers AI — and neither stays here. Access folded
+into the **Auth** item below, where Supabase shipped as the priority vendor
+rather than Access. Workers AI folds into the **AI** item below, reframed as
+one candidate implementation of a vendor-neutral contract rather than the
+contract's namesake. What remains under this item is therefore nothing
+Cloudflare-specific; it closes when those two do.
+
 **Depends on:** cross-platform adapter architecture above.
 
 Low compounding, high product value — correctly placed after the infrastructure
 rather than before it.
+
+### Auth — *terminal, product-critical* ✅
+
+Users and authentication — named directly by the founder as a priority,
+**Supabase-first**. Scoped 2026-09-15 before building
+(`docs/specs/2026-09-15-turnstile-and-queues.md` §Context), then shipped the
+same day: `docs/specs/2026-09-15-auth-contract.md`.
+
+- **Full flows, not session-verification-only.** The `Auth` contract covers
+  sign-up, sign-in (password + OAuth), sign-out, password reset, and session
+  read — the product never touches a vendor SDK directly for auth, matching
+  how `database`/`storage` already work.
+- **Both session delivery models shipped:** `CookieKeyValueStore` (web-next/
+  web-svelte, real PKCE support across the OAuth redirect) and
+  `BearerKeyValueStore` (Tauri or a future mobile client — cannot carry PKCE
+  state across a redirect without a cookie, so OAuth methods throw clearly
+  under it rather than silently losing the verifier; a bearer client does
+  OAuth directly against Supabase instead).
+- **`auth` is not a field on `AdapterSet`.** Every other contract's real
+  vendor is env-scoped; a real `Auth` needs a request-scoped session store.
+  `createAuth(env, store)` is a second factory in the same generated file
+  rather than a seventh `AdapterSet` field that would corrupt the uniform
+  `new {Class}(env)` shape the other six rely on.
+- **`supabase` real, TypeScript-only** — same non-structural reason
+  `turnstile` is: a plain HTTPS API, but no Rust-reachable consumer yet.
+  `clerk`, `auth.js` remain `candidates`.
+
+A real bug surfaced in the process, unrelated to Auth itself: `NoneEmail`
+and `NoneDiagnostics` had no explicit constructor, so `new NoneEmail(env)`
+in the generated factory failed to typecheck — unnoticed since Phase 27
+because nothing had ever run `tsc` against a generated
+`adapters.generated.ts`. Fixed; **not** turned into an automated CI check
+this round (a real gap, recorded in the spec rather than silently closed).
+
+**Hardened immediately afterward**, and two further defects in the same
+day's work found and fixed — `getSession()` verified nothing, and bearer
+delivery never worked at all. See **Identity at every level** below; spec:
+`docs/specs/2026-09-15-identity-at-every-level.md`.
+
+### Identity at every level — *multiplying* ✅
+
+Auth answers *who*. This answers *may they* — and does it once, for users,
+devices and services alike. Spec:
+`docs/specs/2026-09-15-identity-at-every-level.md`.
+
+`crates/fiducial-identity` (`no_std`) defines one `Principal` spanning
+`User`, `Device`, `Service` and `Anonymous`, **reusing
+`fiducial_core::DeviceId`** rather than minting a second device identity.
+`can(principal, action, resource, grants)` is the whole authorization rule,
+in a crate firmware can run — so a device deciding "is this command from my
+owner?" offline reaches the same verdict as the Worker deciding it at the
+edge. `Grant` is the user↔device link that had nowhere to live before.
+
+**The rule is a conformance artifact, not two implementations trusted to
+agree.** `can()` also exists in TypeScript (`@fiducial/identity`) for the
+Worker and the app; an authorization divergence does not look like a bug, it
+looks like access. So the decision table is generated from the Rust crate
+into `docs/identity/vectors.json` and replayed by both suites, with CI
+running the generator without the write flag — the same mechanism
+`docs/protocol/vectors.json` uses for the wire format. Verified
+adversarially: changing one rule in the TypeScript copy fails 10 tests.
+
+**Also hardened `auth` in the same pass**, after an audit found two real
+defects in it shipped hours earlier: `getSession()` verified no signature at
+all (a forged cookie was a valid session with any user id), and bearer
+delivery silently never worked (its token was written under a storage key
+the SDK never reads). Both fixed and pinned by tests that fail if either
+regresses.
+
+**Grant storage shipped** (`docs/specs/2026-09-15-grant-storage.md`):
+`fid add identity` derives `migrations/0001_grants.sql` from the identity
+model — its `CHECK` lists *are* the `Principal`/`Resource`/`Role` variants,
+so adding a role and forgetting the migration fails `fid derive --check`
+rather than producing a table that silently rejects it. `SqlGrantStore` is a
+consumer of the `database` contract, not a ninth contract beside it, so it
+works on D1 today and any future vendor free. Tested against real SQLite
+(what D1 runs) on the real generated schema.
+
+**Postgres and RLS shipped**
+(`docs/specs/2026-09-15-postgres-dialect-and-rls.md`), correcting the above:
+the migration was SQLite-only and said so nowhere, so `GLOB '*[^0]*'` — a
+constraint that spec was pleased with — is a syntax error on Postgres and a
+Supabase product could not apply its own derived schema. The dialect is now
+derived from `[adapters] database`, the store renumbers its placeholders
+(`?` → `$1`), and `src/identity.generated.ts` carries both facts into
+TypeScript so nothing is retyped. `rls = true` adds Postgres policies as
+defence in depth — `can()` is still the rule, because it is the one both
+languages share and the only one firmware can run.
+
+Three defects, none of which a test that reads generated text can see: the
+`GLOB` migration, the store's `?` placeholders, and a policy on `grants`
+that reads `grants` and therefore refuses every query it guards
+(*"infinite recursion detected in policy"*). `scripts/verify-postgres.sh`
+runs the real thing against a real server — 14 checks, in CI on a
+`postgres:16` service — and reproduces all three when the fixes are reverted.
+
+**Deliberately not done:** it is **not a migrations system** — it generates
+the first table; schema *change* needs ordering, idempotency and drift
+detection against a live database, and that is the next real design question
+here. No Postgres `database` adapter either: `supabase`/`neon`/`postgres`
+resolve the dialect correctly but remain `candidates`, so such a product
+supplies its own `{ query, execute }`. Also no device/service token issuance
+— how a device *proves* it is that device needs its own pass with real
+cryptographic choices — and no grant expiry, delegation, audit log or
+caching.
+
+**Open: `fid add identity` is one opt-in doing two jobs.** Everything here is
+already opt-in — `fid new` generates none of it, the way all twelve
+capabilities work, every adapter contract defaults to `none`, and
+`[spine] enabled = false`. But installing the capability installs the *rule*
+and the *storage* together. A product that wants `can()` and seeds its grants
+from config or `MemoryGrantStore` still gets a migration it will never apply
+and a generated module it will never import.
+
+The fix that fits the platform is `[identity] storage = "none"`, because
+`none` is already this platform's word for "wired in, reported, does nothing"
+— see the `NONE` adapter, which is a real implementation rather than a
+placeholder. Splitting identity into two capabilities is the alternative, and
+is more surface for the same result.
+
+Not built, deliberately: no product has yet wanted the rule without the
+table, and a contract shaped for a consumer that does not exist is the
+speculative-contract mistake this platform has already corrected once. The
+first product that hits it is the signal to build it.
+
+### AI — *terminal, product-critical* ⬜
+
+"Some way to run AI on the edge or connect to an internet API" — named
+correcting an earlier framing of this as "Workers AI": the founder was
+explicit that Workers AI specifically might not be the right vendor, and
+the actual need is thinking about **AI apps**, vendor-neutral. Scoped
+2026-09-15, not yet built:
+
+- **Conversational/agentic first.** Streaming chat completion, tool calls,
+  system prompts — shaped like the Anthropic/OpenAI messages API. This is
+  the founder's stated priority use case.
+- **Embeddings/RAG named as a real second use, not this round's.** Turning
+  product data into vectors for retrieval needs its own method and pairs
+  with a vector store this platform does not have either — a second
+  contract or a second method, decided when it has a consumer.
+- **Workers AI is a candidate, not the contract's namesake.** Naming the
+  contract after one vendor's product would repeat the mistake this
+  platform's own adapter system exists to avoid.
+- **Gateway-first, decided 2026-09-15.** An earlier sketch here was "write
+  one adapter per model vendor and find their narrowest shared interface."
+  The founder's correction: target an **AI gateway** — OpenRouter, or a
+  comparable vendor-independent one — rather than N vendors.
+
+  That is the better answer, and it dissolves the objection that made this
+  item risky. The hard part of an LLM contract is that no neutral
+  intersection exists: Anthropic puts `system` top-level where OpenAI makes
+  it a message role; Anthropic has content blocks where OpenAI has a string
+  or parts array; streaming event shapes differ substantially; and the
+  surface moves fast (thinking config, `tool_choice` and prefill all changed
+  shape within a year). Intersect those by hand and the contract is too thin
+  for agentic work; superset them and you have picked a vendor without
+  admitting it.
+
+  A gateway already does that normalization and maintains it. So the
+  contract targets **one** shape — the gateway's — and model choice becomes
+  a *string in a declaration* rather than an adapter per vendor. Vendor drift
+  becomes the gateway's problem, which is what you are paying it for.
+
+  Open before building: whether `model` belongs in `[ai]` as a declaration
+  (derivable into the factory, gated like everything else) or per-call; and
+  whether a direct-vendor adapter is ever worth having as an escape hatch for
+  someone who does not want a gateway in the path.
+
+**Why it is not built yet:** highest design risk of everything discussed in
+this round — model APIs vary more across vendors than storage or database
+APIs do (chat completion vs. embeddings vs. image generation are genuinely
+different shapes), so a first attempt is the likeliest of all these items to
+need a redesign. No product has a concrete AI feature yet to generalize the
+contract from.
 
 ### Legal & compliance — *terminal* ⬜
 
@@ -406,8 +604,9 @@ firmware. Firmware uses `embedded-hal` / Embassy HAL for peripherals and
 full mapping. Tauri bridges both worlds: this crate in the Rust backend,
 `packages/adapters` in the TS frontend, `fiducial-tauri` for serial transport.
 
-**Vendor implementations** (Supabase, Neon/Postgres, Cloudflare D1, S3/R2,
-Resend, Sentry) are the next item — *Cloudflare adapter set*.
+**Vendor implementations.** `d1` (database) and `r2` (storage) shipped —
+see *Cloudflare adapter set*. Supabase, Neon/Postgres, S3, Resend and Sentry
+remain candidates.
 
 ---
 
