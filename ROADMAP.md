@@ -5,7 +5,13 @@
 > once, so no part of it has to be re-derived from memory or a chat log.
 >
 > `SHIPPED.md` records what is *built*. This records what is *intended*, and why.
-> `fid dash` reads the ⬜ 🟡 ✅ markers below.
+> `fid dash` reads the ⬜ 🟡 ✅ markers below — so **every item carries one**. An
+> unmarked item is invisible to the dashboard, which then reports the roadmap as
+> finished; that is exactly what happened to items 4–9 until 2026-09-15.
+>
+> **Nothing here says "next".** The order of work below plus the markers already
+> say it, and `fid dash` derives it. A sentence naming the next item is a second
+> declaration of what these markers hold, and it is the copy that goes stale.
 
 ---
 
@@ -123,7 +129,7 @@ expensive, and nothing else on this list has that property.
 It is also the item the whole strategy rests on. "We can add that later, easily"
 is only true once shipping a capability does not require releasing the CLI.
 
-### 4 · Context sync — *multiplying*
+### 4 · Context sync — *multiplying* ⬜
 
 Code ↔ documentation ↔ agent context kept in step automatically.
 
@@ -133,7 +139,7 @@ catching the omission *after the fact*. Doing it here makes every later phase
 cheaper and removes a recurring drift risk, rather than paying the tax six more
 times first.
 
-### 5 · Brand — *terminal, high value*
+### 5 · Brand — *terminal, high value* ⬜
 
 One declaration → favicons, app icons, OG images, press kit, social templates,
 in-theme email, sitemap, robots.txt, JSON-LD.
@@ -143,7 +149,7 @@ of whether steps 2–4 actually worked. Unblocks **legal** and the **Claude Desi
 bridge**. Feeds `@fiducial/tokens`, so the chain is brand → tokens → every
 registry → Claude Design, one source throughout.
 
-### 6 · Cloudflare adapter set — *terminal, product-critical*
+### 6 · Cloudflare adapter set — *terminal, product-critical* ⬜
 
 D1, R2, Workers, Access, Turnstile, Queues, Workers AI. The first real adapters,
 and the proof that the adapter contract is vendor-neutral rather than a
@@ -152,19 +158,19 @@ Cloudflare-shaped hole.
 Low compounding, high product value — correctly placed after the infrastructure
 rather than before it.
 
-### 7 · Legal & compliance — *terminal*
+### 7 · Legal & compliance — *terminal* ⬜
 
 Depends on **i18n** (legal text is long-form localized copy) and **brand** (it is
 copy about a declared entity). A genuine dependency, not a preference: built
 earlier, it gets built twice.
 
-### 8 · `fid capability extract` — *terminal*
+### 8 · `fid capability extract` — *terminal* ⬜
 
 "It works in my product, now lift it." Mechanizes the second-use rule. Needs the
 taxonomy and external capabilities to exist first, or there is nothing to extract
 *into*.
 
-### 9 · On demand
+### 9 · On demand ⬜
 
 None of these block a product; each is added when wanted, through the system
 step 3 delivers.

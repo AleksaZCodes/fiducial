@@ -17,6 +17,7 @@ Git
 Roadmap
   source         ROADMAP.md
   progress       0 done, 0 in progress, 1 to do  (1 tracked)
+  next           _Replace this row_ _and say what it costs to defer_
 
 Decisions
   state          none recorded (looked in docs/specs, docs/decisions, docs/adr)

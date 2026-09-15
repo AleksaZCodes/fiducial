@@ -6,11 +6,27 @@ This file covers the same ground as `CLAUDE.md` for agent runtimes that read
 `AGENTS.md` (Codex, Copilot Workspace, etc.). The authoritative design is in
 `docs/specs/2026-09-06-fiducial-design.md`.
 
-## Current phase
+## Where the work is recorded
 
-Read `SHIPPED.md` before every session. It states which phase is active and what
-"done" means for it. Do not begin the next phase until the current one is
-complete.
+Two files, and the names say which is which:
+
+| File | Holds | Read it for |
+|---|---|---|
+| [`ROADMAP.md`](ROADMAP.md) | what is **intended**, ordered, with ⬜ 🟡 ✅ markers | what to do next |
+| [`SHIPPED.md`](SHIPPED.md) | what was **built**, phase by phase | what already exists, and what "done" meant for it |
+
+Read both before starting. **Neither file states "what is next" in prose** — the
+roadmap's order plus its markers already do, and `fid dash` derives it:
+
+```sh
+fid dash --section roadmap    # progress, anything in flight, and the next item
+```
+
+A sentence naming the next item is a second declaration of those markers, and it
+is the copy that goes stale. One lived in `SHIPPED.md` until 2026-09-15 and had
+to be hand-edited on every merge.
+
+Finish the item you are on before starting the next.
 
 ## Principles
 

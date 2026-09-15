@@ -504,3 +504,74 @@ fn no_build_output_is_tracked() {
         offenders.join("\n")
     );
 }
+
+// ── The record-keeping split ──────────────────────────────────────────────────
+
+/// `SHIPPED.md` looks backwards only.
+///
+/// `docs/specs/2026-09-14-phases-renamed-to-shipped.md` states that the
+/// next-items prose *"was removed from `PHASES.md` precisely so it would hold
+/// only the record"* — and the same commit that wrote that sentence put a
+/// `## Current phase: … — next is …` line back into the renamed file, where it
+/// then had to be hand-edited on every merge for three phases.
+///
+/// A spec asserting something is not the same as anything checking it. This
+/// checks it.
+#[test]
+fn shipped_does_not_state_what_is_next() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("workspace root")
+        .to_path_buf();
+    let text = std::fs::read_to_string(root.join("SHIPPED.md")).expect("reading SHIPPED.md");
+
+    let offenders: Vec<&str> = text
+        .lines()
+        .filter(|l| l.trim_start().starts_with('#'))
+        .filter(|l| {
+            let l = l.to_lowercase();
+            l.contains("current phase") || l.contains("next is") || l.contains("up next")
+        })
+        .collect();
+
+    assert!(
+        offenders.is_empty(),
+        "SHIPPED.md records what was built; what is next belongs to ROADMAP.md, \
+         whose order and markers already say it and which `fid dash` derives from.\n\
+         Offending heading(s): {offenders:?}"
+    );
+}
+
+/// Every ordered roadmap item carries a status marker.
+///
+/// `fid dash` counts ⬜ 🟡 ✅ and ignores unmarked prose — deliberately, so a
+/// sentence is not counted as an item. The cost is that an *item* without a
+/// marker is invisible: items 4–9 carried none, and the dashboard reported the
+/// platform's own roadmap as "5 done, 0 to do".
+#[test]
+fn every_roadmap_item_carries_a_marker() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("workspace root")
+        .to_path_buf();
+    let text = std::fs::read_to_string(root.join("ROADMAP.md")).expect("reading ROADMAP.md");
+
+    let unmarked: Vec<&str> = text
+        .lines()
+        // The ordered items are `### <n> · …`; other headings are prose.
+        .filter(|l| {
+            l.starts_with("### ")
+                && l.trim_start_matches("### ")
+                    .starts_with(|c: char| c.is_ascii_digit())
+        })
+        .filter(|l| !l.contains('⬜') && !l.contains('🟡') && !l.contains('✅'))
+        .collect();
+
+    assert!(
+        unmarked.is_empty(),
+        "a roadmap item with no marker is invisible to `fid dash`, which then \
+         reports the roadmap as finished.\nUnmarked: {unmarked:?}"
+    );
+}

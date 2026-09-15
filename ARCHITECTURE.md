@@ -5,7 +5,7 @@ a new product. Read this before writing code. It is the mental model; the design
 spec (`docs/specs/`) is the reference.
 
 The tiebreaker for anything not resolved here is `MISSION.md`. The enumerated
-technology choices are in `STACK.md`. The build order is `SHIPPED.md`.
+technology choices are in `STACK.md`. The build order is `ROADMAP.md`; `SHIPPED.md` records what was built.
 
 ---
 
@@ -342,7 +342,8 @@ This document is the mental model. For depth, go to:
 | The principles (why) | `MISSION.md` |
 | Every technology decision | `STACK.md` |
 | The full design specification | `docs/specs/2026-09-06-fiducial-design.md` |
-| Current phase and deliverables | `SHIPPED.md` |
+| What was built, phase by phase | `SHIPPED.md` |
+| What is intended, and what is next | `ROADMAP.md` |
 | Agent context for this session | `AGENTS.md` (and `.claude/skills/*.md` for installed capabilities) |
 | A specific capability's usage | `.claude/skills/<capability-id>.md` |
 
