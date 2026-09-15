@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
+mod adapter;
 mod capability;
 mod commands;
 mod config;

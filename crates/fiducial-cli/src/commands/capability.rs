@@ -121,6 +121,7 @@ fn cmd_list(show_all: bool) -> Result<()> {
                     };
                     println!("  ✓ {id:<24} {desc}", id = id, desc = def.description);
                     println!("    skill: {skill_status}");
+                    print_contributions(def);
                 }
                 None => {
                     println!("  ? {id:<24} (third-party or unknown — not in built-in registry)");
@@ -141,16 +142,98 @@ fn cmd_list(show_all: bool) -> Result<()> {
             println!("  AVAILABLE (not installed)");
             for def in available {
                 println!("  · {id:<24} {desc}", id = def.id, desc = def.description);
+                print_contributions(def);
             }
             println!();
             println!("  Install with: fid add <capability-id>");
         }
+
+        print_contracts(&cfg);
     }
 
     Ok(())
 }
 
+/// The adapter contracts, what satisfies each today, and what is intended.
+///
+/// Shown under `--all` because a contract is not discoverable otherwise: the
+/// set lives in the binary, and a product cannot select a vendor it has never
+/// been told exists. The split between selectable and planned is the honest
+/// half — naming a vendor nothing implements as if it worked is the failure
+/// this repository spent a phase removing from its guard rules.
+fn print_contracts(cfg: &crate::config::Config) {
+    use crate::adapter;
+
+    println!();
+    println!("  ADAPTER CONTRACTS");
+    for c in adapter::CONTRACTS {
+        let selected = cfg
+            .adapters
+            .get(c.name)
+            .map(|v| format!("  [selected: {v}]"))
+            .unwrap_or_default();
+        println!(
+            "  · {name:<24} {desc}{selected}",
+            name = c.name,
+            desc = c.description
+        );
+        println!(
+            "    selectable: {}{}",
+            c.implementations.join(", "),
+            if c.candidates.is_empty() {
+                String::new()
+            } else {
+                format!("   planned: {}", c.candidates.join(", "))
+            }
+        );
+    }
+    println!();
+    println!("  Select with `[adapters]` in fiducial.toml. `none` is a working no-op.");
+}
+
 // ── check ─────────────────────────────────────────────────────────────────────
+
+/// What a capability contributes, by taxonomy kind.
+///
+/// Printed under the description so `fid capability list` answers the question
+/// the taxonomy exists to make askable: not just "is it installed", but *what
+/// does it bring* — which facts, which derivations, which contracts.
+fn print_contributions(def: &crate::capability::CapabilityDef) {
+    use crate::capability::Declaration;
+
+    let mut parts: Vec<String> = Vec::new();
+    let decls: Vec<&str> = def.declarations.iter().map(|d| d.name()).collect();
+    if !decls.is_empty() {
+        parts.push(format!("declares {}", decls.join(", ")));
+    }
+    if !def.pipelines.is_empty() {
+        let names: Vec<&str> = def
+            .pipelines
+            .iter()
+            .map(|(p, _)| p.trim_start_matches("pipelines/"))
+            .collect();
+        parts.push(format!("derives via {}", names.join(", ")));
+    }
+    if !def.requires_adapters.is_empty() {
+        parts.push(format!("requires {}", def.requires_adapters.join(", ")));
+    }
+    if !def.templates.is_empty() {
+        parts.push(format!("{} template file(s)", def.templates.len()));
+    }
+    // A config block is a declaration whose absence is invisible on disk, so
+    // say so rather than leaving the reader to infer it from the name.
+    if def
+        .declarations
+        .iter()
+        .any(|d| matches!(d, Declaration::ConfigBlock { .. }))
+    {
+        parts.push("seeds a fiducial.toml block".to_string());
+    }
+
+    if !parts.is_empty() {
+        println!("    {}", parts.join("; "));
+    }
+}
 
 fn cmd_check(filter: Option<&str>) -> Result<()> {
     let cwd = env::current_dir().context("getting current directory")?;
@@ -284,7 +367,12 @@ fn cmd_new(name: &str) -> Result<()> {
     println!("✦ capabilities/{name}/ scaffolded. Next steps:");
     println!();
     println!("  1. Edit  capabilities/{name}/SKILL.md — teach agents how to use this capability.");
-    println!("  2. Add   template files under capabilities/{name}/");
+    println!("  2. Decide what this capability contributes, by kind:");
+    println!("       declarations  typed facts it introduces (a file, or a fiducial.toml block)");
+    println!("       pipelines     what it derives from them, under pipelines/ — gated by fid derive --check");
+    println!("       adapters      contracts it needs a vendor for, without choosing one");
+    println!("       templates     plain files copied in, belonging to no pipeline");
+    println!("     The test for a declaration: could two pipelines read it and both be correct?");
     println!("  3. Register the capability in crates/fiducial-cli/src/capability.rs.");
     println!("  4. Run   fid capability check --capability {name}");
     println!("  5. Install into a product:  fid add {name}");

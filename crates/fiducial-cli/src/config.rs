@@ -24,6 +24,32 @@ pub struct Config {
     /// `fiducial.toml` carries no empty `[i18n]` block.
     #[serde(default, skip_serializing_if = "I18n::is_empty")]
     pub i18n: I18n,
+    /// `[adapters]` — one vendor per contract.
+    #[serde(default, skip_serializing_if = "Adapters::is_empty")]
+    pub adapters: Adapters,
+}
+
+/// `[adapters]` — which implementation satisfies each contract.
+///
+/// A plain map rather than a struct with a field per contract: the contract set
+/// is declared once in `crate::adapter::CONTRACTS`, and a struct here would be
+/// a second copy of it that drifts the first time one is added.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct Adapters {
+    #[serde(flatten)]
+    pub selected: std::collections::BTreeMap<String, String>,
+}
+
+impl Adapters {
+    /// True when the product selects no adapters at all.
+    pub fn is_empty(&self) -> bool {
+        self.selected.is_empty()
+    }
+
+    /// The vendor chosen for a contract, if the product chose one.
+    pub fn get(&self, contract: &str) -> Option<&str> {
+        self.selected.get(contract).map(|s| s.as_str())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -174,6 +200,22 @@ fn default_rules() -> Vec<String> {
 }
 
 impl Config {
+    /// The smallest valid config, for tests and for seeding probes.
+    #[cfg(test)]
+    pub fn minimal(name: &str) -> Self {
+        Self {
+            product: Product {
+                name: name.to_string(),
+                version: default_version(),
+            },
+            spine: Spine::default(),
+            capabilities: Capabilities::default(),
+            guard: Guard::default(),
+            i18n: I18n::default(),
+            adapters: Adapters::default(),
+        }
+    }
+
     /// Load from a specific path.
     pub fn load(path: &Path) -> Result<Self> {
         let raw =

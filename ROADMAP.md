@@ -83,9 +83,15 @@ Also: the **second** declaration→pipeline case. `eda` was the first — it alr
 installs `board/board.interface.json` as a declaration plus `eda.toml` and
 `enclosure.toml` as pipelines. That matters for what comes next.
 
-### 2 · Capability taxonomy, made real — *multiplying*
+### 2 · Capability taxonomy, made real — *multiplying* ✅
 
-Declarations, pipelines and adapters become first-class in the CLI.
+Complete. Declarations, pipelines and adapters are first-class in the CLI; see
+`docs/specs/2026-09-15-capability-taxonomy-made-real.md`.
+
+**The adapter half shipped as format only** — five contracts, each implementing
+`none` and nothing else, with intended vendors recorded as `candidates` that
+cannot be selected. Contracts get real implementations in item 6; until then a
+selectable vendor would be a name with nothing behind it.
 
 **Why now and not later:** the second-use rule is satisfied. `eda` and i18n are
 two real declaration→pipeline capabilities, so the taxonomy is *generalized from
