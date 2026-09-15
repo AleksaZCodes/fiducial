@@ -138,10 +138,14 @@ for them. `can()` stays the shared half.
 ## Tests
 
 ```sh
-pnpm --filter @fiducial/identity test   # the real schema on real SQLite
-cargo test -p fiducial-cli identity_    # end-to-end through the real binary
-PGHOST=… scripts/verify-postgres.sh     # the migration + policies on real Postgres
+pnpm --filter @fiducial/identity test          # the rule, on the vectors
+pnpm --filter @fiducial/identity test:schema   # the real schema on real SQLite
+cargo test -p fiducial-cli identity_           # end-to-end through the real binary
+PGHOST=… scripts/verify-postgres.sh            # migration + policies on real Postgres
 ```
+
+`test:schema` and the Postgres script need `cargo build -p fiducial-cli --bin
+fid` first — they run what `fid derive` actually produced, not a copy.
 
 Every one of those runs the schema `fid derive` actually generates, rather
 than a copy. The Postgres script is what caught both a migration that would

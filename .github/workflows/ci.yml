@@ -513,8 +513,20 @@ jobs:
         # `fid derive` to produce it rather than checking a copy into the test.
         run: cargo build -p fiducial-cli --bin fid
 
-      - name: TypeScript — same verdict on every vector, and the schema on real SQLite
+      - name: Build @fiducial/identity
+        # The suites import `../dist/index.js` — the built package, the same
+        # entry point a consumer resolves. Without this they fail on a missing
+        # module, which is what they did the first time this job ran.
+        run: pnpm --filter @fiducial/identity build
+
+      - name: TypeScript — same verdict on every vector
         run: pnpm --filter @fiducial/identity test
+
+      - name: The generated schema, on real SQLite
+        # `test:schema` rather than `test` because it needs the `fid` binary
+        # built above. The generic JS/TS job builds no Rust, so this is the
+        # only job that can run it.
+        run: pnpm --filter @fiducial/identity test:schema
 
       - name: Postgres — the other dialect, on a real server
         run: scripts/verify-postgres.sh

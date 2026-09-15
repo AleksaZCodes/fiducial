@@ -143,17 +143,25 @@ cargo build --workspace
 cargo test --workspace --all-features         # includes the freshness gates
 ```
 
-One suite needs a server and so is not in the default run:
+Two suites run the **real generated schema**, so they need something built
+first and are not part of the default run:
 
 ```sh
+cargo build -p fiducial-cli --bin fid
+pnpm --filter @fiducial/identity build            # the tests import ../dist
+pnpm --filter @fiducial/identity test:schema      # the schema on real SQLite
+
 PGHOST=localhost PGUSER=postgres PGPASSWORD=postgres scripts/verify-postgres.sh
 ```
 
-It applies the generated grants migration and its RLS policies to a real
-PostgreSQL server. CI runs it on a `postgres:16` service. It exists because
-node has no Postgres, so that half of the derivation was previously only ever
-asserted as *text* — which is how a migration that does not apply, and
-policies that refuse every query they guard, both shipped looking correct.
+`test:schema` generates the grants table with the real `fid` binary and runs
+it on `node:sqlite` — D1 *is* SQLite. `verify-postgres.sh` applies the same
+derivation, RLS policies included, to a real PostgreSQL server. The `identity`
+CI job runs both; the generic JS/TS job builds no Rust and cannot.
+
+They are separate scripts rather than part of `pnpm test` because a suite that
+cannot run is worse than one that is named: the first CI run of these failed
+on a missing binary and a missing `dist/`, saying nothing about either.
 
 Everything that decides *how* it builds is committed, so a cloud checkout — Claude
 Code on the web, a Codespace, a new contributor — gets the same answers as a

@@ -9,13 +9,24 @@
  * That matters because the failure mode of a mocked store is that every query
  * "works": a typo'd column, a broken `ON CONFLICT`, a `CHECK` that rejects
  * nothing — all pass against a Map. Here they fail.
+ *
+ * ## This suite is `test:schema`, not `test`
+ *
+ * It needs the real `fid` binary, so it is a separate script rather than part
+ * of `pnpm test`. The generic JS/TS CI job builds no Rust; running it there
+ * only ever produced an ENOENT that said nothing about what to do. The
+ * `identity` job, which builds `fid` because these tests need it, runs this.
+ *
+ *     cargo build -p fiducial-cli --bin fid
+ *     pnpm --filter @fiducial/identity build      # the tests import ../dist
+ *     pnpm --filter @fiducial/identity test:schema
  */
 
 import { describe, it, before } from 'node:test'
 import assert from 'node:assert/strict'
 import { DatabaseSync } from 'node:sqlite'
 import { execFileSync } from 'node:child_process'
-import { readFileSync, mkdtempSync } from 'node:fs'
+import { readFileSync, mkdtempSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -47,6 +58,12 @@ const PLATFORM = { kind: 'platform' }
  */
 function generatedSchema() {
   const fid = join(repoRoot, 'target/debug/fid')
+  if (!existsSync(fid)) {
+    throw new Error(
+      `these tests run the real generated schema, and ${fid} is not built.\n` +
+        'Run: cargo build -p fiducial-cli --bin fid',
+    )
+  }
   const dir = mkdtempSync(join(tmpdir(), 'grants-'))
   execFileSync(fid, ['new', 'p'], { cwd: dir, stdio: 'ignore' })
   const root = join(dir, 'p')
