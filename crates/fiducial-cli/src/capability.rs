@@ -84,7 +84,7 @@ pub fn builtins() -> &'static [Capability] {
 pub fn seeded_locales() -> Option<(Vec<String>, String)> {
     let cap = find("i18n")?;
     let seed = cap.declarations.iter().find_map(|d| match d {
-        Declaration::ConfigBlock { name, seed } if name == "i18n" => Some(seed),
+        Declaration::ConfigBlock { name, seed } if name == "i18n" => seed.as_ref(),
         _ => None,
     })?;
     let table = seed.as_table()?;
@@ -356,7 +356,9 @@ fn patch_config(root: &Path, cap: &Capability) -> Result<()> {
             .get(name)
             .is_some_and(|existing| !is_empty_block(existing));
         if !already_declared {
-            table.insert(name.clone(), seed.clone());
+            if let Some(seed) = seed {
+                table.insert(name.clone(), seed.clone());
+            }
         }
     }
 
@@ -384,7 +386,8 @@ fn content_hash(cap: &Capability) -> String {
         match decl {
             Declaration::File(f) => parts.push(format!("decl\u{1f}{}\u{1f}{}", f.path, f.content)),
             Declaration::ConfigBlock { name, seed } => {
-                parts.push(format!("block\u{1f}{name}\u{1f}{seed}"))
+                let seed_str = seed.as_ref().map(|s| s.to_string()).unwrap_or_default();
+                parts.push(format!("block\u{1f}{name}\u{1f}{seed_str}"))
             }
         }
     }
@@ -599,6 +602,10 @@ mod tests {
         for cap in builtins() {
             for decl in &cap.declarations {
                 let Declaration::ConfigBlock { name, seed } = decl else {
+                    continue;
+                };
+                let Some(seed) = seed else {
+                    // No seed means the block pre-exists in the scaffold; skip.
                     continue;
                 };
                 assert!(

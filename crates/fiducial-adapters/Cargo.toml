@@ -1,0 +1,18 @@
+[package]
+name        = "fiducial-adapters"
+description = "Cross-platform adapter contracts for Fiducial — database, storage, email, diagnostics."
+version.workspace     = true
+edition.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+homepage.workspace    = true
+authors.workspace     = true
+rust-version.workspace = true
+keywords    = ["adapters", "database", "storage", "fiducial", "cross-platform"]
+categories  = ["api-bindings", "asynchronous"]
+
+[dependencies]
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }

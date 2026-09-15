@@ -177,6 +177,32 @@ EXAMPLE:
     )]
     Brand,
 
+    /// Add cross-platform adapter contracts (database, storage, email, diagnostics)
+    #[command(
+        long_about = "\
+Install the adapters capability.
+
+Adds `fiducial-adapters` (Rust) and `@fiducial/adapters` (TypeScript) contracts
+to the product and wires `fid derive` to generate `src/adapters.generated.ts`
+from the `[adapters]` declaration in fiducial.toml.
+
+After installing, declare your vendor choices in fiducial.toml:
+
+    [adapters]
+    database = \"none\"   # swap for d1, supabase, neon, postgres when ready
+    storage  = \"none\"   # swap for r2, s3, supabase-storage
+    email    = \"none\"   # swap for resend, ses
+    errors   = \"none\"   # swap for sentry, workers-analytics
+
+Then run `fid derive` to regenerate the factory file.",
+        after_long_help = "\
+EXAMPLE
+    fid add adapters
+    fid derive          # writes src/adapters.generated.ts
+    fid derive --check  # CI gate — fails if the factory is stale"
+    )]
+    Adapters,
+
     /// Add firmware support for a microcontroller target
     #[command(
         long_about = "\
@@ -250,6 +276,7 @@ pub fn run(target: AddTarget) -> Result<()> {
         AddTarget::Eda => install_capability("eda"),
         AddTarget::I18n => install_capability("i18n"),
         AddTarget::Brand => install_capability("brand"),
+        AddTarget::Adapters => install_capability("adapters"),
         AddTarget::Capability { id, from } => match from {
             Some(spec) => install_external(&id, &spec),
             None => install_capability(&id),
