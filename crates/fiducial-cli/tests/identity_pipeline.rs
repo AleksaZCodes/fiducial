@@ -58,6 +58,17 @@ fn module(root: &Path) -> String {
     std::fs::read_to_string(root.join("src/identity.generated.ts")).unwrap()
 }
 
+/// Add lines to `[identity]` without deriving.
+fn set_identity(root: &Path, body: &str) {
+    let path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        config.replace("[identity]", &format!("[identity]\n{body}")),
+    )
+    .unwrap();
+}
+
 /// Rewrite `[identity]` with the given body and re-derive.
 fn with_identity(root: &Path, body: &str) -> String {
     let path = root.join("fiducial.toml");
@@ -361,6 +372,127 @@ fn a_custom_table_name_is_used_everywhere_it_appears() {
     assert!(sql.contains("CREATE TABLE IF NOT EXISTS acl"), "{sql}");
     assert!(sql.contains("acl_by_principal"), "{sql}");
     assert!(!sql.contains("grants_by_principal"), "{sql}");
+}
+
+// ── Opt-in storage ───────────────────────────────────────────────────────────
+//
+// `fid add identity` used to be one opt-in doing two jobs: installing the rule
+// also generated storage for it. A product that wants `can()` and seeds its
+// grants from config or a `MemoryGrantStore` got a migration it would never
+// apply and a module it would never import.
+
+#[test]
+fn storage_none_generates_nothing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+    assert!(root.join("migrations/0001_grants.sql").exists());
+
+    set_identity(&root, "storage = \"none\"");
+    std::fs::remove_file(root.join("migrations/0001_grants.sql")).unwrap();
+    std::fs::remove_file(root.join("src/identity.generated.ts")).unwrap();
+
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(!root.join("migrations/0001_grants.sql").exists());
+    assert!(!root.join("src/identity.generated.ts").exists());
+}
+
+/// The point of switching the *pipeline* off rather than having the executor
+/// write nothing: `--check` demands every output of every pipeline that is on,
+/// and a pipeline that is off has none. Were this done inside the executor,
+/// "produces nothing" would become an excuse for a file it failed to write.
+#[test]
+fn check_passes_with_storage_switched_off() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+
+    set_identity(&root, "storage = \"none\"");
+    std::fs::remove_file(root.join("migrations/0001_grants.sql")).unwrap();
+    std::fs::remove_file(root.join("src/identity.generated.ts")).unwrap();
+    assert!(run(&root, &["derive"]).status.success());
+
+    let out = run(&root, &["derive", "--check"]);
+    assert!(out.status.success(), "{}", text(&out));
+}
+
+/// A lock that claims an artifact nothing derives is a quiet untruth.
+#[test]
+fn switching_storage_off_drops_its_artifacts_from_the_lock() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+
+    let lock = std::fs::read_to_string(root.join("fiducial.lock")).unwrap();
+    assert!(
+        lock.contains("[artifacts.\"migrations/0001_grants.sql\"]"),
+        "{lock}"
+    );
+
+    set_identity(&root, "storage = \"none\"");
+    assert!(run(&root, &["derive"]).status.success());
+
+    let lock = std::fs::read_to_string(root.join("fiducial.lock")).unwrap();
+    assert!(
+        !lock.contains("[artifacts.\"migrations/0001_grants.sql\"]"),
+        "the lock still claims an artifact nothing derives: {lock}"
+    );
+    assert!(
+        !lock.contains("[artifacts.\"src/identity.generated.ts\"]"),
+        "{lock}"
+    );
+}
+
+/// A migration a product has already applied is not ours to delete.
+#[test]
+fn switching_storage_off_leaves_an_existing_migration_on_disk() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+
+    set_identity(&root, "storage = \"none\"");
+    assert!(run(&root, &["derive"]).status.success());
+    assert!(root.join("migrations/0001_grants.sql").exists());
+}
+
+#[test]
+fn storage_defaults_to_generating_the_table() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    let config = std::fs::read_to_string(root.join("fiducial.toml")).unwrap();
+    assert!(
+        !config.contains("storage"),
+        "not declared by default: {config}"
+    );
+
+    assert!(run(&root, &["derive"]).status.success());
+    assert!(root.join("migrations/0001_grants.sql").exists());
+}
+
+/// RLS is policies on a table. With no table, `rls = true` would be a security
+/// control that silently does nothing — the same reason it is refused on
+/// SQLite rather than ignored.
+#[test]
+fn rls_with_storage_none_is_refused() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    set_identity(&root, "storage = \"none\"\nrls = true");
+
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success(), "{}", text(&out));
+    assert!(text(&out).contains("not being generated"), "{}", text(&out));
+}
+
+#[test]
+fn an_unknown_storage_mode_is_refused() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    set_identity(&root, "storage = \"postgres\"");
+
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success(), "{}", text(&out));
+    assert!(text(&out).contains("not a storage mode"), "{}", text(&out));
 }
 
 // ── Validation ───────────────────────────────────────────────────────────────

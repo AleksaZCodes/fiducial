@@ -61,6 +61,24 @@ pub fn run_in(root: &Path, check: bool, pipeline_filter: Option<String>) -> Resu
         None => pipelines.iter().collect(),
     };
 
+    // A pipeline a declaration switches off is neither run nor checked. Doing
+    // it here rather than inside the executor is what keeps `--check` honest:
+    // the gate still demands every output of every pipeline that *is* on, so
+    // "produces nothing" never becomes an excuse an executor can make for a
+    // file it failed to write.
+    // Declarations are validated before anything is switched off, not inside
+    // the executor. Otherwise turning a pipeline off would also turn off the
+    // checking of the settings that configure it, and `rls = true` alongside
+    // `storage = "none"` — a security control that cannot do anything — would
+    // pass in silence.
+    if to_run.iter().any(|p| p.executor == "fid-identity") {
+        config.identity.validate(&config.adapters)?;
+    }
+
+    let (to_run, switched_off): (Vec<&Pipeline>, Vec<&Pipeline>) = to_run
+        .into_iter()
+        .partition(|p| !pipeline_switched_off(p, &config));
+
     if to_run.is_empty() {
         println!("✦ fid derive — no pipelines declared");
         println!("  Declare pipelines in `pipelines/*.toml` or enable [spine] in fiducial.toml.");
@@ -70,7 +88,39 @@ pub fn run_in(root: &Path, check: bool, pipeline_filter: Option<String>) -> Resu
     if check {
         run_check(&to_run, &lock, root)
     } else {
+        // Flipping a pipeline off leaves its old artifacts in the lock,
+        // claiming a freshness nothing maintains any more. Drop them. The
+        // files themselves stay: a migration a product has already applied is
+        // not ours to delete.
+        for pipeline in &switched_off {
+            prune_artifacts(&mut lock, &pipeline.name);
+        }
         run_derive(&to_run, root, &mut lock, &lock_path)
+    }
+}
+
+/// Forget every artifact a pipeline produced.
+fn prune_artifacts(lock: &mut Lock, pipeline: &str) {
+    lock.artifacts
+        .retain(|_, record| record.pipeline != pipeline);
+}
+
+/// Is this pipeline switched off by a declaration?
+///
+/// Deliberately a short, explicit list rather than a general mechanism. One
+/// pipeline has a reason to be optional; a framework for the other six would
+/// be scaffolding for consumers that do not exist.
+///
+/// When a pipeline is off, its artifacts also stop being the lock's business —
+/// see `prune_artifacts`. A lock that claims an artifact nothing derives is
+/// the kind of quiet untruth this file exists to prevent.
+fn pipeline_switched_off(pipeline: &Pipeline, config: &Config) -> bool {
+    match pipeline.executor.as_str() {
+        // `[identity] storage = "none"`: the product wants `can()` and
+        // supplies its grants itself. Installing the rule should not force a
+        // migration it will never apply.
+        "fid-identity" => !config.identity.generates_storage(),
+        _ => false,
     }
 }
 

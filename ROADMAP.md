@@ -331,24 +331,19 @@ supplies its own `{ query, execute }`. Also no device/service token issuance
 cryptographic choices — and no grant expiry, delegation, audit log or
 caching.
 
-**Open: `fid add identity` is one opt-in doing two jobs.** Everything here is
-already opt-in — `fid new` generates none of it, the way all twelve
-capabilities work, every adapter contract defaults to `none`, and
-`[spine] enabled = false`. But installing the capability installs the *rule*
-and the *storage* together. A product that wants `can()` and seeds its grants
-from config or `MemoryGrantStore` still gets a migration it will never apply
-and a generated module it will never import.
+**Storage is opt-in** (`docs/specs/2026-09-15-grant-storage-is-opt-in.md`).
+`fid add identity` was one opt-in doing two jobs: installing the *rule* also
+generated *storage* for it. `[identity] storage = "none"` separates them —
+the rule, with grants supplied from config or a `MemoryGrantStore` and no
+migration to ignore. `sql` stays the default, so nothing moved.
 
-The fix that fits the platform is `[identity] storage = "none"`, because
-`none` is already this platform's word for "wired in, reported, does nothing"
-— see the `NONE` adapter, which is a real implementation rather than a
-placeholder. Splitting identity into two capabilities is the alternative, and
-is more surface for the same result.
-
-Not built, deliberately: no product has yet wanted the rule without the
-table, and a contract shaped for a consumer that does not exist is the
-speculative-contract mistake this platform has already corrected once. The
-first product that hits it is the signal to build it.
+The interesting part was where to put the switch. Having the executor write
+nothing would mean `fid derive --check` — which demands every output of every
+pipeline — had to tolerate an executor that succeeded and produced nothing,
+and *"produces nothing"* then becomes an excuse available to one that
+genuinely failed. The switch is at pipeline selection instead, where derive
+and `--check` share one list, so the gate keeps its strength. Cost: one
+`partition`.
 
 ### AI — *terminal, product-critical* ⬜
 

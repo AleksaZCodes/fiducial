@@ -121,6 +121,31 @@ ordering, idempotency and drift detection against a live database, and none
 of that exists yet. Said plainly here rather than discovered later — see
 `docs/specs/2026-09-15-grant-storage.md`.
 
+## Storage is opt-in
+
+```toml
+[identity]
+storage = "none"
+```
+
+The rule and the storage are separate wants. `can()`, `Principal` and
+`effectiveRole` are useful to a product whose grants are seeded from config,
+held in a `MemoryGrantStore`, or read from a table it manages itself — and
+that product has no use for a generated migration.
+
+With `storage = "none"` the identity pipeline is not run **and not checked**:
+no migration, no `identity.generated.ts`, and `fid derive --check` does not
+ask for them. `table`, `dialect` and `current_user_sql` become inert; `rls =
+true` is refused, because policies on a table that is not generated is a
+security control that cannot do anything.
+
+Files already generated stay on disk. A migration you have applied to a live
+database is not this tool's to delete — but it is dropped from
+`fiducial.lock`, which no longer claims to keep it fresh.
+
+`none` is the same word the adapter contracts use, and means the same thing:
+wired in, reported, does nothing.
+
 ## Do you need this?
 
 If permission is always "you own what you created,"
@@ -128,6 +153,9 @@ If permission is always "you own what you created,"
 grants. They earn their place when **sharing** exists — Bob can view Alice's
 thermostat, an installer holds temporary admin — which is where scattered
 `if` statements stop working.
+
+If you want the rule but not the table, that is `storage = "none"` above
+rather than not installing the capability.
 
 ## Storage is a server concern
 

@@ -434,6 +434,26 @@ built because no product has one yet.
 | Clippy (0 warnings), fmt, full Rust suite (all workspace crates), JS build/typecheck/test/lint all green | ✅ |
 | **Deliberately not done, and said so in `ROADMAP.md` and the spec**: an automated CI typecheck of the generated factory (the bug above was caught by hand, not by a new test — a real, recorded gap), Clerk/Auth.js implementations, a Rust-side `SupabaseAuth`, multi-factor auth, magic links, organizations | ✅ |
 
+**Phase 33 — grant storage is opt-in ✅ (2026-09-15)**
+
+> Closes the open question recorded against the roadmap item **Identity at
+> every level**: `fid add identity` was one opt-in doing two jobs. Prompted by
+> a question worth repeating — *"maybe those grants should be opt in, so we
+> don't have boilerplate for no reason? is that the case for most things in
+> fiducial?"* Mostly it was; here it was not.
+> Spec: `docs/specs/2026-09-15-grant-storage-is-opt-in.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **`[identity] storage = "none"`** — the rule without the table. `can()`, `Principal` and `effectiveRole` are useful to a product that seeds grants from config or a `MemoryGrantStore`; it was getting a migration it would never apply and a module it would never import | ✅ |
+| Reuses the word the adapter contracts already have, for the same meaning: wired in, reported, does nothing. `sql` stays the default, so no product's behaviour moves | ✅ |
+| **The pipeline is switched off, not the executor** — and `fid derive --check` is the reason. `--check` demands every output of every pipeline; an executor that "succeeded" while writing nothing would have to be tolerated by that gate, and then *"produces nothing"* becomes an excuse available to one that genuinely failed. The switch is at pipeline selection, where derive and `--check` share one list, so the gate keeps exactly the strength it had | ✅ |
+| `pipeline_switched_off` is a short explicit match on the executor name, **not a general mechanism** — one pipeline has a reason to be optional; a framework for the other six would be scaffolding for consumers that do not exist | ✅ |
+| **A defect in my own first version, caught by its test**: validation lived in the executor, so switching the pipeline off also switched off the checking of the settings that configure it — `rls = true` with `storage = "none"` passed in silence. Declarations are now validated before the partition, and that combination is refused with its reason | ✅ |
+| The lock forgets, the disk keeps: switched-off artifacts are pruned from `fiducial.lock` (which would otherwise claim to keep fresh what nothing derives), while the files stay — a migration already applied to a live database is not this tool's to delete, and it cannot know whether that happened | ✅ |
+| 25 end-to-end CLI tests for this pipeline, up from 18; clippy clean, fmt, full workspace suite green | ✅ |
+| **Deliberately not done**: no general optional-pipeline mechanism (the second consumer is when to generalize, not the first); the capability still ships `SqlGrantStore`, because a product on `none` may construct one by hand against its own table — what stops is *generating* it | ✅ |
+
 **Phase 32 — two SQL dialects, and RLS ✅ (2026-09-15)**
 
 > Corrects the roadmap item **Identity at every level** where Phase 31 shipped

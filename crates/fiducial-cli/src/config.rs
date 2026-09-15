@@ -69,7 +69,25 @@ impl SqlDialect {
 /// database of its own).
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Identity {
+    /// Where grants live: `sql` (the default) or `none`.
+    ///
+    /// `none` means the product wants the *rule* — `can()`, `Principal`,
+    /// `effectiveRole` — and supplies its grants some other way: seeded from
+    /// config, held in a `MemoryGrantStore`, or read from a table it manages
+    /// itself. The identity pipeline is then not run and not checked, so
+    /// there is no migration and no generated module to ignore.
+    ///
+    /// Before this existed, `fid add identity` was one opt-in doing two jobs:
+    /// installing the rule also generated storage for it, whether or not the
+    /// product had any use for the table.
+    ///
+    /// `none` is the same word the adapter contracts use, and means the same
+    /// thing: wired in, reported, does nothing.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub storage: String,
     /// Table holding the permission rows. Defaults to `grants`.
+    ///
+    /// Inert when `storage = "none"` — nothing is generated to name.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub table: String,
     /// `sqlite` | `postgres`. Empty means "derive it from `[adapters]
@@ -97,10 +115,19 @@ pub struct Identity {
 
 impl Identity {
     pub fn is_empty(&self) -> bool {
-        self.table.is_empty()
+        self.storage.is_empty()
+            && self.table.is_empty()
             && self.dialect.is_empty()
             && !self.rls
             && self.current_user_sql.is_empty()
+    }
+
+    /// Does this product want grant storage generated?
+    ///
+    /// The default is yes: a product that installed the capability and said
+    /// nothing gets the table, which is what it got before `storage` existed.
+    pub fn generates_storage(&self) -> bool {
+        self.storage != "none"
     }
 
     /// The table name to generate against, defaulted.
@@ -146,6 +173,28 @@ impl Identity {
 
     /// Everything the pipeline needs, each problem named.
     pub fn validate(&self, adapters: &Adapters) -> Result<()> {
+        if !matches!(self.storage.as_str(), "" | "sql" | "none") {
+            bail!(
+                "[identity] storage = \"{}\" is not a storage mode. Known: sql \
+                 (the default — generate the grants table), none (the rule \
+                 only; supply grants yourself).",
+                self.storage
+            );
+        }
+
+        if !self.generates_storage() {
+            if self.rls {
+                bail!(
+                    "[identity] rls = true with storage = \"none\". Row-level \
+                     security is policies on the grants table, and that table is \
+                     not being generated. Either set storage = \"sql\", or drop \
+                     rls."
+                );
+            }
+            // Nothing else here describes an artifact that will exist.
+            return Ok(());
+        }
+
         let name = self.table_name();
         let ok = !name.is_empty()
             && name
