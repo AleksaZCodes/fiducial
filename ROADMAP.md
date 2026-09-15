@@ -102,8 +102,9 @@ Complete. Declarations, pipelines and adapters are first-class in the CLI; see
 
 **The adapter half shipped as format only** — five contracts, each implementing
 `none` and nothing else, with intended vendors recorded as `candidates` that
-cannot be selected. Contracts get real implementations in item 6; until then a
-selectable vendor would be a name with nothing behind it.
+cannot be selected. Async trait definitions and TypeScript interfaces followed
+in *Cross-platform adapter architecture* (shipped). Vendor implementations
+follow in *Cloudflare adapter set*.
 
 **Why now and not later:** the second-use rule is satisfied. `eda` and i18n are
 two real declaration→pipeline capabilities, so the taxonomy is *generalized from
@@ -171,64 +172,24 @@ Unblocks **legal** and the **Claude Design bridge**. Feeds `@fiducial/tokens`,
 so the chain is brand → tokens → every registry → Claude Design, one source
 throughout — the token feed itself remains future work.
 
-### Cross-platform adapter architecture — *multiplying, must precede real adapters* ⬜
+### Cross-platform adapter architecture — *multiplying, must precede real adapters* ✅
 
-The adapter system today is a **config validator**, not a runtime abstraction.
-`adapter.rs` holds a static registry that validates `[adapters]` in
-`fiducial.toml` and nothing more. There is no Rust trait, no TypeScript
-interface, no WASM binding, no IPC bridge — nothing a product can actually
-call.
+Complete. `crates/fiducial-adapters` defines `Database`, `Storage`, `Email`
+and `Diagnostics` as Rust async trait contracts (using `BoxFuture` for
+object-safe async without the `async-trait` crate); `packages/adapters` mirrors
+each as a TypeScript interface. `None*` no-op implementations on both sides
+work end-to-end. `fid add adapters` installs the capability; `fid derive` runs
+the `fid-adapters` executor and generates `src/adapters.generated.ts` from
+`[adapters]` in `fiducial.toml`, gated by `fid derive --check`.
 
-That matters because Fiducial's value proposition is *declare once, use
-everywhere*, and "everywhere" means:
+**Firmware boundary stated and documented:** cloud adapter contracts do not
+apply to `no_std` targets. Firmware uses `embedded-hal` / Embassy HAL and
+`fiducial-ota` for OTA. Tauri bridges both worlds: this crate in the Rust
+backend, `packages/adapters` in the TS frontend. `src/firmware.rs` holds the
+full mapping.
 
-| Target | How an adapter is called |
-|---|---|
-| Rust native (server, binary) | Rust trait dispatch — direct |
-| WASM in a browser | JS shim calling a TS implementation |
-| Cloudflare Worker | TS environment; may run WASM or native TS |
-| Tauri (desktop/mobile) | Rust frontend calls backend over IPC; backend holds the impl |
-| SvelteKit / Next.js | Server action or edge handler calling the TS impl |
-| Firmware (RP2040, STM32) | Rust, `no_std`, different surface — may be out of scope but must be stated |
-
-A Cloudflare D1 adapter built without this layer would be a Rust struct
-satisfying a Rust trait, callable from Rust servers but not from a SvelteKit
-endpoint or a WASM Worker. That is not a cross-platform adapter; it is a
-Rust library with a portability hat on.
-
-**The three layers:**
-
-1. **Contract definition.** Each contract (database, storage, email, …) is
-   defined once in a target-neutral form: a Rust trait *and* a TypeScript
-   interface, derived from the same source of truth so they cannot drift.
-   Today neither exists.
-
-2. **Runtime binding layer.** A thin, generated layer per target that routes
-   a call to the right backend:
-   - Native Rust: `dyn Contract` dispatch.
-   - WASM/browser: a JS shim that calls the TS implementation; WASM code calls
-     the JS import.
-   - Tauri: frontend code calls a named Tauri command; the backend holds the
-     implementation and the IPC is the boundary.
-   - Edge/Workers: TS, calling platform bindings (D1, R2, etc.) directly; no
-     WASM involved.
-   - Server actions: same TS implementation, called from Node or Bun.
-
-3. **Capability-level selection.** `fiducial.toml` `[adapters]` already
-   declares the vendor choice. `fid derive` generates the binding-layer glue
-   for each target from that declaration — the same move as every other
-   pipeline, just the target is code rather than a text file.
-
-**Why this is "multiplying":** every real vendor implementation lands on the
-right abstraction. An architecture retrofitted after Cloudflare is built means
-migrating the Cloudflare adapter, the Supabase adapter, and everything else
-that shipped before the retrofit — exactly the cost-of-delay pattern this
-list exists to avoid.
-
-**What ships in this item:** the contract definition format, the binding-layer
-code generation, and a `none` implementation that works end-to-end across at
-least two targets (Rust native and one TypeScript target). Vendor
-implementations are item 7.
+**Vendor implementations** (Supabase, Neon/Postgres, D1, S3/R2, Resend,
+Sentry) are the next item — *Cloudflare adapter set*.
 
 ### Cloudflare adapter set — *terminal, product-critical* ⬜
 
@@ -415,54 +376,38 @@ Feeds `@fiducial/tokens`, so brand and design system are one source, not two.
 cross-platform themselves for any real platform — be it Rust, WebAssembly,
 web, Svelte, React, whatever."
 
-The current `adapter.rs` is a config validator. It checks that
-`[adapters] database = "supabase"` names a known contract and a selectable
-vendor. That is all it does. A product that declares `database = "d1"` after
-this item ships will be able to call the D1 contract from every target it
-runs on. A product that does so before this item exists will have a
-declaration with nothing behind it.
+**What shipped.** `crates/fiducial-adapters` defines four contracts as Rust
+async traits: `Database`, `Storage`, `Email`, `Diagnostics`. Each uses
+`BoxFuture<'a, T>` — `Pin<Box<dyn Future<...> + Send + 'a>>` — to stay
+object-safe without the `async-trait` crate. `packages/adapters` mirrors each
+as a TypeScript interface with the same method signatures. Both sides ship a
+`None*` no-op implementation (e.g. `NoneDatabase`, `NoneStorage`) so the
+default is always a valid, inert adapter rather than a missing dependency.
 
-**Contract definition.** The first decision is the canonical form. Options:
+`fid add adapters` installs the capability. `fid derive` (the `fid-adapters`
+executor) reads `[adapters]` from `fiducial.toml` and generates
+`src/adapters.generated.ts` — a `createAdapters(env)` factory that returns
+the no-op set by default and is wired to real implementations once vendors are
+selected. The file is checked in and gated by `fid derive --check`, the same
+as every other derived artifact.
 
-| Form | Pros | Cons |
-|---|---|---|
-| Rust trait → derive TS interface | One source; Rust is already the CLI language | TS interface is derived, not authored; editor support is worse |
-| TS interface → derive Rust trait | TS is the browser/edge native; many contract callers will be TS | Requires a codegen step in Rust, which `build.rs` can do but adds build deps |
-| IDL (Protocol Buffers, Cap'n Proto) | Truly language-neutral | Heavy; no existing dep; overkill for 5 contracts |
-| Hand-author both | No dep; explicit | Two declarations of the same fact — exactly what principle 1 prohibits |
+**Contract → toml key mapping:**
 
-The recommended path: **Rust trait as the source, derive the TypeScript
-interface via `tsify` or a bespoke `build.rs` codegen.** The contracts are
-small (3–6 methods each) and stable; a mechanical derivation is fine, and
-Rust already defines the CLI and the validation side.
+| Rust trait | TS interface | `[adapters]` key | No-op |
+|---|---|---|---|
+| `Database` | `Database` | `database` | `NoneDatabase` |
+| `Storage` | `Storage` | `storage` | `NoneStorage` |
+| `Email` | `Email` | `email` | `NoneEmail` |
+| `Diagnostics` | `Diagnostics` | `diagnostics` | `NoneDiagnostics` |
 
-**Binding layer.** The generated glue between a caller and the vendor
-implementation. This is the part that actually differs per target:
+**Firmware boundary.** Cloud adapter contracts do not apply to `no_std`
+firmware. Firmware uses `embedded-hal` / Embassy HAL for peripherals and
+`fiducial-ota` for OTA. `crates/fiducial-adapters/src/firmware.rs` holds the
+full mapping. Tauri bridges both worlds: this crate in the Rust backend,
+`packages/adapters` in the TS frontend, `fiducial-tauri` for serial transport.
 
-- **Native Rust:** a `fn build_database() -> Box<dyn Database>` that reads
-  the selected vendor from config and returns the right implementation. No
-  magic; the same pattern `fid-i18n` uses for executor dispatch.
-- **WASM:** the WASM module imports a JS function that satisfies the
-  contract; the generated TS shim wraps the vendor implementation. The
-  boundary is the WASM import table, not a trait object.
-- **Tauri:** the Rust frontend module exposes Tauri commands that match the
-  contract's methods. The backend Rust implementation is loaded in the
-  Tauri subprocess. A generated command map keeps frontend and backend in
-  sync.
-- **Edge/server TS:** a generated `createDatabase(env: Env): Database`
-  factory that picks the D1, Supabase or no-op implementation. Idiomatic TS;
-  no WASM.
-
-**Code generation.** `fid derive` already generates text files. Generating
-TypeScript and Rust glue is the same mechanism: a pipeline reads
-`[adapters]`, the target list, and the contract definitions, and writes the
-binding layer. The output is checked in and gated by `fid derive --check`,
-exactly like `robots.txt` or a translation catalog.
-
-**Scope of this item:** contract definition format, binding-layer codegen for
-at least Rust-native and TypeScript/edge, `none` implementations that
-compile and run in both environments, and the `fid derive` pipeline that
-generates the glue. Vendor implementations are a separate item.
+**Vendor implementations** (Supabase, Neon/Postgres, Cloudflare D1, S3/R2,
+Resend, Sentry) are the next item — *Cloudflare adapter set*.
 
 ---
 

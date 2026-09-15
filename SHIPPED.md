@@ -378,6 +378,28 @@ built because no product has one yet.
 | 11 unit tests (rendering in `brand.rs`, validation in `config.rs`), 7 end-to-end. Clippy (0 warnings), fmt, full Rust suite and `fid context` all green | ✅ |
 | **Deliberately not done, and said so in `ROADMAP.md` and the capability's own `SKILL.md`:** raster favicons/ICO, OG and Twitter card images, a press kit, social templates, and email themes in the product's own colours. Each needs a rendering step — font shaping, rasterization — this pipeline does not carry, and none has a consumer yet; adding one is a new output name and a new match arm, not a redesign | ✅ |
 
+**Phase 27 — cross-platform adapter architecture ✅ (2026-09-15)**
+
+> Implements the roadmap item **Cross-platform adapter architecture**: Rust async
+> trait contracts, TypeScript interface mirrors, `None*` no-op implementations,
+> and the `fid-adapters` derive executor that generates `src/adapters.generated.ts`
+> from `[adapters]` in `fiducial.toml`.
+> Spec: `ROADMAP.md` § Cross-platform adapter architecture.
+
+| Deliverable | Status |
+| --- | --- |
+| `crates/fiducial-adapters/` — `Database`, `Storage`, `Email`, `Diagnostics` async traits using `BoxFuture<'a, T>` for object-safe async without the `async-trait` crate | ✅ |
+| `NoneDatabase`, `NoneStorage`, `NoneEmail`, `NoneDiagnostics` — no-op implementations suitable for tests, scaffolds, and default wiring | ✅ |
+| `packages/adapters/` — `@fiducial/adapters` TypeScript package mirroring each Rust contract as an interface; sub-path exports (`./database`, `./storage`, `./email`, `./diagnostics`) for tree-shaking | ✅ |
+| `createNoneAdapters()` — builds a full `AdapterSet` of no-ops in one call; the correct default for any test or scaffold | ✅ |
+| `fid add adapters` — installs the `adapters` capability, writing `pipelines/adapters.toml` with executor `fid-adapters` | ✅ |
+| `fid derive` (`fid-adapters` executor) — reads `[adapters]` from `fiducial.toml`, generates `src/adapters.generated.ts` with a typed `createAdapters(env)` factory | ✅ |
+| `fid derive --check` — stale or hand-edited `adapters.generated.ts` fails the gate, same as every other derived artifact | ✅ |
+| `capability/manifest.rs` — `ConfigDeclaration.seed` made optional, so a pipeline can declare it reads a pre-existing scaffold block (like `[adapters]`) without seeding it on install | ✅ |
+| **Firmware boundary documented:** cloud adapter contracts do not apply to `no_std` targets — `embedded-hal` / Embassy / `fiducial-ota` for hardware; Tauri bridges both worlds | ✅ |
+| 5 e2e tests in `adapters_pipeline.rs`: install, derive, import path, stale-file gate, `fid doctor` | ✅ |
+| `cargo test` (all test suites) and `cargo fmt --check` clean | ✅ |
+
 **Phase 22 — i18n: localized by construction ✅ (2026-09-14)**
 
 > Implements the roadmap item **i18n — localized by construction**. Principle
