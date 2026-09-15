@@ -256,8 +256,11 @@ A real bug surfaced in the process, unrelated to Auth itself: `NoneEmail`
 and `NoneDiagnostics` had no explicit constructor, so `new NoneEmail(env)`
 in the generated factory failed to typecheck — unnoticed since Phase 27
 because nothing had ever run `tsc` against a generated
-`adapters.generated.ts`. Fixed; **not** turned into an automated CI check
-this round (a real gap, recorded in the spec rather than silently closed).
+`adapters.generated.ts`. Fixed, and the gap it exposed is **now closed**:
+`pnpm --filter @fiducial/adapters test:generated` derives the factory for
+every vendor selection and compiles it, in its own CI job. Deleting the
+constructor again fails it with `TS2554`. Spec:
+`docs/specs/2026-09-15-generated-code-is-compiled-not-matched.md`.
 
 **Hardened immediately afterward**, and two further defects in the same
 day's work found and fixed — `getSession()` verified nothing, and bearer
