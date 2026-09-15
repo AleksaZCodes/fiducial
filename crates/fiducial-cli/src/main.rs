@@ -5,6 +5,7 @@ mod adapter;
 mod capability;
 mod commands;
 mod config;
+mod context;
 mod guard;
 mod i18n;
 mod lock;
@@ -48,7 +49,7 @@ DOCS
     version,
     propagate_version = true
 )]
-struct Cli {
+pub struct Cli {
     #[command(subcommand)]
     command: Commands,
 }
@@ -419,6 +420,41 @@ AFTERWARDS:
         json: bool,
     },
 
+    /// Regenerate the derivable parts of AGENTS.md / CLAUDE.md
+    #[command(
+        long_about = "\
+Regenerate the blocks of agent context that are facts about this repository.
+
+The layout tree, the command list, the capability list and where the skills live
+are all derivable from the things that decide them — the workspace manifests,
+this binary's own command definitions, the capability registry, the commands
+directory. Written by hand they go stale, and a test that catches that
+afterwards is detection, not sync.
+
+Blocks are marked with HTML comments, so they render as nothing and a file
+without them is left completely alone:
+
+  <!-- fid:begin layout -->
+  <!-- fid:end layout -->
+
+Judgment stays hand-written. Nothing can derive what not to do.",
+        after_long_help = "\
+BLOCKS
+  layout         crates/ and packages/, with each member's own description
+  commands       every `fid` command, from this binary's definition
+  capabilities   every built-in capability and what it contributes
+  skills         where the instructions an agent can load live
+
+EXAMPLES
+  fid context            regenerate every marked block
+  fid context --check    fail when a block is out of date (the CI gate)"
+    )]
+    Context {
+        /// Fail instead of rewriting, for CI
+        #[arg(long)]
+        check: bool,
+    },
+
     /// Check for drift: outdated deps, stale templates, un-applied migrations
     #[command(
         long_about = "\
@@ -497,6 +533,7 @@ fn main() -> Result<()> {
             into,
             json,
         } => commands::harvest::run(&path, name, into, json),
+        Commands::Context { check } => commands::context::run(check),
         Commands::Doctor => commands::doctor::run(),
         Commands::GuardCheck => guard::check_from_stdin(),
     }

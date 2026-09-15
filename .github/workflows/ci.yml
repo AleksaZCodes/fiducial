@@ -153,6 +153,12 @@ jobs:
       - name: Captures match the binary
         run: cargo test -p fiducial-cli --test captures
 
+      # Agent context is derived from the code it describes. Run without
+      # rewriting, so a crate added without regenerating fails here rather than
+      # reaching main as a tree that quietly omits it.
+      - name: Agent context matches the code
+        run: cargo run -p fiducial-cli -- context --check
+
   # ── WASM: wasm-pack build ─────────────────────────────────────────────────
   wasm-pack:
     name: wasm-pack (fiducial-wasm)
