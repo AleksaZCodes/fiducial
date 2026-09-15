@@ -143,8 +143,8 @@ cargo build --workspace
 cargo test --workspace --all-features         # includes the freshness gates
 ```
 
-Two suites run the **real generated schema**, so they need something built
-first and are not part of the default run:
+Three suites run **real generated output**, so they need something built first
+and are not part of the default run:
 
 ```sh
 cargo build -p fiducial-cli --bin fid
@@ -152,12 +152,22 @@ pnpm --filter @fiducial/identity build            # the tests import ../dist
 pnpm --filter @fiducial/identity test:schema      # the schema on real SQLite
 
 PGHOST=localhost PGUSER=postgres PGPASSWORD=postgres scripts/verify-postgres.sh
+
+pnpm --filter @fiducial/adapters build
+pnpm --filter @fiducial/adapters test:generated   # the factory through real tsc
 ```
 
 `test:schema` generates the grants table with the real `fid` binary and runs
 it on `node:sqlite` — D1 *is* SQLite. `verify-postgres.sh` applies the same
-derivation, RLS policies included, to a real PostgreSQL server. The `identity`
-CI job runs both; the generic JS/TS job builds no Rust and cannot.
+derivation, RLS policies included, to a real PostgreSQL server.
+`test:generated` derives `src/adapters.generated.ts` for every vendor selection
+and compiles it with `tsc`. The `identity` and `adapters` CI jobs run them; the
+generic JS/TS job builds no Rust and cannot.
+
+All three exist for one reason: **generated code asserted as text is not
+tested.** A `contains()` check passes on a migration no server will run and on
+a factory no compiler will accept, and both of those shipped here before these
+suites existed.
 
 They are separate scripts rather than part of `pnpm test` because a suite that
 cannot run is worse than one that is named: the first CI run of these failed
@@ -255,10 +265,26 @@ The capabilities this platform ships:
 | `worker-cloudflare` | 1 template file(s) | `fid add capability worker-cloudflare` |
 <!-- fid:end capabilities -->
 
-**Adapters name contracts, not vendors.** Every contract currently implements
-only `none` — a real, working no-op. The vendors each is intended to carry are
-listed as *planned* and cannot be selected, because a selectable name with
-nothing behind it is a promise the platform does not keep.
+**Adapters name contracts, not vendors.** A product picks a vendor per contract
+in `[adapters]`, and every contract ships with `none` — a real, working no-op,
+not a placeholder, which is what makes it cost nothing to wire in on day one.
+
+A name under **Planned** cannot be selected and fails with a message saying so,
+because a selectable name with nothing behind it is a promise the platform does
+not keep. This table is generated from the registry that enforces that rule:
+
+<!-- fid:begin adapters -->
+| Contract | For | Selectable today | Planned |
+|---|---|---|---|
+| `database` | Relational storage: queries, migrations, transactions | `none`, `d1` | `supabase`, `neon`, `postgres` |
+| `storage` | Object storage: put, get, signed URLs | `none`, `r2` | `s3`, `supabase-storage` |
+| `deploy` | Where the product ships and how a release is promoted | `none`, `cloudflare` | `vercel`, `fly` |
+| `email` | Transactional email: send, template, verify a domain | `none` | `resend`, `ses`, `cloudflare-email` |
+| `errors` | Error tracking and diagnostics | `none` | `sentry`, `workers-analytics` |
+| `botProtection` | Bot / abuse challenge verification | `none`, `turnstile` | `recaptcha`, `hcaptcha` |
+| `queue` | Asynchronous job/message queue (producer side) | `none`, `cloudflare-queues` | `sqs` |
+| `auth` | Users and authentication: sign-up, sign-in, sessions | `none`, `supabase` | `clerk`, `auth.js` |
+<!-- fid:end adapters -->
 
 ## Skills this repository authors
 

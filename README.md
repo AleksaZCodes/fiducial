@@ -26,7 +26,38 @@ So: **one declaration, many derivations.** The declaration is typed,
 machine-readable and lives in git. Everything downstream is generated, and
 generated artifacts are never hand-edited.
 
-## What that looks like in practice
+## The shape of the system
+
+Three ideas stacked, and each one exists to make the one above it cheap.
+
+```
+                        ┌───────────────────────────────┐
+   DECLARE              │  board.interface.json         │   typed facts,
+   a fact, once         │  fiducial.toml  ·  messages/  │   inert, in git
+                        └───────────────┬───────────────┘
+                                        │
+                                  fid derive          ← gated by --check
+                                        │
+        ┌───────────────┬───────────────┼───────────────┬───────────────┐
+        ▼               ▼               ▼               ▼               ▼
+   DERIVE          enclosure       TypeScript      wrangler.toml    migrations
+   every artifact  STL · GLB       types           (deploy cfg)     SQL schema
+        │
+        └── never hand-edited · hashed into fiducial.lock · stale ⇒ CI fails
+
+        firmware · desktop · browser · edge · CLI     ← many runtimes
+                          ╲   │   ╱
+   RUN IT ANYWHERE  fiducial-protocol                  ← one waist
+                          ╱   │   ╲
+        USB serial · Web Serial · WebUSB · BLE · LoRa  ← many transports
+```
+
+Logic lives as far down as it can. The `no_std` Rust spine compiles for the host,
+`wasm32`, and two embedded targets **on every commit** — so a behaviour written
+once runs in a browser, on a desktop, at the edge, and on a microcontroller, and
+outlives every framework above it.
+
+## A worked example
 
 ```sh
 cargo install fiducial-cli
@@ -37,7 +68,7 @@ fid derive                 # run every pipeline, hash every output
 fid dash                   # roadmap, decisions, CI, pipelines, freshness
 ```
 
-Declare a board once in `board/board.interface.json`:
+Declare the board once, in `board/board.interface.json`:
 
 ```json
 {
@@ -55,23 +86,161 @@ Then `fid derive` produces — with nobody modelling anything —
 - a printable **STL** and a web-ready **GLB**
 - **TypeScript types** for the same board, for the app that talks to it
 
-Change `width_mm` and every one of those moves. `fid derive --check` fails CI if
-one of them didn't.
+Change `width_mm` to `120.0` and every one of those moves. Until they do,
+`fid derive --check` says so and exits non-zero:
 
-## The shape of the system
+<!-- capture: fid-derive-check-stale.txt -->
+
+```text
+$ fid derive --check
+✗ fid derive --check failed:
+  board/board.interface.json: stale (lock:9d241d22 file:867aeb34) — run `fid derive`
+Error: stale artifacts detected
+```
+
+<!-- /capture -->
+
+That is the whole contract. `fid derive --check` runs in CI, so an artifact that
+did not follow its declaration fails the build instead of shipping.
+
+## What you can add to it
+
+Nothing above is special-cased into the CLI. Each of these is a **capability** —
+a named, versioned extension that contributes declarations, pipelines, guard
+rules and a skill for agents. `fid new` generates none of them; you add what the
+product actually needs.
+
+<!-- fid:begin capabilities -->
+| Capability | Contributes | Install |
+|---|---|---|
+| `adapters` | declares `adapters`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability adapters` |
+| `brand` | declares `brand`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability brand` |
+| `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
+| `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
+| `firmware-rp2040` | 10 template file(s) | `fid add capability firmware-rp2040` |
+| `firmware-stm32` | 9 template file(s) | `fid add capability firmware-stm32` |
+| `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
+| `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
+| `tauri` | 5 template file(s) | `fid add capability tauri` |
+| `web-next` | 8 template file(s) | `fid add capability web-next` |
+| `web-svelte` | 8 template file(s) | `fid add capability web-svelte` |
+| `worker-cloudflare` | 1 template file(s) | `fid add capability worker-cloudflare` |
+<!-- fid:end capabilities -->
+
+Vendors sit behind **adapter contracts**, chosen per product in `[adapters]`.
+Every contract ships with `none` — a real, working no-op, not a placeholder,
+which is what makes it cost nothing to wire in from the first commit. A name
+under *Planned* cannot be selected and fails with a message saying so: a
+selectable name with nothing behind it is a promise the platform does not keep.
+
+<!-- fid:begin adapters -->
+| Contract | For | Selectable today | Planned |
+|---|---|---|---|
+| `database` | Relational storage: queries, migrations, transactions | `none`, `d1` | `supabase`, `neon`, `postgres` |
+| `storage` | Object storage: put, get, signed URLs | `none`, `r2` | `s3`, `supabase-storage` |
+| `deploy` | Where the product ships and how a release is promoted | `none`, `cloudflare` | `vercel`, `fly` |
+| `email` | Transactional email: send, template, verify a domain | `none` | `resend`, `ses`, `cloudflare-email` |
+| `errors` | Error tracking and diagnostics | `none` | `sentry`, `workers-analytics` |
+| `botProtection` | Bot / abuse challenge verification | `none`, `turnstile` | `recaptcha`, `hcaptcha` |
+| `queue` | Asynchronous job/message queue (producer side) | `none`, `cloudflare-queues` | `sqs` |
+| `auth` | Users and authentication: sign-up, sign-in, sessions | `none`, `supabase` | `clerk`, `auth.js` |
+<!-- fid:end adapters -->
+
+Both tables are generated from the registries that enforce them, by
+`fid context`, and CI fails if they drift from the code.
+
+## How you extend it
+
+### A capability is a directory
+
+There is no plugin API to learn and no CLI release to wait for. The **layout is
+the manifest** — `fid` derives the capability from the directory, and a
+third-party capability goes through the same derivation, the same conformance
+checks and the same lock entry as a built-in.
 
 ```
-        firmware · desktop · browser · edge · CLI     ← many runtimes
-                          ╲   │   ╱
-                    fiducial-protocol                  ← one waist
-                          ╱   │   ╲
-        USB serial · Web Serial · WebUSB · BLE · LoRa  ← many transports
+my-capability/
+├── SKILL.md              ← the only required file: how an agent uses this
+├── capability.toml       ← optional: description, guard rules, [config] seed,
+│                           required adapter contracts
+├── declarations/         ← typed facts, installed at the path below this dir
+│   └── messages/en.json
+├── pipelines/
+│   └── i18n.toml         ← name, executor, args, outputs
+└── anything-else         ← a plain template file, copied in, gated by nothing
 ```
 
-Logic lives as far down as it can. The `no_std` Rust spine compiles for the host,
-`wasm32`, and two embedded targets **on every commit** — so a behaviour written
-once runs in a browser, on a desktop, at the edge, and on a microcontroller, and
-outlives every framework above it.
+Scaffold one, then install it from anywhere — a directory, or a git repository
+pinned in `fiducial.lock` at the commit it resolved to:
+
+```sh
+fid capability new my-sensor                    # scaffold the directory above
+
+fid add capability my-sensor --from ./capabilities/my-sensor
+fid add capability stripe    --from git:https://github.com/acme/fid-stripe#v1.2.0
+fid capability check                            # conformance, once installed
+```
+
+One file is a complete capability. The failure mode for an extension system is
+ceremony, so `capability.toml` is optional and a capability without one takes
+its description from the first line of prose in its own skill.
+
+### The four kinds, and why the difference is not cosmetic
+
+| Kind | Is | Example |
+|---|---|---|
+| **Declaration** | a typed fact, written once, inert | `board/board.interface.json`, the `[i18n]` block |
+| **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/eda.toml` |
+| **Adapter** | a swappable vendor behind a fixed contract | `storage = "r2"` |
+| **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
+
+The test for a declaration: *could two different pipelines read this and both be
+correct?* If yes it is a declaration; if it is one tool's config file it is a
+template.
+
+Filing one as another is not a style mistake. A pipeline outside `pipelines/` is
+installed and never runs; a `pipelines/` file listed as a template is installed
+and never gated. `fid capability check` rejects both.
+
+### A pipeline is four lines
+
+```toml
+name     = "enclosure"
+executor = "fid-mesh"
+args     = ["board/board.interface.json"]
+outputs  = [
+  "enclosure/case-base.stl",
+  "enclosure/case-lid.stl",
+  "enclosure/gasket.stl",
+  "enclosure/case.glb",
+]
+```
+
+`outputs` is what makes it gated: `fid derive` hashes each one into
+`fiducial.lock`, and `fid derive --check` fails when a hash no longer matches
+what the declaration implies.
+
+Executors are `shell` and `cargo-test` — which need no platform change at all —
+plus the in-process ones (`fid-validate`, `fid-mesh`, `fid-i18n`, `fid-brand`,
+`fid-deploy`, `fid-identity`, `fid-adapters`). Reach for `shell` first; a new
+in-process executor is warranted only when the work is genuinely a Rust library
+call rather than a tool invocation.
+
+### Adding a vendor to a contract
+
+Implement the contract in `crates/fiducial-adapters` (and its TypeScript mirror
+in `packages/adapters`), then move the vendor from `candidates` to
+`implementations` in `crates/fiducial-cli/src/adapter.rs`. The table above and
+the error message a user sees both derive from that one move.
+
+One place does need the new name: `REAL_VENDORS` in
+`packages/adapters/src/generated-factory.test.js`, which is the list of vendor
+selections CI actually compiles the generated factory for. A vendor missing
+from it is generated and never typechecked, so the suite names itself in that
+comment rather than leaving it to be discovered.
+
+Deeper detail: [`docs/specs/2026-09-15-external-capabilities.md`](./docs/specs/2026-09-15-external-capabilities.md)
+and [`docs/specs/2026-09-14-capability-taxonomy.md`](./docs/specs/2026-09-14-capability-taxonomy.md).
 
 ## Documentation
 
@@ -83,6 +252,7 @@ minutes.
 | Read | For |
 |---|---|
 | [**docs/guides/**](./docs/guides/) | Step-by-step guides for humans and agents |
+| [`AGENTS.md`](./AGENTS.md) | Working here as an agent — layout, rules, build commands |
 | [`MISSION.md`](./MISSION.md) | Why this exists. The tiebreaker for ambiguous decisions. |
 | [`ARCHITECTURE.md`](./ARCHITECTURE.md) | How the layers fit together. |
 | [`STACK.md`](./STACK.md) | Every technology choice, enumerated. |
@@ -97,12 +267,46 @@ Each crate and package carries its own README — start with
 
 ## Repository
 
-| Path | Holds |
-|---|---|
-| `crates/` | 13 Rust members — the `no_std` spine, the pipelines, the `fid` CLI |
-| `firmware/` | A separate Cargo workspace (Embassy; RP2040 + STM32) |
-| `packages/` | 11 JS/TS packages — tokens, transports, component registries |
-| `docs/` | Specs, the protocol, the compatibility matrix |
+`firmware/` is a separate Cargo workspace (Embassy; RP2040 + STM32), and `docs/`
+holds the specs, the protocol and the compatibility matrix. The two workspaces
+this repository builds:
+
+<!-- fid:begin layout -->
+```
+fiducial/
+├── crates/               15 members
+│   ├── fiducial                 Declare each fact once. Derive every artifact from it.
+│   ├── fiducial-adapters        Cross-platform adapter contracts for Fiducial — database, s…
+│   ├── fiducial-cli             fid — the Fiducial platform CLI
+│   ├── fiducial-core            no_std spine: IDs, time primitives, validation, state machi…
+│   ├── fiducial-eda             no_std EDA pipeline types — the BoardInterface schema for b…
+│   ├── fiducial-geometry        no_std geometry for Fiducial: points, tolerance profiles, c…
+│   ├── fiducial-identity        no_std identity spine: one Principal across users, devices…
+│   ├── fiducial-mesh            no_std case generation from a board outline: gasket-sealed…
+│   ├── fiducial-model           no_std Fact, Decision and Pipeline contract types.
+│   ├── fiducial-ota             no_std over-the-air firmware update protocol: signed manife…
+│   ├── fiducial-protocol        no_std transport-agnostic protocol: framing, checksums, seq…
+│   ├── fiducial-quantity        no_std typed quantities with tolerance algebra and assertions.
+│   ├── fiducial-sim             Numerical simulation — ODE integration that runs native (wi…
+│   ├── fiducial-tauri           Serial transport and device discovery for Fiducial Tauri apps.
+│   └── fiducial-wasm            WASM bindings for fiducial-core — browser, edge, and Cloudf…
+└── packages/             14 members
+    ├── adapters                 Cross-platform adapter contracts for Fiducial — database, s…
+    ├── board-schema             TypeScript types for board.interface.json — mirrors the Rus…
+    ├── cli                      fid — the Fiducial platform CLI
+    ├── fiducial                 Declare each fact once. Derive every artifact from it.
+    ├── headless                 Framework-agnostic headless utilities for Fiducial — Result…
+    ├── i18n                     Localized by construction — typed message keys, locale nego…
+    ├── identity                 One identity model across users, devices and services — mir…
+    ├── realtime                 Supabase Realtime typed wrappers — Broadcast, Presence, and…
+    ├── tokens                   Design tokens for Fiducial — OKLCH theme vars, Tailwind v4…
+    ├── transport-web            Web Serial, WebUSB, and BLE transports for Fiducial — same…
+    ├── ui-react                 Fiducial component registry source — React. Use `fid add co…
+    ├── ui-svelte                Fiducial component registry source — Svelte. Use `fid add c…
+    ├── viewer3d-react           React component for rendering Fiducial board GLB files in a…
+    └── wasm-bridge              Generated TypeScript types for the fiducial WASM boundary.
+```
+<!-- fid:end layout -->
 
 ## License
 

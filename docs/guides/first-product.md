@@ -265,10 +265,16 @@ $ fid derive --check
 Now break it deliberately. Open `board/board.interface.json`, change
 `width_mm` to `120.0`, and run `--check` again:
 
+<!-- capture: fid-derive-check-stale.txt -->
+
+```text
+$ fid derive --check
+✗ fid derive --check failed:
+  board/board.interface.json: stale (lock:9d241d22 file:867aeb34) — run `fid derive`
+Error: stale artifacts detected
 ```
-✗ enclosure/case-base.stl — STALE
-  the declaration changed but the artifact was not regenerated
-```
+
+<!-- /capture -->
 
 Non-zero exit. **That is the guarantee.** Not "we generate things" — an artifact
 that has drifted from its declaration cannot reach `main`, because the workflow

@@ -50,6 +50,8 @@ pub enum Block {
     Commands,
     /// Every built-in capability, from the capability registry.
     Capabilities,
+    /// Every adapter contract and the vendors selectable behind it.
+    Adapters,
     /// Where the instructions an agent can load actually live.
     Skills,
 }
@@ -61,6 +63,7 @@ impl Block {
             Self::Layout => "layout",
             Self::Commands => "commands",
             Self::Capabilities => "capabilities",
+            Self::Adapters => "adapters",
             Self::Skills => "skills",
         }
     }
@@ -70,6 +73,7 @@ impl Block {
         Block::Layout,
         Block::Commands,
         Block::Capabilities,
+        Block::Adapters,
         Block::Skills,
     ];
 
@@ -243,6 +247,44 @@ fn render_capabilities() -> String {
     s
 }
 
+/// Every adapter contract, and what can actually sit behind it today.
+///
+/// `AGENTS.md` carried this as prose — *"every contract currently implements
+/// only `none`"* — which was true when it was written and false six vendors
+/// later, once `d1`, `r2`, `cloudflare`, `turnstile`, `cloudflare-queues` and
+/// `supabase` had landed behind it. The distinction that sentence was
+/// protecting is the important one and is kept here: a vendor under
+/// **Selectable today** works, and a vendor under **Planned** cannot be
+/// selected at all. Stating it per contract, from the registry that decides
+/// it, is what a sentence about all eight contracts could never stay right
+/// about for more than one release.
+fn render_adapters() -> String {
+    let mut s = String::new();
+    s.push_str("| Contract | For | Selectable today | Planned |\n|---|---|---|---|\n");
+    for contract in crate::adapter::CONTRACTS {
+        s.push_str(&format!(
+            "| `{}` | {} | {} | {} |\n",
+            contract.name,
+            escape_pipes(contract.description),
+            vendor_list(contract.implementations),
+            vendor_list(contract.candidates),
+        ));
+    }
+    s
+}
+
+/// A contract's vendors as table cell text, or an em-dash when there are none.
+fn vendor_list(vendors: &[&str]) -> String {
+    if vendors.is_empty() {
+        return "—".to_string();
+    }
+    vendors
+        .iter()
+        .map(|v| format!("`{v}`"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// Where the instructions an agent can load actually live.
 fn render_skills(root: &Path) -> Result<String> {
     let mut s = String::new();
@@ -351,6 +393,7 @@ pub fn render_file(root: &Path, rel: &str, command: &clap::Command) -> Result<Op
             Block::Layout => render_layout(root)?,
             Block::Commands => render_commands(command),
             Block::Capabilities => render_capabilities(),
+            Block::Adapters => render_adapters(),
             Block::Skills => render_skills(root)?,
         };
         content = replace_block(&content, &b, &e, &body, rel)?;
@@ -455,6 +498,29 @@ mod tests {
         let err = replace_block(text, &begin("layout"), &end("layout"), "NEW\n", "AGENTS.md")
             .unwrap_err();
         assert!(format!("{err:#}").contains("no matching"), "{err:#}");
+    }
+
+    #[test]
+    fn every_contract_is_rendered_with_none_always_selectable() {
+        let table = render_adapters();
+        for contract in crate::adapter::CONTRACTS {
+            assert!(
+                table.contains(&format!("| `{}` |", contract.name)),
+                "contract `{}` missing from the generated table",
+                contract.name
+            );
+        }
+        // `none` is a real implementation, not a placeholder — if it ever stops
+        // being selectable on every contract, that is a platform change and
+        // this table is how a reader would find out.
+        let rows = table.lines().filter(|l| l.starts_with("| `")).count();
+        assert_eq!(rows, crate::adapter::CONTRACTS.len());
+    }
+
+    #[test]
+    fn a_contract_with_no_candidates_renders_a_dash_rather_than_an_empty_cell() {
+        assert_eq!(vendor_list(&[]), "—");
+        assert_eq!(vendor_list(&["none", "d1"]), "`none`, `d1`");
     }
 
     #[test]
