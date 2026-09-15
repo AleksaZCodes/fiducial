@@ -1,6 +1,6 @@
 # fiducial-adapters
 
-**Cross-platform adapter contracts for Fiducial — database, storage, email, diagnostics.**
+**Cross-platform adapter contracts for Fiducial — database, storage, email, diagnostics, bot protection, queue.**
 
 [![crates.io](https://img.shields.io/crates/v/fiducial-adapters.svg)](https://crates.io/crates/fiducial-adapters)
 
@@ -11,21 +11,27 @@ Resend, Sentry) satisfy the same traits and are swapped in via `fid derive`.
 
 The same contracts exist as TypeScript interfaces in `@fiducial/adapters`
 (`packages/adapters/`). Both sides are kept in sync by design **for the
-contract and the `none` no-op**. Cloudflare's binding-reached vendors — `d1`
-(database) and `r2` (storage), the first two real implementations — exist
-only on the TypeScript side: a D1 or R2 binding is only reachable inside a
-Cloudflare Worker, so there is nothing for a Rust `Database`/`Storage`
-implementation in this crate to bind to yet. See
-`docs/specs/2026-09-15-cloudflare-adapter-set.md`.
+contract and the `none` no-op**. The real vendors that shipped so far — `d1`
+(database), `r2` (storage), `turnstile` (bot protection), `cloudflare-queues`
+(queue) — exist only on the TypeScript side. `d1`, `r2` and
+`cloudflare-queues` are binding-reached: a Cloudflare Workers binding only
+exists inside a Worker, so there is nothing for a Rust implementation in this
+crate to bind to yet. `turnstile` is different — it is a plain HTTPS call,
+reachable from Rust — but every product shape here that submits a form does
+so from TypeScript, so a Rust client has no consumer either. See
+`docs/specs/2026-09-15-cloudflare-adapter-set.md` and
+`docs/specs/2026-09-15-turnstile-and-queues.md`.
 
 ## Contracts
 
-| Contract      | Rust trait     | `[adapters]` key | No-op             |
-|---------------|----------------|------------------|-------------------|
-| Relational DB | `Database`     | `database`       | `NoneDatabase`    |
-| Object store  | `Storage`      | `storage`        | `NoneStorage`     |
-| Transactional email | `Email`  | `email`          | `NoneEmail`       |
-| Error / event tracking | `Diagnostics` | `diagnostics` | `NoneDiagnostics` |
+| Contract               | Rust trait      | `[adapters]` key | No-op                |
+|-------------------------|-----------------|-------------------|-----------------------|
+| Relational DB           | `Database`      | `database`        | `NoneDatabase`        |
+| Object store            | `Storage`       | `storage`         | `NoneStorage`         |
+| Transactional email     | `Email`         | `email`           | `NoneEmail`           |
+| Error / event tracking  | `Diagnostics`   | `errors`          | `NoneDiagnostics`     |
+| Bot / abuse challenge   | `BotProtection` | `botProtection`   | `NoneBotProtection`   |
+| Async queue (producer)  | `Queue`         | `queue`           | `NoneQueue`           |
 
 ## Firmware boundary
 

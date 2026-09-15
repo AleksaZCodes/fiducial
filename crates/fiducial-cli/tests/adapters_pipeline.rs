@@ -74,6 +74,8 @@ fn derive_writes_the_factory_file() {
     assert!(factory.contains("NoneStorage"), "{factory}");
     assert!(factory.contains("NoneEmail"), "{factory}");
     assert!(factory.contains("NoneDiagnostics"), "{factory}");
+    assert!(factory.contains("NoneBotProtection"), "{factory}");
+    assert!(factory.contains("NoneQueue"), "{factory}");
     assert!(
         factory.contains("do not edit"),
         "generated header present: {factory}"
@@ -177,6 +179,33 @@ fn deriving_with_both_d1_and_r2_selected_writes_both_classes() {
     // Contracts nobody selected still fall back to their no-op.
     assert!(factory.contains("NoneEmail"), "{factory}");
     assert!(factory.contains("NoneDiagnostics"), "{factory}");
+}
+
+#[test]
+fn selecting_turnstile_derives_the_real_class() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "botProtection", "turnstile");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("Turnstile"), "{factory}");
+    assert!(
+        factory.contains("@fiducial/adapters/bot-protection"),
+        "{factory}"
+    );
+}
+
+#[test]
+fn selecting_cloudflare_queues_derives_the_real_class() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "queue", "cloudflare-queues");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("CloudflareQueue"), "{factory}");
+    assert!(factory.contains("@fiducial/adapters/queue"), "{factory}");
 }
 
 #[test]

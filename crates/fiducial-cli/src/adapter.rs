@@ -94,6 +94,18 @@ pub static CONTRACTS: &[Contract] = &[
         implementations: &[NONE],
         candidates: &["sentry", "workers-analytics"],
     },
+    Contract {
+        name: "botProtection",
+        description: "Bot / abuse challenge verification",
+        implementations: &[NONE, "turnstile"],
+        candidates: &["recaptcha", "hcaptcha"],
+    },
+    Contract {
+        name: "queue",
+        description: "Asynchronous job/message queue (producer side)",
+        implementations: &[NONE, "cloudflare-queues"],
+        candidates: &["sqs"],
+    },
 ];
 
 /// Look up a contract by name.

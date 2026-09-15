@@ -25,14 +25,28 @@ export { EmailError, NoneEmail } from "./email.js";
 export type { Diagnostics, DiagnosticsLevel } from "./diagnostics.js";
 export { NoneDiagnostics } from "./diagnostics.js";
 
+export type { BotProtection, VerifyOutcome } from "./bot-protection.js";
+export {
+  BotProtectionError,
+  NoneBotProtection,
+  Turnstile,
+} from "./bot-protection.js";
+
+export type { Queue } from "./queue.js";
+export { CloudflareQueue, NoneQueue, QueueError } from "./queue.js";
+
 import type { Database } from "./database.js";
 import type { Storage } from "./storage.js";
 import type { Email } from "./email.js";
 import type { Diagnostics } from "./diagnostics.js";
+import type { BotProtection } from "./bot-protection.js";
+import type { Queue } from "./queue.js";
 import { NoneDatabase } from "./database.js";
 import { NoneStorage } from "./storage.js";
 import { NoneEmail } from "./email.js";
 import { NoneDiagnostics } from "./diagnostics.js";
+import { NoneBotProtection } from "./bot-protection.js";
+import { NoneQueue } from "./queue.js";
 
 /**
  * The full adapter set — one of these per product, built from `[adapters]`
@@ -51,6 +65,8 @@ export interface AdapterSet {
   storage: Storage;
   email: Email;
   diagnostics: Diagnostics;
+  botProtection: BotProtection;
+  queue: Queue;
 }
 
 /**
@@ -66,5 +82,7 @@ export function createNoneAdapters(): AdapterSet {
     storage: new NoneStorage(),
     email: new NoneEmail(),
     diagnostics: new NoneDiagnostics(),
+    botProtection: new NoneBotProtection(),
+    queue: new NoneQueue(),
   };
 }

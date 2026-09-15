@@ -15,6 +15,12 @@ import {
   StorageError,
   NoneEmail,
   NoneDiagnostics,
+  NoneBotProtection,
+  Turnstile,
+  BotProtectionError,
+  NoneQueue,
+  CloudflareQueue,
+  QueueError,
   createNoneAdapters,
 } from '../dist/index.js'
 
@@ -221,6 +227,132 @@ describe('@fiducial/adapters', () => {
     })
   })
 
+  describe('NoneBotProtection', () => {
+    it('always verifies successfully', async () => {
+      const bp = new NoneBotProtection()
+      assert.deepEqual(await bp.verify('any-token'), { success: true })
+    })
+  })
+
+  describe('Turnstile', () => {
+    it('throws when no secret key is present', () => {
+      assert.throws(() => new Turnstile({}), BotProtectionError)
+    })
+
+    it('posts the token and secret, and maps a successful response', async () => {
+      let capturedUrl
+      let capturedBody
+      const fakeFetch = async (url, init) => {
+        capturedUrl = url
+        capturedBody = init.body
+        return {
+          ok: true,
+          async json() {
+            return {
+              success: true,
+              challenge_ts: '2026-09-15T00:00:00Z',
+              hostname: 'example.com',
+            }
+          },
+        }
+      }
+      const t = new Turnstile({ TURNSTILE_SECRET_KEY: 'sekrit' }, fakeFetch)
+      const outcome = await t.verify('tok-123', '203.0.113.1')
+
+      assert.equal(
+        capturedUrl,
+        'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+      )
+      assert.equal(capturedBody.get('secret'), 'sekrit')
+      assert.equal(capturedBody.get('response'), 'tok-123')
+      assert.equal(capturedBody.get('remoteip'), '203.0.113.1')
+      assert.deepEqual(outcome, {
+        success: true,
+        challengeTs: '2026-09-15T00:00:00Z',
+        hostname: 'example.com',
+      })
+    })
+
+    it('maps a failed verification', async () => {
+      const fakeFetch = async () => ({
+        ok: true,
+        async json() {
+          return { success: false, ['error-codes']: ['invalid-input-response'] }
+        },
+      })
+      const t = new Turnstile({ TURNSTILE_SECRET_KEY: 'sekrit' }, fakeFetch)
+      const outcome = await t.verify('bad-token')
+      assert.equal(outcome.success, false)
+    })
+
+    it('throws BotProtectionError on a non-OK HTTP response', async () => {
+      const fakeFetch = async () => ({ ok: false, status: 503 })
+      const t = new Turnstile({ TURNSTILE_SECRET_KEY: 'sekrit' }, fakeFetch)
+      await assert.rejects(() => t.verify('tok'), BotProtectionError)
+    })
+
+    it('throws BotProtectionError when fetch itself rejects', async () => {
+      const fakeFetch = async () => {
+        throw new Error('network down')
+      }
+      const t = new Turnstile({ TURNSTILE_SECRET_KEY: 'sekrit' }, fakeFetch)
+      await assert.rejects(() => t.verify('tok'), BotProtectionError)
+    })
+  })
+
+  describe('NoneQueue', () => {
+    it('send and sendBatch succeed silently', async () => {
+      const q = new NoneQueue()
+      await q.send(new Uint8Array([1]))
+      await q.sendBatch([new Uint8Array([1]), new Uint8Array([2])])
+    })
+  })
+
+  describe('CloudflareQueue', () => {
+    function fakeQueue() {
+      return { sent: [], batches: [],
+        async send(message, options) {
+          this.sent.push({ message, options })
+        },
+        async sendBatch(messages) {
+          this.batches.push([...messages])
+        },
+      }
+    }
+
+    it('throws when no QUEUE binding is present', () => {
+      assert.throws(() => new CloudflareQueue({}), QueueError)
+    })
+
+    it('send passes bytes through with contentType: bytes', async () => {
+      const QUEUE = fakeQueue()
+      const q = new CloudflareQueue({ QUEUE })
+      const body = new Uint8Array([1, 2, 3])
+      await q.send(body)
+      assert.equal(QUEUE.sent.length, 1)
+      assert.equal(QUEUE.sent[0].message, body)
+      assert.deepEqual(QUEUE.sent[0].options, { contentType: 'bytes' })
+    })
+
+    it('sendBatch wraps every message the same way', async () => {
+      const QUEUE = fakeQueue()
+      const q = new CloudflareQueue({ QUEUE })
+      await q.sendBatch([new Uint8Array([1]), new Uint8Array([2])])
+      assert.equal(QUEUE.batches[0].length, 2)
+      assert.equal(QUEUE.batches[0][0].contentType, 'bytes')
+    })
+
+    it('wraps a thrown send error as QueueError', async () => {
+      const QUEUE = {
+        async send() {
+          throw new Error('boom')
+        },
+      }
+      const q = new CloudflareQueue({ QUEUE })
+      await assert.rejects(() => q.send(new Uint8Array([1])), QueueError)
+    })
+  })
+
   describe('createNoneAdapters', () => {
     it('builds a full no-op adapter set', () => {
       const adapters = createNoneAdapters()
@@ -228,6 +360,8 @@ describe('@fiducial/adapters', () => {
       assert.ok(adapters.storage instanceof NoneStorage)
       assert.ok(adapters.email instanceof NoneEmail)
       assert.ok(adapters.diagnostics instanceof NoneDiagnostics)
+      assert.ok(adapters.botProtection instanceof NoneBotProtection)
+      assert.ok(adapters.queue instanceof NoneQueue)
     })
   })
 })

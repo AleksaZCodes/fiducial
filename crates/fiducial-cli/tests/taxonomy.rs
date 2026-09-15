@@ -194,7 +194,7 @@ fn every_contract_is_listed_whether_selected_or_not() {
     let adapters = d["taxonomy"]["adapters"].as_array().unwrap();
     assert_eq!(
         adapters.len(),
-        5,
+        7,
         "every contract is a fact about the product"
     );
     for a in adapters {
@@ -223,6 +223,15 @@ fn contracts_are_discoverable_and_honest_about_what_works() {
     assert!(
         t.contains("selectable: none, r2") && t.contains("planned: s3"),
         "r2 moved from planned to selectable:\n{t}"
+    );
+    // turnstile and cloudflare-queues followed the same seam.
+    assert!(
+        t.contains("selectable: none, turnstile") && t.contains("planned: recaptcha"),
+        "turnstile moved from planned to selectable:\n{t}"
+    );
+    assert!(
+        t.contains("selectable: none, cloudflare-queues") && t.contains("planned: sqs"),
+        "cloudflare-queues moved from planned to selectable:\n{t}"
     );
 }
 

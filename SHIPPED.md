@@ -362,8 +362,8 @@ built because no product has one yet.
 
 **Phase 28 — Cloudflare adapter set: `d1` and `r2` 🟡 (2026-09-15)**
 
-> Implements the first two of seven items in the roadmap's **Cloudflare
-> adapter set**: `d1` and `r2`, the ones that land on a contract *Cross-platform
+> Implements the roadmap item **Cloudflare adapter set**, first two of seven
+> pieces: `d1` and `r2`, the ones that land on a contract *Cross-platform
 > adapter architecture* already shipped. The other five — Workers as `deploy`,
 > Access, Turnstile, Queues, Workers AI — have no contract to attach to and
 > are scoped, not built. Spec:
@@ -383,6 +383,32 @@ built because no product has one yet.
 | `fid capability list --all` — `database`/`storage` now show `selectable: none, d1` / `none, r2` | ✅ |
 | **Deliberately not done, and said so in `ROADMAP.md`, `SHIPPED.md` and the spec**: Workers-as-`deploy` (needs its own design — `deploy` is pipeline-shaped, not a runtime trait), Access, Turnstile, Queues, Workers AI (no contract exists for any of the four, and designing one against zero consumers is the mistake *capability taxonomy, made real* already corrected once), a Rust-side D1/R2 client (would need Cloudflare's HTTP/S3 API over an API token, not a binding — no Tauri product needs it), a working `signedUrl` | ✅ |
 | Clippy (0 warnings), fmt, full Rust suite (all workspace crates) and the new JS test file all green | ✅ |
+
+**Phase 28b — Turnstile and Cloudflare Queues 🟡 (2026-09-15)**
+
+> Implements the roadmap item **Cloudflare adapter set**, two more of seven
+> pieces: `turnstile` (new `botProtection` contract) and `cloudflare-queues`
+> (new `queue` contract). Requested directly by the founder, alongside
+> **Auth** (Supabase-first) and **AI** (conversational/agentic) — both
+> scoped in `ROADMAP.md` but deliberately not built this round, per the
+> founder's own stated build order. Spec:
+> `docs/specs/2026-09-15-turnstile-and-queues.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **Two new contracts** — `BotProtection` (`verify(token, remoteIp?) -> VerifyOutcome`) and `Queue` (`send`/`sendBatch`, producer side only) — Rust traits + `None*` in `fiducial-adapters`, TS interfaces + `None*` in `@fiducial/adapters` | ✅ |
+| `Turnstile` — real `BotProtection`, a plain HTTPS POST to Cloudflare's `siteverify` endpoint authenticated by `env.TURNSTILE_SECRET_KEY` — the first real vendor reached over HTTP rather than a Workers binding | ✅ |
+| `CloudflareQueue` — real `Queue`, reached through `env.QUEUE`; sends with `contentType: "bytes"` so a consumer gets the same `Uint8Array` back instead of Cloudflare's default JSON round-trip | ✅ |
+| **`NoneBotProtection` fails open, documented loudly as a real security default**: `botProtection = "none"` means no protection at all, not "pending" — stated in the doc comment so it cannot be mistaken for a placeholder | ✅ |
+| **No `receive`/consume method on `Queue`, and said why**: Cloudflare Queues deliver by invoking a consumer's exported handler, not by polling — a pull API would misdescribe delivery and have nothing to bind against on the one real vendor this contract has | ✅ |
+| **Both TypeScript-only, for two different reasons, both stated**: `cloudflare-queues` is binding-only (structural, same boundary as `d1`/`r2`); `turnstile` is a plain HTTPS call with no Rust-side consumer yet (not structural) — the crate doc, README and SKILL.md all distinguish the two rather than flattening them into one excuse | ✅ |
+| `run_fid_adapters` refactored from four hand-duplicated import/class/field triples to a loop over `ADAPTER_SLOTS` — going to six contracts by copy-pasting a fifth and sixth block was the signal to generalize | ✅ |
+| `botProtection` and `queue` added to `adapter::CONTRACTS`, straight to `implementations` alongside their one real vendor each | ✅ |
+| **`ROADMAP.md` gains scoped, unbuilt Auth and AI entries** — full-flow Supabase auth with cookie + bearer sessions; conversational/agentic AI with Workers AI reframed as a candidate, not the contract's namesake — recorded so the founder's scoping decisions survive past this conversation, per the file's own stated purpose as the anti-amnesia artifact | ✅ |
+| 8 new Rust unit tests, 11 new TypeScript tests, 2 new end-to-end CLI tests | ✅ |
+| Docs terminal captures regenerated (`fid capability list --all` / `fid dash` now show 7 contracts) | ✅ |
+| Clippy (0 warnings), fmt, full Rust suite (all workspace crates), JS build/typecheck/test/lint all green | ✅ |
+| **Deliberately not done, and said so in `ROADMAP.md` and the spec**: Auth contract + Supabase implementation, AI contract, Rust-side `Turnstile`, a `receive`/consumer API for `Queue`, `recaptcha`/`hcaptcha`/`sqs` implementations | ✅ |
 
 **Phase 26 — brand ✅ (2026-09-15)**
 

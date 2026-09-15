@@ -195,6 +195,8 @@ Capabilities
   deploy         not selected
   email          not selected
   errors         not selected
+  botProtection  not selected
+  queue          not selected
 ```
 
 <!-- /capture -->

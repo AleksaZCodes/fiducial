@@ -197,22 +197,81 @@ D1, R2, Workers, Access, Turnstile, Queues, Workers AI. The first real adapters,
 and the proof that the adapter contract is vendor-neutral rather than a
 Cloudflare-shaped hole.
 
-**Shipped:** `d1` (database) and `r2` (storage) — the two that land on a
-contract already defined. Real `D1Database` / `R2Storage` TypeScript classes,
-selectable in `[adapters]`, wired through `fid derive` exactly as
-`adapter.rs`'s own "adding a vendor" doc describes. Spec:
-`docs/specs/2026-09-15-cloudflare-adapter-set.md`.
+**Shipped:** `d1` (database), `r2` (storage), `turnstile` (botProtection),
+`cloudflare-queues` (queue) — four of seven, each landing on a contract that
+either already existed (`d1`, `r2`) or was designed narrowly for it this
+round (`botProtection`, `queue`). Wired through `fid derive` exactly as
+`adapter.rs`'s own "adding a vendor" doc describes. Specs:
+`docs/specs/2026-09-15-cloudflare-adapter-set.md`,
+`docs/specs/2026-09-15-turnstile-and-queues.md`.
 
 **Not yet:** Workers (as the `deploy` contract, which is currently
-pipeline-shaped, not a runtime trait), Access, Turnstile, Queues, Workers AI —
-none of the last four has a contract to attach to yet, and designing one
-against zero consumers is the mistake *capability taxonomy, made real*
-already named and corrected once.
+pipeline-shaped, not a runtime trait), Access, Workers AI. Access folds into
+the new **Auth** item below rather than staying a Cloudflare-only line —
+Supabase Auth is the priority vendor, not Access. Workers AI folds into the
+new **AI** item below, reframed as one candidate implementation of a
+vendor-neutral contract rather than the contract's namesake.
 
 **Depends on:** cross-platform adapter architecture above.
 
 Low compounding, high product value — correctly placed after the infrastructure
 rather than before it.
+
+### Auth — *terminal, product-critical* ⬜
+
+Users and authentication — named directly by the founder as a priority,
+**Supabase-first**. Scoped 2026-09-15 (`docs/specs/2026-09-15-turnstile-and-queues.md`
+§Context) before building, so the decisions are not re-derived from a chat
+log later:
+
+- **Full flows, not session-verification-only.** The contract covers
+  sign-up, sign-in (password + OAuth), sign-out, password reset, and session
+  read — the product never touches a vendor SDK directly for auth, matching
+  how `database`/`storage` already work. A narrower "who is this request"
+  contract was considered and rejected: it would leave sign-up/sign-in as
+  direct Supabase calls outside the adapter system, so swapping vendors
+  later means rewriting the login UI, not just the adapter.
+- **Two session delivery models, both in scope:** cookie-based SSR (fits
+  web-next/web-svelte, matches Supabase's own SSR helper pattern) and bearer
+  token (fits Tauri or a future mobile client). This decides the contract's
+  method shapes up front rather than discovering mid-implementation that one
+  product shape doesn't fit.
+- **Candidate vendors:** `supabase` (priority), `clerk`, `auth.js` as the
+  contract's `candidates` once it exists.
+
+**Why it is not built yet:** the founder's own build order put Turnstile and
+Queues first, explicitly because Auth is the larger design project and
+deserves dedicated attention rather than being folded into a round whose
+proof point was "small items land fast on an existing shape." Next in line.
+
+### AI — *terminal, product-critical* ⬜
+
+"Some way to run AI on the edge or connect to an internet API" — named
+correcting an earlier framing of this as "Workers AI": the founder was
+explicit that Workers AI specifically might not be the right vendor, and
+the actual need is thinking about **AI apps**, vendor-neutral. Scoped
+2026-09-15, not yet built:
+
+- **Conversational/agentic first.** Streaming chat completion, tool calls,
+  system prompts — shaped like the Anthropic/OpenAI messages API. This is
+  the founder's stated priority use case.
+- **Embeddings/RAG named as a real second use, not this round's.** Turning
+  product data into vectors for retrieval needs its own method and pairs
+  with a vector store this platform does not have either — a second
+  contract or a second method, decided when it has a consumer.
+- **Workers AI is a candidate, not the contract's namesake.** The contract
+  must be designed against the narrowest interface a chat-completion API
+  actually shares across vendors (Anthropic, OpenAI, Workers AI) — the same
+  rule `adapter.rs` already states for `database`/`storage`. Naming the
+  contract after one vendor's product would repeat the mistake this
+  platform's own adapter system exists to avoid.
+
+**Why it is not built yet:** highest design risk of everything discussed in
+this round — model APIs vary more across vendors than storage or database
+APIs do (chat completion vs. embeddings vs. image generation are genuinely
+different shapes), so a first attempt is the likeliest of all these items to
+need a redesign. No product has a concrete AI feature yet to generalize the
+contract from.
 
 ### Legal & compliance — *terminal* ⬜
 
