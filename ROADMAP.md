@@ -53,7 +53,7 @@ make. "I want legal pages" is a decision. "I want a button" is a component.
 | File | Holds | Numbering |
 |---|---|---|
 | `ROADMAP.md` (this) | what is **intended**, and why | items have **names**, not numbers |
-| `SHIPPED.md` | what was **built**, phase by phase | phases are numbered, in build order |
+| `SHIPPED.md` | what was **built**, phase by phase | phases are numbered, in the order they shipped |
 
 They were briefly coupled — roadmap items numbered 22–35 to shadow phase numbers
 — which is a fact declared twice. It breaks the first time one item spans two

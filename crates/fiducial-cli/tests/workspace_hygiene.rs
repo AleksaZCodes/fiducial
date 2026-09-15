@@ -519,11 +519,7 @@ fn no_build_output_is_tracked() {
 /// checks it.
 #[test]
 fn shipped_does_not_state_what_is_next() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(2)
-        .expect("workspace root")
-        .to_path_buf();
+    let root = workspace_root();
     let text = std::fs::read_to_string(root.join("SHIPPED.md")).expect("reading SHIPPED.md");
 
     let offenders: Vec<&str> = text
@@ -543,6 +539,81 @@ fn shipped_does_not_state_what_is_next() {
     );
 }
 
+/// No document sends a reader to `SHIPPED.md` for what is next.
+///
+/// The narrower `shipped_does_not_state_what_is_next` checks headings *inside*
+/// that file, and passed while `README.md`, `docs/guides/README.md` and the
+/// design agent all still described it as "build order and current state". A
+/// file that holds only the record is not much use if three other files say it
+/// holds the plan.
+#[test]
+fn nothing_points_at_shipped_for_what_is_next() {
+    let root = workspace_root();
+    // The specs are the append-only history: they record what *was* true on the
+    // day they were written, and correcting them would be the edit this
+    // project's fourth rule forbids.
+    let skip = ["docs/specs/", "/target/", "node_modules/", "CHANGELOG"];
+
+    let mut offenders: Vec<String> = Vec::new();
+    let mut stack = vec![root.clone()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let shown = path
+                .strip_prefix(&root)
+                .unwrap_or(&path)
+                .to_string_lossy()
+                .replace('\\', "/");
+            if skip.iter().any(|s| shown.contains(s)) || shown.starts_with(".git/") {
+                continue;
+            }
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if path.extension().is_none_or(|e| e != "md") {
+                continue;
+            }
+            let Ok(text) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            for (i, line) in text.lines().enumerate() {
+                let l = line.to_lowercase();
+                if !l.contains("shipped.md") {
+                    continue;
+                }
+                // "looks backwards only … what is next is in ROADMAP.md" is the
+                // correction, not the offence.
+                if l.contains("roadmap.md") {
+                    continue;
+                }
+                if [
+                    "build order",
+                    "current state",
+                    "current phase",
+                    "what's next",
+                    "what is next",
+                ]
+                .iter()
+                .any(|phrase| l.contains(phrase))
+                {
+                    offenders.push(format!("{shown}:{}: {}", i + 1, line.trim()));
+                }
+            }
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "`SHIPPED.md` holds the record; `ROADMAP.md` holds the order of work and \
+         what is next.\n{}",
+        offenders.join("\n")
+    );
+}
+
 /// Every ordered roadmap item carries a status marker.
 ///
 /// `fid dash` counts ⬜ 🟡 ✅ and ignores unmarked prose — deliberately, so a
@@ -551,11 +622,7 @@ fn shipped_does_not_state_what_is_next() {
 /// platform's own roadmap as "5 done, 0 to do".
 #[test]
 fn every_roadmap_item_carries_a_marker() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(2)
-        .expect("workspace root")
-        .to_path_buf();
+    let root = workspace_root();
     let text = std::fs::read_to_string(root.join("ROADMAP.md")).expect("reading ROADMAP.md");
 
     let unmarked: Vec<&str> = text
