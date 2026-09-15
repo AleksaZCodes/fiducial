@@ -1,0 +1,10 @@
+description = "One declaration → favicon, manifest, sitemap, robots.txt, JSON-LD"
+
+# A declaration with no file of its own: a `fiducial.toml` block, seeded with
+# placeholder text so `is_empty` is false and the pipeline this capability
+# also installs does not fail on the very next `fid derive`. Every field here
+# is a fact about one product that this platform cannot decide on its
+# behalf — replace all five before deriving for real.
+[[declarations.config]]
+block = "brand"
+seed = { legal_name = "Example LLC", trading_name = "Example", domain = "example.com", contact_email = "hello@example.com", primary_color = "#0EA5E9", background_color = "#0B1120" }

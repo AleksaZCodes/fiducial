@@ -146,15 +146,30 @@ catching the omission *after the fact*. Doing it here makes every later phase
 cheaper and removes a recurring drift risk, rather than paying the tax six more
 times first.
 
-### Brand — *terminal, high value* ⬜
+### Brand — *terminal, high value* ✅
 
-One declaration → favicons, app icons, OG images, press kit, social templates,
-in-theme email, sitemap, robots.txt, JSON-LD.
+**Complete for the text/data half.** One declaration — `[brand]`: legal name,
+trading name, domain, contact email, two colours — derives a favicon (SVG,
+vector, no rasterizer required), `site.webmanifest`, `robots.txt`,
+`sitemap.xml` and a `schema.org` JSON-LD record, gated by `fid derive --check`
+exactly like every other pipeline.
 
 First capability built entirely on the finished system, which makes it the test
-of whether steps 2–4 actually worked. Unblocks **legal** and the **Claude Design
-bridge**. Feeds `@fiducial/tokens`, so the chain is brand → tokens → every
-registry → Claude Design, one source throughout.
+of whether steps 2–4 actually worked. It is: `[brand]` is a declaration exactly
+like `[i18n]`, seeded the same way, validated field-by-field the same way, and
+`fid-brand` is a fifth executor next to `fid-i18n` and `fid-mesh` with nothing
+new invented.
+
+**Raster favicons, OG/Twitter card images, a press kit, social templates and
+in-theme email are deferred, not built.** Each needs a rendering step — font
+shaping, rasterization — this pipeline does not carry, and none has a consumer
+yet. Adding one is a new output name in `pipelines/brand.toml` and a new
+branch in `fid-brand`'s match, not a redesign of `[brand]` — the same shape of
+extension `fid-mesh` and `fid-i18n` already went through.
+
+Unblocks **legal** and the **Claude Design bridge**. Feeds `@fiducial/tokens`,
+so the chain is brand → tokens → every registry → Claude Design, one source
+throughout — the token feed itself remains future work.
 
 ### Cloudflare adapter set — *terminal, product-critical* ⬜
 

@@ -464,6 +464,81 @@ fn run_fid_i18n(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+// ── Built-in fid-brand executor ───────────────────────────────────────────────
+
+/// One declaration in, a handful of static artifacts out.
+///
+/// `[brand]` in `fiducial.toml` is the declaration; each output is addressed by
+/// **file name**, the same way `fid-mesh` addresses parts by stem — the name
+/// says which artifact, the pipeline's `outputs` says where it lands.
+///
+/// | File name | Derives |
+/// |---|---|
+/// | `robots.txt` | crawler policy pointing at the sitemap |
+/// | `sitemap.xml` | the domain root — a real route list is a router's declaration, not brand's |
+/// | `site.webmanifest` | app name/colours, pointing at the generated favicon |
+/// | `favicon.svg` | a vector mark from the trading name's initials — no rasterizer required |
+/// | `organization.jsonld` | a `schema.org` `Organization` record |
+///
+/// Rendering itself is pure and lives in `crate::brand`; this function is only
+/// I/O — reading the declaration, and writing what it renders.
+fn run_fid_brand(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    let config = Config::load(&working_dir.join(crate::config::CONFIG_FILE))
+        .context("fid-brand needs [brand] in fiducial.toml")?;
+    let brand = &config.brand;
+
+    if brand.is_empty() {
+        bail!(
+            "fid-brand: [brand] is not declared in fiducial.toml.\n\
+             Add [brand] with legal_name, trading_name, domain and contact_email \
+             (the `brand` capability seeds a placeholder — `fid add brand`)."
+        );
+    }
+    brand.validate()?;
+
+    for out in &pipeline.outputs {
+        let path = Path::new(out);
+        let name = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| anyhow::anyhow!("fid-brand: output `{out}` has no file name"))?;
+
+        let content = match name {
+            "robots.txt" => crate::brand::render_robots(&brand.domain),
+            "sitemap.xml" => crate::brand::render_sitemap(&brand.domain),
+            "site.webmanifest" => crate::brand::render_manifest(
+                &brand.trading_name,
+                brand.primary_color(),
+                brand.background_color(),
+            ),
+            "favicon.svg" => crate::brand::render_favicon_svg(
+                &brand.trading_name,
+                brand.primary_color(),
+                brand.background_color(),
+            ),
+            "organization.jsonld" => crate::brand::render_jsonld(
+                &brand.legal_name,
+                &brand.trading_name,
+                &brand.domain,
+                &brand.contact_email,
+            ),
+            other => bail!(
+                "fid-brand: unknown output `{other}` (supported: robots.txt, sitemap.xml, \
+                 site.webmanifest, favicon.svg, organization.jsonld)"
+            ),
+        };
+
+        let abs = working_dir.join(out);
+        if let Some(parent) = abs.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("creating parent for `{out}`"))?;
+        }
+        std::fs::write(&abs, content).with_context(|| format!("writing {out}"))?;
+    }
+
+    Ok(())
+}
+
 // ── Command execution ─────────────────────────────────────────────────────────
 
 fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
@@ -487,9 +562,10 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             "fid-validate" => return run_fid_validate(pipeline, working_dir),
             "fid-mesh" => return run_fid_mesh(pipeline, working_dir),
             "fid-i18n" => return run_fid_i18n(pipeline, working_dir),
+            "fid-brand" => return run_fid_brand(pipeline, working_dir),
             other => bail!(
                 "unknown executor `{other}` \
-                 (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n)"
+                 (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n, fid-brand)"
             ),
         };
 

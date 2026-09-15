@@ -156,6 +156,27 @@ EXAMPLE:
     )]
     I18n,
 
+    /// Add brand — one declaration, favicon/manifest/sitemap/robots/JSON-LD
+    #[command(
+        long_about = "\
+Make this product's identity a declaration instead of scattered files.
+
+Installs `[brand]` in fiducial.toml (legal name, trading name, domain, contact
+email, two colours) and a `fid-brand` pipeline that derives robots.txt,
+sitemap.xml, site.webmanifest, favicon.svg and organization.jsonld from it.
+
+Seeds placeholder text so the pipeline does not fail on the first `fid
+derive` — replace every field before deriving for real.",
+        after_long_help = "\
+EXAMPLE:
+    fid add brand
+    # edit [brand] in fiducial.toml
+    fid derive          # writes robots.txt, sitemap.xml, site.webmanifest,
+                         # favicon.svg, organization.jsonld
+    fid derive --check  # fails if any is missing or stale"
+    )]
+    Brand,
+
     /// Add firmware support for a microcontroller target
     #[command(
         long_about = "\
@@ -228,6 +249,7 @@ pub fn run(target: AddTarget) -> Result<()> {
         }
         AddTarget::Eda => install_capability("eda"),
         AddTarget::I18n => install_capability("i18n"),
+        AddTarget::Brand => install_capability("brand"),
         AddTarget::Capability { id, from } => match from {
             Some(spec) => install_external(&id, &spec),
             None => install_capability(&id),

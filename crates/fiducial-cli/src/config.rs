@@ -27,6 +27,10 @@ pub struct Config {
     /// `[adapters]` — one vendor per contract.
     #[serde(default, skip_serializing_if = "Adapters::is_empty")]
     pub adapters: Adapters,
+    /// Skipped when the product declares no brand, so a product that has not
+    /// added the `brand` capability carries no empty `[brand]` block.
+    #[serde(default, skip_serializing_if = "Brand::is_empty")]
+    pub brand: Brand,
 }
 
 /// `[adapters]` — which implementation satisfies each contract.
@@ -157,6 +161,123 @@ impl I18n {
     }
 }
 
+/// `[brand]` — the one declaration every brand-derived artifact reads.
+///
+/// Legal name, trading name, domain and contact email have no platform
+/// default — they are facts about one product, not a decision this platform
+/// can make on a product's behalf. The `brand` capability seeds them as
+/// placeholder text precisely so `is_empty` is false and the pipeline it
+/// installs does not fail on the very next `fid derive`; `validate` then
+/// catches whichever placeholder a product forgot to replace.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct Brand {
+    #[serde(default)]
+    pub legal_name: String,
+    #[serde(default)]
+    pub trading_name: String,
+    #[serde(default)]
+    pub domain: String,
+    #[serde(default)]
+    pub contact_email: String,
+    #[serde(
+        default = "default_primary_color",
+        skip_serializing_if = "is_default_primary_color"
+    )]
+    pub primary_color: String,
+    #[serde(
+        default = "default_background_color",
+        skip_serializing_if = "is_default_background_color"
+    )]
+    pub background_color: String,
+}
+
+fn default_primary_color() -> String {
+    "#0EA5E9".to_string()
+}
+
+fn is_default_primary_color(c: &str) -> bool {
+    c.is_empty() || c == default_primary_color()
+}
+
+fn default_background_color() -> String {
+    "#0B1120".to_string()
+}
+
+fn is_default_background_color(c: &str) -> bool {
+    c.is_empty() || c == default_background_color()
+}
+
+impl Brand {
+    /// True when the product declares no brand at all.
+    pub fn is_empty(&self) -> bool {
+        self.legal_name.is_empty()
+            && self.trading_name.is_empty()
+            && self.domain.is_empty()
+            && self.contact_email.is_empty()
+    }
+
+    /// The colour to render with, defaulted for a value that round-tripped empty.
+    pub fn primary_color(&self) -> &str {
+        if self.primary_color.is_empty() {
+            "#0EA5E9"
+        } else {
+            &self.primary_color
+        }
+    }
+
+    pub fn background_color(&self) -> &str {
+        if self.background_color.is_empty() {
+            "#0B1120"
+        } else {
+            &self.background_color
+        }
+    }
+
+    /// Every fact the brand pipeline needs is present and well-formed.
+    ///
+    /// Named field by field, like `[i18n] default`'s error, rather than one
+    /// generic "invalid `[brand]`" — an agent fixing this reads it once.
+    pub fn validate(&self) -> Result<()> {
+        let mut missing = Vec::new();
+        if self.legal_name.trim().is_empty() {
+            missing.push("legal_name");
+        }
+        if self.trading_name.trim().is_empty() {
+            missing.push("trading_name");
+        }
+        if self.domain.trim().is_empty() {
+            missing.push("domain");
+        }
+        if self.contact_email.trim().is_empty() {
+            missing.push("contact_email");
+        }
+        if !missing.is_empty() {
+            bail!(
+                "[brand] is missing: {}.\n\
+                 Every brand-derived artifact reads these — fill them in before running `fid derive`.",
+                missing.join(", ")
+            );
+        }
+        for (field, value) in [
+            ("primary_color", self.primary_color()),
+            ("background_color", self.background_color()),
+        ] {
+            if !is_hex_color(value) {
+                bail!("[brand] {field} = \"{value}\" is not a `#RRGGBB` hex colour.");
+            }
+        }
+        Ok(())
+    }
+}
+
+/// `#` followed by exactly six hex digits.
+fn is_hex_color(s: &str) -> bool {
+    let Some(digits) = s.strip_prefix('#') else {
+        return false;
+    };
+    digits.len() == 6 && digits.chars().all(|c| c.is_ascii_hexdigit())
+}
+
 /// Guard configuration — what `fid guard-check` enforces in this product.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Guard {
@@ -208,5 +329,56 @@ impl Config {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod brand_tests {
+    use super::Brand;
+
+    fn filled() -> Brand {
+        Brand {
+            legal_name: "Example LLC".into(),
+            trading_name: "Example".into(),
+            domain: "example.com".into(),
+            contact_email: "hello@example.com".into(),
+            primary_color: String::new(),
+            background_color: String::new(),
+        }
+    }
+
+    #[test]
+    fn a_product_with_no_brand_declared_is_empty() {
+        assert!(Brand::default().is_empty());
+    }
+
+    #[test]
+    fn a_declared_brand_is_not_empty() {
+        assert!(!filled().is_empty());
+    }
+
+    #[test]
+    fn empty_colors_round_trip_to_the_platform_default() {
+        let brand = filled();
+        assert_eq!(brand.primary_color(), "#0EA5E9");
+        assert_eq!(brand.background_color(), "#0B1120");
+        assert!(brand.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_names_every_missing_field_at_once() {
+        let err = Brand::default().validate().unwrap_err();
+        let msg = format!("{err:#}");
+        for field in ["legal_name", "trading_name", "domain", "contact_email"] {
+            assert!(msg.contains(field), "{msg}");
+        }
+    }
+
+    #[test]
+    fn a_malformed_colour_is_named_rather_than_a_generic_error() {
+        let mut brand = filled();
+        brand.primary_color = "blue".into();
+        let err = brand.validate().unwrap_err();
+        assert!(format!("{err:#}").contains("primary_color"));
     }
 }

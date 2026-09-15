@@ -360,6 +360,24 @@ no live CI status (deliberate; would go behind a flag), decisions are listed but
 not read so supersession is undetected, and `briefs` from §10's v0 row is not
 built because no product has one yet.
 
+**Phase 26 — brand ✅ (2026-09-15)**
+
+> Implements the roadmap item **Brand**: one declaration derives a favicon,
+> web manifest, `robots.txt`, `sitemap.xml` and a JSON-LD organization record.
+> Spec: `ROADMAP.md` § Brand.
+
+| Deliverable | Status |
+| --- | --- |
+| `[brand]` in `fiducial.toml` — legal name, trading name, domain, contact email, two hex colours. Empty exactly when a product has not added the capability, like `[i18n]` | ✅ |
+| `brand` capability — seeds a placeholder `[brand]` block so the pipeline it also installs does not fail on the next `fid derive`, the same reason every seeded declaration seeds something | ✅ |
+| `fid-brand` executor — five outputs addressed by **file name**, the same convention `fid-mesh` uses by stem: `robots.txt`, `sitemap.xml`, `site.webmanifest`, `favicon.svg`, `organization.jsonld` | ✅ |
+| **The favicon is SVG, not raster.** Every current browser accepts an SVG favicon, and rendering one is text generation — a rounded square in `primary_color` with the trading name's initials in `background_color` — so the first real derivation needed no image-rendering dependency at all | ✅ |
+| `Brand::validate` names every missing field at once, and names a malformed colour by which field it is — the same shape of error `[i18n] default` gives for a fallback outside the locale set | ✅ |
+| **The gate:** a missing or stale output fails `fid derive --check` exactly like every other pipeline's outputs — no special case for this capability anywhere in `derive.rs` | ✅ |
+| `fid add brand`, alongside the dedicated `fid add eda` / `fid add i18n` subcommands — a first-class roadmap capability gets a named command, not only `fid add capability brand` | ✅ |
+| 11 unit tests (rendering in `brand.rs`, validation in `config.rs`), 7 end-to-end. Clippy (0 warnings), fmt, full Rust suite and `fid context` all green | ✅ |
+| **Deliberately not done, and said so in `ROADMAP.md` and the capability's own `SKILL.md`:** raster favicons/ICO, OG and Twitter card images, a press kit, social templates, and email themes in the product's own colours. Each needs a rendering step — font shaping, rasterization — this pipeline does not carry, and none has a consumer yet; adding one is a new output name and a new match arm, not a redesign | ✅ |
+
 **Phase 22 — i18n: localized by construction ✅ (2026-09-14)**
 
 > Implements the roadmap item **i18n — localized by construction**. Principle

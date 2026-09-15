@@ -217,6 +217,7 @@ The capabilities this platform ships:
 <!-- fid:begin capabilities -->
 | Capability | Contributes | Install |
 |---|---|---|
+| `brand` | declares `brand`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability brand` |
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
 | `firmware-rp2040` | 10 template file(s) | `fid add capability firmware-rp2040` |
 | `firmware-stm32` | 9 template file(s) | `fid add capability firmware-stm32` |

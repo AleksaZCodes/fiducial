@@ -1,0 +1,24 @@
+name     = "brand"
+executor = "fid-brand"
+outputs  = [
+  "public/robots.txt",
+  "public/sitemap.xml",
+  "public/site.webmanifest",
+  "public/favicon.svg",
+  "public/organization.jsonld",
+]
+
+# `[brand]` in fiducial.toml is the declaration. Each output is derived from it
+# by `fid-brand`, addressed by file name — the name says which artifact, this
+# list says where it lands.
+#
+# `public/` is the Next.js static-asset convention. A SvelteKit product should
+# change these five paths to `apps/web/static/…` — the declaration does not
+# move, only where the derivation is written.
+#
+# `fid derive --check` fails when any of these five files is missing or stale
+# against `fiducial.lock`, the same as every other pipeline's outputs.
+#
+# Not yet derived here, deliberately: raster favicons/OG images, a press kit,
+# social templates, and email themes. Those need a rendering step (fonts,
+# rasterization) this pipeline does not carry yet — see ROADMAP.md § Brand.
