@@ -48,6 +48,10 @@ export interface Email {
  * Switching to Resend in production is a config change, not a refactor.
  */
 export class NoneEmail implements Email {
+  // Accepts and ignores `env` so every vendor class in this contract shares
+  // one constructor shape for the generated factory to call uniformly.
+  constructor(_env?: unknown) {}
+
   async send(_message: Message): Promise<string> {
     return "";
   }

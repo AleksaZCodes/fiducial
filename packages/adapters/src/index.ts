@@ -35,6 +35,20 @@ export {
 export type { Queue } from "./queue.js";
 export { CloudflareQueue, NoneQueue, QueueError } from "./queue.js";
 
+// `Auth` is not part of `AdapterSet` — see its own doc comment in auth.ts for
+// why: every other contract here is env-scoped, and a real Auth
+// implementation is request-scoped (it needs a session store bound to the
+// current request's cookies or Authorization header). `createAuth(env, store)`
+// is a separate factory `fid derive` generates alongside `createAdapters(env)`.
+export type { Auth, AuthKeyValueStore, AuthSession, AuthUser } from "./auth.js";
+export {
+  AuthError,
+  BearerKeyValueStore,
+  CookieKeyValueStore,
+  NoneAuth,
+  SupabaseAuth,
+} from "./auth.js";
+
 import type { Database } from "./database.js";
 import type { Storage } from "./storage.js";
 import type { Email } from "./email.js";

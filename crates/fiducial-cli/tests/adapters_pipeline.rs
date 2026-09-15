@@ -76,6 +76,8 @@ fn derive_writes_the_factory_file() {
     assert!(factory.contains("NoneDiagnostics"), "{factory}");
     assert!(factory.contains("NoneBotProtection"), "{factory}");
     assert!(factory.contains("NoneQueue"), "{factory}");
+    assert!(factory.contains("NoneAuth"), "{factory}");
+    assert!(factory.contains("createAuth"), "{factory}");
     assert!(
         factory.contains("do not edit"),
         "generated header present: {factory}"
@@ -179,6 +181,24 @@ fn deriving_with_both_d1_and_r2_selected_writes_both_classes() {
     // Contracts nobody selected still fall back to their no-op.
     assert!(factory.contains("NoneEmail"), "{factory}");
     assert!(factory.contains("NoneDiagnostics"), "{factory}");
+}
+
+#[test]
+fn selecting_supabase_auth_derives_the_real_class() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "auth", "supabase");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("SupabaseAuth"), "{factory}");
+    assert!(factory.contains("@fiducial/adapters/auth"), "{factory}");
+    // createAuth is a separate, request-scoped factory — auth never joins
+    // AdapterSet/createAdapters.
+    assert!(
+        factory.contains("export function createAuth(env: any, store: AuthKeyValueStore)"),
+        "{factory}"
+    );
 }
 
 #[test]

@@ -206,43 +206,49 @@ round (`botProtection`, `queue`). Wired through `fid derive` exactly as
 `docs/specs/2026-09-15-turnstile-and-queues.md`.
 
 **Not yet:** Workers (as the `deploy` contract, which is currently
-pipeline-shaped, not a runtime trait), Access, Workers AI. Access folds into
-the new **Auth** item below rather than staying a Cloudflare-only line —
-Supabase Auth is the priority vendor, not Access. Workers AI folds into the
-new **AI** item below, reframed as one candidate implementation of a
-vendor-neutral contract rather than the contract's namesake.
+pipeline-shaped, not a runtime trait), Access, Workers AI. Access folded
+into the **Auth** item below rather than staying a Cloudflare-only line —
+Supabase Auth shipped there as the priority vendor, not Access. Workers AI
+folds into the **AI** item below, reframed as one candidate implementation
+of a vendor-neutral contract rather than the contract's namesake.
 
 **Depends on:** cross-platform adapter architecture above.
 
 Low compounding, high product value — correctly placed after the infrastructure
 rather than before it.
 
-### Auth — *terminal, product-critical* ⬜
+### Auth — *terminal, product-critical* ✅
 
 Users and authentication — named directly by the founder as a priority,
-**Supabase-first**. Scoped 2026-09-15 (`docs/specs/2026-09-15-turnstile-and-queues.md`
-§Context) before building, so the decisions are not re-derived from a chat
-log later:
+**Supabase-first**. Scoped 2026-09-15 before building
+(`docs/specs/2026-09-15-turnstile-and-queues.md` §Context), then shipped the
+same day: `docs/specs/2026-09-15-auth-contract.md`.
 
-- **Full flows, not session-verification-only.** The contract covers
+- **Full flows, not session-verification-only.** The `Auth` contract covers
   sign-up, sign-in (password + OAuth), sign-out, password reset, and session
   read — the product never touches a vendor SDK directly for auth, matching
-  how `database`/`storage` already work. A narrower "who is this request"
-  contract was considered and rejected: it would leave sign-up/sign-in as
-  direct Supabase calls outside the adapter system, so swapping vendors
-  later means rewriting the login UI, not just the adapter.
-- **Two session delivery models, both in scope:** cookie-based SSR (fits
-  web-next/web-svelte, matches Supabase's own SSR helper pattern) and bearer
-  token (fits Tauri or a future mobile client). This decides the contract's
-  method shapes up front rather than discovering mid-implementation that one
-  product shape doesn't fit.
-- **Candidate vendors:** `supabase` (priority), `clerk`, `auth.js` as the
-  contract's `candidates` once it exists.
+  how `database`/`storage` already work.
+- **Both session delivery models shipped:** `CookieKeyValueStore` (web-next/
+  web-svelte, real PKCE support across the OAuth redirect) and
+  `BearerKeyValueStore` (Tauri or a future mobile client — cannot carry PKCE
+  state across a redirect without a cookie, so OAuth methods throw clearly
+  under it rather than silently losing the verifier; a bearer client does
+  OAuth directly against Supabase instead).
+- **`auth` is not a field on `AdapterSet`.** Every other contract's real
+  vendor is env-scoped; a real `Auth` needs a request-scoped session store.
+  `createAuth(env, store)` is a second factory in the same generated file
+  rather than a seventh `AdapterSet` field that would corrupt the uniform
+  `new {Class}(env)` shape the other six rely on.
+- **`supabase` real, TypeScript-only** — same non-structural reason
+  `turnstile` is: a plain HTTPS API, but no Rust-reachable consumer yet.
+  `clerk`, `auth.js` remain `candidates`.
 
-**Why it is not built yet:** the founder's own build order put Turnstile and
-Queues first, explicitly because Auth is the larger design project and
-deserves dedicated attention rather than being folded into a round whose
-proof point was "small items land fast on an existing shape." Next in line.
+A real bug surfaced in the process, unrelated to Auth itself: `NoneEmail`
+and `NoneDiagnostics` had no explicit constructor, so `new NoneEmail(env)`
+in the generated factory failed to typecheck — unnoticed since Phase 27
+because nothing had ever run `tsc` against a generated
+`adapters.generated.ts`. Fixed; **not** turned into an automated CI check
+this round (a real gap, recorded in the spec rather than silently closed).
 
 ### AI — *terminal, product-critical* ⬜
 

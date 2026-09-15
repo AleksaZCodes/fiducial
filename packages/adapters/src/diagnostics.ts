@@ -32,6 +32,10 @@ export interface Diagnostics {
  * is a config change, not a refactor.
  */
 export class NoneDiagnostics implements Diagnostics {
+  // Accepts and ignores `env` so every vendor class in this contract shares
+  // one constructor shape for the generated factory to call uniformly.
+  constructor(_env?: unknown) {}
+
   captureError(_error: unknown, _context?: string): void {}
   captureMessage(_level: DiagnosticsLevel, _message: string): void {}
 }

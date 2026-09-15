@@ -106,6 +106,12 @@ pub static CONTRACTS: &[Contract] = &[
         implementations: &[NONE, "cloudflare-queues"],
         candidates: &["sqs"],
     },
+    Contract {
+        name: "auth",
+        description: "Users and authentication: sign-up, sign-in, sessions",
+        implementations: &[NONE, "supabase"],
+        candidates: &["clerk", "auth.js"],
+    },
 ];
 
 /// Look up a contract by name.

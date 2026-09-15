@@ -21,6 +21,11 @@ import {
   NoneQueue,
   CloudflareQueue,
   QueueError,
+  NoneAuth,
+  AuthError,
+  CookieKeyValueStore,
+  BearerKeyValueStore,
+  SupabaseAuth,
   createNoneAdapters,
 } from '../dist/index.js'
 
@@ -350,6 +355,288 @@ describe('@fiducial/adapters', () => {
       }
       const q = new CloudflareQueue({ QUEUE })
       await assert.rejects(() => q.send(new Uint8Array([1])), QueueError)
+    })
+  })
+
+  describe('NoneAuth', () => {
+    it('signUp, signIn, signInWithOAuth, exchangeCodeForSession, resetPasswordForEmail, updatePassword all throw', async () => {
+      const auth = new NoneAuth()
+      await assert.rejects(() => auth.signUp('a@example.com', 'pw'), AuthError)
+      await assert.rejects(() => auth.signIn('a@example.com', 'pw'), AuthError)
+      await assert.rejects(() => auth.signInWithOAuth('google', 'https://x'), AuthError)
+      await assert.rejects(() => auth.exchangeCodeForSession('code'), AuthError)
+      await assert.rejects(
+        () => auth.resetPasswordForEmail('a@example.com', 'https://x'),
+        AuthError,
+      )
+      await assert.rejects(() => auth.updatePassword('new-pw'), AuthError)
+    })
+
+    it('signOut succeeds silently and getSession reports signed out', async () => {
+      const auth = new NoneAuth()
+      await auth.signOut()
+      assert.equal(await auth.getSession(), null)
+    })
+  })
+
+  describe('CookieKeyValueStore', () => {
+    function fakeCookies() {
+      const jar = new Map()
+      return {
+        jar,
+        get(name) {
+          return jar.get(name)
+        },
+        set(name, value, options) {
+          jar.set(name, value)
+          this.lastOptions = options
+        },
+        delete(name) {
+          jar.delete(name)
+        },
+      }
+    }
+
+    it('getItem reads from the cookie jar, or null when absent', () => {
+      const cookies = fakeCookies()
+      const store = new CookieKeyValueStore(cookies)
+      assert.equal(store.getItem('missing'), null)
+      cookies.jar.set('k', 'v')
+      assert.equal(store.getItem('k'), 'v')
+    })
+
+    it('setItem writes through with httpOnly/secure defaults', () => {
+      const cookies = fakeCookies()
+      const store = new CookieKeyValueStore(cookies)
+      store.setItem('k', 'v')
+      assert.equal(cookies.jar.get('k'), 'v')
+      assert.equal(cookies.lastOptions.httpOnly, true)
+      assert.equal(cookies.lastOptions.secure, true)
+    })
+
+    it('removeItem deletes from the jar', () => {
+      const cookies = fakeCookies()
+      const store = new CookieKeyValueStore(cookies)
+      cookies.jar.set('k', 'v')
+      store.removeItem('k')
+      assert.ok(!cookies.jar.has('k'))
+    })
+  })
+
+  describe('BearerKeyValueStore', () => {
+    it('fromAuthorizationHeader extracts the bearer token', () => {
+      const store = BearerKeyValueStore.fromAuthorizationHeader('Bearer abc123')
+      assert.equal(store.getItem('sb-access-token'), 'abc123')
+    })
+
+    it('fromAuthorizationHeader with no header is empty', () => {
+      const store = BearerKeyValueStore.fromAuthorizationHeader(null)
+      assert.equal(store.getItem('sb-access-token'), null)
+    })
+
+    it('setItem/getItem/removeItem round-trip in memory', () => {
+      const store = new BearerKeyValueStore()
+      store.setItem('k', 'v')
+      assert.equal(store.getItem('k'), 'v')
+      store.removeItem('k')
+      assert.equal(store.getItem('k'), null)
+    })
+  })
+
+  describe('SupabaseAuth', () => {
+    function fakeSupabaseClient(overrides = {}) {
+      return {
+        auth: {
+          async signUp() {
+            return { data: { session: fakeSession(), user: fakeUser() }, error: null }
+          },
+          async signInWithPassword() {
+            return { data: { session: fakeSession(), user: fakeUser() }, error: null }
+          },
+          async signInWithOAuth() {
+            return { data: { url: 'https://provider.example/authorize' }, error: null }
+          },
+          async exchangeCodeForSession() {
+            return { data: { session: fakeSession(), user: fakeUser() }, error: null }
+          },
+          async signOut() {
+            return { error: null }
+          },
+          async getSession() {
+            return { data: { session: fakeSession() }, error: null }
+          },
+          async resetPasswordForEmail() {
+            return { error: null }
+          },
+          async updateUser() {
+            return { error: null }
+          },
+          ...overrides,
+        },
+      }
+    }
+
+    function fakeUser() {
+      return {
+        id: 'user-1',
+        email: 'a@example.com',
+        email_confirmed_at: '2026-01-01T00:00:00Z',
+        created_at: '2026-01-01T00:00:00Z',
+      }
+    }
+
+    function fakeSession() {
+      return {
+        access_token: 'access-tok',
+        refresh_token: 'refresh-tok',
+        expires_at: 9999999999,
+        user: fakeUser(),
+      }
+    }
+
+    function env() {
+      return { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_ANON_KEY: 'anon-key' }
+    }
+
+    function cookieStore() {
+      const jar = new Map()
+      return new CookieKeyValueStore({
+        get: (n) => jar.get(n),
+        set: (n, v) => jar.set(n, v),
+        delete: (n) => jar.delete(n),
+      })
+    }
+
+    it('throws when env is missing SUPABASE_URL/SUPABASE_ANON_KEY', () => {
+      assert.throws(() => new SupabaseAuth({}, cookieStore(), fakeSupabaseClient), AuthError)
+    })
+
+    it('signUp maps the returned session', async () => {
+      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      const session = await auth.signUp('a@example.com', 'pw')
+      assert.equal(session.accessToken, 'access-tok')
+      assert.equal(session.user.email, 'a@example.com')
+      assert.equal(session.user.emailVerified, true)
+    })
+
+    it('signUp throws when email confirmation is pending (no session)', async () => {
+      const client = fakeSupabaseClient({
+        async signUp() {
+          return { data: { session: null, user: fakeUser() }, error: null }
+        },
+      })
+      const auth = new SupabaseAuth(env(), cookieStore(), () => client)
+      await assert.rejects(() => auth.signUp('a@example.com', 'pw'), AuthError)
+    })
+
+    it('signIn maps the returned session', async () => {
+      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      const session = await auth.signIn('a@example.com', 'pw')
+      assert.equal(session.refreshToken, 'refresh-tok')
+    })
+
+    it('signIn with invalid credentials maps to a clear AuthError', async () => {
+      const client = fakeSupabaseClient({
+        async signInWithPassword() {
+          return {
+            data: { session: null, user: null },
+            error: { message: 'Invalid login credentials', status: 400 },
+          }
+        },
+      })
+      const auth = new SupabaseAuth(env(), cookieStore(), () => client)
+      await assert.rejects(() => auth.signIn('a@example.com', 'wrong'), (err) => {
+        assert.ok(err instanceof AuthError)
+        assert.match(err.message, /invalid credentials/)
+        return true
+      })
+    })
+
+    it('signIn rate-limited maps to a clear AuthError', async () => {
+      const client = fakeSupabaseClient({
+        async signInWithPassword() {
+          return {
+            data: { session: null, user: null },
+            error: { message: 'too many requests', status: 429 },
+          }
+        },
+      })
+      const auth = new SupabaseAuth(env(), cookieStore(), () => client)
+      await assert.rejects(() => auth.signIn('a@example.com', 'pw'), /rate limited/)
+    })
+
+    it('signInWithOAuth returns the redirect URL under a cookie store', async () => {
+      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      const { url } = await auth.signInWithOAuth('google', 'https://app.example/callback')
+      assert.equal(url, 'https://provider.example/authorize')
+    })
+
+    it('signInWithOAuth throws under a bearer store', async () => {
+      const auth = new SupabaseAuth(
+        env(),
+        new BearerKeyValueStore(),
+        () => fakeSupabaseClient(),
+      )
+      await assert.rejects(
+        () => auth.signInWithOAuth('google', 'https://app.example/callback'),
+        AuthError,
+      )
+    })
+
+    it('exchangeCodeForSession maps the session under a cookie store', async () => {
+      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      const session = await auth.exchangeCodeForSession('code-123')
+      assert.equal(session.accessToken, 'access-tok')
+    })
+
+    it('exchangeCodeForSession throws under a bearer store', async () => {
+      const auth = new SupabaseAuth(
+        env(),
+        new BearerKeyValueStore(),
+        () => fakeSupabaseClient(),
+      )
+      await assert.rejects(() => auth.exchangeCodeForSession('code-123'), AuthError)
+    })
+
+    it('signOut calls through and resolves', async () => {
+      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      await auth.signOut()
+    })
+
+    it('getSession returns null when the client reports none', async () => {
+      const client = fakeSupabaseClient({
+        async getSession() {
+          return { data: { session: null }, error: null }
+        },
+      })
+      const auth = new SupabaseAuth(env(), cookieStore(), () => client)
+      assert.equal(await auth.getSession(), null)
+    })
+
+    it('getSession maps a present session', async () => {
+      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      const session = await auth.getSession()
+      assert.equal(session.user.id, 'user-1')
+    })
+
+    it('resetPasswordForEmail calls through', async () => {
+      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      await auth.resetPasswordForEmail('a@example.com', 'https://app.example/reset')
+    })
+
+    it('updatePassword calls through', async () => {
+      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      await auth.updatePassword('new-password')
+    })
+
+    it('propagates a generic vendor error', async () => {
+      const client = fakeSupabaseClient({
+        async signOut() {
+          return { error: { message: 'network blip' } }
+        },
+      })
+      const auth = new SupabaseAuth(env(), cookieStore(), () => client)
+      await assert.rejects(() => auth.signOut(), /network blip/)
     })
   })
 

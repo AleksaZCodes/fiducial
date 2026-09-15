@@ -197,6 +197,7 @@ Capabilities
   errors         not selected
   botProtection  not selected
   queue          not selected
+  auth           not selected
 ```
 
 <!-- /capture -->

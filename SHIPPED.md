@@ -405,10 +405,34 @@ built because no product has one yet.
 | `run_fid_adapters` refactored from four hand-duplicated import/class/field triples to a loop over `ADAPTER_SLOTS` — going to six contracts by copy-pasting a fifth and sixth block was the signal to generalize | ✅ |
 | `botProtection` and `queue` added to `adapter::CONTRACTS`, straight to `implementations` alongside their one real vendor each | ✅ |
 | **`ROADMAP.md` gains scoped, unbuilt Auth and AI entries** — full-flow Supabase auth with cookie + bearer sessions; conversational/agentic AI with Workers AI reframed as a candidate, not the contract's namesake — recorded so the founder's scoping decisions survive past this conversation, per the file's own stated purpose as the anti-amnesia artifact | ✅ |
-| 8 new Rust unit tests, 11 new TypeScript tests, 2 new end-to-end CLI tests | ✅ |
+| 6 new Rust unit tests, 11 new TypeScript tests, 2 new end-to-end CLI tests | ✅ |
 | Docs terminal captures regenerated (`fid capability list --all` / `fid dash` now show 7 contracts) | ✅ |
 | Clippy (0 warnings), fmt, full Rust suite (all workspace crates), JS build/typecheck/test/lint all green | ✅ |
 | **Deliberately not done, and said so in `ROADMAP.md` and the spec**: Auth contract + Supabase implementation, AI contract, Rust-side `Turnstile`, a `receive`/consumer API for `Queue`, `recaptcha`/`hcaptcha`/`sqs` implementations | ✅ |
+
+**Phase 29 — Auth: full flows, Supabase-first ✅ (2026-09-15)**
+
+> Implements the roadmap item **Auth** — the founder's stated top priority,
+> scoped in Phase 28b and built the same day. Closes out the Cloudflare
+> adapter set's Access line by replacing it with a vendor-neutral contract
+> whose priority vendor is Supabase. Spec:
+> `docs/specs/2026-09-15-auth-contract.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **Seventh adapter contract, `Auth`**: `signUp`, `signIn`, `signInWithOAuth`, `exchangeCodeForSession`, `signOut`, `getSession`, `resetPasswordForEmail`, `updatePassword` — Rust trait + `NoneAuth` in `fiducial-adapters`, TS interface + `NoneAuth` + real `SupabaseAuth` in `@fiducial/adapters` | ✅ |
+| **`NoneAuth` fails loudly, not silently** — every write throws, unlike almost every other `None*` type in this system: `auth = "none"` means no auth is configured, and a product should find that out on the first sign-in attempt, not ship believing it has working authentication | ✅ |
+| **`auth` is not a field on `AdapterSet`** — every other contract's vendor is env-scoped; a real `Auth` needs a request-scoped session store. `createAuth(env, store)` is a second, honestly-different factory `fid derive` emits in the same generated file, documented inline so it does not read as an oversight | ✅ |
+| `AuthKeyValueStore` — mirrors `@supabase/supabase-js`'s own `SupportedStorage` extension point exactly, rather than depending on `@supabase/ssr`'s heavier chunked-cookie format built for a larger payload than this contract needs | ✅ |
+| `CookieKeyValueStore` — real PKCE support across the OAuth redirect/callback round trip (web-next/web-svelte) | ✅ |
+| `BearerKeyValueStore` — in-memory, request-lifetime (Tauri / future mobile). **Cannot** carry PKCE state across a redirect without a cookie, so `signInWithOAuth`/`exchangeCodeForSession` throw a clear `AuthError` under it instead of silently losing the verifier; a bearer client does OAuth directly against Supabase and hands this API the resulting session instead | ✅ |
+| `SupabaseAuth` — wraps the plain `@supabase/supabase-js` client (not `@supabase/ssr`) with `storage`/`persistSession`/`flowType: "pkce"` wired to the injected store; errors mapped through `throwIfError` into named `AuthError`s (invalid credentials, rate limited) the same shape `DatabaseError`/`EmailError` already use | ✅ |
+| **Real bug found and fixed, unrelated to Auth**: `NoneEmail`/`NoneDiagnostics` had no explicit constructor, so `new NoneEmail(env)` in the generated factory failed to typecheck under `strict` — invisible since Phase 27 because nothing had ever run real `tsc` against a generated `adapters.generated.ts`, only string `contains()` checks. Fixed; verified by hand against a scaffold with every real vendor selected (zero errors) | ✅ |
+| `auth` added to `adapter::CONTRACTS`, straight to `implementations` with `supabase` | ✅ |
+| 7 new Rust unit tests, 24 new TypeScript tests, 1 new end-to-end CLI test | ✅ |
+| Docs terminal captures regenerated (`fid capability list --all` / `fid dash` now show 8 contracts) | ✅ |
+| Clippy (0 warnings), fmt, full Rust suite (all workspace crates), JS build/typecheck/test/lint all green | ✅ |
+| **Deliberately not done, and said so in `ROADMAP.md` and the spec**: an automated CI typecheck of the generated factory (the bug above was caught by hand, not by a new test — a real, recorded gap), Clerk/Auth.js implementations, a Rust-side `SupabaseAuth`, multi-factor auth, magic links, organizations | ✅ |
 
 **Phase 26 — brand ✅ (2026-09-15)**
 

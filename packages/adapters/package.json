@@ -1,7 +1,7 @@
 {
   "name": "@fiducial/adapters",
   "version": "0.1.0",
-  "description": "Cross-platform adapter contracts for Fiducial — database, storage, email, diagnostics, bot protection, queue.",
+  "description": "Cross-platform adapter contracts for Fiducial — database, storage, email, diagnostics, bot protection, queue, auth.",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
   "repository": {
@@ -39,6 +39,10 @@
     "./queue": {
       "import": "./dist/queue.js",
       "types": "./dist/queue.d.ts"
+    },
+    "./auth": {
+      "import": "./dist/auth.js",
+      "types": "./dist/auth.d.ts"
     }
   },
   "files": ["dist", "README.md"],
@@ -47,6 +51,9 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "node --test src/adapters.test.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.116.0"
   },
   "devDependencies": {
     "typescript": "catalog:"

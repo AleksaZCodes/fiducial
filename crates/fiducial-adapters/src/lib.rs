@@ -18,6 +18,7 @@
 //! | `Diagnostics`    | `errors`          |
 //! | `BotProtection`  | `botProtection`   |
 //! | `Queue`          | `queue`           |
+//! | `Auth`           | `auth`            |
 //! | (n/a)            | `deploy`          |
 //!
 //! `deploy` is a build-time/pipeline concern, not a runtime call — no trait.
@@ -38,8 +39,10 @@
 //!    and *is* reachable from Rust, but has no Rust-side implementation
 //!    either — every product shape here that submits a form does so from
 //!    TypeScript (a Next.js/SvelteKit server action or a Worker), so a Rust
-//!    client would have no consumer. Add one here only when something in
-//!    Rust can actually reach, and would actually use, the vendor.
+//!    client would have no consumer. `supabase` (auth) is the same story: a
+//!    plain HTTPS API, no Rust consumer yet. Add one here only when
+//!    something in Rust can actually reach, and would actually use, the
+//!    vendor.
 //! 2. Add the vendor key to `CONTRACTS` in `fiducial-cli/src/adapter.rs`
 //!    (move it from `candidates` to `implementations`).
 //! 3. Update the `fid-adapters` executor in `derive.rs` to emit the import.
@@ -48,6 +51,7 @@
 
 use std::{future::Future, pin::Pin};
 
+pub mod auth;
 pub mod bot_protection;
 pub mod database;
 pub mod diagnostics;
@@ -56,6 +60,7 @@ pub mod firmware;
 pub mod queue;
 pub mod storage;
 
+pub use auth::{Auth, AuthError, AuthSession, AuthUser, NoneAuth};
 pub use bot_protection::{BotProtection, BotProtectionError, NoneBotProtection, VerifyOutcome};
 pub use database::{Database, DatabaseError, NoneDatabase};
 pub use diagnostics::{Diagnostics, DiagnosticsError, NoneDiagnostics};
