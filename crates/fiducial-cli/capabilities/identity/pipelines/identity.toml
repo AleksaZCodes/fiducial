@@ -1,0 +1,18 @@
+name     = "identity"
+executor = "fid-identity"
+outputs  = ["migrations/0001_grants.sql"]
+
+# The grants table is a derivation of the identity model.
+#
+# Its CHECK constraints are the `Principal`, `Resource` and `Role` variants
+# themselves — so adding a role and forgetting the migration is not something
+# that can happen quietly; `fid derive --check` fails instead.
+#
+# SQLite dialect, because D1 is SQLite and D1 is the one real `database`
+# vendor. A Postgres vendor would add a dialect to the executor rather than a
+# second hand-written file.
+#
+# THIS IS NOT A MIGRATIONS SYSTEM. It generates the first table. The moment
+# the schema changes you need ordering, idempotency and drift detection
+# against a live database, and none of that exists yet — see
+# `docs/specs/2026-09-15-grant-storage.md`.

@@ -434,6 +434,27 @@ built because no product has one yet.
 | Clippy (0 warnings), fmt, full Rust suite (all workspace crates), JS build/typecheck/test/lint all green | ✅ |
 | **Deliberately not done, and said so in `ROADMAP.md` and the spec**: an automated CI typecheck of the generated factory (the bug above was caught by hand, not by a new test — a real, recorded gap), Clerk/Auth.js implementations, a Rust-side `SupabaseAuth`, multi-factor auth, magic links, organizations | ✅ |
 
+**Phase 31 — grant storage ✅ (2026-09-15)**
+
+> Implements the roadmap item **Identity at every level**'s open half: the
+> permission rows `can()` reads. Identity shipped as a rule with no
+> persistence, which made it unusable — `can()` took a list nothing produced.
+> Spec: `docs/specs/2026-09-15-grant-storage.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **`SqlGrantStore` is a consumer of the `database` contract, not a ninth contract beside it** — it calls only `query`/`execute`, so it works on D1 today and any future database vendor free. Permissions are not vendor-shaped: there is no "Supabase permissions" vs "D1 permissions", there are rows in whatever database you already picked | ✅ |
+| Takes the database **structurally** (`{ query, execute }`, not an imported `Database`), so `@fiducial/identity` still depends on nothing — same move as `principalFromSession` taking an id rather than an `AuthSession` | ✅ |
+| **The schema is derived from the identity model**: `fid derive` writes `migrations/0001_grants.sql` whose `CHECK` lists *are* the `Principal`/`Resource`/`Role` variants. Add a role and forget the migration → `fid derive --check` fails, instead of a table that silently rejects the new value in production | ✅ |
+| **Two runtime rules enforced by the schema too**: `anonymous` is absent from `principal_kind`'s CHECK, and `principal_id GLOB '*[^0]*'` refuses an all-zero sentinel — so an unprovisioned device cannot hold a grant as "device zero", an identity every unprovisioned device shares. Deliberate double-enforcement, both derived from one model so they cannot disagree | ✅ |
+| `grantsFor` / `grantsOn` / `grant` / `revoke`; one role per (principal, resource) via `ON CONFLICT … DO UPDATE`, with platform-scoped grants as separate rows so `effectiveRole` takes the stronger | ✅ |
+| `MemoryGrantStore` — a real implementation for tests and seeded products, run against the **same suite** as the SQL one, because a difference between them is a bug in whichever one production is not using | ✅ |
+| **Tested against real SQLite (`node:sqlite`) on the real generated schema** — D1 *is* SQLite, so it is the same engine and the same DDL a deployed product runs. The schema is not a checked-in copy: the suite shells out to the real `fid` binary and reads what `fid derive` produced | ✅ |
+| **Verified adversarially:** renaming one column in the store (`principal_id` → `principal_uid`) fails 10 of 35 tests. Against a mocked database every query "works" — a typo'd column, a broken `ON CONFLICT`, a `CHECK` that rejects nothing — which is the failure mode this test design exists to avoid | ✅ |
+| `[identity] table` — the one fact the model cannot imply. It reaches SQL by interpolation (a parameter cannot bind an identifier), so it is validated as an identifier in **both** the executor and `SqlGrantStore`; `table = "grants; DROP TABLE users"` is refused at derive time | ✅ |
+| 35 TypeScript tests, 8 end-to-end CLI tests; the `identity` CI job now builds `fid` first because the schema tests use the real one | ✅ |
+| **Deliberately not done, and the pipeline's own comment says so in capitals:** this is **not a migrations system** — it generates the first table; schema *change* needs ordering, idempotency and drift detection against a live database. Also no Rust counterpart (`no_std`, a device cannot run SQL — it receives grants rather than querying), no expiry, delegation, audit log or caching | ✅ |
+
 **Phase 30 — deploy config is derived ✅ (2026-09-15)**
 
 > Implements the roadmap item **Cloudflare adapter set**'s last Cloudflare

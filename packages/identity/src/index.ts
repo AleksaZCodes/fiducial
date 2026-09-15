@@ -216,3 +216,8 @@ export function principalFromSession(
   if (!session?.user?.id) return ANONYMOUS;
   return userPrincipal(session.user.id);
 }
+
+// ── Grant storage ────────────────────────────────────────────────────────────
+
+export type { GrantDatabase, GrantStore } from "./grants.js";
+export { MemoryGrantStore, SqlGrantStore } from "./grants.js";

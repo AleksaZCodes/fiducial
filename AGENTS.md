@@ -228,6 +228,7 @@ The capabilities this platform ships:
 | `firmware-rp2040` | 10 template file(s) | `fid add capability firmware-rp2040` |
 | `firmware-stm32` | 9 template file(s) | `fid add capability firmware-stm32` |
 | `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
+| `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
 | `tauri` | 5 template file(s) | `fid add capability tauri` |
 | `web-next` | 8 template file(s) | `fid add capability web-next` |
 | `web-svelte` | 8 template file(s) | `fid add capability web-svelte` |

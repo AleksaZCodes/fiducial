@@ -200,6 +200,28 @@ EXAMPLE:
     )]
     Deploy,
 
+    /// Add grant storage — the permission rows `can()` reads
+    #[command(
+        long_about = "\
+Install the identity capability.
+
+Auth answers who you are; a grant answers what you may do. A grant is one row
+— principal, resource, role — and this capability is where those rows live.
+
+Generates `migrations/0001_grants.sql` from the identity model: the table's
+CHECK constraints are the Principal, Resource and Role variants themselves, so
+adding a role and forgetting the migration fails `fid derive --check` rather
+than drifting quietly.
+
+Not a migrations system — it generates the first table only.",
+        after_long_help = "\
+EXAMPLE:
+    fid add identity
+    fid derive          # writes migrations/0001_grants.sql
+    fid derive --check  # fails if the model changed and this did not"
+    )]
+    Identity,
+
     /// Add cross-platform adapter contracts (database, storage, email, diagnostics)
     #[command(
         long_about = "\
@@ -300,6 +322,7 @@ pub fn run(target: AddTarget) -> Result<()> {
         AddTarget::I18n => install_capability("i18n"),
         AddTarget::Brand => install_capability("brand"),
         AddTarget::Deploy => install_capability("deploy"),
+        AddTarget::Identity => install_capability("identity"),
         AddTarget::Adapters => install_capability("adapters"),
         AddTarget::Capability { id, from } => match from {
             Some(spec) => install_external(&id, &spec),

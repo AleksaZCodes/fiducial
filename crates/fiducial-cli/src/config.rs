@@ -34,6 +34,59 @@ pub struct Config {
     /// `[deploy]` — the facts a deploy target needs that nothing can derive.
     #[serde(default, skip_serializing_if = "Deploy::is_empty")]
     pub deploy: Deploy,
+    /// `[identity]` — where this product keeps its permission rows.
+    #[serde(default, skip_serializing_if = "Identity::is_empty")]
+    pub identity: Identity,
+}
+
+/// `[identity]` — the one fact grant storage cannot derive.
+///
+/// Everything about the grants table's *shape* follows from the identity
+/// model: its `CHECK` constraints are the `Principal`, `Resource` and `Role`
+/// variants. Its **name** does not — a product may already have a `grants`
+/// table, or prefer `access_grants`, and no amount of looking at the model
+/// reveals which.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct Identity {
+    /// Table holding the permission rows. Defaults to `grants`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub table: String,
+}
+
+impl Identity {
+    pub fn is_empty(&self) -> bool {
+        self.table.is_empty()
+    }
+
+    /// The table name to generate against, defaulted.
+    pub fn table_name(&self) -> &str {
+        if self.table.is_empty() {
+            "grants"
+        } else {
+            &self.table
+        }
+    }
+
+    /// The name reaches SQL by interpolation — a parameter cannot bind an
+    /// identifier — so it is validated rather than trusted. `fiducial.toml` is
+    /// not user input, but "not user input today" is how injection sites are
+    /// introduced, and the same check exists in `SqlGrantStore`.
+    pub fn validate(&self) -> Result<()> {
+        let name = self.table_name();
+        let ok = !name.is_empty()
+            && name
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+            && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+        if !ok {
+            bail!(
+                "[identity] table = \"{name}\" is not a valid SQL identifier \
+                 (letters, digits and underscore; not starting with a digit)."
+            );
+        }
+        Ok(())
+    }
 }
 
 /// `[deploy]` — what a deploy config needs that `[adapters]` cannot imply.

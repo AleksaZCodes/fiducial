@@ -294,10 +294,21 @@ delivery silently never worked (its token was written under a storage key
 the SDK never reads). Both fixed and pinned by tests that fail if either
 regresses.
 
-**Deliberately not done:** no grant storage (where grants live is a
-product's decision), and no device/service token issuance — how a device
-*proves* it is that device needs its own pass with real cryptographic
-choices.
+**Grant storage shipped** (`docs/specs/2026-09-15-grant-storage.md`):
+`fid add identity` derives `migrations/0001_grants.sql` from the identity
+model — its `CHECK` lists *are* the `Principal`/`Resource`/`Role` variants,
+so adding a role and forgetting the migration fails `fid derive --check`
+rather than producing a table that silently rejects it. `SqlGrantStore` is a
+consumer of the `database` contract, not a ninth contract beside it, so it
+works on D1 today and any future vendor free. Tested against real SQLite
+(what D1 runs) on the real generated schema.
+
+**Deliberately not done:** it is **not a migrations system** — it generates
+the first table; schema *change* needs ordering, idempotency and drift
+detection against a live database, and that is the next real design question
+here. Also no device/service token issuance — how a device *proves* it is
+that device needs its own pass with real cryptographic choices — and no
+grant expiry, delegation, audit log or caching.
 
 ### AI — *terminal, product-critical* ⬜
 
@@ -314,12 +325,33 @@ the actual need is thinking about **AI apps**, vendor-neutral. Scoped
   product data into vectors for retrieval needs its own method and pairs
   with a vector store this platform does not have either — a second
   contract or a second method, decided when it has a consumer.
-- **Workers AI is a candidate, not the contract's namesake.** The contract
-  must be designed against the narrowest interface a chat-completion API
-  actually shares across vendors (Anthropic, OpenAI, Workers AI) — the same
-  rule `adapter.rs` already states for `database`/`storage`. Naming the
+- **Workers AI is a candidate, not the contract's namesake.** Naming the
   contract after one vendor's product would repeat the mistake this
   platform's own adapter system exists to avoid.
+- **Gateway-first, decided 2026-09-15.** An earlier sketch here was "write
+  one adapter per model vendor and find their narrowest shared interface."
+  The founder's correction: target an **AI gateway** — OpenRouter, or a
+  comparable vendor-independent one — rather than N vendors.
+
+  That is the better answer, and it dissolves the objection that made this
+  item risky. The hard part of an LLM contract is that no neutral
+  intersection exists: Anthropic puts `system` top-level where OpenAI makes
+  it a message role; Anthropic has content blocks where OpenAI has a string
+  or parts array; streaming event shapes differ substantially; and the
+  surface moves fast (thinking config, `tool_choice` and prefill all changed
+  shape within a year). Intersect those by hand and the contract is too thin
+  for agentic work; superset them and you have picked a vendor without
+  admitting it.
+
+  A gateway already does that normalization and maintains it. So the
+  contract targets **one** shape — the gateway's — and model choice becomes
+  a *string in a declaration* rather than an adapter per vendor. Vendor drift
+  becomes the gateway's problem, which is what you are paying it for.
+
+  Open before building: whether `model` belongs in `[ai]` as a declaration
+  (derivable into the factory, gated like everything else) or per-call; and
+  whether a direct-vendor adapter is ever worth having as an escape hatch for
+  someone who does not want a gateway in the path.
 
 **Why it is not built yet:** highest design risk of everything discussed in
 this round — model APIs vary more across vendors than storage or database

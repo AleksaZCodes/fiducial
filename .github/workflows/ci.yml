@@ -491,7 +491,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: TypeScript — same verdict on every vector
+      - name: Build the fid binary
+        # The grant-storage tests run the REAL generated schema — they invoke
+        # `fid derive` to produce it rather than checking a copy into the test.
+        run: cargo build -p fiducial-cli --bin fid
+
+      - name: TypeScript — same verdict on every vector, and the schema on real SQLite
         run: pnpm --filter @fiducial/identity test
 
   # ── portfolio: workbench v1 ───────────────────────────────────────────────
