@@ -9,9 +9,11 @@ numbering is unchanged._
 
 ---
 
-## Current phase: between phases — next is the capability taxonomy
+## Current phase: between phases — next is external capabilities
 
-_i18n is closed out (Phase 22b). `ROADMAP.md` item 1 has nothing left open._
+_Roadmap items 1 (i18n) and 2 (capability taxonomy) are complete. Item 3,
+external capabilities, is the keystone: every capability built before it exists
+is one more compiled into the binary that later has to be migrated out._
 
 > Build order beyond this phase: [`ROADMAP.md`](ROADMAP.md).
 
@@ -376,6 +378,34 @@ built because no product has one yet.
 | Untranslated-looking values reported, never fatal — failing there would block a legitimate `"Wi-Fi"` | ✅ |
 | Installing a capability **seeds the declaration it needs**; a pipeline with an empty declaration fails on the next derive | ✅ |
 | 43 runtime tests, 10 comparison unit tests, 10 end-to-end. 395 across the workspace | ✅ |
+
+**Phase 23 — capability taxonomy, made real ✅ (2026-09-15)**
+
+> Declarations, pipelines and adapters become first-class in the CLI.
+> Spec: `docs/specs/2026-09-15-capability-taxonomy-made-real.md`, extending the
+> accepted `2026-09-14-capability-taxonomy.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| `CapabilityDef` gains `declarations`, `pipelines`, `requires_adapters` — a capability can now **say what it contributes**, by kind | ✅ |
+| **The `if cap.id == "i18n"` branch is gone.** `patch_config` had to know that the i18n capability introduces an `[i18n]` block, because the capability had no way to say so; the next one with a config block would have added a second branch | ✅ |
+| `Declaration::ConfigBlock { name, seed }` carries a `fn(&mut Config)`, so the capability that owns a fact owns filling it in | ✅ |
+| `eda` and `i18n` migrated: the board interface and the message catalogs are declarations, the four `pipelines/*.toml` are pipelines, `main.ato` stays a template. Generalized from two working cases, not designed | ✅ |
+| Declarations install **before** pipelines — a pipeline whose declaration is not yet on disk fails on the next derive, and install order is the cheapest place to make that impossible | ✅ |
+| `[adapters]` in `fiducial.toml` — one vendor per contract, as a map rather than a struct, because a struct would be a second copy of the contract list | ✅ |
+| Five contracts: `database`, `storage`, `deploy`, `email`, `errors` | ✅ |
+| **Every contract implements exactly `none` today, and nothing else.** A selectable vendor is a promise — and this repository had just spent a phase removing five guard-rule names that were declared, counted by `fid dash`, and enforced by nothing. An adapter registry offering `supabase` before anything speaks Supabase is that bug with a different noun | ✅ |
+| `candidates` records where each contract is heading, kept out of `implementations` so nothing can select one and believe it works | ✅ |
+| A planned vendor and a typo get **different messages** — `supabase` is a "not yet", `supabse` is a "no". One "unknown value" message answers both the same way | ✅ |
+| `none` is a real no-op, not a placeholder: diagnostics wired in from the first commit, costing nothing until pointed somewhere | ✅ |
+| A capability may **require** a contract without choosing the vendor; `fid doctor` fails when nobody filled it | ✅ |
+| `check_capability` rejects a pipeline outside `pipelines/` (installed and never run), a `pipelines/` file filed as a template (installed and never gated), a capability with pipelines and no declarations, and an unknown required contract | ✅ |
+| `every_builtin_capability_conforms` runs those against the registry itself — a first-party capability cannot ship violating a rule the CLI enforces on everyone else's. Verified by breaking a real capability | ✅ |
+| `fid dash --section taxonomy` — every declaration with whether it is **present**, every contract with what satisfies it, including the ones nothing selected. An `[adapters]` key that is not a contract is appended rather than dropped | ✅ |
+| `fid capability list` says what each capability declares, derives and requires; `--all` prints the contracts, because the set lives in the binary and nobody can select what they have not been told exists | ✅ |
+| `fid capability new` teaches the four kinds and the test for a declaration | ✅ |
+| 5 capability invariants, 6 adapter unit tests, 9 end-to-end. Clippy (0 warnings), fmt, full Rust suite and 17 JS tasks green | ✅ |
+| **Deliberately not done:** no real adapter implementations (roadmap item 6 — designing contracts against no consumer is the failure the spec names); no adapter *capability*, because a contract is a slot a product fills, not something you `fid add` | ✅ |
 
 **Phase 22b — i18n, closed out ✅ (2026-09-14)**
 

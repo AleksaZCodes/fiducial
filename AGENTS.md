@@ -165,10 +165,35 @@ rule that matters most.
 | `fid upgrade [--dry-run]` | 3-way merge upstream template changes; apply codemods |
 | `fid harvest <path>` | Survey another codebase for reusable work |
 | `fid release check` | Fail when the compatibility matrix and `WIRE_VERSION` disagree |
-| `fid capability list` | What is installed and what is available |
+| `fid capability list [--all]` | What each capability declares, derives and requires; `--all` also lists the adapter contracts |
 
 Every command takes `--help`, and the help names no phase numbers on purpose —
 a schedule is a fact `SHIPPED.md` owns, and a second copy of it drifts.
+
+## What a capability is made of
+
+Four kinds, and the difference is not cosmetic — see
+`docs/specs/2026-09-14-capability-taxonomy.md`.
+
+| Kind | Is | Example |
+|---|---|---|
+| **Declaration** | a typed fact, written once, inert | `board/board.interface.json`, the `[i18n]` block |
+| **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/eda.toml` |
+| **Adapter** | a swappable vendor behind a fixed contract, selected in `[adapters]` | `storage = "none"` |
+| **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
+
+The test for a declaration: *could two different pipelines read this and both be
+correct?* If yes it is a declaration; if it is one tool's config file it is a
+template.
+
+Filing one as another is not a style mistake. A pipeline outside `pipelines/` is
+installed and never runs; a `pipelines/` file listed as a template is installed
+and never gated. `fid capability check` rejects both.
+
+**Adapters name contracts, not vendors.** Every contract currently implements
+only `none` — a real, working no-op. The vendors each is intended to carry are
+listed as *planned* and cannot be selected, because a selectable name with
+nothing behind it is a promise the platform does not keep.
 
 ## Skills this repository authors
 

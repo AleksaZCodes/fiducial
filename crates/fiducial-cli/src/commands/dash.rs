@@ -27,6 +27,7 @@ use std::{
 };
 
 use crate::{
+    adapter,
     config::{Config, CONFIG_FILE},
     guard,
     lock::{sha256_hex, Lock, LOCK_FILE},
@@ -46,6 +47,44 @@ pub struct Dash {
     graph: GraphView,
     freshness: FreshnessView,
     i18n: I18nView,
+    taxonomy: TaxonomyView,
+}
+
+/// What the installed capabilities contribute, by kind.
+///
+/// Spec: `docs/specs/2026-09-14-capability-taxonomy.md`. Before the split these
+/// were indistinguishable — a declaration, a pipeline and a tool's config file
+/// were all entries in one `templates` list — so there was nothing to report.
+#[derive(Debug, Serialize)]
+struct TaxonomyView {
+    /// Facts the installed capabilities introduce, and whether each is present.
+    declarations: Vec<DeclarationView>,
+    /// Adapter contracts, and what satisfies each.
+    adapters: Vec<AdapterView>,
+}
+
+#[derive(Debug, Serialize)]
+struct DeclarationView {
+    /// The capability that introduced it.
+    capability: String,
+    /// File path, or `fiducial.toml` block name.
+    name: String,
+    /// `file` or `config-block`.
+    kind: &'static str,
+    /// Whether the fact is actually there. A declaration a pipeline reads and
+    /// nobody wrote is the failure this reports before `fid derive` hits it.
+    present: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct AdapterView {
+    contract: String,
+    /// The vendor selected, when the product selects one.
+    selected: Option<String>,
+    /// Set when the selection cannot be satisfied.
+    problem: Option<String>,
+    /// Capabilities that need this contract filled.
+    required_by: Vec<String>,
 }
 
 /// Localization: what is declared, and what never reached the catalog.
@@ -232,6 +271,7 @@ impl Dash {
             },
             freshness: freshness_view(root, &pipelines)?,
             i18n: i18n_view(root, config),
+            taxonomy: taxonomy_view(root, config),
         })
     }
 }
@@ -755,6 +795,83 @@ fn i18n_view(root: &Path, config: &Config) -> I18nView {
     }
 }
 
+/// What the installed capabilities declare, derive and require.
+fn taxonomy_view(root: &Path, config: &Config) -> TaxonomyView {
+    let installed: Vec<&'static crate::capability::CapabilityDef> = config
+        .capabilities
+        .enabled
+        .iter()
+        .filter_map(|id| crate::capability::find(id))
+        .collect();
+
+    let mut declarations = Vec::new();
+    for cap in &installed {
+        for decl in cap.declarations {
+            let (kind, present) = match decl {
+                crate::capability::Declaration::File { path, .. } => {
+                    ("file", root.join(path).exists())
+                }
+                crate::capability::Declaration::ConfigBlock { name, .. } => (
+                    "config-block",
+                    // Only `i18n` exists as a block today; a second one adds a
+                    // match arm here rather than a new reporting path.
+                    match *name {
+                        "i18n" => !config.i18n.is_empty(),
+                        _ => true,
+                    },
+                ),
+            };
+            declarations.push(DeclarationView {
+                capability: cap.id.to_string(),
+                name: decl.name().to_string(),
+                kind,
+                present,
+            });
+        }
+    }
+
+    // Every contract, not only the selected ones: an unfilled contract is a
+    // fact about the product, and listing only what was chosen hides it.
+    let adapters: Vec<AdapterView> = adapter::CONTRACTS
+        .iter()
+        .map(|c| {
+            let selected = config.adapters.get(c.name).map(|v| v.to_string());
+            AdapterView {
+                contract: c.name.to_string(),
+                problem: selected
+                    .as_deref()
+                    .and_then(|v| adapter::problem(c.name, v)),
+                selected,
+                required_by: installed
+                    .iter()
+                    .filter(|cap| cap.requires_adapters.contains(&c.name))
+                    .map(|cap| cap.id.to_string())
+                    .collect(),
+            }
+        })
+        .collect();
+
+    // A key that is not a contract at all would otherwise vanish from the view:
+    // the loop above walks the known contracts, so an unknown one is in neither
+    // the selected set nor the listing. Absence is a finding.
+    let mut adapters: Vec<AdapterView> = adapters;
+    for (contract, vendor) in &config.adapters.selected {
+        if adapter::find(contract).is_none() {
+            adapters.push(AdapterView {
+                contract: contract.clone(),
+                problem: adapter::problem(contract, vendor),
+                selected: Some(vendor.clone()),
+                required_by: Vec::new(),
+            });
+        }
+    }
+
+    TaxonomyView {
+        declarations,
+        adapters,
+    }
+}
+
 /// Section names `--section` accepts.
 pub const SECTIONS: &[&str] = &[
     "product",
@@ -765,6 +882,7 @@ pub const SECTIONS: &[&str] = &[
     "graph",
     "freshness",
     "i18n",
+    "taxonomy",
 ];
 
 /// Whether to emit terminal styling.
@@ -1008,6 +1126,38 @@ impl Dash {
                         );
                     }
                     println!("  these warn; they never fail a build");
+                }
+            }
+        }
+
+        if want("taxonomy") {
+            heading("Capabilities");
+            let t = &self.taxonomy;
+
+            if t.declarations.is_empty() {
+                println!("  no declarations — installed capabilities introduce no facts");
+            } else {
+                for d in &t.declarations {
+                    let mark = if d.present { "✓" } else { "!" };
+                    println!(
+                        "  {mark} {:<34} {} ({})",
+                        d.name,
+                        if d.present { "declared" } else { "MISSING" },
+                        d.capability
+                    );
+                }
+            }
+
+            println!();
+            for a in &t.adapters {
+                let state = match (&a.selected, &a.problem) {
+                    (_, Some(p)) => format!("! {p}"),
+                    (Some(v), None) => v.clone(),
+                    (None, None) => "not selected".to_string(),
+                };
+                field(&a.contract, state);
+                if !a.required_by.is_empty() {
+                    println!("  {:<14} required by {}", "", a.required_by.join(", "));
                 }
             }
         }

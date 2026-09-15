@@ -183,6 +183,17 @@ Freshness
 Localization
   locales        sr, en (default: sr)
   no hardcoded user-visible strings found
+
+Capabilities
+  ✓ i18n                               declared (i18n)
+  ✓ messages/en.json                   declared (i18n)
+  ✓ messages/sr.json                   declared (i18n)
+
+  database       not selected
+  storage        not selected
+  deploy         not selected
+  email          not selected
+  errors         not selected
 ```
 
 <!-- /capture -->
