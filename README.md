@@ -86,7 +86,8 @@ minutes.
 | [`MISSION.md`](./MISSION.md) | Why this exists. The tiebreaker for ambiguous decisions. |
 | [`ARCHITECTURE.md`](./ARCHITECTURE.md) | How the layers fit together. |
 | [`STACK.md`](./STACK.md) | Every technology choice, enumerated. |
-| [`SHIPPED.md`](./SHIPPED.md) | Build order and current state. |
+| [`ROADMAP.md`](./ROADMAP.md) | What is intended, in order — and so what is next. |
+| [`SHIPPED.md`](./SHIPPED.md) | What was built, phase by phase. |
 | [`docs/protocol/`](./docs/protocol/) | The wire specification + conformance vectors. |
 | [`docs/specs/`](./docs/specs/) | Design decisions, append-only. |
 

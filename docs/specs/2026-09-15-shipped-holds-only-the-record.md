@@ -89,3 +89,28 @@ is active."* It does not, and should not. It now names both files, says which
 question each answers, and points at `fid dash` for what is next.
 
 `ARCHITECTURE.md` called `SHIPPED.md` the build order. That is `ROADMAP.md`.
+
+## Addendum, same day: the first sweep was too narrow
+
+`shipped_does_not_state_what_is_next` checks headings **inside** that file, and
+passed while three other documents still sent readers to it for the plan:
+
+| File | Said |
+|---|---|
+| `README.md` | "`SHIPPED.md` — Build order and current state" |
+| `docs/guides/README.md` | the same line |
+| `.claude/agents/fiducial-design.md` | "Read `SHIPPED.md` — current phase and what 'done' means" |
+
+A file that holds only the record is not much use if three other files say it
+holds the plan. The property is not "this file contains no forward-looking
+heading"; it is **"nobody is sent here for what is next."**
+
+`nothing_points_at_shipped_for_what_is_next` walks every tracked `.md` and
+fails on a line naming `SHIPPED.md` alongside "build order", "current state",
+"current phase" or "what is next" — unless the line also names `ROADMAP.md`,
+which is what the correction itself reads like. `docs/specs/` is skipped: those
+record what was true on the day they were written, and editing them is the edit
+rule 4 forbids.
+
+**Scaffolded products were never affected.** The product `ROADMAP.md` template
+already pointed the right way, so this was the platform's own drift only.
