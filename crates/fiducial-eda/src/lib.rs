@@ -415,7 +415,7 @@ mod tests {
     use std::string::ToString;
 
     const SEED_JSON: &str =
-        include_str!("../../fiducial-cli/capabilities/eda/board/board.interface.json");
+        include_str!("../../fiducial-cli/capabilities/eda/declarations/board/board.interface.json");
 
     #[test]
     fn parse_seed_json() {

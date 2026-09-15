@@ -1,0 +1,2 @@
+description = "SvelteKit web app with Turborepo wiring, Biome, and Changesets"
+guard_rules = ["no-unpinned-cli-fetch"]

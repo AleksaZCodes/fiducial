@@ -5,7 +5,7 @@ use clap::Subcommand;
 use std::env;
 
 use crate::{
-    capability::{self, CapabilityDef, BUILTIN_CAPABILITIES},
+    capability::{self, builtins, Capability},
     config::{Config, CONFIG_FILE},
 };
 
@@ -133,9 +133,9 @@ fn cmd_list(show_all: bool) -> Result<()> {
 
     // Available (not installed).
     if show_all {
-        let available: Vec<&CapabilityDef> = BUILTIN_CAPABILITIES
+        let available: Vec<&Capability> = builtins()
             .iter()
-            .filter(|c| !installed.contains(&c.id))
+            .filter(|c| !installed.contains(&c.id.as_str()))
             .collect();
 
         if !available.is_empty() {
@@ -198,7 +198,7 @@ fn print_contracts(cfg: &crate::config::Config) {
 /// Printed under the description so `fid capability list` answers the question
 /// the taxonomy exists to make askable: not just "is it installed", but *what
 /// does it bring* — which facts, which derivations, which contracts.
-fn print_contributions(def: &crate::capability::CapabilityDef) {
+fn print_contributions(def: &crate::capability::Capability) {
     use crate::capability::Declaration;
 
     let mut parts: Vec<String> = Vec::new();
@@ -210,7 +210,7 @@ fn print_contributions(def: &crate::capability::CapabilityDef) {
         let names: Vec<&str> = def
             .pipelines
             .iter()
-            .map(|(p, _)| p.trim_start_matches("pipelines/"))
+            .map(|f| f.path.trim_start_matches("pipelines/"))
             .collect();
         parts.push(format!("derives via {}", names.join(", ")));
     }

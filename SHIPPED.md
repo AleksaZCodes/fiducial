@@ -9,11 +9,11 @@ numbering is unchanged._
 
 ---
 
-## Current phase: between phases — next is external capabilities
+## Current phase: between phases — next is context sync
 
-_Roadmap items 1 (i18n) and 2 (capability taxonomy) are complete. Item 3,
-external capabilities, is the keystone: every capability built before it exists
-is one more compiled into the binary that later has to be migrated out._
+_Roadmap items 1–3 are complete. The debt that grew with every phase — each new
+capability compiled into the binary — has stopped accruing: a capability is a
+directory now, and shipping one does not require releasing the CLI._
 
 > Build order beyond this phase: [`ROADMAP.md`](ROADMAP.md).
 
@@ -378,6 +378,35 @@ built because no product has one yet.
 | Untranslated-looking values reported, never fatal — failing there would block a legitimate `"Wi-Fi"` | ✅ |
 | Installing a capability **seeds the declaration it needs**; a pipeline with an empty declaration fails on the next derive | ✅ |
 | 43 runtime tests, 10 comparison unit tests, 10 end-to-end. 395 across the workspace | ✅ |
+
+**Phase 24 — external capabilities ✅ (2026-09-15)**
+
+> A capability is a directory, resolvable from outside the binary.
+> Spec: `docs/specs/2026-09-15-external-capabilities.md`. Roadmap item 3 — the
+> keystone, and the one whose cost of delay was measurable.
+
+| Deliverable | Status |
+| --- | --- |
+| **`build.rs` derives the built-in registry from `capabilities/<id>/`.** Every capability was a literal listing its own files by hand — 56 `include_str!` calls next to a directory that already held exactly those files. Adding a file meant editing two places, and forgetting the second shipped a capability missing a file | ✅ |
+| The build script emits **bytes, not a parsed manifest** — a parsed one would be a second implementation of the derivation, in a place no test can reach | ✅ |
+| `a_builtin_derives_the_same_from_its_directory` — the embedded registry and the on-disk directory produce the same capability, so "built-in" is a statement about where the bytes live and nothing more | ✅ |
+| The layout **is** the manifest: `declarations/…`, `pipelines/*.toml`, everything else a template. `pipelines/` needed no convention invented — it is already where `pipeline::discover` looks | ✅ |
+| **One file is still a complete capability** (§3.3). `capability.toml` is optional; without one the description comes from the skill's own first line of prose | ✅ |
+| `deny_unknown_fields`: a misspelled manifest key is an error, because one silently ignored is a capability that does not do what its author wrote | ✅ |
+| **A config-block declaration stopped being `fn(&mut Config)`.** No capability outside the binary can supply a Rust function — the signature quietly made "resolvable from outside" false for every capability that declares a block. Now TOML data, merged at the `toml::Value` level so a third party can declare a block this binary knows nothing about | ✅ |
+| That removed a duplicate: `fid new --locales` defaulted to a constant in `config.rs` while the capability seeded its own. `fid new` now asks the capability | ✅ |
+| `fid add capability <id> --from <path>` and `--from git:<url>[#<rev>][::<subdir>]` | ✅ |
+| **A git source pins the commit, never the reference.** `#main` installs what `main` was at that moment; a lock recording `main` would pin a question whose answer changes | ✅ |
+| `git:` is a prefix rather than a sniff — a URL and a path are not reliably distinguishable, and a wrong guess reaches the network | ✅ |
+| **npm and crates deferred, with the reason recorded**: a registry adds a packaging format nothing needs yet. §3.3 names git as the source model; git is the one with a consumer | ✅ |
+| Trust, applied at the one place every source passes through: no absolute path, no `..`, nothing under `.git`; the directory name must be the id asked for; and **the same conformance checks a built-in passes**, before anything is written | ✅ |
+| **`fiducial.lock` records each installed capability** — source, content hash, description, declarations, pipelines, required adapters. Every consumer used to look a capability up in the built-in registry, which stopped being the whole truth the moment one could come from a repository | ✅ |
+| `fid dash` and `fid doctor` read the lock first, so an externally resolved capability declares and requires exactly like a built-in — offline, without re-resolving | ✅ |
+| **Bug surfaced by the refactor:** `templates::raw` resolved `firmware/Cargo.toml`, `firmware/rust-toolchain.toml` and `firmware/shared/src/lib.rs` to the **RP2040** version always, though both firmware capabilities install them with different content. A product with `firmware-stm32` had `fid doctor` and `fid upgrade` comparing against the wrong board — reporting drift that was not drift, and offering to overwrite a correct file. `raw_for` resolves against what the product installed, and returns `None` rather than guessing when still ambiguous | ✅ |
+| Four `firmware-stm32/…` lookup keys nothing ever queried — callers pass real installed paths — removed | ✅ |
+| 86 `CAP_*` constants and a 40-line match deleted; capability templates are read from the registry | ✅ |
+| 9 manifest unit tests, 4 source-parsing, 7 end-to-end (including a git install against a local repository). Clippy 0 warnings, fmt, 41 Rust test binaries and 17 JS tasks green | ✅ |
+| **Deliberately not done:** no marketplace or index (discovery has no consumer yet); no transitive capability dependencies (easier to add than remove); binary files refused with the path named, because supporting them means deciding how `fid upgrade` merges them | ✅ |
 
 **Phase 23 — capability taxonomy, made real ✅ (2026-09-15)**
 

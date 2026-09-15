@@ -15,7 +15,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 // Load the canonical seed file from the EDA capability.
 const SEED_PATH = join(
   __dirname,
-  '../../../crates/fiducial-cli/capabilities/eda/board/board.interface.json'
+  '../../../crates/fiducial-cli/capabilities/eda/declarations/board/board.interface.json'
 )
 const SEED_JSON = readFileSync(SEED_PATH, 'utf8')
 

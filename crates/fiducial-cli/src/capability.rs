@@ -31,387 +31,79 @@ pub const PLATFORM_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // ── Capability definition ────────────────────────────────────────────────────
 
-/// A fact a capability introduces, which its pipelines then read.
+pub mod manifest;
+pub mod source;
+
+pub use manifest::{Capability, Declaration, FileEntry, Source};
+
+/// Every built-in capability's files, embedded by `build.rs` from
+/// `capabilities/<id>/`.
 ///
-/// The test, from the spec: *could two different pipelines read this and both be
-/// correct?* `board/board.interface.json` is read by both `eda.toml` and
-/// `enclosure.toml`, so it is a declaration. `apps/worker/wrangler.toml` is one
-/// tool's config file, so it is a template.
-///
-/// The distinction was invisible before: a declaration, a pipeline and a plain
-/// file were all entries in `templates`, which is why the `[i18n]` block had to
-/// be seeded by an `if cap.id == "i18n"` branch in `patch_config`. A capability
-/// could not say what it declared, so one place had to know for it.
-pub enum Declaration {
-    /// A file in the product that people edit and pipelines read.
-    File {
-        /// Repo-relative path.
-        path: &'static str,
-        /// Seed content, written on install.
-        content: &'static str,
-    },
-    /// A `fiducial.toml` block.
-    ///
-    /// Seeded on install, because a pipeline whose declaration is an empty
-    /// block fails on the next `fid derive` — the capability would install
-    /// clean and break the first time anyone used it.
-    ConfigBlock {
-        /// Block name as it appears in `fiducial.toml`, e.g. `i18n`.
-        name: &'static str,
-        /// Fills the block in, if the product has not already declared it.
-        seed: fn(&mut Config),
-    },
+/// Bytes, not parsed capabilities: they go through the same
+/// `manifest::derive` a third-party capability does, so there is one
+/// definition of what a capability is rather than one per source.
+mod builtin_files {
+    include!(concat!(env!("OUT_DIR"), "/capabilities.rs"));
 }
 
-impl Declaration {
-    /// What this declaration is called in `fid capability list` and `fid dash`.
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::File { path, .. } => path,
-            Self::ConfigBlock { name, .. } => name,
-        }
-    }
+/// The built-in capabilities, derived once on first use.
+///
+/// `OnceLock` rather than a `static` literal because a `Capability` owns its
+/// strings. Deriving at startup rather than at compile time is the price of
+/// having one derivation; it is a few hundred microseconds against a registry
+/// that could otherwise disagree with the directory it came from.
+pub fn builtins() -> &'static [Capability] {
+    static BUILTINS: std::sync::OnceLock<Vec<Capability>> = std::sync::OnceLock::new();
+    BUILTINS.get_or_init(|| {
+        builtin_files::BUILTIN_FILES
+            .iter()
+            .map(|(id, files)| {
+                let map: std::collections::BTreeMap<String, String> = files
+                    .iter()
+                    .map(|(p, c)| ((*p).to_string(), (*c).to_string()))
+                    .collect();
+                manifest::derive(id, &map, Source::Builtin).unwrap_or_else(|e| {
+                    // A built-in that does not derive is a broken build, not a
+                    // runtime condition: the directory ships inside the binary.
+                    panic!("built-in capability `{id}` does not derive: {e:#}")
+                })
+            })
+            .collect()
+    })
 }
 
-/// A capability definition: everything the platform needs to install it.
+/// The locale set a capability's `[i18n]` seed declares.
 ///
-/// The three members above `templates` are the taxonomy from
-/// `docs/specs/2026-09-14-capability-taxonomy.md`. They are not decoration: a
-/// capability that cannot say which facts it introduces, what it derives from
-/// them, and which contracts it needs is one the CLI has to special-case.
-pub struct CapabilityDef {
-    /// Kebab-case slug used in `fiducial.toml [capabilities]` and on the CLI.
-    pub id: &'static str,
-    /// One-line description shown in `fid capability list`.
-    pub description: &'static str,
-    /// Typed facts this capability introduces. Inert on their own.
-    pub declarations: &'static [Declaration],
-    /// Pipelines that read those facts and produce gated artifacts.
-    ///
-    /// Each entry is (repo-relative path under `pipelines/`, file content).
-    /// Separate from `templates` because a pipeline is the thing `fid derive`
-    /// runs and `fid derive --check` gates — the property that makes its output
-    /// a build failure rather than a surprise.
-    pub pipelines: &'static [(&'static str, &'static str)],
-    /// Adapter contracts this capability needs a vendor for.
-    ///
-    /// Naming a contract is not choosing a vendor. A capability that needs
-    /// storage says `storage`; which of `r2`, `s3` or `none` satisfies it is
-    /// the product's decision, recorded in `[adapters]`.
-    pub requires_adapters: &'static [&'static str],
-    /// Guard rule names that activate when this capability is installed.
-    pub guard_rules: &'static [&'static str],
-    /// Template files to write into the product root on install.
-    /// Each entry is (repo-relative path, file content).
-    pub templates: &'static [(&'static str, &'static str)],
-    /// The SKILL.md content (mandatory per §3.3).
-    pub skill_md: &'static str,
-}
-
-// ── Built-in capability registry ─────────────────────────────────────────────
-
-/// All first-party capabilities shipped with this platform version.
-pub static BUILTIN_CAPABILITIES: &[CapabilityDef] = &[
-    CapabilityDef {
-        id: "web-next",
-        description: "Next.js web app with Turborepo wiring, Biome, and Changesets",
-        declarations: &[],
-        pipelines: &[],
-        requires_adapters: &[],
-        guard_rules: &["no-unpinned-cli-fetch"],
-        templates: &[
-            (
-                "apps/web/package.json",
-                include_str!("../capabilities/web-next/apps/web/package.json"),
-            ),
-            (
-                "apps/web/next.config.ts",
-                include_str!("../capabilities/web-next/apps/web/next.config.ts"),
-            ),
-            (
-                "apps/web/tsconfig.json",
-                include_str!("../capabilities/web-next/apps/web/tsconfig.json"),
-            ),
-            (
-                "apps/web/src/app/page.tsx",
-                include_str!("../capabilities/web-next/apps/web/src/app/page.tsx"),
-            ),
-            (
-                "apps/web/src/app/board/page.tsx",
-                include_str!("../capabilities/web-next/apps/web/src/app/board/page.tsx"),
-            ),
-            (
-                "apps/web/src/app/layout.tsx",
-                include_str!("../capabilities/web-next/apps/web/src/app/layout.tsx"),
-            ),
-            (
-                "apps/web/src/app/globals.css",
-                include_str!("../capabilities/web-next/apps/web/src/app/globals.css"),
-            ),
-            (
-                "apps/web/components.json",
-                include_str!("../capabilities/web-next/apps/web/components.json"),
-            ),
-        ],
-        skill_md: include_str!("../capabilities/web-next/SKILL.md"),
-    },
-    CapabilityDef {
-        id: "web-svelte",
-        description: "SvelteKit web app with Turborepo wiring, Biome, and Changesets",
-        declarations: &[],
-        pipelines: &[],
-        requires_adapters: &[],
-        guard_rules: &["no-unpinned-cli-fetch"],
-        templates: &[
-            (
-                "apps/web/package.json",
-                include_str!("../capabilities/web-svelte/apps/web/package.json"),
-            ),
-            (
-                "apps/web/svelte.config.js",
-                include_str!("../capabilities/web-svelte/apps/web/svelte.config.js"),
-            ),
-            (
-                "apps/web/vite.config.ts",
-                include_str!("../capabilities/web-svelte/apps/web/vite.config.ts"),
-            ),
-            (
-                "apps/web/tsconfig.json",
-                include_str!("../capabilities/web-svelte/apps/web/tsconfig.json"),
-            ),
-            (
-                "apps/web/src/app.html",
-                include_str!("../capabilities/web-svelte/apps/web/src/app.html"),
-            ),
-            (
-                "apps/web/src/app.css",
-                include_str!("../capabilities/web-svelte/apps/web/src/app.css"),
-            ),
-            (
-                "apps/web/src/routes/+layout.svelte",
-                include_str!("../capabilities/web-svelte/apps/web/src/routes/+layout.svelte"),
-            ),
-            (
-                "apps/web/src/routes/+page.svelte",
-                include_str!("../capabilities/web-svelte/apps/web/src/routes/+page.svelte"),
-            ),
-        ],
-        skill_md: include_str!("../capabilities/web-svelte/SKILL.md"),
-    },
-    CapabilityDef {
-        id: "firmware-rp2040",
-        description: "RP2040 Embassy firmware with defmt logging and probe-rs flashing",
-        declarations: &[],
-        pipelines: &[],
-        requires_adapters: &[],
-        guard_rules: &["no-unpinned-cli-fetch"],
-        templates: &[
-            (
-                "firmware/Cargo.toml",
-                include_str!("../capabilities/firmware-rp2040/firmware/Cargo.toml"),
-            ),
-            (
-                "firmware/rust-toolchain.toml",
-                include_str!("../capabilities/firmware-rp2040/firmware/rust-toolchain.toml"),
-            ),
-            (
-                "firmware/shared/Cargo.toml",
-                include_str!("../capabilities/firmware-rp2040/firmware/shared/Cargo.toml"),
-            ),
-            (
-                "firmware/shared/src/lib.rs",
-                include_str!("../capabilities/firmware-rp2040/firmware/shared/src/lib.rs"),
-            ),
-            (
-                "firmware/rp2040/.cargo/config.toml",
-                include_str!("../capabilities/firmware-rp2040/firmware/rp2040/.cargo/config.toml"),
-            ),
-            (
-                "firmware/rp2040/Cargo.toml",
-                include_str!("../capabilities/firmware-rp2040/firmware/rp2040/Cargo.toml"),
-            ),
-            (
-                "firmware/rp2040/build.rs",
-                include_str!("../capabilities/firmware-rp2040/firmware/rp2040/build.rs"),
-            ),
-            (
-                "firmware/rp2040/memory.x",
-                include_str!("../capabilities/firmware-rp2040/firmware/rp2040/memory.x"),
-            ),
-            (
-                "firmware/rp2040/src/main.rs",
-                include_str!("../capabilities/firmware-rp2040/firmware/rp2040/src/main.rs"),
-            ),
-            (
-                "firmware/rp2040/README.md",
-                include_str!("../capabilities/firmware-rp2040/firmware/rp2040/README.md"),
-            ),
-        ],
-        skill_md: include_str!("../capabilities/firmware-rp2040/SKILL.md"),
-    },
-    CapabilityDef {
-        id: "firmware-stm32",
-        description: "STM32F401 Embassy firmware with defmt logging and probe-rs flashing",
-        declarations: &[],
-        pipelines: &[],
-        requires_adapters: &[],
-        guard_rules: &["no-unpinned-cli-fetch"],
-        templates: &[
-            (
-                "firmware/Cargo.toml",
-                include_str!("../capabilities/firmware-stm32/firmware/Cargo.toml"),
-            ),
-            (
-                "firmware/rust-toolchain.toml",
-                include_str!("../capabilities/firmware-stm32/firmware/rust-toolchain.toml"),
-            ),
-            (
-                "firmware/shared/Cargo.toml",
-                include_str!("../capabilities/firmware-stm32/firmware/shared/Cargo.toml"),
-            ),
-            (
-                "firmware/shared/src/lib.rs",
-                include_str!("../capabilities/firmware-stm32/firmware/shared/src/lib.rs"),
-            ),
-            (
-                "firmware/stm32/.cargo/config.toml",
-                include_str!("../capabilities/firmware-stm32/firmware/stm32/.cargo/config.toml"),
-            ),
-            (
-                "firmware/stm32/Cargo.toml",
-                include_str!("../capabilities/firmware-stm32/firmware/stm32/Cargo.toml"),
-            ),
-            (
-                "firmware/stm32/build.rs",
-                include_str!("../capabilities/firmware-stm32/firmware/stm32/build.rs"),
-            ),
-            (
-                "firmware/stm32/memory.x",
-                include_str!("../capabilities/firmware-stm32/firmware/stm32/memory.x"),
-            ),
-            (
-                "firmware/stm32/src/main.rs",
-                include_str!("../capabilities/firmware-stm32/firmware/stm32/src/main.rs"),
-            ),
-        ],
-        skill_md: include_str!("../capabilities/firmware-stm32/SKILL.md"),
-    },
-    CapabilityDef {
-        id: "tauri",
-        description: "Tauri 2 desktop app with fiducial-tauri serial transport",
-        declarations: &[],
-        pipelines: &[],
-        requires_adapters: &[],
-        guard_rules: &["no-unpinned-cli-fetch"],
-        templates: &[
-            (
-                "apps/desktop/src-tauri/tauri.conf.json",
-                include_str!("../capabilities/tauri/apps/desktop/src-tauri/tauri.conf.json"),
-            ),
-            (
-                "apps/desktop/src-tauri/Cargo.toml",
-                include_str!("../capabilities/tauri/apps/desktop/src-tauri/Cargo.toml.tmpl"),
-            ),
-            (
-                "apps/desktop/src-tauri/build.rs",
-                include_str!("../capabilities/tauri/apps/desktop/src-tauri/build.rs"),
-            ),
-            (
-                "apps/desktop/src-tauri/src/lib.rs",
-                include_str!("../capabilities/tauri/apps/desktop/src-tauri/src/lib.rs"),
-            ),
-            (
-                "apps/desktop/src-tauri/src/main.rs",
-                include_str!("../capabilities/tauri/apps/desktop/src-tauri/src/main.rs"),
-            ),
-        ],
-        skill_md: include_str!("../capabilities/tauri/SKILL.md"),
-    },
-    CapabilityDef {
-        id: "worker-cloudflare",
-        description: "Cloudflare Worker / Durable Object with Wrangler and Miniflare",
-        declarations: &[],
-        pipelines: &[],
-        requires_adapters: &[],
-        guard_rules: &["no-unpinned-cli-fetch"],
-        templates: &[(
-            "apps/worker/wrangler.toml",
-            include_str!("../capabilities/worker-cloudflare/apps/worker/wrangler.toml"),
-        )],
-        skill_md: include_str!("../capabilities/worker-cloudflare/SKILL.md"),
-    },
-    CapabilityDef {
-        id: "i18n",
-        description: "Localized by construction: JSON catalogs in, typed message keys out",
-        declarations: &[
-            Declaration::ConfigBlock {
-                name: "i18n",
-                seed: seed_default_locales,
-            },
-            Declaration::File {
-                path: "messages/en.json",
-                content: include_str!("../capabilities/i18n/messages/en.json"),
-            },
-            Declaration::File {
-                path: "messages/sr.json",
-                content: include_str!("../capabilities/i18n/messages/sr.json"),
-            },
-        ],
-        pipelines: &[(
-            "pipelines/i18n.toml",
-            include_str!("../capabilities/i18n/pipelines/i18n.toml"),
-        )],
-        requires_adapters: &[],
-        guard_rules: &[],
-        templates: &[],
-        skill_md: include_str!("../capabilities/i18n/SKILL.md"),
-    },
-    CapabilityDef {
-        id: "eda",
-        description: "EDA pipeline: atopile → KiCad → board.interface.json tracked by fid derive",
-        // Read by both pipelines below, which is the test for a declaration.
-        declarations: &[Declaration::File {
-            path: "board/board.interface.json",
-            content: include_str!("../capabilities/eda/board/board.interface.json"),
-        }],
-        pipelines: &[
-            (
-                "pipelines/eda.toml",
-                include_str!("../capabilities/eda/pipelines/eda.toml"),
-            ),
-            (
-                "pipelines/enclosure.toml",
-                include_str!("../capabilities/eda/pipelines/enclosure.toml"),
-            ),
-        ],
-        requires_adapters: &[],
-        guard_rules: &[],
-        templates: &[(
-            "board/main.ato",
-            include_str!("../capabilities/eda/board/main.ato"),
-        )],
-        skill_md: include_str!("../capabilities/eda/SKILL.md"),
-    },
-];
-
-/// Seed `[i18n]` with the locales a product is born with.
+/// `fid new --locales` defaults to whatever the `i18n` capability seeds, rather
+/// than to a constant of its own. Two copies of "the locales a product is born
+/// with" would drift the first time either changed — and one of them lives in
+/// a manifest a third party could replace, which is the whole point of the
+/// capability owning its own defaults.
 ///
-/// A function rather than a branch in `patch_config`: the capability that
-/// introduces a declaration is the thing that knows how to fill it in, and
-/// `if cap.id == "i18n"` put that knowledge somewhere the capability could not
-/// reach. The next capability with a config block would have added a second
-/// branch to the same function.
-fn seed_default_locales(cfg: &mut Config) {
-    cfg.i18n.locales = crate::config::DEFAULT_LOCALES
+/// Returns `(locales, default)` when the capability declares them.
+pub fn seeded_locales() -> Option<(Vec<String>, String)> {
+    let cap = find("i18n")?;
+    let seed = cap.declarations.iter().find_map(|d| match d {
+        Declaration::ConfigBlock { name, seed } if name == "i18n" => Some(seed),
+        _ => None,
+    })?;
+    let table = seed.as_table()?;
+    let locales = table
+        .get("locales")?
+        .as_array()?
         .iter()
-        .map(|l| (*l).to_string())
-        .collect();
-    cfg.i18n.default = Some(crate::config::DEFAULT_LOCALE.to_string());
+        .filter_map(|v| v.as_str().map(str::to_string))
+        .collect::<Vec<_>>();
+    let default = table.get("default")?.as_str()?.to_string();
+    if locales.is_empty() {
+        return None;
+    }
+    Some((locales, default))
 }
 
-/// Look up a capability by id.
-pub fn find(id: &str) -> Option<&'static CapabilityDef> {
-    BUILTIN_CAPABILITIES.iter().find(|c| c.id == id)
+/// Look up a built-in capability by id.
+pub fn find(id: &str) -> Option<&'static Capability> {
+    builtins().iter().find(|c| c.id == id)
 }
 
 // ── Install ──────────────────────────────────────────────────────────────────
@@ -423,7 +115,7 @@ pub fn find(id: &str) -> Option<&'static CapabilityDef> {
 ///    at `.claude/skills/<capability-id>.md` for Claude Code's auto-discovery.
 /// 3. Add capability id to `fiducial.toml [capabilities]`.
 /// 4. Merge capability guard rules into `fiducial.toml [guard]`.
-pub fn install(cap: &CapabilityDef, root: &Path, product_name: &str) -> Result<()> {
+pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> {
     println!("✦ fid add {} — installing into {}", cap.id, root.display());
 
     let mut lock = load_or_new_lock(root)?;
@@ -433,16 +125,16 @@ pub fn install(cap: &CapabilityDef, root: &Path, product_name: &str) -> Result<(
     // Declarations first: a pipeline whose declaration is not yet on disk
     // fails on the next `fid derive`, and install order is the cheapest place
     // to make that impossible.
-    let mut files: Vec<(&str, &str)> = Vec::new();
-    for decl in cap.declarations {
-        if let Declaration::File { path, content } = decl {
-            files.push((path, content));
+    let mut files: Vec<&FileEntry> = Vec::new();
+    for decl in &cap.declarations {
+        if let Declaration::File(f) = decl {
+            files.push(f);
         }
     }
-    files.extend(cap.pipelines.iter().copied());
-    files.extend(cap.templates.iter().copied());
+    files.extend(cap.pipelines.iter());
+    files.extend(cap.templates.iter());
 
-    for (rel, content) in files {
+    for FileEntry { path: rel, content } in files {
         let expanded = content
             .replace("{{name}}", product_name)
             .replace("{{version}}", PLATFORM_VERSION);
@@ -500,6 +192,26 @@ pub fn install(cap: &CapabilityDef, root: &Path, product_name: &str) -> Result<(
         .context("reading updated fiducial.toml")?;
     lock.record("fiducial.toml", &new_config_content, PLATFORM_VERSION);
 
+    // Record what was installed, and from where. Without this a capability
+    // resolved from outside the binary is invisible to every command that
+    // reports on a product — which is most of them.
+    lock.capabilities.insert(
+        cap.id.clone(),
+        crate::lock::CapabilityRecord {
+            source: cap.source.label(),
+            source_version: PLATFORM_VERSION.to_string(),
+            hash: content_hash(cap),
+            description: cap.description.clone(),
+            declarations: cap
+                .declarations
+                .iter()
+                .map(|d| d.name().to_string())
+                .collect(),
+            pipelines: cap.pipelines.iter().map(|f| f.path.clone()).collect(),
+            requires_adapters: cap.requires_adapters.clone(),
+        },
+    );
+
     // Persist updated lock.
     lock.save(&root.join("fiducial.lock"))
         .context("writing fiducial.lock")?;
@@ -519,7 +231,7 @@ pub fn install(cap: &CapabilityDef, root: &Path, product_name: &str) -> Result<(
 
 /// Bring `messages/` in line with a declared locale set.
 ///
-/// The `i18n` capability ships catalogs for [`DEFAULT_LOCALES`] only. A product
+/// The `i18n` capability ships catalogs for the locales it seeds, and no more. A product
 /// created with a different set needs a catalog for each locale it declares and
 /// none for a locale it does not — the executor reads the locale set **from the
 /// directory listing**, so a stray catalog is a language the product silently
@@ -529,8 +241,6 @@ pub fn install(cap: &CapabilityDef, root: &Path, product_name: &str) -> Result<(
 /// deliberately visible rather than convenient: identical values are exactly
 /// what `compare` reports as untranslated, so the work still to do shows up in
 /// the first `fid derive` instead of being discovered by a reader.
-///
-/// [`DEFAULT_LOCALES`]: crate::config::DEFAULT_LOCALES
 pub fn reconcile_i18n_catalogs(root: &Path, locales: &[String], default: &str) -> Result<()> {
     let dir = root.join("messages");
     if !dir.is_dir() {
@@ -607,7 +317,7 @@ fn write_file(root: &Path, rel: &str, content: &str) -> Result<()> {
 /// Uses line-level editing rather than a full TOML rewrite to preserve
 /// comments and formatting. This is safe because the relevant lines have
 /// a predictable shape written by `fid new`.
-fn patch_config(root: &Path, cap: &CapabilityDef) -> Result<()> {
+fn patch_config(root: &Path, cap: &Capability) -> Result<()> {
     let config_path = root.join(CONFIG_FILE);
     let mut cfg = Config::load(&config_path)?;
 
@@ -617,23 +327,40 @@ fn patch_config(root: &Path, cap: &CapabilityDef) -> Result<()> {
     }
 
     // Add guard rules that aren't already present.
-    for rule in cap.guard_rules {
-        if !cfg.guard.rules.contains(&rule.to_string()) {
-            cfg.guard.rules.push(rule.to_string());
-        }
-    }
-
-    // A capability that introduces a DECLARATION must seed it, or the pipeline
-    // it also installs fails on the next `fid derive` with an empty block.
-    for decl in cap.declarations {
-        if let Declaration::ConfigBlock { seed, .. } = decl {
-            seed(&mut cfg);
+    for rule in &cap.guard_rules {
+        if !cfg.guard.rules.contains(rule) {
+            cfg.guard.rules.push(rule.clone());
         }
     }
 
     // Serialise back. We use a structured round-trip here rather than line
     // editing because the config schema is small and comments are at the top.
-    let raw = toml::to_string_pretty(&cfg).context("serialising fiducial.toml")?;
+    let mut value = toml::Value::try_from(&cfg).context("serialising fiducial.toml")?;
+
+    // A capability that introduces a DECLARATION must seed it, or the pipeline
+    // it also installs fails on the next `fid derive` with an empty block.
+    //
+    // Merged at the `toml::Value` level rather than through the typed `Config`,
+    // because the seed comes from a manifest a third party wrote: it names a
+    // block this binary may know nothing about. Typing it would mean only
+    // blocks compiled into `fid` could be declared, which is the limitation
+    // this phase exists to remove.
+    for decl in &cap.declarations {
+        let Declaration::ConfigBlock { name, seed } = decl else {
+            continue;
+        };
+        let Some(table) = value.as_table_mut() else {
+            break;
+        };
+        let already_declared = table
+            .get(name)
+            .is_some_and(|existing| !is_empty_block(existing));
+        if !already_declared {
+            table.insert(name.clone(), seed.clone());
+        }
+    }
+
+    let raw = toml::to_string_pretty(&value).context("serialising fiducial.toml")?;
     let header = format!(
         "# fiducial.toml — updated by `fid add {}` (fiducial {})\n\n",
         cap.id, PLATFORM_VERSION
@@ -644,11 +371,51 @@ fn patch_config(root: &Path, cap: &CapabilityDef) -> Result<()> {
     Ok(())
 }
 
+/// A hash over everything a capability installs.
+///
+/// Path and content of every file, plus the skill, in a fixed order. Two
+/// resolutions of the same source that differ here are different capabilities,
+/// whatever the revision says — which is what makes a `path:` source, with no
+/// revision of its own, still checkable.
+fn content_hash(cap: &Capability) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    parts.push(format!("skill\u{1f}{}", cap.skill_md));
+    for decl in &cap.declarations {
+        match decl {
+            Declaration::File(f) => parts.push(format!("decl\u{1f}{}\u{1f}{}", f.path, f.content)),
+            Declaration::ConfigBlock { name, seed } => {
+                parts.push(format!("block\u{1f}{name}\u{1f}{seed}"))
+            }
+        }
+    }
+    for f in &cap.pipelines {
+        parts.push(format!("pipe\u{1f}{}\u{1f}{}", f.path, f.content));
+    }
+    for f in &cap.templates {
+        parts.push(format!("tmpl\u{1f}{}\u{1f}{}", f.path, f.content));
+    }
+    parts.sort();
+    crate::lock::sha256_hex(parts.join("\u{1e}").as_bytes())
+}
+
+/// Whether a `fiducial.toml` block carries no decision yet.
+///
+/// A block present but empty is the state `serde(default)` leaves behind, and
+/// treating it as "already declared" would install a pipeline against nothing.
+fn is_empty_block(value: &toml::Value) -> bool {
+    match value {
+        toml::Value::Table(t) => t.is_empty() || t.values().all(is_empty_block),
+        toml::Value::Array(a) => a.is_empty(),
+        toml::Value::String(s) => s.is_empty(),
+        _ => false,
+    }
+}
+
 // ── Conformance check ─────────────────────────────────────────────────────────
 
 /// Check that a capability definition is well-formed.
 /// Returns a list of conformance errors.
-pub fn check_capability(cap: &CapabilityDef) -> Vec<String> {
+pub fn check_capability(cap: &Capability) -> Vec<String> {
     let mut errors = Vec::new();
 
     if cap.id.is_empty() {
@@ -687,7 +454,7 @@ pub fn check_capability(cap: &CapabilityDef) -> Vec<String> {
     // pipeline filed under `templates` is not gated by `fid derive --check`,
     // and a declaration filed there is one `fid dash` cannot report as missing.
 
-    for (path, _) in cap.pipelines {
+    for FileEntry { path, .. } in &cap.pipelines {
         if !path.starts_with("pipelines/") {
             errors.push(format!(
                 "[{}] pipeline `{path}` must live under `pipelines/` — that is \
@@ -698,7 +465,7 @@ pub fn check_capability(cap: &CapabilityDef) -> Vec<String> {
         }
     }
 
-    for (path, _) in cap.templates {
+    for FileEntry { path, .. } in &cap.templates {
         if path.starts_with("pipelines/") {
             errors.push(format!(
                 "[{}] `{path}` is under `pipelines/` but is declared as a \
@@ -720,7 +487,7 @@ pub fn check_capability(cap: &CapabilityDef) -> Vec<String> {
         ));
     }
 
-    for contract in cap.requires_adapters {
+    for contract in &cap.requires_adapters {
         if crate::adapter::find(contract).is_none() {
             errors.push(format!(
                 "[{}] requires adapter contract `{contract}`, which is not one \
@@ -749,7 +516,7 @@ mod tests {
     /// violating a rule the CLI enforces on everyone else's.
     #[test]
     fn every_builtin_capability_conforms() {
-        for cap in BUILTIN_CAPABILITIES {
+        for cap in builtins() {
             let errors = check_capability(cap);
             assert!(errors.is_empty(), "capability `{}`: {errors:?}", cap.id);
         }
@@ -762,15 +529,15 @@ mod tests {
     /// kind `fid dash` reports it as becomes a matter of iteration order.
     #[test]
     fn no_path_is_declared_twice_within_a_capability() {
-        for cap in BUILTIN_CAPABILITIES {
+        for cap in builtins() {
             let mut paths: Vec<&str> = Vec::new();
-            for decl in cap.declarations {
-                if let Declaration::File { path, .. } = decl {
-                    paths.push(path);
+            for decl in &cap.declarations {
+                if let Declaration::File(f) = decl {
+                    paths.push(&f.path);
                 }
             }
-            paths.extend(cap.pipelines.iter().map(|(p, _)| *p));
-            paths.extend(cap.templates.iter().map(|(p, _)| *p));
+            paths.extend(cap.pipelines.iter().map(|f| f.path.as_str()));
+            paths.extend(cap.templates.iter().map(|f| f.path.as_str()));
 
             let mut seen = paths.clone();
             seen.sort_unstable();
@@ -788,7 +555,7 @@ mod tests {
     /// Ids are unique — they are the key `fid add` and `[capabilities]` use.
     #[test]
     fn capability_ids_are_unique() {
-        let mut ids: Vec<&str> = BUILTIN_CAPABILITIES.iter().map(|c| c.id).collect();
+        let mut ids: Vec<&str> = builtins().iter().map(|c| c.id.as_str()).collect();
         ids.sort_unstable();
         let before = ids.len();
         ids.dedup();
@@ -829,21 +596,48 @@ mod tests {
     /// exists to prevent, moved one step later.
     #[test]
     fn every_config_block_seed_populates_something() {
-        for cap in BUILTIN_CAPABILITIES {
-            for decl in cap.declarations {
+        for cap in builtins() {
+            for decl in &cap.declarations {
                 let Declaration::ConfigBlock { name, seed } = decl else {
                     continue;
                 };
-                let mut cfg = Config::minimal("probe");
-                let before = toml::to_string(&cfg).expect("serialise");
-                seed(&mut cfg);
-                let after = toml::to_string(&cfg).expect("serialise");
-                assert_ne!(
-                    before, after,
-                    "[{}] declares config block `{name}` with a seed that changes nothing",
+                assert!(
+                    !is_empty_block(seed),
+                    "[{}] declares config block `{name}` with a seed that fills in nothing — \
+                     the pipeline it installs would fail on the next derive",
                     cap.id
                 );
             }
+        }
+    }
+
+    /// A built-in and the directory it came from are the same capability.
+    ///
+    /// The registry is derived from `capabilities/<id>/` by `build.rs`, and a
+    /// third-party capability is derived from a directory at runtime. This
+    /// asserts the two paths agree — that "built in" is only a statement about
+    /// where the bytes live, not about what a capability is.
+    #[test]
+    fn a_builtin_derives_the_same_from_its_directory() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("capabilities");
+        for cap in builtins() {
+            let from_disk = manifest::from_dir(&root.join(&cap.id), Source::Builtin)
+                .unwrap_or_else(|e| {
+                    panic!("`{}` does not derive from its directory: {e:#}", cap.id)
+                });
+
+            assert_eq!(from_disk.id, cap.id);
+            assert_eq!(from_disk.description, cap.description, "[{}]", cap.id);
+            assert_eq!(from_disk.declarations, cap.declarations, "[{}]", cap.id);
+            assert_eq!(from_disk.pipelines, cap.pipelines, "[{}]", cap.id);
+            assert_eq!(from_disk.templates, cap.templates, "[{}]", cap.id);
+            assert_eq!(from_disk.guard_rules, cap.guard_rules, "[{}]", cap.id);
+            assert_eq!(
+                from_disk.requires_adapters, cap.requires_adapters,
+                "[{}]",
+                cap.id
+            );
+            assert_eq!(from_disk.skill_md, cap.skill_md, "[{}]", cap.id);
         }
     }
 }

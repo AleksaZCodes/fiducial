@@ -52,7 +52,7 @@ pub fn run() -> Result<()> {
 
     // ── 7. Adapter selections ─────────────────────────────────────────────
     if let Some(cfg) = &cfg {
-        check_adapters(cfg, &mut issues, &mut ok);
+        check_adapters(cfg, lock.as_ref(), &mut issues, &mut ok);
     }
 
     // ── 8. Hardcoded user-visible strings ─────────────────────────────────
@@ -114,7 +114,12 @@ pub fn run() -> Result<()> {
 /// cannot work, and a capability whose contract nobody filled is a product that
 /// will discover the gap at runtime. Both are unambiguous, which is the test
 /// for whether something belongs in `issues`.
-fn check_adapters(cfg: &Config, issues: &mut Vec<String>, ok: &mut Vec<String>) {
+fn check_adapters(
+    cfg: &Config,
+    lock: Option<&Lock>,
+    issues: &mut Vec<String>,
+    ok: &mut Vec<String>,
+) {
     let mut bad = false;
     for (contract, vendor) in &cfg.adapters.selected {
         if let Some(problem) = adapter::problem(contract, vendor) {
@@ -126,10 +131,17 @@ fn check_adapters(cfg: &Config, issues: &mut Vec<String>, ok: &mut Vec<String>) 
     // A capability can need a contract without choosing the vendor — that is
     // the point of the split. What it cannot do is need one nobody filled.
     for id in &cfg.capabilities.enabled {
-        let Some(cap) = crate::capability::find(id) else {
-            continue;
+        // The lock first: a capability resolved from outside the binary is not
+        // in the built-in registry, and its requirements are still its
+        // requirements.
+        let required: Vec<String> = match lock.and_then(|l| l.capabilities.get(id)) {
+            Some(record) => record.requires_adapters.clone(),
+            None => match crate::capability::find(id) {
+                Some(cap) => cap.requires_adapters.clone(),
+                None => continue,
+            },
         };
-        for contract in cap.requires_adapters {
+        for contract in &required {
             if cfg.adapters.get(contract).is_none() {
                 issues.push(format!(
                     "capability `{id}` requires the `{contract}` adapter, and \
@@ -301,7 +313,7 @@ fn check_upstream_templates(
             Some(b) => b,
             None => continue, // Pre-Phase-4 lock entry — skip.
         };
-        let raw = match templates::raw(rel_path) {
+        let raw = match templates::raw_for(rel_path, &cfg.capabilities.enabled) {
             Some(r) => r,
             None => continue, // Path not in registry.
         };
