@@ -611,8 +611,10 @@ fn run_fid_adapters(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
 
 /// TypeScript import line for a contract + vendor pair.
 ///
-/// Until real vendor implementations ship, every vendor falls through to the
-/// `none` import from `@fiducial/adapters`. As each vendor lands, add it here.
+/// Until a vendor ships an implementation, it falls through to the `none`
+/// import from `@fiducial/adapters`. As each vendor lands, add it here *and*
+/// to `implementations` in `adapter::CONTRACTS` — the two must move together,
+/// or `fid doctor` calls a selection valid that derive cannot actually wire.
 fn vendor_ts_import(contract: &str, vendor: &str) -> String {
     let (class, path) = vendor_ts_class_and_path(contract, vendor);
     format!("import {{ {class} }} from \"{path}\";")
@@ -633,15 +635,20 @@ fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
         _ => ("NoneDatabase", "@fiducial/adapters"),
     };
 
-    // Real vendor implementations extend this match when they ship.
-    // Returning none_class here is intentional: selecting a candidate vendor
-    // that has no implementation yet is caught by `fid doctor`; derive falls
-    // back to none so the file is still generated and the build stays green.
-    if vendor == "none" {
-        return (none_class.0.to_string(), none_class.1.to_string());
-    }
+    // Real vendor implementations land here. Falling back to `none_class` for
+    // an unrecognized (contract, vendor) pair is intentional: selecting a
+    // candidate that has no implementation yet is caught by `fid doctor`;
+    // derive still writes a file so the build stays green.
+    let real = match (contract, vendor) {
+        ("database", "d1") => Some(("D1Database", "@fiducial/adapters/database")),
+        ("storage", "r2") => Some(("R2Storage", "@fiducial/adapters/storage")),
+        _ => None,
+    };
 
-    (none_class.0.to_string(), none_class.1.to_string())
+    match real {
+        Some((class, path)) => (class.to_string(), path.to_string()),
+        None => (none_class.0.to_string(), none_class.1.to_string()),
+    }
 }
 
 // ── Command execution ─────────────────────────────────────────────────────────

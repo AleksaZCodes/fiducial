@@ -118,3 +118,78 @@ fn doctor_is_clean_after_installing_adapters() {
     let out = run(&root, &["doctor"]);
     assert!(out.status.success(), "{}", text(&out));
 }
+
+// ── Real vendors: d1, r2 ─────────────────────────────────────────────────────
+
+/// Select a vendor for a contract by editing `fiducial.toml` directly.
+///
+/// `[adapters]` is written only when at least one vendor is selected
+/// (`Adapters::is_empty` skips it), so a fresh scaffold has no section to
+/// find-and-replace into — this appends one entry, adding a new `[adapters]`
+/// heading only the first time.
+fn set_adapter(root: &Path, contract: &str, vendor: &str) {
+    let path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&path).unwrap();
+    let entry = format!("{contract} = \"{vendor}\"");
+    let updated = if config.contains("[adapters]") {
+        config.replacen("[adapters]", &format!("[adapters]\n{entry}"), 1)
+    } else {
+        format!("{config}\n[adapters]\n{entry}\n")
+    };
+    std::fs::write(&path, updated).unwrap();
+}
+
+#[test]
+fn selecting_d1_derives_the_real_class() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "database", "d1");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("D1Database"), "{factory}");
+    assert!(factory.contains("@fiducial/adapters/database"), "{factory}");
+}
+
+#[test]
+fn selecting_r2_derives_the_real_class() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "storage", "r2");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("R2Storage"), "{factory}");
+    assert!(factory.contains("@fiducial/adapters/storage"), "{factory}");
+}
+
+#[test]
+fn deriving_with_both_d1_and_r2_selected_writes_both_classes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "database", "d1");
+    set_adapter(&root, "storage", "r2");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("D1Database"), "{factory}");
+    assert!(factory.contains("R2Storage"), "{factory}");
+    // Contracts nobody selected still fall back to their no-op.
+    assert!(factory.contains("NoneEmail"), "{factory}");
+    assert!(factory.contains("NoneDiagnostics"), "{factory}");
+}
+
+#[test]
+fn doctor_still_rejects_an_unimplemented_candidate() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "database", "supabase");
+
+    let out = run(&root, &["doctor"]);
+    assert!(!out.status.success(), "{}", text(&out));
+    assert!(
+        text(&out).contains("nothing implements yet"),
+        "{}",
+        text(&out)
+    );
+}

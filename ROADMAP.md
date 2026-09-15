@@ -188,14 +188,26 @@ apply to `no_std` targets. Firmware uses `embedded-hal` / Embassy HAL and
 backend, `packages/adapters` in the TS frontend. `src/firmware.rs` holds the
 full mapping.
 
-**Vendor implementations** (Supabase, Neon/Postgres, D1, S3/R2, Resend,
-Sentry) are the next item — *Cloudflare adapter set*.
+**Vendor implementations** — `d1` and `r2` shipped as the first two; Supabase,
+Neon/Postgres, S3, Resend, Sentry remain — under *Cloudflare adapter set*.
 
-### Cloudflare adapter set — *terminal, product-critical* ⬜
+### Cloudflare adapter set — *terminal, product-critical* 🟡
 
 D1, R2, Workers, Access, Turnstile, Queues, Workers AI. The first real adapters,
 and the proof that the adapter contract is vendor-neutral rather than a
 Cloudflare-shaped hole.
+
+**Shipped:** `d1` (database) and `r2` (storage) — the two that land on a
+contract already defined. Real `D1Database` / `R2Storage` TypeScript classes,
+selectable in `[adapters]`, wired through `fid derive` exactly as
+`adapter.rs`'s own "adding a vendor" doc describes. Spec:
+`docs/specs/2026-09-15-cloudflare-adapter-set.md`.
+
+**Not yet:** Workers (as the `deploy` contract, which is currently
+pipeline-shaped, not a runtime trait), Access, Turnstile, Queues, Workers AI —
+none of the last four has a contract to attach to yet, and designing one
+against zero consumers is the mistake *capability taxonomy, made real*
+already named and corrected once.
 
 **Depends on:** cross-platform adapter architecture above.
 
@@ -406,8 +418,9 @@ firmware. Firmware uses `embedded-hal` / Embassy HAL for peripherals and
 full mapping. Tauri bridges both worlds: this crate in the Rust backend,
 `packages/adapters` in the TS frontend, `fiducial-tauri` for serial transport.
 
-**Vendor implementations** (Supabase, Neon/Postgres, Cloudflare D1, S3/R2,
-Resend, Sentry) are the next item — *Cloudflare adapter set*.
+**Vendor implementations.** `d1` (database) and `r2` (storage) shipped —
+see *Cloudflare adapter set*. Supabase, Neon/Postgres, S3, Resend and Sentry
+remain candidates.
 
 ---
 

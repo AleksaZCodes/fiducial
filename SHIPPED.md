@@ -360,6 +360,30 @@ no live CI status (deliberate; would go behind a flag), decisions are listed but
 not read so supersession is undetected, and `briefs` from §10's v0 row is not
 built because no product has one yet.
 
+**Phase 28 — Cloudflare adapter set: `d1` and `r2` 🟡 (2026-09-15)**
+
+> Implements the first two of seven items in the roadmap's **Cloudflare
+> adapter set**: `d1` and `r2`, the ones that land on a contract *Cross-platform
+> adapter architecture* already shipped. The other five — Workers as `deploy`,
+> Access, Turnstile, Queues, Workers AI — have no contract to attach to and
+> are scoped, not built. Spec:
+> `docs/specs/2026-09-15-cloudflare-adapter-set.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| `D1Database` — real `Database` implementation reached through a Workers binding (`env.DB`); `execute`/`query`/`queryOne` wrap D1's `prepare().bind().run()/all()/first()`, `batch` wraps `db.batch()` | ✅ |
+| `R2Storage` — real `Storage` implementation reached through `env.BUCKET`; `list` follows R2's cursor across pages instead of silently truncating past 1000 keys | ✅ |
+| **`signedUrl` throws, and says why** — a presigned R2 URL needs SigV4 signing against the S3-compatible API with an R2 API token, credentials the binding does not carry. Throwing beats `NoneStorage`'s silent `""`: an empty URL from a *selected* vendor would read as an R2 bug | ✅ |
+| `d1` and `r2` moved from `candidates` to `implementations` in `adapter::CONTRACTS` — the exact seam Phase 27 left for this | ✅ |
+| `vendor_ts_class_and_path` in `derive.rs` — two new match arms; every other (contract, vendor) pair still falls back to `none`, unchanged | ✅ |
+| **Binding-name convention documented, not inferred**: `fid derive` cannot see a hand-edited `wrangler.toml`, so `D1Database`/`R2Storage` read fixed names (`DB`, `BUCKET`) — stated in both class doc comments and the capability `SKILL.md`, with the escape hatch (pass a differently-shaped `env`, or wrap the class) named alongside it | ✅ |
+| **The Rust/TypeScript "kept in sync" claim narrowed to what is still true**: `d1`/`r2` exist only on the TypeScript side, because a Workers binding is not reachable from a Tauri desktop process — `fiducial-adapters::lib` and the crate README now say so, rather than leaving the old blanket claim standing | ✅ |
+| 20 TypeScript unit tests against fake D1/R2 bindings (`packages/adapters/src/adapters.test.js`) — the package's first test file; its `test` script previously matched no files | ✅ |
+| 4 new end-to-end tests through the real `fid` binary: selecting `d1` alone, `r2` alone, both together, and that an unimplemented candidate (e.g. `supabase`) still fails `fid doctor` with "nothing implements yet" | ✅ |
+| `fid capability list --all` — `database`/`storage` now show `selectable: none, d1` / `none, r2` | ✅ |
+| **Deliberately not done, and said so in `ROADMAP.md`, `SHIPPED.md` and the spec**: Workers-as-`deploy` (needs its own design — `deploy` is pipeline-shaped, not a runtime trait), Access, Turnstile, Queues, Workers AI (no contract exists for any of the four, and designing one against zero consumers is the mistake *capability taxonomy, made real* already corrected once), a Rust-side D1/R2 client (would need Cloudflare's HTTP/S3 API over an API token, not a binding — no Tauri product needs it), a working `signedUrl` | ✅ |
+| Clippy (0 warnings), fmt, full Rust suite (all workspace crates) and the new JS test file all green | ✅ |
+
 **Phase 26 — brand ✅ (2026-09-15)**
 
 > Implements the roadmap item **Brand**: one declaration derives a favicon,

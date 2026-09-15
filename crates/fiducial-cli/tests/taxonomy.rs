@@ -214,9 +214,15 @@ fn contracts_are_discoverable_and_honest_about_what_works() {
     let t = text(&out);
     assert!(t.contains("ADAPTER CONTRACTS"), "{t}");
     assert!(t.contains("selectable: none"), "{t}");
+    // d1 and r2 shipped as the first real vendors (Cloudflare adapter set) —
+    // selectable now, no longer merely planned.
     assert!(
-        t.contains("planned: d1, supabase"),
-        "planned vendors are named, and kept out of selectable:\n{t}"
+        t.contains("selectable: none, d1") && t.contains("planned: supabase"),
+        "d1 moved from planned to selectable:\n{t}"
+    );
+    assert!(
+        t.contains("selectable: none, r2") && t.contains("planned: s3"),
+        "r2 moved from planned to selectable:\n{t}"
     );
 }
 

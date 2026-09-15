@@ -28,7 +28,12 @@
 //!
 //! ## Adding a vendor
 //!
-//! 1. Implement the trait for your vendor struct.
+//! 1. Implement the trait for your vendor struct — **if the vendor is
+//!    reachable from Rust.** `d1` and `r2` are not: a Cloudflare Workers
+//!    binding only exists inside a Worker, so those two vendors implement
+//!    only the TypeScript side (`packages/adapters`) and this crate has no
+//!    `D1Database`/`R2Storage` struct. Add one here only when something in
+//!    Rust can actually reach the vendor.
 //! 2. Add the vendor key to `CONTRACTS` in `fiducial-cli/src/adapter.rs`
 //!    (move it from `candidates` to `implementations`).
 //! 3. Update the `fid-adapters` executor in `derive.rs` to emit the import.

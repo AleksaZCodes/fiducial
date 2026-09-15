@@ -42,6 +42,10 @@ export interface Storage {
 
 /** No-op object storage — all writes succeed silently; all reads return null. */
 export class NoneStorage implements Storage {
+  // Accepts and ignores `env` so every vendor class in this contract shares
+  // one constructor shape for the generated factory to call uniformly.
+  constructor(_env?: unknown) {}
+
   async put(
     _key: string,
     _bytes: Uint8Array,
@@ -60,5 +64,118 @@ export class NoneStorage implements Storage {
 
   async signedUrl(_key: string, _ttlSeconds: number): Promise<string> {
     return "";
+  }
+}
+
+// ── R2 ───────────────────────────────────────────────────────────────────
+
+/**
+ * R2 — Cloudflare's object storage, reached through a binding (`env.BUCKET`)
+ * inside a Worker. No egress fees, which is why `docs/specs/…cloudflare-default`
+ * names it as the default for firmware distribution.
+ *
+ * `R2Binding` mirrors the methods this adapter calls from
+ * `@cloudflare/workers-types`' `R2Bucket`, without depending on that package
+ * at the type level — same reasoning as `D1Binding` above.
+ *
+ * **Binding convention:** `env.BUCKET`, for the same reason `D1Database`
+ * reads `env.DB` — see its doc comment.
+ *
+ * **`signedUrl` is not implemented, on purpose.** A time-limited URL for an
+ * R2 object requires AWS SigV4 signing against R2's S3-compatible API,
+ * which needs an R2 API token (access key + secret) — credentials the
+ * binding does not carry and that only exist outside the Workers runtime.
+ * Producing one from inside a Worker is a second, S3-shaped client this
+ * adapter does not build, because nothing in this repository has needed a
+ * signed URL yet. Calling it throws a `StorageError` that says so, rather
+ * than returning an empty string like `NoneStorage` — a silently-empty URL
+ * from a *selected* vendor would look like a bug in R2, not an
+ * unimplemented method.
+ */
+interface R2Binding {
+  put(
+    key: string,
+    value: Uint8Array,
+    options?: { httpMetadata?: { contentType?: string } },
+  ): Promise<unknown>;
+  get(key: string): Promise<R2Object | null>;
+  delete(key: string): Promise<void>;
+  list(options?: {
+    prefix?: string;
+    cursor?: string;
+  }): Promise<{ objects: { key: string }[]; truncated: boolean; cursor?: string }>;
+}
+
+interface R2Object {
+  arrayBuffer(): Promise<ArrayBuffer>;
+}
+
+export class R2Storage implements Storage {
+  private readonly bucket: R2Binding;
+
+  constructor(env: { BUCKET?: R2Binding }) {
+    if (!env?.BUCKET) {
+      throw new StorageError(
+        "R2Storage: no `BUCKET` binding on env — add a [[r2_buckets]] block " +
+          'with `binding = "BUCKET"` to wrangler.toml',
+      );
+    }
+    this.bucket = env.BUCKET;
+  }
+
+  async put(
+    key: string,
+    bytes: Uint8Array,
+    contentType?: string,
+  ): Promise<void> {
+    try {
+      await this.bucket.put(key, bytes, {
+        httpMetadata: contentType ? { contentType } : undefined,
+      });
+    } catch (err) {
+      throw new StorageError(`R2 put failed: ${String(err)}`, key);
+    }
+  }
+
+  async get(key: string): Promise<Uint8Array | null> {
+    try {
+      const obj = await this.bucket.get(key);
+      if (!obj) return null;
+      return new Uint8Array(await obj.arrayBuffer());
+    } catch (err) {
+      throw new StorageError(`R2 get failed: ${String(err)}`, key);
+    }
+  }
+
+  async delete(key: string): Promise<void> {
+    try {
+      await this.bucket.delete(key);
+    } catch (err) {
+      throw new StorageError(`R2 delete failed: ${String(err)}`, key);
+    }
+  }
+
+  async list(prefix: string): Promise<string[]> {
+    try {
+      const keys: string[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await this.bucket.list({ prefix, cursor });
+        keys.push(...page.objects.map((o) => o.key));
+        cursor = page.truncated ? page.cursor : undefined;
+      } while (cursor);
+      return keys;
+    } catch (err) {
+      throw new StorageError(`R2 list failed: ${String(err)}`);
+    }
+  }
+
+  async signedUrl(key: string, _ttlSeconds: number): Promise<string> {
+    throw new StorageError(
+      "R2Storage.signedUrl: not implemented — R2 presigned URLs require " +
+        "SigV4 signing against the S3-compatible API with an R2 API token, " +
+        "which the Workers binding does not carry. See the class doc comment.",
+      key,
+    );
   }
 }
