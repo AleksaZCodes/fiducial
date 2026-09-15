@@ -11,6 +11,15 @@
 - [ ] No generated artifact edited by hand
 - [ ] No value typed a second time — it has a declaration
 
+## Contributor License Agreement
+
+> Required by [`IP-POLICY.md`](../IP-POLICY.md) rule 3. Without it, this
+> contribution can never be relicensed without tracking you down individually.
+
+- [ ] Every commit carries `Signed-off-by:` matching its author
+      (`git commit -s`), certifying agreement with [`CLA.md`](../CLA.md)
+- [ ] Not applicable — I am a maintainer listed in `.github/cla-exempt.txt`
+
 ## Disclosure checkpoint
 
 > Required by [`IP-POLICY.md`](../IP-POLICY.md). Public disclosure is prior art

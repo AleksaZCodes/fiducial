@@ -314,3 +314,8 @@ MIT — see [`LICENSE`](./LICENSE).
 
 Product repos, domain logic, novel protocols and hardware designs are private;
 see [`IP-POLICY.md`](./IP-POLICY.md).
+
+Contributions are welcome and need a sign-off — see [`CLA.md`](./CLA.md). It
+exists so the project keeps the option to relicense later: that option is
+destroyed silently by the first contribution merged without one, and cannot be
+recovered afterwards.

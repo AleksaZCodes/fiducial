@@ -306,6 +306,16 @@ Generating the per-vendor wrappers from one authored source is roadmap item
 **agent portability**; today the wrapper for Claude is written by hand and there
 is none for anyone else.
 
+## Contributions from outside
+
+`CLA.md` binds outside contributors so the project keeps the option to
+relicense; `IP-POLICY.md` rule 3 is where that requirement is authored. Every
+commit from a non-maintainer needs `Signed-off-by:` matching its author, gated
+by `outside_contributions_carry_a_cla_sign_off` in
+`crates/fiducial-cli/tests/commit_hygiene.rs`. Maintainers and automation are
+listed in `.github/cla-exempt.txt`, which is the only place that decides who is
+exempt.
+
 ## What not to do
 
 - Do not modify `/home/aleksa/dev/rop-reference/` (real secrets).
