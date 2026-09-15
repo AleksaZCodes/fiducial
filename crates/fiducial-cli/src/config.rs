@@ -37,6 +37,35 @@ pub struct Config {
     /// `[identity]` — where this product keeps its permission rows.
     #[serde(default, skip_serializing_if = "Identity::is_empty")]
     pub identity: Identity,
+    /// `[freshness]` — gates other than `fid derive --check`.
+    #[serde(default, skip_serializing_if = "Freshness::is_empty")]
+    pub freshness: Freshness,
+}
+
+/// `[freshness]` — how this repository stops a stale artifact reaching `main`.
+///
+/// `fid dash` used to equate "gated" with "a workflow runs `fid derive
+/// --check`", and reported *this* repository as ungated while seven gates ran
+/// on every commit. The reason is in `fiducial.toml`: the protocol vectors and
+/// the terminal captures are gated by Rust tests on purpose, because a gate
+/// that runs through the tool it gates is blind exactly where it matters.
+///
+/// That is a judgment, so it is declared rather than guessed. `fid derive
+/// --check` stays recognised without being listed — it is the default for a
+/// scaffolded product, and requiring every product to restate it would be the
+/// second declaration this block exists to avoid.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct Freshness {
+    /// Commands that gate a generated artifact, matched as substrings against
+    /// each workflow's text.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub gates: Vec<String>,
+}
+
+impl Freshness {
+    pub fn is_empty(&self) -> bool {
+        self.gates.is_empty()
+    }
 }
 
 /// Which SQL dialect the grants table is generated for.
@@ -69,9 +98,34 @@ impl SqlDialect {
 /// database of its own).
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Identity {
+    /// Where the permission rows live: `sql` (the default) or `none`.
+    ///
+    /// `fid add identity` used to install the *rule* and the *storage*
+    /// together. A product that wants `can()` and seeds its grants from config
+    /// or `MemoryGrantStore` still got a migration it will never apply and a
+    /// generated module it will never import.
+    ///
+    /// `none` is this platform's existing word for "wired in, reported, does
+    /// nothing" — see the `NONE` adapter, which is a real implementation
+    /// rather than a placeholder. Splitting identity into two capabilities was
+    /// the alternative, and is more surface for the same result.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub storage: String,
     /// Table holding the permission rows. Defaults to `grants`.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub table: String,
+    /// Derive an append-only log of authorization decisions.
+    ///
+    /// Off by default. An audit log is a write on every decision and a
+    /// retention obligation on every row, so it is a choice a product makes
+    /// rather than something it acquires by installing identity.
+    ///
+    /// It arrives as `migrations/0002_audit.sql` — a *second* migration, not
+    /// an edit to the first. Editing an applied migration is the one thing the
+    /// migration runner refuses outright, and the generator does not get an
+    /// exemption from the rule it generates for.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub audit: bool,
     /// `sqlite` | `postgres`. Empty means "derive it from `[adapters]
     /// database`", which is the normal case.
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -97,10 +151,21 @@ pub struct Identity {
 
 impl Identity {
     pub fn is_empty(&self) -> bool {
-        self.table.is_empty()
+        self.storage.is_empty()
+            && !self.audit
+            && self.table.is_empty()
             && self.dialect.is_empty()
             && !self.rls
             && self.current_user_sql.is_empty()
+    }
+
+    /// Whether this product derives grant storage at all.
+    ///
+    /// Empty means `sql`: the default has to stay what it was, or adding this
+    /// option would silently delete the migration of every product that
+    /// already has one.
+    pub fn stores_grants(&self) -> bool {
+        !matches!(self.storage.as_str(), "none")
     }
 
     /// The table name to generate against, defaulted.
@@ -146,6 +211,46 @@ impl Identity {
 
     /// Everything the pipeline needs, each problem named.
     pub fn validate(&self, adapters: &Adapters) -> Result<()> {
+        match self.storage.as_str() {
+            "" | "sql" | "none" => {}
+            other => bail!(
+                "[identity] storage = \"{other}\" is not a kind of grant storage \
+                 this generates. Known: sql (the default), none.\n\
+                 `none` installs the rule without the table — `can()` still works, \
+                 against grants you supply yourself."
+            ),
+        }
+
+        if !self.stores_grants() {
+            // Every other key here configures a table that will not exist.
+            // Silently ignoring them is how a product ends up believing `rls =
+            // true` protects something.
+            let ignored: Vec<&str> = [
+                // `table = "grants"` is what the capability seeds, so it is
+                // present in every product that ran `fid add identity` and
+                // says nothing about intent. Only a name someone chose does.
+                (!self.table.is_empty() && self.table != "grants").then_some("table"),
+                (!self.dialect.is_empty()).then_some("dialect"),
+                self.rls.then_some("rls"),
+                self.audit.then_some("audit"),
+                (!self.current_user_sql.is_empty()).then_some("current_user_sql"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
+            if !ignored.is_empty() {
+                bail!(
+                    "[identity] storage = \"none\", so no table is generated — but \
+                     `{}` configure{} one.\n\
+                     Remove {}, or set storage = \"sql\".",
+                    ignored.join("`, `"),
+                    if ignored.len() == 1 { "s" } else { "" },
+                    if ignored.len() == 1 { "it" } else { "them" },
+                );
+            }
+            return Ok(());
+        }
+
         let name = self.table_name();
         let ok = !name.is_empty()
             && name

@@ -21,7 +21,8 @@
 //! levels disagreeing.
 
 use fiducial_identity::{
-    can, effective_role, Action, DeviceId, Grant, Principal, Resource, Role, ServiceId, UserId,
+    can, effective_role, explain, Action, DeviceId, Grant, Principal, Reason, Resource, Role,
+    ServiceId, Timestamp, UserId,
 };
 
 const VECTORS_PATH: &str = "../../docs/identity/vectors.json";
@@ -32,6 +33,14 @@ const BOB: [u8; 16] = [0x0b; 16];
 const DEV_A: [u8; 8] = [0xda; 8];
 const DEV_B: [u8; 8] = [0xdb; 8];
 const SVC: [u8; 8] = [0x5c; 8];
+
+/// A fixed "current time" for the vectors: 2026-09-15T00:00:00Z in millis.
+///
+/// Fixed rather than `now()` — a vector file that changes every time it is
+/// generated cannot be a freshness gate.
+const NOW: Timestamp = Timestamp(1_789_516_800_000);
+const EARLIER: Timestamp = Timestamp(1_789_516_800_000 - 86_400_000);
+const LATER: Timestamp = Timestamp(1_789_516_800_000 + 86_400_000);
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
@@ -62,6 +71,20 @@ fn action_name(a: Action) -> &'static str {
     }
 }
 
+fn reason_name(r: Reason) -> &'static str {
+    match r {
+        Reason::Granted => "granted",
+        Reason::DeviceReadingItself => "device_reading_itself",
+        Reason::NotIdentified => "not_identified",
+        Reason::NoGrant => "no_grant",
+        Reason::RoleTooWeak => "role_too_weak",
+        Reason::Expired => "expired",
+        Reason::NoClock => "no_clock",
+        Reason::DelegatorLacksAuthority => "delegator_lacks_authority",
+        Reason::DelegationTooDeep => "delegation_too_deep",
+    }
+}
+
 fn role_name(r: Role) -> &'static str {
     match r {
         Role::Viewer => "viewer",
@@ -78,6 +101,10 @@ struct Scenario {
     why: &'static str,
     grants: Vec<Grant>,
     probes: Vec<(Principal, Action, Resource)>,
+    /// The clock the scenario is evaluated at. `None` models a caller with no
+    /// clock — a device whose RTC has not synced — which is the case expiry
+    /// has to fail closed for.
+    now: Option<Timestamp>,
 }
 
 fn scenarios() -> Vec<Scenario> {
@@ -112,12 +139,14 @@ fn scenarios() -> Vec<Scenario> {
             why: "deny is the default; a device may still read itself",
             grants: vec![],
             probes: all_probes(&[r_dev_a, r_dev_b]),
+            now: Some(NOW),
         },
         Scenario {
             name: "alice_owns_device_a",
             why: "the user↔device link: ownership covers one device, not the fleet",
             grants: vec![Grant::new(alice, r_dev_a, Role::Owner)],
             probes: all_probes(&[r_dev_a, r_dev_b]),
+            now: Some(NOW),
         },
         Scenario {
             name: "bob_views_device_a",
@@ -127,18 +156,21 @@ fn scenarios() -> Vec<Scenario> {
                 Grant::new(bob, r_dev_a, Role::Viewer),
             ],
             probes: all_probes(&[r_dev_a]),
+            now: Some(NOW),
         },
         Scenario {
             name: "member_may_command",
             why: "a household member sends commands but cannot re-grant",
             grants: vec![Grant::new(bob, r_dev_a, Role::Member)],
             probes: all_probes(&[r_dev_a]),
+            now: Some(NOW),
         },
         Scenario {
             name: "service_admin_platform",
             why: "a backend service holds a platform-wide grant",
             grants: vec![Grant::new(svc, Resource::Platform, Role::Admin)],
             probes: all_probes(&[r_dev_a, r_dev_b]),
+            now: Some(NOW),
         },
         Scenario {
             name: "zero_sentinel_is_not_an_identity",
@@ -166,6 +198,7 @@ fn scenarios() -> Vec<Scenario> {
                     Resource::Platform,
                 ),
             ],
+            now: Some(NOW),
         },
         Scenario {
             name: "device_reports_to_its_owner",
@@ -179,6 +212,91 @@ fn scenarios() -> Vec<Scenario> {
                 (alice, Action::Write, r_dev_a),
                 (alice, Action::Admin, r_dev_a),
             ],
+            now: Some(NOW),
+        },
+        Scenario {
+            name: "expired_grant_is_not_a_grant",
+            why: "a support engineer's access lapses without anyone remembering to revoke it",
+            grants: vec![
+                Grant::new(alice, r_dev_a, Role::Owner),
+                Grant::new(bob, r_dev_a, Role::Admin).expiring_at(EARLIER),
+            ],
+            probes: all_probes(&[r_dev_a]),
+            now: Some(NOW),
+        },
+        Scenario {
+            name: "unexpired_grant_still_works",
+            why: "the same grant, before its expiry — the other half of the pair",
+            grants: vec![
+                Grant::new(alice, r_dev_a, Role::Owner),
+                Grant::new(bob, r_dev_a, Role::Admin).expiring_at(LATER),
+            ],
+            probes: all_probes(&[r_dev_a]),
+            now: Some(NOW),
+        },
+        Scenario {
+            name: "no_clock_refuses_an_expiring_grant",
+            why: "a device with no synced RTC cannot honour an expiry, so it must not \
+                  honour the grant; the permanent grant beside it is unaffected",
+            grants: vec![
+                Grant::new(alice, r_dev_a, Role::Owner),
+                Grant::new(bob, r_dev_a, Role::Admin).expiring_at(LATER),
+            ],
+            probes: all_probes(&[r_dev_a]),
+            now: None,
+        },
+        Scenario {
+            name: "delegated_grant_follows_its_delegator",
+            why: "alice owns the device and delegates admin to bob; bob's grant is worth \
+                  exactly what alice's authority is worth",
+            grants: vec![
+                Grant::new(alice, r_dev_a, Role::Owner),
+                Grant::new(bob, r_dev_a, Role::Admin).delegated_by(alice),
+            ],
+            probes: all_probes(&[r_dev_a]),
+            now: Some(NOW),
+        },
+        Scenario {
+            name: "revoking_the_delegator_revokes_the_delegation",
+            why: "alice's own grant is gone, so bob's delegated grant stops working \
+                  without anyone having to find it",
+            grants: vec![Grant::new(bob, r_dev_a, Role::Admin).delegated_by(alice)],
+            probes: all_probes(&[r_dev_a]),
+            now: Some(NOW),
+        },
+        Scenario {
+            name: "a_member_cannot_delegate_what_they_lack",
+            why: "delegation needs Admin — the action defined as changing who else may \
+                  act — so a Member cannot mint grants they could not use",
+            grants: vec![
+                Grant::new(alice, r_dev_a, Role::Member),
+                Grant::new(bob, r_dev_a, Role::Admin).delegated_by(alice),
+            ],
+            probes: all_probes(&[r_dev_a]),
+            now: Some(NOW),
+        },
+        Scenario {
+            name: "a_delegation_cycle_terminates",
+            why: "alice delegated by bob, bob delegated by alice — a table anyone with \
+                  Admin can write, and an unbounded walk there is a crash in the \
+                  authorization path",
+            grants: vec![
+                Grant::new(alice, r_dev_a, Role::Admin).delegated_by(bob),
+                Grant::new(bob, r_dev_a, Role::Admin).delegated_by(alice),
+            ],
+            probes: all_probes(&[r_dev_a]),
+            now: Some(NOW),
+        },
+        Scenario {
+            name: "an_expired_delegator_cannot_sustain_a_delegation",
+            why: "expiry and delegation compose: the chain is only live while every \
+                  link in it is",
+            grants: vec![
+                Grant::new(alice, r_dev_a, Role::Owner).expiring_at(EARLIER),
+                Grant::new(bob, r_dev_a, Role::Admin).delegated_by(alice),
+            ],
+            probes: all_probes(&[r_dev_a]),
+            now: Some(NOW),
         },
     ]
 }
@@ -195,6 +313,8 @@ fn render() -> String {
                         "principal": principal_json(&g.principal),
                         "resource": resource_json(&g.resource),
                         "role": role_name(g.role),
+                        "expires_at": g.expires_at.map(|t| t.0),
+                        "delegated_by": g.delegated_by.as_ref().map(principal_json),
                     })
                 })
                 .collect();
@@ -207,8 +327,9 @@ fn render() -> String {
                         "principal": principal_json(p),
                         "action": action_name(*a),
                         "resource": resource_json(r),
-                        "allowed": can(p, *a, r, &s.grants),
-                        "effective_role": effective_role(p, r, &s.grants).map(role_name),
+                        "allowed": can(p, *a, r, &s.grants, s.now),
+                        "effective_role": effective_role(p, r, &s.grants, s.now).map(role_name),
+                        "reason": reason_name(explain(p, *a, r, &s.grants, s.now).reason),
                     })
                 })
                 .collect();
@@ -216,6 +337,7 @@ fn render() -> String {
             serde_json::json!({
                 "name": s.name,
                 "why": s.why,
+                "now": s.now.map(|t| t.0),
                 "grants": grants,
                 "probes": probes,
             })
@@ -286,7 +408,7 @@ fn vectors_contain_both_verdicts_for_every_action() {
                 if action_name(*a) != action {
                     continue;
                 }
-                if can(p, *a, r, &s.grants) {
+                if can(p, *a, r, &s.grants, s.now) {
                     allowed = true;
                 } else {
                     denied = true;

@@ -1,0 +1,4 @@
+$ fid derive --check
+✗ fid derive --check failed:
+  board/board.interface.json: stale (lock:9d241d22 file:867aeb34) — run `fid derive`
+Error: stale artifacts detected

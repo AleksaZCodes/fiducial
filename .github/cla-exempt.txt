@@ -1,0 +1,28 @@
+# Identities that do not need a CLA sign-off trailer.
+#
+# The CLA (see CLA.md) binds OUTSIDE contributors. The project owner already
+# holds the copyright and does not sign an agreement with themselves, and
+# automation does not hold copyright at all.
+#
+# This file is the single declaration of who that is. `commit_hygiene.rs`
+# reads it; nothing else decides. Adding a maintainer means adding a line here
+# and nowhere else.
+#
+# One identity per line, matched against the commit author's name OR email,
+# exactly. Blank lines and `#` comments are ignored.
+
+# The project owner — the copyright holder named in LICENSE. Listed under both
+# spellings because the LICENSE drops the diacritic and git does not.
+Aleksa Zdravkovic
+Aleksa Zdravković
+108585048+AleksaZCodes@users.noreply.github.com
+aleksazdravkovic@proton.me
+
+# Automation. A bot is not a contributor: `github-actions[bot]` opens the
+# changesets release PR, and agent-authored commits are work-for-hire of the
+# owner who ran the agent, recorded by a Co-Authored-By trailer rather than by
+# authorship.
+github-actions[bot]
+41898282+github-actions[bot]@users.noreply.github.com
+Claude
+noreply@anthropic.com

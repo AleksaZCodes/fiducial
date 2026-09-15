@@ -46,21 +46,39 @@ use std::process::Command;
 /// are installed. The capture was real output, faithfully generated, and
 /// completely misleading — which is the failure mode generated documentation is
 /// supposed to remove, not introduce.
-struct Step {
-    /// Where the output lands, or `None` for a step that only advances state.
-    file: Option<&'static str>,
-    args: &'static [&'static str],
+enum Step {
+    /// Run `fid …` and record what it prints.
+    Capture {
+        file: &'static str,
+        args: &'static [&'static str],
+    },
+    /// Run `fid …` only to advance the product's state; record nothing.
+    Setup { args: &'static [&'static str] },
+    /// Edit a declaration in place, the way a reader following the guide does.
+    ///
+    /// The interesting captures are the *failing* ones — an artifact that no
+    /// longer matches its declaration is the guarantee this platform sells, and
+    /// it cannot be reached by running `fid` commands alone. Without this the
+    /// stale-output block in `docs/guides/first-product.md` had to be written
+    /// from memory, and it was wrong: it named `enclosure/case-base.stl` and a
+    /// wording the binary has never printed.
+    Edit {
+        file: &'static str,
+        from: &'static str,
+        to: &'static str,
+    },
 }
 
 const fn capture(file: &'static str, args: &'static [&'static str]) -> Step {
-    Step {
-        file: Some(file),
-        args,
-    }
+    Step::Capture { file, args }
 }
 
 const fn setup(args: &'static [&'static str]) -> Step {
-    Step { file: None, args }
+    Step::Setup { args }
+}
+
+const fn edit(file: &'static str, from: &'static str, to: &'static str) -> Step {
+    Step::Edit { file, from, to }
 }
 
 /// The single declaration of what the documentation shows, in the order a
@@ -77,6 +95,14 @@ fn steps() -> Vec<Step> {
         setup(&["derive"]),
         capture("fid-derive-check.txt", &["derive", "--check"]),
         capture("fid-release-status.txt", &["release", "status"]),
+        // The guarantee, shown failing. Last, because it leaves the product
+        // deliberately stale and every capture above it expects fresh.
+        edit(
+            "board/board.interface.json",
+            "\"width_mm\": 100.0",
+            "\"width_mm\": 120.0",
+        ),
+        capture("fid-derive-check-stale.txt", &["derive", "--check"]),
     ]
 }
 
@@ -141,27 +167,50 @@ fn render() -> Vec<(String, String)> {
     let mut rendered = Vec::new();
 
     for step in steps() {
-        // `fid new` runs in the scratch directory; everything else runs inside
-        // the product it created.
-        let cwd = if step.args[0] == "new" {
-            &scratch
-        } else {
-            &product
+        let (file, args) = match step {
+            Step::Capture { file, args } => (Some(file), args),
+            Step::Setup { args } => (None, args),
+            Step::Edit { file, from, to } => {
+                let path = product.join(file);
+                let before = std::fs::read_to_string(&path)
+                    .unwrap_or_else(|e| panic!("reading {file}: {e}"));
+                // A silent no-op here would make the next capture record the
+                // fresh output under a name promising the stale one.
+                assert!(
+                    before.contains(from),
+                    "{file} does not contain `{from}` — the declaration moved \
+                     and this edit no longer does anything"
+                );
+                std::fs::write(&path, before.replace(from, to))
+                    .unwrap_or_else(|e| panic!("writing {file}: {e}"));
+                continue;
+            }
         };
 
+        // `fid new` runs in the scratch directory; everything else runs inside
+        // the product it created.
+        let cwd = if args[0] == "new" { &scratch } else { &product };
+
         let output = Command::new(fid())
-            .args(step.args)
+            .args(args)
             .current_dir(cwd)
             .env("NO_COLOR", "1")
+            // A capture must be reproducible on another machine. `anyhow`
+            // prints a backtrace when `RUST_BACKTRACE` is set, so a developer
+            // who exports it — and this repository's own CI container does —
+            // would regenerate every failing capture with fifty lines of
+            // `/rustc/<hash>/library/…` paths in it. Harmless until a capture
+            // was allowed to fail; the stale-check capture is the first.
+            .env("RUST_BACKTRACE", "0")
             .output()
-            .unwrap_or_else(|e| panic!("running `fid {}`: {e}", step.args.join(" ")));
+            .unwrap_or_else(|e| panic!("running `fid {}`: {e}", args.join(" ")));
 
-        let Some(name) = step.file else {
+        let Some(name) = file else {
             // A setup step only has to succeed; nothing is recorded from it.
             assert!(
                 output.status.success(),
                 "setup step `fid {}` failed:\n{}",
-                step.args.join(" "),
+                args.join(" "),
                 String::from_utf8_lossy(&output.stderr)
             );
             continue;
@@ -173,7 +222,7 @@ fn render() -> Vec<(String, String)> {
             body.push_str(&stderr);
         }
 
-        let header = format!("$ fid {}\n", step.args.join(" "));
+        let header = format!("$ fid {}\n", args.join(" "));
         rendered.push((
             name.to_string(),
             format!("{header}{}", normalize(&body, &scratch, &product)),
@@ -240,20 +289,18 @@ fn captures_and_their_references_agree() {
         .nth(2)
         .expect("workspace root")
         .to_path_buf();
-    let guides = root.join("docs/guides");
-
+    // The same document list the inliner walks, so a capture shown only in
+    // `README.md` counts as referenced rather than reading as dead weight.
     let mut prose = String::new();
-    if let Ok(entries) = std::fs::read_dir(&guides) {
-        for entry in entries.flatten() {
-            if entry.path().extension().is_some_and(|e| e == "md") {
-                prose.push_str(&std::fs::read_to_string(entry.path()).unwrap_or_default());
-            }
-        }
+    for path in documents_with_captures(&root) {
+        prose.push_str(&std::fs::read_to_string(path).unwrap_or_default());
     }
 
     let mut unreferenced: Vec<String> = Vec::new();
     for step in steps() {
-        let Some(name) = step.file else { continue };
+        let Step::Capture { file: name, .. } = step else {
+            continue;
+        };
         if !prose.contains(name) {
             unreferenced.push(format!("  {name} — generated but no guide shows it"));
         }
@@ -261,7 +308,7 @@ fn captures_and_their_references_agree() {
 
     assert!(
         unreferenced.is_empty(),
-        "every declared capture is shown in a guide, or it is dead weight:\n\n{}\n",
+        "every declared capture is shown in a document, or it is dead weight:\n\n{}\n",
         unreferenced.join("\n")
     );
 }
@@ -334,59 +381,73 @@ fn inline_captures(markdown: &str, captures: &[(String, String)]) -> Result<Stri
     Ok(out)
 }
 
-/// Every capture block in every guide matches the capture it names.
+/// Every document that embeds terminal output, wherever it lives.
+///
+/// `README.md` is on this list because it is the most-read page in the
+/// repository and was the least gated: it showed `fid` output that no test had
+/// ever compared against the binary. A capture marker is worth nothing if the
+/// file it is in is not scanned.
+fn documents_with_captures(root: &Path) -> Vec<PathBuf> {
+    let mut out = vec![root.join("README.md")];
+    if let Ok(entries) = std::fs::read_dir(root.join("docs/guides")) {
+        let mut guides: Vec<PathBuf> = entries
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.extension().is_some_and(|e| e == "md"))
+            .collect();
+        guides.sort();
+        out.extend(guides);
+    }
+    out
+}
+
+/// Every capture block in every document matches the capture it names.
 #[test]
-fn guides_embed_the_current_captures() {
+fn documents_embed_the_current_captures() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
         .nth(2)
         .expect("workspace root")
         .to_path_buf();
-    let guides = root.join("docs/guides");
     let captures = render();
 
     let writing = std::env::var("FIDUCIAL_WRITE_CAPTURES").is_ok();
     let mut stale: Vec<String> = Vec::new();
 
-    let entries = match std::fs::read_dir(&guides) {
-        Ok(e) => e,
-        Err(_) => return,
-    };
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().is_none_or(|e| e != "md") {
+    for path in documents_with_captures(&root) {
+        let Ok(text) = std::fs::read_to_string(&path) else {
             continue;
-        }
-        let text = std::fs::read_to_string(&path).expect("guide is readable");
+        };
         if !text.contains(OPEN) {
             continue;
         }
 
-        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        let rel = path
+            .strip_prefix(&root)
+            .unwrap_or(&path)
+            .display()
+            .to_string();
         let rendered = match inline_captures(&text, &captures) {
             Ok(r) => r,
             Err(e) => {
-                stale.push(format!("  docs/guides/{name} — {e}"));
+                stale.push(format!("  {rel} — {e}"));
                 continue;
             }
         };
 
         if writing {
             if rendered != text {
-                std::fs::write(&path, &rendered).expect("write guide");
-                eprintln!("inlined captures into docs/guides/{name}");
+                std::fs::write(&path, &rendered).expect("write document");
+                eprintln!("inlined captures into {rel}");
             }
         } else if rendered != text {
-            stale.push(format!(
-                "  docs/guides/{name} — an embedded capture is out of date"
-            ));
+            stale.push(format!("  {rel} — an embedded capture is out of date"));
         }
     }
 
     assert!(
         stale.is_empty(),
-        "\nA guide shows terminal output the CLI no longer produces.\n\n{}\n\n\
+        "\nA document shows terminal output the CLI no longer produces.\n\n{}\n\n\
          Regenerate with:\n  \
          FIDUCIAL_WRITE_CAPTURES=1 cargo test -p fiducial-cli --test captures\n",
         stale.join("\n")

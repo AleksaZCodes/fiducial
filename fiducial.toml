@@ -26,6 +26,40 @@ enabled = false
 # Capabilities are authored here, not installed here.
 enabled = []
 
+[freshness]
+# How a stale artifact is stopped here, given the paragraph above.
+#
+# `fid dash` recognises `fid derive --check` on its own — that is what a
+# scaffolded product uses. This block names the gates a repository uses
+# *instead*, and exists because dash reported this repository as ungated while
+# every one of these ran on every commit. The reason it could not know is that
+# "which command gates an artifact" is a judgment, and a judgment has to be
+# declared rather than pattern-matched.
+#
+# A gate listed here that no workflow runs is reported too: a declared gate
+# reads as protection whether or not anything runs it.
+gates = [
+    # The wire format, and the decision table both languages replay.
+    "cargo test -p fiducial-protocol --test vectors",
+    "cargo test -p fiducial-identity",
+    "cargo test -p fiducial-identity --features ed25519",
+    # Terminal output in the guides, and the derived blocks in this repo's
+    # own agent context.
+    "cargo test -p fiducial-cli --test captures",
+    "context --check",
+    # Hand-written prose, against the sources it describes.
+    "docs --check",
+    # Generated TypeScript: the wasm bridge, and the adapter factory a product
+    # gets from `fid derive`.
+    "git diff --exit-code packages/wasm-bridge/src/generated.ts",
+    "test:generated",
+    # The generated grants schema, on the two engines it claims to support.
+    "test:schema",
+    "scripts/verify-postgres.sh",
+    # The compatibility matrix against the compiled wire version.
+    "fid release check",
+]
+
 [guard]
 # The rules products get are the rules we work under.
 rules = [

@@ -32,7 +32,7 @@
  * for them. `can()` stays the shared half; storage is a server concern.
  */
 
-import type { Grant, Principal, Resource, Role } from "./index.js";
+import type { Grant, Principal, Resource, Role, Timestamp } from "./index.js";
 
 /**
  * The slice of the `database` contract this needs.
@@ -75,6 +75,24 @@ export interface SqlGrantStoreOptions {
 }
 
 /** Reading and writing the permission rows. */
+/** What a grant carries beyond principal, resource and role. */
+export interface GrantOptions {
+  /**
+   * When the grant stops being valid, in milliseconds since the epoch.
+   *
+   * Omitted is permanent. A grant that has to be remembered to be revoked is
+   * one that is not revoked.
+   */
+  expiresAt?: Timestamp | null;
+  /**
+   * Who delegated it, if it is not direct.
+   *
+   * Recorded rather than flattened into the grant, so revoking the delegator
+   * revokes everything they issued without anyone having to find it.
+   */
+  delegatedBy?: Principal | null;
+}
+
 export interface GrantStore {
   /**
    * Every grant held by `principal` — the list `can()` wants.
@@ -94,7 +112,12 @@ export interface GrantStore {
   grantsOn(resource: Resource): Promise<Grant[]>;
 
   /** Give `principal` this `role` over `resource`, replacing any existing role. */
-  grant(principal: Principal, resource: Resource, role: Role): Promise<void>;
+  grant(
+    principal: Principal,
+    resource: Resource,
+    role: Role,
+    options?: GrantOptions,
+  ): Promise<void>;
 
   /** Remove `principal`'s grant over `resource`. Succeeds if there was none. */
   revoke(principal: Principal, resource: Resource): Promise<void>;
@@ -122,10 +145,25 @@ function str(row: { get(column: string): unknown }, column: string): string {
 }
 
 function rowToGrant(row: { get(column: string): unknown }): Grant {
+  // A delegator is both halves or neither. The schema has a CHECK saying so,
+  // but a store reading a database it did not create cannot rely on that, and
+  // half a principal silently becoming `null` here is a delegated grant
+  // quietly promoted to a direct one — strictly more access than intended.
+  const delegatorKind = row.get("delegated_by_kind");
+  const delegatorId = row.get("delegated_by_id");
+  const delegatedBy =
+    delegatorKind === null || delegatorKind === undefined || delegatorKind === ""
+      ? null
+      : toPrincipal(String(delegatorKind), String(delegatorId ?? ""));
+
+  const expires = row.get("expires_at");
   return {
     principal: toPrincipal(str(row, "principal_kind"), str(row, "principal_id")),
     resource: toResource(str(row, "resource_kind"), str(row, "resource_id")),
     role: str(row, "role") as Role,
+    expiresAt:
+      expires === null || expires === undefined ? null : Number(expires),
+    delegatedBy,
   };
 }
 
@@ -188,7 +226,8 @@ export class SqlGrantStore implements GrantStore {
 
     const rows = await this.db.query(
       this.sql(
-        `SELECT principal_kind, principal_id, resource_kind, resource_id, role
+        `SELECT principal_kind, principal_id, resource_kind, resource_id, role,
+                expires_at, delegated_by_kind, delegated_by_id
            FROM ${this.table}
           WHERE principal_kind = ? AND principal_id = ?`,
       ),
@@ -200,7 +239,8 @@ export class SqlGrantStore implements GrantStore {
   async grantsOn(resource: Resource): Promise<Grant[]> {
     const rows = await this.db.query(
       this.sql(
-        `SELECT principal_kind, principal_id, resource_kind, resource_id, role
+        `SELECT principal_kind, principal_id, resource_kind, resource_id, role,
+                expires_at, delegated_by_kind, delegated_by_id
            FROM ${this.table}
           WHERE resource_kind = ? AND resource_id = ?`,
       ),
@@ -213,7 +253,12 @@ export class SqlGrantStore implements GrantStore {
     principal: Principal,
     resource: Resource,
     role: Role,
+    options: GrantOptions = {},
   ): Promise<void> {
+    const delegator =
+      options.delegatedBy && options.delegatedBy.kind !== "anonymous"
+        ? options.delegatedBy
+        : null;
     if (principal.kind === "anonymous") {
       throw new Error(
         "SqlGrantStore.grant: anonymous can hold no grant — `can()` refuses " +
@@ -223,10 +268,14 @@ export class SqlGrantStore implements GrantStore {
     await this.db.execute(
       this.sql(
         `INSERT INTO ${this.table}
-           (principal_kind, principal_id, resource_kind, resource_id, role, granted_at)
-         VALUES (?, ?, ?, ?, ?, ?)
+           (principal_kind, principal_id, resource_kind, resource_id, role, granted_at,
+            expires_at, delegated_by_kind, delegated_by_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (principal_kind, principal_id, resource_kind, resource_id)
-         DO UPDATE SET role = excluded.role, granted_at = excluded.granted_at`,
+         DO UPDATE SET role = excluded.role, granted_at = excluded.granted_at,
+                       expires_at = excluded.expires_at,
+                       delegated_by_kind = excluded.delegated_by_kind,
+                       delegated_by_id = excluded.delegated_by_id`,
       ),
       [
         principal.kind,
@@ -235,6 +284,9 @@ export class SqlGrantStore implements GrantStore {
         resourceId(resource),
         role,
         new Date().toISOString(),
+        options.expiresAt ?? null,
+        delegator ? delegator.kind : null,
+        delegator ? delegator.id : null,
       ],
     );
   }
@@ -290,7 +342,12 @@ export class MemoryGrantStore implements GrantStore {
     );
   }
 
-  async grant(principal: Principal, resource: Resource, role: Role): Promise<void> {
+  async grant(
+    principal: Principal,
+    resource: Resource,
+    role: Role,
+    options: GrantOptions = {},
+  ): Promise<void> {
     if (principal.kind === "anonymous") {
       throw new Error("MemoryGrantStore.grant: anonymous can hold no grant");
     }
@@ -298,6 +355,11 @@ export class MemoryGrantStore implements GrantStore {
       principal,
       resource,
       role,
+      expiresAt: options.expiresAt ?? null,
+      delegatedBy:
+        options.delegatedBy && options.delegatedBy.kind !== "anonymous"
+          ? options.delegatedBy
+          : null,
     });
   }
 

@@ -1,0 +1,9 @@
+description = "Schema migrations — ordered, idempotent, and checked for drift"
+
+# The pipeline reads every `.sql` file here, and this capability ships none of
+# them: which migrations a product needs is the product's business. Declaring
+# the directory is how the pipeline's input is named without inventing a
+# placeholder migration — a dummy `0000_init.sql` would be a migration that
+# runs.
+[[declarations.directory]]
+path = "migrations"

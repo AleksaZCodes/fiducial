@@ -256,8 +256,11 @@ A real bug surfaced in the process, unrelated to Auth itself: `NoneEmail`
 and `NoneDiagnostics` had no explicit constructor, so `new NoneEmail(env)`
 in the generated factory failed to typecheck — unnoticed since Phase 27
 because nothing had ever run `tsc` against a generated
-`adapters.generated.ts`. Fixed; **not** turned into an automated CI check
-this round (a real gap, recorded in the spec rather than silently closed).
+`adapters.generated.ts`. Fixed, and the gap it exposed is **now closed**:
+`pnpm --filter @fiducial/adapters test:generated` derives the factory for
+every vendor selection and compiles it, in its own CI job. Deleting the
+constructor again fails it with `TS2554`. Spec:
+`docs/specs/2026-09-15-generated-code-is-compiled-not-matched.md`.
 
 **Hardened immediately afterward**, and two further defects in the same
 day's work found and fixed — `getSession()` verified nothing, and bearer
@@ -321,17 +324,57 @@ that reads `grants` and therefore refuses every query it guards
 runs the real thing against a real server — 14 checks, in CI on a
 `postgres:16` service — and reproduces all three when the fixes are reverted.
 
-**Deliberately not done:** it is **not a migrations system** — it generates
-the first table; schema *change* needs ordering, idempotency and drift
-detection against a live database, and that is the next real design question
-here. No Postgres `database` adapter either: `supabase`/`neon`/`postgres`
-resolve the dialect correctly but remain `candidates`, so such a product
-supplies its own `{ query, execute }`. Also no device/service token issuance
-— how a device *proves* it is that device needs its own pass with real
-cryptographic choices — and no grant expiry, delegation, audit log or
-caching.
+**The migrations system shipped 2026-09-15**
+(`docs/specs/2026-09-15-schema-migrations.md`): `fid add migrations` derives an
+ordered manifest from `migrations/NNNN_slug.sql`, and `Migrator` in
+`@fiducial/adapters/migrate` applies it through the `database` contract — so it
+works on D1 today and any future vendor free. Ordering is numeric, the ledger
+makes re-application a no-op, and a migration edited after it was applied stops
+`apply()` entirely rather than compounding a schema nobody has reconciled.
+Tested against real SQLite.
 
-**Open: `fid add identity` is one opt-in doing two jobs.** Everything here is
+**Deliberately not done:** No Postgres `database` adapter either: `supabase`/`neon`/`postgres`
+resolve the dialect correctly but remain `candidates`, so such a product
+supplies its own `{ query, execute }`. **Device and service token issuance shipped 2026-09-15**
+(`docs/specs/2026-09-15-token-issuance.md`): a fixed-layout,
+domain-separated ed25519 bearer token, 105 bytes, verified `no_std` on every
+device target. Not a JWT — a header that names its own algorithm is how
+`alg: none` happens. Expiry is mandatory and verification fails closed without
+a clock, the same rule grant expiry follows. The format is pinned by
+conformance vectors the TypeScript verifier replays; changing one character of
+the domain separator in TypeScript alone fails 23 checks.
+
+**Grant expiry, delegation, audit and caching shipped 2026-09-15**
+(`docs/specs/2026-09-15-grant-lifecycle.md`). A grant carries an expiry and a
+delegator; `can()` takes the current time, and **fails closed without one** —
+a device whose RTC has not synced cannot honour an expiry, and treating "no
+clock" as "not expired" would make expiry evaporate in the one environment
+least able to notice. A delegated grant is worth what its delegator's
+authority is worth *at evaluation time*, so revoking a manager revokes
+everything they issued. `explain()` returns the reason, which is the audit
+record — reconstructing it afterwards is guesswork, because the grants table
+has moved on by the time anyone reads the log. All of it mirrored in
+TypeScript and pinned by 8 new conformance scenarios covering verdict,
+effective role *and* reason.
+
+**Closed 2026-09-15: `fid add identity` was one opt-in doing two jobs.**
+`[identity] storage = "none"` installs the rule without the table, exactly as
+sketched below. `can()` is unaffected — it takes grants as an argument and does
+not care where they came from, which is what makes `none` a real configuration
+rather than a disabled one. The generated TypeScript module still appears and
+names its storage kind, so a product importing it gets a clear error rather
+than a module-not-found.
+
+Building it needed one mechanism that did not exist: a pipeline's `outputs` are
+written by the capability author, who cannot know which of them a given product
+wants, so `fid derive --check` demanded a migration the declaration said must
+not exist. Outputs a configuration does not produce are now skipped by both the
+record and the check, and switching to `none` stops tracking the old migration
+and says so rather than deleting a file that may already have been applied.
+
+The original note follows.
+
+**`fid add identity` is one opt-in doing two jobs.** Everything here is
 already opt-in — `fid new` generates none of it, the way all twelve
 capabilities work, every adapter contract defaults to `none`, and
 `[spine] enabled = false`. But installing the capability installs the *rule*
@@ -431,7 +474,7 @@ step 3 delivers.
 | **Rust release versioning** | Changesets drives npm; the thirteen crates move in lockstep at 0.1.0 with nothing driving a bump |
 | **Tagged releases + Zenodo DOI** | No release exists, so there is nothing to archive or cite |
 | **Claude chat plugin** | The making philosophy, as a skill for claude.ai — see below |
-| **`fid dash` freshness detection** | Dash equates "gated" with "a workflow runs `fid derive --check`". This repository gates three artifacts by other means on purpose, so dash reports a false positive. Found by adopting level 2 self-hosting |
+| ~~**`fid dash` freshness detection**~~ ✅ | Shipped 2026-09-15. Dash equated "gated" with "a workflow runs `fid derive --check`" and reported this repository as ungated while nine gates ran on every commit. `[freshness] gates` declares the others — which command gates an artifact is a judgment, not something to pattern-match — and a gate declared but run by nothing is now reported too |
 
 ### Out of band — risk, not priority ⬜
 

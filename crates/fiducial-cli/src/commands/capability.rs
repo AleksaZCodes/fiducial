@@ -373,9 +373,14 @@ fn cmd_new(name: &str) -> Result<()> {
     println!("       adapters      contracts it needs a vendor for, without choosing one");
     println!("       templates     plain files copied in, belonging to no pipeline");
     println!("     The test for a declaration: could two pipelines read it and both be correct?");
-    println!("  3. Register the capability in crates/fiducial-cli/src/capability.rs.");
-    println!("  4. Run   fid capability check --capability {name}");
-    println!("  5. Install into a product:  fid add {name}");
+    // No registration step: `build.rs` walks `capabilities/`, so the directory
+    // is the declaration. This used to say "register it in capability.rs",
+    // which was true until the `CapabilityDef` literals were deleted and the
+    // manifest started being derived from the layout.
+    println!("  3. Run   fid capability check --capability {name}");
+    println!("  4. Install it:");
+    println!("       fid add {name}                      built in, once it is in this repo");
+    println!("       fid add capability {name} --from ./capabilities/{name}");
 
     Ok(())
 }

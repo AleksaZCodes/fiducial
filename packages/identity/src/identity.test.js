@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import {
   can,
+  explain,
   effectiveRole,
   isIdentified,
   roleAllows,
@@ -39,7 +40,23 @@ describe('@fiducial/identity', () => {
       assert.ok(probes > 50, `enough probes to be meaningful, got ${probes}`)
     })
 
+    // The vectors are a language-neutral artifact and spell fields the way the
+    // Rust side does; the TypeScript interface is camelCase. Converting here
+    // rather than emitting camelCase keeps the file readable from both sides,
+    // and the conversion is three lines under test — a probe whose grant lost
+    // its expiry in translation would report the wrong verdict immediately.
+    const toGrant = (g) => ({
+      principal: g.principal,
+      resource: g.resource,
+      role: g.role,
+      expiresAt: g.expires_at ?? null,
+      delegatedBy: g.delegated_by ?? null,
+    })
+
     for (const scenario of vectors.scenarios) {
+      const grants = scenario.grants.map(toGrant)
+      const now = scenario.now ?? null
+
       describe(`${scenario.name} — ${scenario.why}`, () => {
         for (const probe of scenario.probes) {
           const label =
@@ -50,14 +67,23 @@ describe('@fiducial/identity', () => {
 
           it(label, () => {
             assert.equal(
-              can(probe.principal, probe.action, probe.resource, scenario.grants),
+              can(probe.principal, probe.action, probe.resource, grants, now),
               probe.allowed,
               'verdict must match the Rust implementation',
             )
             assert.equal(
-              effectiveRole(probe.principal, probe.resource, scenario.grants),
+              effectiveRole(probe.principal, probe.resource, grants, now),
               probe.effective_role ?? null,
               'effective role must match the Rust implementation',
+            )
+            // The reason, not just the verdict. Two implementations that agree
+            // on "denied" while disagreeing on why have diverged in a way an
+            // audit log would record wrongly and no verdict test would catch.
+            assert.equal(
+              explain(probe.principal, probe.action, probe.resource, grants, now)
+                .reason,
+              probe.reason,
+              'reason must match the Rust implementation',
             )
           })
         }

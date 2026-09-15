@@ -177,7 +177,10 @@ Auth contract with Supabase as its first vendor. The two are unrelated;
 
 ## What this deliberately does not do
 
-- **No automated typecheck of the generated factory in CI.** The bug above
+- **No automated typecheck of the generated factory in CI.**
+  *(Closed 2026-09-15 by
+  `docs/specs/2026-09-15-generated-code-is-compiled-not-matched.md`, which
+  built exactly the suite sketched below.)* The bug above
   was caught by hand this round, not by a new test. Adding one properly
   (spinning up a scaffold, linking the built `@fiducial/adapters`, running
   `tsc --noEmit` from a Rust integration test) is real, valuable work in the

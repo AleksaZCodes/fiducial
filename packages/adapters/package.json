@@ -36,6 +36,10 @@
       "import": "./dist/bot-protection.js",
       "types": "./dist/bot-protection.d.ts"
     },
+    "./migrate": {
+      "import": "./dist/migrate.js",
+      "types": "./dist/migrate.d.ts"
+    },
     "./queue": {
       "import": "./dist/queue.js",
       "types": "./dist/queue.d.ts"
@@ -50,7 +54,8 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "node --test src/adapters.test.js"
+    "test": "node --test src/adapters.test.js src/migrate.test.js",
+    "test:generated": "node --test src/generated-factory.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0"

@@ -222,6 +222,41 @@ EXAMPLE:
     )]
     Identity,
 
+    /// Add schema migrations — ordered, idempotent, checked for drift
+    #[command(
+        long_about = "\
+Install the migrations capability.
+
+SQL applied to this product's database. NOT the codemod migrations `fid
+upgrade` applies to source files — they share a word and nothing else.
+
+`migrations/NNNN_slug.sql` is the declaration. `fid derive` generates
+`src/migrations.generated.ts`: the migrations in order, each with its SQL
+embedded and hashed. Embedded because the runner has no filesystem — a Worker
+applying migrations at deploy time cannot open a file — and hashed so a
+migration edited after it was applied is detectable.
+
+Apply it with the runner in @fiducial/adapters, which goes through the
+`database` contract and so works on every vendor that contract has.
+
+Generation fails rather than producing a set that cannot be applied safely:
+two files sharing a number have no order, and a `.sql` file not named
+`NNNN_slug.sql` is a migration that silently never runs.",
+        after_long_help = "\
+EXAMPLE:
+    fid add migrations
+    # write migrations/0002_add_index.sql
+    fid derive          # regenerates src/migrations.generated.ts
+    fid derive --check  # fails if the manifest is stale
+
+WHAT THE RUNNER ENFORCES
+    Never edit an applied migration. Environments that ran it keep the old
+    schema, new ones get the new one, and neither can tell they disagree.
+    `Migrator.apply()` refuses to run at all while that is true. Add a new
+    migration instead."
+    )]
+    Migrations,
+
     /// Add cross-platform adapter contracts (database, storage, email, diagnostics)
     #[command(
         long_about = "\
@@ -324,6 +359,7 @@ pub fn run(target: AddTarget) -> Result<()> {
         AddTarget::Deploy => install_capability("deploy"),
         AddTarget::Identity => install_capability("identity"),
         AddTarget::Adapters => install_capability("adapters"),
+        AddTarget::Migrations => install_capability("migrations"),
         AddTarget::Capability { id, from } => match from {
             Some(spec) => install_external(&id, &spec),
             None => install_capability(&id),

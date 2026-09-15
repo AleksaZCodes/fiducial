@@ -22,11 +22,18 @@
 //! let thermostat = Resource::Device(DeviceId::new([1, 2, 3, 4, 5, 6, 7, 8]));
 //! let grants = [Grant::new(owner, thermostat, Role::Owner)];
 //!
-//! assert!(can(&owner, Action::Write, &thermostat, &grants));
+//! assert!(can(&owner, Action::Write, &thermostat, &grants, None));
 //!
 //! let stranger = Principal::User(UserId::new([9; 16]));
-//! assert!(!can(&stranger, Action::Read, &thermostat, &grants));
+//! assert!(!can(&stranger, Action::Read, &thermostat, &grants, None));
 //! ```
+//!
+//! The last argument is the current time, and `None` means *this caller has no
+//! clock*. A permanent grant is unaffected by that; a grant with an expiry is
+//! **refused**, because a caller that cannot tell the time cannot honour one.
+//! A device whose RTC has not synced is exactly such a caller, and treating
+//! "no clock" as "not expired" would make expiry evaporate in the one
+//! environment least able to notice.
 //!
 //! # The decision table is a conformance artifact
 //!
@@ -283,7 +290,26 @@ impl Role {
     }
 }
 
+pub mod token;
+
 // ── Grants ───────────────────────────────────────────────────────────────────
+
+/// Milliseconds since the Unix epoch.
+///
+/// A plain `u64` rather than a date type: this crate is `no_std` and must
+/// build for a microcontroller, where there is no calendar and no allocator.
+/// Milliseconds because that is what `Date.now()` gives the TypeScript mirror,
+/// and a unit conversion at the boundary is a place for the two to disagree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Timestamp(pub u64);
+
+/// How many delegation links deep a grant chain may go.
+///
+/// Bounded because the chain is walked recursively and a cycle — A delegated
+/// by B, B delegated by A — is a grant table anyone with `Admin` can write.
+/// An unbounded walk there is a stack overflow in the authorization path,
+/// which on firmware is a crash and everywhere is a denial of service.
+pub const MAX_DELEGATION_DEPTH: u8 = 4;
 
 /// One principal's role over one resource — the user↔device link that had
 /// nowhere to live before this crate.
@@ -292,6 +318,20 @@ pub struct Grant {
     pub principal: Principal,
     pub resource: Resource,
     pub role: Role,
+    /// When this grant stops being valid, if ever.
+    ///
+    /// `None` is a permanent grant, which is what an owner holds. A support
+    /// engineer's access is the case this exists for: a grant that has to be
+    /// remembered to be revoked is one that is not revoked.
+    pub expires_at: Option<Timestamp>,
+    /// Who handed this grant out, when it was not the platform.
+    ///
+    /// `None` means the grant is direct — seeded by provisioning or written by
+    /// an operator. `Some(p)` means `p` delegated it, and the grant is only as
+    /// good as `p`'s own authority over the same resource *right now*: revoke
+    /// the manager and every grant they issued stops working, without anyone
+    /// having to find them.
+    pub delegated_by: Option<Principal>,
 }
 
 impl Grant {
@@ -301,6 +341,38 @@ impl Grant {
             principal,
             resource,
             role,
+            expires_at: None,
+            delegated_by: None,
+        }
+    }
+
+    /// The same grant, valid only until `at`.
+    #[inline]
+    pub const fn expiring_at(mut self, at: Timestamp) -> Self {
+        self.expires_at = Some(at);
+        self
+    }
+
+    /// The same grant, derived from `delegator`'s authority rather than direct.
+    #[inline]
+    pub const fn delegated_by(mut self, delegator: Principal) -> Self {
+        self.delegated_by = Some(delegator);
+        self
+    }
+
+    /// `true` when this grant has not expired as of `now`.
+    ///
+    /// **Fails closed without a clock.** A grant that expires cannot be
+    /// honoured by a caller that does not know the time, and a device whose
+    /// RTC has not synced is exactly such a caller. Treating "no clock" as
+    /// "not expired" would make expiry a suggestion that evaporates in the one
+    /// environment least able to notice.
+    #[inline]
+    pub fn is_live(&self, now: Option<Timestamp>) -> bool {
+        match (self.expires_at, now) {
+            (None, _) => true,
+            (Some(expiry), Some(now)) => now < expiry,
+            (Some(_), None) => false,
         }
     }
 
@@ -334,20 +406,176 @@ impl Grant {
 ///    grant for it would mean every device needs a provisioning round trip
 ///    before it can say anything at all — including the "I am here, I am
 ///    unclaimed" message that provisioning itself depends on.
-pub fn can(principal: &Principal, action: Action, resource: &Resource, grants: &[Grant]) -> bool {
+pub fn can(
+    principal: &Principal,
+    action: Action,
+    resource: &Resource,
+    grants: &[Grant],
+    now: Option<Timestamp>,
+) -> bool {
+    explain(principal, action, resource, grants, now).allowed
+}
+
+/// Why a principal may or may not act — the audit record.
+///
+/// [`can`] answers the gate's question and throws the reason away. An audit
+/// log needs the reason, and reconstructing it afterwards from the grant table
+/// is guesswork: the table has moved on by the time anyone reads the log.
+///
+/// This is the whole audit mechanism in this crate. There is deliberately no
+/// sink, writer or buffer here — `no_std` has nowhere to put one, and a
+/// Worker, a desktop app and a device each have a different right answer for
+/// where a record goes. The crate produces the record; the host stores it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Decision {
+    pub allowed: bool,
+    pub reason: Reason,
+    /// The grant that decided it, when one did.
+    pub via: Option<Grant>,
+}
+
+/// The specific ground for a decision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reason {
+    /// A live grant covered it.
+    Granted,
+    /// A device reading its own state, which needs no grant.
+    DeviceReadingItself,
+    /// Anonymous, or an all-zero sentinel id.
+    NotIdentified,
+    /// No grant covers this principal and resource at all.
+    NoGrant,
+    /// A grant covers it, but not at this level of power.
+    RoleTooWeak,
+    /// A covering grant existed and has expired.
+    Expired,
+    /// A covering grant exists but the caller has no clock to judge its
+    /// expiry, so it cannot be honoured.
+    NoClock,
+    /// A covering grant was delegated by someone who no longer has the
+    /// authority to have delegated it.
+    DelegatorLacksAuthority,
+    /// The delegation chain is longer than [`MAX_DELEGATION_DEPTH`].
+    DelegationTooDeep,
+}
+
+/// [`can`], with the reason attached.
+pub fn explain(
+    principal: &Principal,
+    action: Action,
+    resource: &Resource,
+    grants: &[Grant],
+    now: Option<Timestamp>,
+) -> Decision {
+    let deny = |reason: Reason| Decision {
+        allowed: false,
+        reason,
+        via: None,
+    };
+
     if !principal.is_identified() {
-        return false;
+        return deny(Reason::NotIdentified);
     }
 
     if let (Principal::Device(actor), Resource::Device(target)) = (principal, resource) {
         if actor == target && action == Action::Read {
-            return true;
+            return Decision {
+                allowed: true,
+                reason: Reason::DeviceReadingItself,
+                via: None,
+            };
         }
     }
 
-    grants
-        .iter()
-        .any(|g| g.covers(principal, resource) && g.role.allows(action))
+    // The most specific denial wins, so the reason reported is the one a
+    // reader can act on: "expired" tells them to renew, where "no grant"
+    // would send them to create one that is already there.
+    let mut best_denial = Reason::NoGrant;
+    let mut note = |reason: Reason| {
+        let rank = |r: Reason| match r {
+            Reason::NoGrant => 0,
+            Reason::RoleTooWeak => 1,
+            Reason::DelegationTooDeep => 2,
+            Reason::DelegatorLacksAuthority => 3,
+            Reason::NoClock => 4,
+            Reason::Expired => 5,
+            _ => 0,
+        };
+        if rank(reason) > rank(best_denial) {
+            best_denial = reason;
+        }
+    };
+
+    for grant in grants {
+        if !grant.covers(principal, resource) {
+            continue;
+        }
+        if !grant.role.allows(action) {
+            note(Reason::RoleTooWeak);
+            continue;
+        }
+        if !grant.is_live(now) {
+            note(if now.is_none() {
+                Reason::NoClock
+            } else {
+                Reason::Expired
+            });
+            continue;
+        }
+        match delegation_ok(grant, resource, grants, now, 0) {
+            Ok(()) => {
+                return Decision {
+                    allowed: true,
+                    reason: Reason::Granted,
+                    via: Some(*grant),
+                }
+            }
+            Err(reason) => note(reason),
+        }
+    }
+
+    deny(best_denial)
+}
+
+/// Whether a grant's delegation chain still holds.
+///
+/// A delegated grant is worth exactly what its delegator's own authority is
+/// worth *at evaluation time*. That is the point of recording the delegator
+/// rather than flattening the grant on creation: revoking a manager revokes
+/// everything they handed out, without anyone having to go and find it.
+///
+/// The delegator must be able to `Admin` the resource — the action that
+/// [`Action::Admin`] is defined as, "change who else may act". A `Member`
+/// cannot mint grants they could not use.
+fn delegation_ok(
+    grant: &Grant,
+    resource: &Resource,
+    grants: &[Grant],
+    now: Option<Timestamp>,
+    depth: u8,
+) -> Result<(), Reason> {
+    let Some(delegator) = grant.delegated_by else {
+        return Ok(());
+    };
+    if depth >= MAX_DELEGATION_DEPTH {
+        return Err(Reason::DelegationTooDeep);
+    }
+
+    // Walked inline rather than by calling `explain` again, so the depth
+    // counter is threaded through. A cycle in the table is otherwise
+    // unbounded recursion in the authorization path.
+    if !delegator.is_identified() {
+        return Err(Reason::DelegatorLacksAuthority);
+    }
+    for g in grants {
+        if !g.covers(&delegator, resource) || !g.role.allows(Action::Admin) || !g.is_live(now) {
+            continue;
+        }
+        if delegation_ok(g, resource, grants, now, depth + 1).is_ok() {
+            return Ok(());
+        }
+    }
+    Err(Reason::DelegatorLacksAuthority)
 }
 
 /// The strongest role `principal` holds over `resource`, if any.
@@ -358,6 +586,7 @@ pub fn effective_role(
     principal: &Principal,
     resource: &Resource,
     grants: &[Grant],
+    now: Option<Timestamp>,
 ) -> Option<Role> {
     if !principal.is_identified() {
         return None;
@@ -365,8 +594,107 @@ pub fn effective_role(
     grants
         .iter()
         .filter(|g| g.covers(principal, resource))
+        .filter(|g| g.is_live(now))
+        .filter(|g| delegation_ok(g, resource, grants, now, 0).is_ok())
         .map(|g| g.role)
         .max()
+}
+
+// ── Caching ──────────────────────────────────────────────────────────────────
+
+/// A fixed-size cache of recent decisions.
+///
+/// `can` is O(grants), and a Worker answering it per request against a table
+/// fetched per request is the shape that makes authorization the slow part of
+/// a page. This caches the verdict, not the grants.
+///
+/// **It holds no clock and does not expire entries by time.** A cache that
+/// decided when its own contents were stale would be a second, quieter copy of
+/// the expiry rule, and the two would disagree. Instead the generation counter
+/// is bumped by [`Self::invalidate`] whenever the grant table changes, and the
+/// caller is expected to bump it when crossing whatever time boundary its
+/// grants use. `N` is a const parameter because `no_std` has no allocator.
+/// One remembered verdict: the generation it was decided in, the question, and
+/// the answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CachedVerdict {
+    generation: u64,
+    principal: Principal,
+    action: Action,
+    resource: Resource,
+    allowed: bool,
+}
+
+#[derive(Debug)]
+pub struct DecisionCache<const N: usize> {
+    entries: [Option<CachedVerdict>; N],
+    generation: u64,
+    next: usize,
+}
+
+impl<const N: usize> Default for DecisionCache<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<const N: usize> DecisionCache<N> {
+    pub const fn new() -> Self {
+        Self {
+            entries: [None; N],
+            generation: 0,
+            next: 0,
+        }
+    }
+
+    /// Drop every cached verdict. Call this when the grant table changes.
+    ///
+    /// A bump rather than a clear: entries from the old generation are simply
+    /// never matched, so invalidation is O(1) and cannot half-finish.
+    pub fn invalidate(&mut self) {
+        self.generation = self.generation.wrapping_add(1);
+    }
+
+    /// The cached verdict, if this exact question was asked since the last
+    /// invalidation.
+    pub fn get(&self, principal: &Principal, action: Action, resource: &Resource) -> Option<bool> {
+        self.entries.iter().flatten().find_map(|e| {
+            (e.generation == self.generation
+                && e.principal == *principal
+                && e.action == action
+                && e.resource == *resource)
+                .then_some(e.allowed)
+        })
+    }
+
+    /// Answer from cache, or evaluate and remember.
+    pub fn can(
+        &mut self,
+        principal: &Principal,
+        action: Action,
+        resource: &Resource,
+        grants: &[Grant],
+        now: Option<Timestamp>,
+    ) -> bool {
+        if let Some(hit) = self.get(principal, action, resource) {
+            return hit;
+        }
+        let verdict = can(principal, action, resource, grants, now);
+        if N > 0 {
+            // Round-robin eviction. LRU needs bookkeeping proportional to the
+            // cache, and for a table this size the difference does not pay for
+            // the code that would have to be right.
+            self.entries[self.next] = Some(CachedVerdict {
+                generation: self.generation,
+                principal: *principal,
+                action,
+                resource: *resource,
+                allowed: verdict,
+            });
+            self.next = (self.next + 1) % N;
+        }
+        verdict
+    }
 }
 
 #[cfg(test)]
@@ -388,7 +716,8 @@ mod tests {
             &Principal::User(USER),
             Action::Read,
             &Resource::Device(DEV),
-            &[]
+            &[],
+            None
         ));
     }
 
@@ -399,7 +728,8 @@ mod tests {
             &Principal::User(USER),
             Action::Admin,
             &Resource::Device(DEV),
-            &g
+            &g,
+            None
         ));
     }
 
@@ -410,7 +740,8 @@ mod tests {
             &Principal::User(OTHER),
             Action::Read,
             &Resource::Device(DEV),
-            &g
+            &g,
+            None
         ));
     }
 
@@ -421,7 +752,8 @@ mod tests {
             &Principal::User(USER),
             Action::Read,
             &Resource::Device(DEV2),
-            &g
+            &g,
+            None
         ));
     }
 
@@ -436,13 +768,15 @@ mod tests {
             &Principal::User(USER),
             Action::Read,
             &Resource::Device(DEV),
-            &g
+            &g,
+            None
         ));
         assert!(!can(
             &Principal::User(USER),
             Action::Write,
             &Resource::Device(DEV),
-            &g
+            &g,
+            None
         ));
     }
 
@@ -457,13 +791,15 @@ mod tests {
             &Principal::User(USER),
             Action::Write,
             &Resource::Device(DEV),
-            &g
+            &g,
+            None
         ));
         assert!(!can(
             &Principal::User(USER),
             Action::Admin,
             &Resource::Device(DEV),
-            &g
+            &g,
+            None
         ));
     }
 
@@ -478,7 +814,8 @@ mod tests {
             &Principal::Anonymous,
             Action::Read,
             &Resource::Device(DEV),
-            &g
+            &g,
+            None
         ));
     }
 
@@ -496,7 +833,8 @@ mod tests {
             &Principal::Device(DeviceId::ZERO),
             Action::Read,
             &Resource::Device(DEV),
-            &g
+            &g,
+            None
         ));
         assert!(!Principal::User(UserId::ZERO).is_identified());
         assert!(!Principal::Service(ServiceId::ZERO).is_identified());
@@ -508,7 +846,8 @@ mod tests {
             &Principal::Device(DEV),
             Action::Read,
             &Resource::Device(DEV),
-            &[]
+            &[],
+            None
         ));
     }
 
@@ -521,7 +860,8 @@ mod tests {
             &Principal::Device(DEV),
             Action::Write,
             &Resource::Device(DEV),
-            &[]
+            &[],
+            None
         ));
     }
 
@@ -531,7 +871,8 @@ mod tests {
             &Principal::Device(DEV),
             Action::Read,
             &Resource::Device(DEV2),
-            &[]
+            &[],
+            None
         ));
     }
 
@@ -546,7 +887,8 @@ mod tests {
             &Principal::Service(ServiceId::new([1; 8])),
             Action::Admin,
             &Resource::Device(DEV),
-            &g
+            &g,
+            None
         ));
     }
 
@@ -557,7 +899,7 @@ mod tests {
             Grant::new(Principal::User(USER), Resource::Platform, Role::Admin),
         ];
         assert_eq!(
-            effective_role(&Principal::User(USER), &Resource::Device(DEV), &g),
+            effective_role(&Principal::User(USER), &Resource::Device(DEV), &g, None),
             Some(Role::Admin)
         );
     }
@@ -565,7 +907,7 @@ mod tests {
     #[test]
     fn effective_role_is_none_without_a_grant() {
         assert_eq!(
-            effective_role(&Principal::User(USER), &Resource::Device(DEV), &[]),
+            effective_role(&Principal::User(USER), &Resource::Device(DEV), &[], None),
             None
         );
     }
@@ -606,6 +948,283 @@ mod tests {
             UserId::parse_uuid("11111111-2222-3333-4444-5555555555555555"),
             Err(IdentityError::MalformedUuid)
         );
+    }
+
+    // ── Expiry ───────────────────────────────────────────────────────────
+
+    const NOW: Timestamp = Timestamp(1_000_000);
+    const PAST: Timestamp = Timestamp(999_000);
+    const FUTURE: Timestamp = Timestamp(1_001_000);
+
+    #[test]
+    fn an_expired_grant_does_not_grant() {
+        let g = [owner_grant().expiring_at(PAST)];
+        assert!(!can(
+            &Principal::User(USER),
+            Action::Read,
+            &Resource::Device(DEV),
+            &g,
+            Some(NOW)
+        ));
+    }
+
+    #[test]
+    fn an_unexpired_grant_still_grants() {
+        let g = [owner_grant().expiring_at(FUTURE)];
+        assert!(can(
+            &Principal::User(USER),
+            Action::Read,
+            &Resource::Device(DEV),
+            &g,
+            Some(NOW)
+        ));
+    }
+
+    #[test]
+    fn expiry_without_a_clock_fails_closed() {
+        // A device whose RTC has not synced cannot honour an expiry. Treating
+        // "no clock" as "not expired" would make expiry evaporate in the one
+        // environment least able to notice.
+        let g = [owner_grant().expiring_at(FUTURE)];
+        assert!(!can(
+            &Principal::User(USER),
+            Action::Read,
+            &Resource::Device(DEV),
+            &g,
+            None
+        ));
+        assert_eq!(
+            explain(
+                &Principal::User(USER),
+                Action::Read,
+                &Resource::Device(DEV),
+                &g,
+                None
+            )
+            .reason,
+            Reason::NoClock
+        );
+    }
+
+    #[test]
+    fn a_permanent_grant_is_unaffected_by_a_missing_clock() {
+        let g = [owner_grant()];
+        assert!(can(
+            &Principal::User(USER),
+            Action::Read,
+            &Resource::Device(DEV),
+            &g,
+            None
+        ));
+    }
+
+    #[test]
+    fn an_expired_grant_is_not_an_effective_role() {
+        let g = [owner_grant().expiring_at(PAST)];
+        assert_eq!(
+            effective_role(
+                &Principal::User(USER),
+                &Resource::Device(DEV),
+                &g,
+                Some(NOW)
+            ),
+            None
+        );
+    }
+
+    // ── Delegation ───────────────────────────────────────────────────────
+
+    #[test]
+    fn a_delegated_grant_works_while_its_delegator_has_authority() {
+        let g = [
+            owner_grant(),
+            Grant::new(Principal::User(OTHER), Resource::Device(DEV), Role::Admin)
+                .delegated_by(Principal::User(USER)),
+        ];
+        assert!(can(
+            &Principal::User(OTHER),
+            Action::Admin,
+            &Resource::Device(DEV),
+            &g,
+            Some(NOW)
+        ));
+    }
+
+    #[test]
+    fn revoking_the_delegator_revokes_the_delegation() {
+        // The whole point of recording the delegator rather than flattening
+        // the grant: revoking a manager revokes everything they handed out,
+        // without anyone having to go and find it.
+        let g = [
+            Grant::new(Principal::User(OTHER), Resource::Device(DEV), Role::Admin)
+                .delegated_by(Principal::User(USER)),
+        ];
+        assert!(!can(
+            &Principal::User(OTHER),
+            Action::Read,
+            &Resource::Device(DEV),
+            &g,
+            Some(NOW)
+        ));
+    }
+
+    #[test]
+    fn a_member_cannot_delegate_what_they_do_not_have() {
+        let g = [
+            Grant::new(Principal::User(USER), Resource::Device(DEV), Role::Member),
+            Grant::new(Principal::User(OTHER), Resource::Device(DEV), Role::Admin)
+                .delegated_by(Principal::User(USER)),
+        ];
+        assert!(!can(
+            &Principal::User(OTHER),
+            Action::Read,
+            &Resource::Device(DEV),
+            &g,
+            Some(NOW)
+        ));
+    }
+
+    #[test]
+    fn a_delegation_cycle_terminates_rather_than_overflowing() {
+        // A table anyone with Admin can write. An unbounded walk here is a
+        // stack overflow in the authorization path — a crash on firmware.
+        let g = [
+            Grant::new(Principal::User(USER), Resource::Device(DEV), Role::Admin)
+                .delegated_by(Principal::User(OTHER)),
+            Grant::new(Principal::User(OTHER), Resource::Device(DEV), Role::Admin)
+                .delegated_by(Principal::User(USER)),
+        ];
+        assert!(!can(
+            &Principal::User(USER),
+            Action::Read,
+            &Resource::Device(DEV),
+            &g,
+            Some(NOW)
+        ));
+    }
+
+    #[test]
+    fn an_expired_delegator_cannot_sustain_a_delegation() {
+        let g = [
+            owner_grant().expiring_at(PAST),
+            Grant::new(Principal::User(OTHER), Resource::Device(DEV), Role::Admin)
+                .delegated_by(Principal::User(USER)),
+        ];
+        assert!(!can(
+            &Principal::User(OTHER),
+            Action::Read,
+            &Resource::Device(DEV),
+            &g,
+            Some(NOW)
+        ));
+    }
+
+    // ── Audit ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn the_reason_reported_is_the_one_a_reader_can_act_on() {
+        // "expired" sends them to renew; "no grant" would send them to create
+        // one that is already there.
+        let g = [owner_grant().expiring_at(PAST)];
+        let d = explain(
+            &Principal::User(USER),
+            Action::Read,
+            &Resource::Device(DEV),
+            &g,
+            Some(NOW),
+        );
+        assert!(!d.allowed);
+        assert_eq!(d.reason, Reason::Expired);
+    }
+
+    #[test]
+    fn an_allowed_decision_names_the_grant_that_decided_it() {
+        let g = [owner_grant()];
+        let d = explain(
+            &Principal::User(USER),
+            Action::Admin,
+            &Resource::Device(DEV),
+            &g,
+            Some(NOW),
+        );
+        assert!(d.allowed);
+        assert_eq!(d.reason, Reason::Granted);
+        assert_eq!(d.via, Some(owner_grant()));
+    }
+
+    #[test]
+    fn a_role_that_is_merely_too_weak_says_so() {
+        let g = [Grant::new(
+            Principal::User(USER),
+            Resource::Device(DEV),
+            Role::Viewer,
+        )];
+        assert_eq!(
+            explain(
+                &Principal::User(USER),
+                Action::Admin,
+                &Resource::Device(DEV),
+                &g,
+                Some(NOW)
+            )
+            .reason,
+            Reason::RoleTooWeak
+        );
+    }
+
+    // ── Cache ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn a_cached_verdict_matches_an_uncached_one() {
+        let g = [owner_grant()];
+        let mut cache: DecisionCache<8> = DecisionCache::new();
+        let p = Principal::User(USER);
+        let r = Resource::Device(DEV);
+
+        let direct = can(&p, Action::Write, &r, &g, Some(NOW));
+        assert_eq!(cache.can(&p, Action::Write, &r, &g, Some(NOW)), direct);
+        assert_eq!(cache.can(&p, Action::Write, &r, &g, Some(NOW)), direct);
+        assert_eq!(cache.get(&p, Action::Write, &r), Some(direct));
+    }
+
+    #[test]
+    fn invalidating_drops_every_cached_verdict() {
+        let mut cache: DecisionCache<8> = DecisionCache::new();
+        let p = Principal::User(USER);
+        let r = Resource::Device(DEV);
+
+        assert!(cache.can(&p, Action::Read, &r, &[owner_grant()], Some(NOW)));
+        cache.invalidate();
+        assert_eq!(cache.get(&p, Action::Read, &r), None);
+        // And the re-evaluation sees the new table rather than the old answer.
+        assert!(!cache.can(&p, Action::Read, &r, &[], Some(NOW)));
+    }
+
+    #[test]
+    fn the_cache_distinguishes_actions_and_resources() {
+        let g = [Grant::new(
+            Principal::User(USER),
+            Resource::Device(DEV),
+            Role::Viewer,
+        )];
+        let mut cache: DecisionCache<8> = DecisionCache::new();
+        let p = Principal::User(USER);
+
+        assert!(cache.can(&p, Action::Read, &Resource::Device(DEV), &g, Some(NOW)));
+        assert!(!cache.can(&p, Action::Write, &Resource::Device(DEV), &g, Some(NOW)));
+        assert!(!cache.can(&p, Action::Read, &Resource::Device(DEV2), &g, Some(NOW)));
+    }
+
+    #[test]
+    fn a_full_cache_keeps_answering_correctly() {
+        // Round-robin eviction must not turn into a wrong answer, only a miss.
+        let g = [owner_grant()];
+        let mut cache: DecisionCache<2> = DecisionCache::new();
+        let p = Principal::User(USER);
+        for _ in 0..10 {
+            assert!(cache.can(&p, Action::Read, &Resource::Device(DEV), &g, Some(NOW)));
+            assert!(!cache.can(&p, Action::Read, &Resource::Device(DEV2), &g, Some(NOW)));
+        }
     }
 }
 

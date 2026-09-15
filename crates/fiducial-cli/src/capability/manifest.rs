@@ -73,6 +73,19 @@ pub enum Declaration {
         /// install logic skips writing when this is `None`.
         seed: Option<toml::Value>,
     },
+    /// A directory of facts the **product** authors, which a pipeline reads.
+    ///
+    /// `migrations/` is the case this exists for: the capability ships no
+    /// migration and cannot, because which migrations a product needs is the
+    /// product's business — but its pipeline reads every file in there, so
+    /// "declares nothing for its pipeline to read" was both true and wrong.
+    ///
+    /// Shipping a placeholder file instead would have been worse: a dummy
+    /// `0000_init.sql` is a migration that runs.
+    Directory {
+        /// Path in the product, e.g. `migrations`.
+        path: String,
+    },
 }
 
 impl Declaration {
@@ -81,6 +94,7 @@ impl Declaration {
         match self {
             Self::File(f) => &f.path,
             Self::ConfigBlock { name, .. } => name,
+            Self::Directory { path } => path,
         }
     }
 }
@@ -152,6 +166,15 @@ struct ManifestDeclarations {
     /// Declarations that are `fiducial.toml` blocks rather than files.
     #[serde(default)]
     config: Vec<ConfigDeclaration>,
+    /// Directories the product fills and a pipeline reads.
+    #[serde(default)]
+    directory: Vec<DirectoryDeclaration>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DirectoryDeclaration {
+    path: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -202,6 +225,13 @@ pub fn derive(id: &str, files: &BTreeMap<String, String>, source: Source) -> Res
             seed: c.seed,
         })
         .collect();
+    declarations.extend(
+        manifest
+            .declarations
+            .directory
+            .into_iter()
+            .map(|d| Declaration::Directory { path: d.path }),
+    );
     let mut pipelines = Vec::new();
     let mut templates = Vec::new();
 
@@ -275,6 +305,9 @@ fn validate_paths(cap: &Capability) -> Result<()> {
         .iter()
         .filter_map(|d| match d {
             Declaration::File(f) => Some(&f.path),
+            // A directory is created in the product, so `../../.ssh` is the
+            // same escape here as it is for a file.
+            Declaration::Directory { path } => Some(path),
             Declaration::ConfigBlock { .. } => None,
         })
         .chain(cap.pipelines.iter().map(|f| &f.path))

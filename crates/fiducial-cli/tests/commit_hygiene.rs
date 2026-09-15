@@ -202,3 +202,112 @@ mod tests {
         assert!(!parse("feat(cli): x").unwrap().2);
     }
 }
+
+// ── CLA sign-off ─────────────────────────────────────────────────────────────
+
+/// Commits under review, with author identity and full message.
+///
+/// A second walk rather than widening `commits_under_review`: that one feeds
+/// two subject-shape tests that have no use for a body, and the sign-off check
+/// is the only caller that needs one.
+fn commits_with_authors() -> Option<Vec<(String, String, String, String)>> {
+    let base = base_ref()?;
+
+    // `%x1e` between records, `%x1f` between fields: a commit body contains
+    // newlines, so a line-oriented parse would split one commit into many.
+    let log = Command::new("git")
+        .args([
+            "log",
+            "--no-merges",
+            "--format=%H%x1f%an%x1f%ae%x1f%B%x1e",
+            &format!("{base}..HEAD"),
+        ])
+        .output()
+        .ok()?;
+    if !log.status.success() {
+        return None;
+    }
+
+    Some(
+        String::from_utf8_lossy(&log.stdout)
+            .split('\u{1e}')
+            .filter(|record| !record.trim().is_empty())
+            .filter_map(|record| {
+                let mut parts = record.trim_start().splitn(4, '\u{1f}');
+                Some((
+                    parts.next()?.to_string(),
+                    parts.next()?.to_string(),
+                    parts.next()?.to_string(),
+                    parts.next()?.to_string(),
+                ))
+            })
+            .collect(),
+    )
+}
+
+/// Identities that do not need a sign-off, from the file that declares them.
+fn cla_exempt() -> Vec<String> {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../.github/cla-exempt.txt");
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    text.lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .map(str::to_string)
+        .collect()
+}
+
+/// Every outside contribution carries the CLA sign-off trailer.
+///
+/// `IP-POLICY.md` rule 3: *"No external contribution is merged before a CLA is
+/// in place."* That rule sat in prose with nothing behind it, which is the
+/// condition `.github/pull_request_template.md` was itself written to fix —
+/// a checkpoint nobody is forced to answer is a checkpoint nobody answers.
+///
+/// The cost of getting this wrong is not a failed build. A contribution merged
+/// without a sign-off cannot be relicensed later without tracking down its
+/// author, and that option disappears silently and permanently.
+///
+/// The owner and the project's automation are exempt, because a CLA is an
+/// agreement with an outside party and neither is one. Who counts is declared
+/// in `.github/cla-exempt.txt`, not decided here.
+#[test]
+fn outside_contributions_carry_a_cla_sign_off() {
+    let Some(commits) = commits_with_authors() else {
+        return;
+    };
+    let exempt = cla_exempt();
+
+    let mut missing: Vec<String> = Vec::new();
+
+    for (hash, name, email, body) in &commits {
+        if is_tool_generated(body.lines().next().unwrap_or_default()) {
+            continue;
+        }
+        if exempt.iter().any(|e| e == name || e == email) {
+            continue;
+        }
+        // Matched on the email, which is the identity `git commit -s` writes
+        // and the one that can actually be traced back to a person. A name
+        // collides; an address is how you reach whoever has to agree.
+        let signed = body
+            .lines()
+            .filter_map(|l| l.trim().strip_prefix("Signed-off-by:"))
+            .any(|trailer| trailer.contains(&format!("<{email}>")));
+
+        if !signed {
+            missing.push(format!("  {}  {name} <{email}>", &hash[..8]));
+        }
+    }
+
+    assert!(
+        missing.is_empty(),
+        "these commits have no CLA sign-off matching their author:\n\n{}\n\n\
+         Every outside contribution needs one — see CLA.md. Add it with:\n  \
+         git commit -s   (or `git rebase --signoff main` for a branch)\n\n\
+         If the author is a maintainer or automation, add the identity to\n  \
+         .github/cla-exempt.txt\n",
+        missing.join("\n")
+    );
+}

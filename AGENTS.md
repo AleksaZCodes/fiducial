@@ -116,6 +116,41 @@ Use `get_me` first to confirm current user context.
 | `docs/guides/first-product.md` | Nothing → board → generated enclosure → CI gate |
 | `docs/guides/harvesting.md` | Getting the good parts out of a codebase already built |
 
+## Documentation that cannot go stale quietly
+
+Three mechanisms, and between them they cover the whole surface:
+
+| What | Gate | Fix when it fails |
+|---|---|---|
+| Derived blocks (`<!-- fid:begin … -->`) | `fid context --check` | `fid context` |
+| Terminal output in the guides | `cargo test -p fiducial-cli --test captures` | `FIDUCIAL_WRITE_CAPTURES=1 cargo test …` |
+| **Hand-written prose** | `fid docs --check` | read it, fix it, `fid docs --accept` |
+
+The third is the one that is not automatic, because it cannot be. A paragraph
+explaining *why* something is shaped a certain way cannot be generated from the
+thing it explains — if it could, it would carry nothing the code does not.
+
+So what is derived is **the obligation to revisit it.** A prose block names the
+source it describes:
+
+```markdown
+<!-- fid:describes crates/fiducial-cli/src/adapter.rs#pub static CONTRACTS -->
+Every contract ships with `none` — a real, working no-op…
+<!-- fid:end-describes -->
+```
+
+`docs/prose.lock` records that source's hash as it stood when someone last read
+the paragraph against it. When it moves and the paragraph does not, the gate
+fails and names both.
+
+**`fid docs --accept` means "I have read this against its source."** Running it
+to make a red build green, without reading, is the one thing that makes the
+mechanism worthless — it is a separate command from `--check` for that reason.
+Narrow a block with `#Symbol`: a whole-file watch fires on every unrelated edit,
+and a gate that cries wolf trains you to accept without reading.
+
+Spec: `docs/specs/2026-09-15-prose-is-gated-not-generated.md`.
+
 Terminal output in those guides is **generated from the real binary** and gated
 in CI. Never hand-edit a block showing `fid` output — regenerate it with
 `FIDUCIAL_WRITE_CAPTURES=1 cargo test -p fiducial-cli --test captures`.
@@ -143,8 +178,8 @@ cargo build --workspace
 cargo test --workspace --all-features         # includes the freshness gates
 ```
 
-Two suites run the **real generated schema**, so they need something built
-first and are not part of the default run:
+Three suites run **real generated output**, so they need something built first
+and are not part of the default run:
 
 ```sh
 cargo build -p fiducial-cli --bin fid
@@ -152,12 +187,22 @@ pnpm --filter @fiducial/identity build            # the tests import ../dist
 pnpm --filter @fiducial/identity test:schema      # the schema on real SQLite
 
 PGHOST=localhost PGUSER=postgres PGPASSWORD=postgres scripts/verify-postgres.sh
+
+pnpm --filter @fiducial/adapters build
+pnpm --filter @fiducial/adapters test:generated   # the factory through real tsc
 ```
 
 `test:schema` generates the grants table with the real `fid` binary and runs
 it on `node:sqlite` — D1 *is* SQLite. `verify-postgres.sh` applies the same
-derivation, RLS policies included, to a real PostgreSQL server. The `identity`
-CI job runs both; the generic JS/TS job builds no Rust and cannot.
+derivation, RLS policies included, to a real PostgreSQL server.
+`test:generated` derives `src/adapters.generated.ts` for every vendor selection
+and compiles it with `tsc`. The `identity` and `adapters` CI jobs run them; the
+generic JS/TS job builds no Rust and cannot.
+
+All three exist for one reason: **generated code asserted as text is not
+tested.** A `contains()` check passes on a migration no server will run and on
+a factory no compiler will accept, and both of those shipped here before these
+suites existed.
 
 They are separate scripts rather than part of `pnpm test` because a suite that
 cannot run is worse than one that is named: the first CI run of these failed
@@ -167,6 +212,8 @@ Everything that decides *how* it builds is committed, so a cloud checkout — Cl
 Code on the web, a Codespace, a new contributor — gets the same answers as a
 laptop:
 
+<!-- fid:describes rust-toolchain.toml -->
+
 | Pinned by | What |
 |---|---|
 | `rust-toolchain.toml` | channel, `rustfmt`/`clippy`, **and the three cross-compilation targets** the spine check needs |
@@ -174,6 +221,8 @@ laptop:
 | `.nvmrc` + `engines` | Node |
 | `pnpm-lock.yaml` + `Cargo.lock` | every dependency |
 | `.claude/settings.json` | the plugin, so the guard is active |
+
+<!-- fid:end-describes -->
 
 The targets line matters: without it, `cargo check --target wasm32-unknown-unknown`
 fails on a fresh machine and looks like a code problem rather than a missing
@@ -203,6 +252,7 @@ rule that matters most.
 | `fid dash` | The workbench — one read-only view of roadmap, decisions, CI, graph, freshness |
 | `fid harvest` | Survey an existing codebase for reusable logic, art, UI and principles |
 | `fid context` | Regenerate the derivable parts of AGENTS.md / CLAUDE.md |
+| `fid docs` | Documentation freshness, including prose nothing can generate |
 | `fid doctor` | Check for drift: outdated deps, stale templates, un-applied migrations |
 <!-- fid:end commands -->
 
@@ -214,12 +264,16 @@ a schedule is a fact `SHIPPED.md` owns, and a second copy of it drifts.
 Four kinds, and the difference is not cosmetic — see
 `docs/specs/2026-09-14-capability-taxonomy.md`.
 
+<!-- fid:describes crates/fiducial-cli/src/capability/manifest.rs#pub fn derive -->
+
 | Kind | Is | Example |
 |---|---|---|
-| **Declaration** | a typed fact, written once, inert | `board/board.interface.json`, the `[i18n]` block |
+| **Declaration** | a typed fact, written once, inert — a file, a `fiducial.toml` block, or a directory the product fills | `board/board.interface.json`, the `[i18n]` block, `migrations/` |
 | **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/eda.toml` |
 | **Adapter** | a swappable vendor behind a fixed contract, selected in `[adapters]` | `storage = "none"` |
 | **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
+
+<!-- fid:end-describes -->
 
 The test for a declaration: *could two different pipelines read this and both be
 correct?* If yes it is a declaration; if it is one tool's config file it is a
@@ -249,16 +303,33 @@ The capabilities this platform ships:
 | `firmware-stm32` | 9 template file(s) | `fid add capability firmware-stm32` |
 | `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
+| `migrations` | declares `migrations`; 1 pipeline(s) | `fid add capability migrations` |
 | `tauri` | 5 template file(s) | `fid add capability tauri` |
 | `web-next` | 8 template file(s) | `fid add capability web-next` |
 | `web-svelte` | 8 template file(s) | `fid add capability web-svelte` |
 | `worker-cloudflare` | 1 template file(s) | `fid add capability worker-cloudflare` |
 <!-- fid:end capabilities -->
 
-**Adapters name contracts, not vendors.** Every contract currently implements
-only `none` — a real, working no-op. The vendors each is intended to carry are
-listed as *planned* and cannot be selected, because a selectable name with
-nothing behind it is a promise the platform does not keep.
+**Adapters name contracts, not vendors.** A product picks a vendor per contract
+in `[adapters]`, and every contract ships with `none` — a real, working no-op,
+not a placeholder, which is what makes it cost nothing to wire in on day one.
+
+A name under **Planned** cannot be selected and fails with a message saying so,
+because a selectable name with nothing behind it is a promise the platform does
+not keep. This table is generated from the registry that enforces that rule:
+
+<!-- fid:begin adapters -->
+| Contract | For | Selectable today | Planned |
+|---|---|---|---|
+| `database` | Relational storage: queries, migrations, transactions | `none`, `d1` | `supabase`, `neon`, `postgres` |
+| `storage` | Object storage: put, get, signed URLs | `none`, `r2` | `s3`, `supabase-storage` |
+| `deploy` | Where the product ships and how a release is promoted | `none`, `cloudflare` | `vercel`, `fly` |
+| `email` | Transactional email: send, template, verify a domain | `none` | `resend`, `ses`, `cloudflare-email` |
+| `errors` | Error tracking and diagnostics | `none` | `sentry`, `workers-analytics` |
+| `botProtection` | Bot / abuse challenge verification | `none`, `turnstile` | `recaptcha`, `hcaptcha` |
+| `queue` | Asynchronous job/message queue (producer side) | `none`, `cloudflare-queues` | `sqs` |
+| `auth` | Users and authentication: sign-up, sign-in, sessions | `none`, `supabase` | `clerk`, `auth.js` |
+<!-- fid:end adapters -->
 
 ## Skills this repository authors
 
@@ -279,6 +350,20 @@ at `.claude/skills/<id>.md` for Claude's auto-discovery.
 Generating the per-vendor wrappers from one authored source is roadmap item
 **agent portability**; today the wrapper for Claude is written by hand and there
 is none for anyone else.
+
+## Contributions from outside
+
+<!-- fid:describes .github/cla-exempt.txt -->
+
+`CLA.md` binds outside contributors so the project keeps the option to
+relicense; `IP-POLICY.md` rule 3 is where that requirement is authored. Every
+commit from a non-maintainer needs `Signed-off-by:` matching its author, gated
+by `outside_contributions_carry_a_cla_sign_off` in
+`crates/fiducial-cli/tests/commit_hygiene.rs`. Maintainers and automation are
+listed in `.github/cla-exempt.txt`, which is the only place that decides who is
+exempt.
+
+<!-- fid:end-describes -->
 
 ## What not to do
 

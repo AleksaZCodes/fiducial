@@ -159,6 +159,18 @@ jobs:
       - name: Agent context matches the code
         run: cargo run -p fiducial-cli -- context --check
 
+      # The half the two gates above cannot see: hand-written prose.
+      #
+      # A paragraph cannot be generated — one explaining WHY a contract is
+      # shaped a certain way would carry nothing the code does not, if it
+      # could. So what is gated is the obligation to revisit it: a prose block
+      # names the source it describes, and this fails when that source moved
+      # and the paragraph did not. AGENTS.md claimed every adapter contract
+      # implemented only `none` for six vendors after that stopped being true,
+      # with every other gate green throughout.
+      - name: Prose still describes what it claims to
+        run: cargo run -p fiducial-cli -- docs --check
+
   # ── WASM: wasm-pack build ─────────────────────────────────────────────────
   wasm-pack:
     name: wasm-pack (fiducial-wasm)
@@ -498,6 +510,20 @@ jobs:
       - name: Rust — rule, and vectors are fresh
         run: cargo test -p fiducial-identity
 
+      - name: Real ed25519 token issuance and verification
+        run: cargo test -p fiducial-identity --features ed25519
+
+      # A device verifies a token offline, with the same code the Worker runs.
+      # If that stops building for a device target it is not a future concern:
+      # it is the claim this crate exists to make, withdrawn.
+      - name: no_std on every device target, with and without software crypto
+        run: |
+          rustup target add thumbv6m-none-eabi thumbv7em-none-eabihf wasm32-unknown-unknown
+          for t in thumbv6m-none-eabi thumbv7em-none-eabihf wasm32-unknown-unknown; do
+            cargo check -p fiducial-identity --target "$t"
+            cargo check -p fiducial-identity --target "$t" --features ed25519
+          done
+
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
@@ -536,6 +562,56 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: postgres
           PGDATABASE: postgres
+
+  # ── adapters: the generated factory is compiled, not string-matched ───────
+  #
+  # `fid derive` writes src/adapters.generated.ts from [adapters]. Every other
+  # test on that file reads it as text and asserts `contains(...)` — which is
+  # how `new NoneEmail(env)` shipped for a phase against a class with no
+  # constructor, failing `tsc` while every test stayed green.
+  #
+  # This job scaffolds a product for each vendor selection, resolves the built
+  # @fiducial/adapters through node_modules the way a real product does, and
+  # runs tsc. It needs both a Rust binary and a built JS package, which is why
+  # it is its own job and its own script rather than part of `pnpm test`.
+  adapters:
+    name: adapters (the generated factory compiles)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the fid binary
+        run: cargo build -p fiducial-cli --bin fid
+
+      - name: Build @fiducial/adapters
+        # The suite resolves the package through its own `exports` map, so it
+        # needs dist/ — the same entry point a consumer gets.
+        run: pnpm --filter @fiducial/adapters build
+
+      - name: tsc against the real generated factory
+        run: pnpm --filter @fiducial/adapters test:generated
+
+      # The migration runner, against real SQLite — which is what D1 runs.
+      # Ordering, idempotency and drift are properties of what a database ends
+      # up containing, and against a mock all three pass whether or not the
+      # code is right. This is the same argument as verify-postgres.sh.
+      - name: The migration runner, on a real database
+        run: pnpm --filter @fiducial/adapters test
 
   # ── portfolio: workbench v1 ───────────────────────────────────────────────
   #

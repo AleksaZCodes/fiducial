@@ -414,3 +414,179 @@ fn check_catches_a_hand_edited_schema() {
     );
     assert!(text(&out).contains("0001_grants.sql"), "{}", text(&out));
 }
+
+// ── `[identity] storage = "none"` ────────────────────────────────────────────
+//
+// `fid add identity` installed the rule and the storage together. A product
+// wanting `can()` with grants from its own config still got a migration it
+// would never apply and a module it would never import. `none` is the word
+// this platform already uses for "wired in, reported, does nothing" — see the
+// `NONE` adapter, which is a real implementation rather than a placeholder.
+
+/// Set `[identity] storage` in a product that already has the capability.
+fn set_storage(root: &Path, value: &str) {
+    let path = root.join("fiducial.toml");
+    let text = std::fs::read_to_string(&path).unwrap();
+    let patched = if text.contains("storage =") {
+        let mut out = String::new();
+        for line in text.lines() {
+            if line.trim_start().starts_with("storage =") {
+                out.push_str(&format!("storage = \"{value}\"\n"));
+            } else {
+                out.push_str(line);
+                out.push('\n');
+            }
+        }
+        out
+    } else {
+        text.replace(
+            "[identity]\n",
+            &format!("[identity]\nstorage = \"{value}\"\n"),
+        )
+    };
+    std::fs::write(&path, patched).unwrap();
+}
+
+#[test]
+fn storage_none_derives_no_migration() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    set_storage(&root, "none");
+
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(
+        !root.join("migrations/0001_grants.sql").exists(),
+        "storage = none must not derive a table"
+    );
+    assert!(
+        root.join("src/identity.generated.ts").exists(),
+        "the rule is still installed, so its module is still generated"
+    );
+}
+
+#[test]
+fn storage_none_still_passes_the_freshness_gate() {
+    // The reason this needed a mechanism rather than an `if`: the pipeline's
+    // declared outputs are written by the capability author, who cannot know
+    // which of them a given product wants. Without skipping the inapplicable
+    // one, `--check` demands an artifact the declaration says must not exist
+    // and reports a correctly configured product as broken.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    set_storage(&root, "none");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let out = run(&root, &["derive", "--check"]);
+    assert!(
+        out.status.success(),
+        "a product with storage = none is not stale: {}",
+        text(&out)
+    );
+}
+
+#[test]
+fn the_generated_module_names_its_storage_kind_either_way() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+
+    assert!(run(&root, &["derive"]).status.success());
+    let sql = std::fs::read_to_string(root.join("src/identity.generated.ts")).unwrap();
+    assert!(sql.contains(r#"grantStorage = "sql""#), "{sql}");
+
+    set_storage(&root, "none");
+    assert!(run(&root, &["derive"]).status.success());
+    let none = std::fs::read_to_string(root.join("src/identity.generated.ts")).unwrap();
+    assert!(none.contains(r#"grantStorage = "none""#), "{none}");
+    // Importing it and calling grantStore() is a mistake the declaration
+    // forbids, so it fails loudly rather than returning a store over a table
+    // that does not exist.
+    assert!(none.contains("never"), "{none}");
+}
+
+#[test]
+fn switching_to_none_stops_tracking_the_migration_and_says_so() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+
+    assert!(run(&root, &["derive"]).status.success());
+    assert!(root.join("migrations/0001_grants.sql").exists());
+
+    set_storage(&root, "none");
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "{}", text(&out));
+
+    // The file is not deleted — it may already have been applied to a real
+    // database — but it stops being tracked, and the note is how a reader
+    // finds out they are carrying a migration nothing derives.
+    // Matched on the artifacts table header rather than the bare path: the
+    // lock also stores the identity pipeline's own file, whose text declares
+    // `outputs = ["migrations/0001_grants.sql", …]`. A substring search finds
+    // that and passes for the wrong reason.
+    let lock = std::fs::read_to_string(root.join("fiducial.lock")).unwrap();
+    assert!(
+        !lock.contains(r#"[artifacts."migrations/0001_grants.sql"]"#),
+        "lock still tracks an artifact no longer derived:\n{lock}"
+    );
+    assert!(text(&out).contains("no longer derived"), "{}", text(&out));
+}
+
+#[test]
+fn switching_back_to_sql_derives_the_table_again() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    set_storage(&root, "none");
+    assert!(run(&root, &["derive"]).status.success());
+
+    set_storage(&root, "sql");
+    assert!(run(&root, &["derive"]).status.success());
+    assert!(root.join("migrations/0001_grants.sql").exists());
+    assert!(run(&root, &["derive", "--check"]).status.success());
+}
+
+#[test]
+fn an_unknown_storage_kind_is_rejected_by_name() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    set_storage(&root, "mongodb");
+
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success(), "an unknown storage kind must fail");
+    let t = text(&out);
+    assert!(t.contains("mongodb"), "{t}");
+    assert!(t.contains("sql"), "the message names what is known: {t}");
+}
+
+#[test]
+fn rls_alongside_storage_none_is_a_contradiction_rather_than_ignored() {
+    // Silently ignoring it is how a product ends up believing `rls = true`
+    // protects a table that does not exist.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    set_storage(&root, "none");
+    let path = root.join("fiducial.toml");
+    let text_before = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        text_before.replace("[identity]\n", "[identity]\nrls = true\n"),
+    )
+    .unwrap();
+
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success());
+    assert!(text(&out).contains("rls"), "{}", text(&out));
+}
+
+#[test]
+fn the_seeded_table_name_does_not_block_storage_none() {
+    // `fid add identity` seeds `table = "grants"`, so it is present in every
+    // product and says nothing about intent. Treating it as a contradiction
+    // would make `storage = "none"` unreachable without hand-editing.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    let toml = std::fs::read_to_string(root.join("fiducial.toml")).unwrap();
+    assert!(toml.contains(r#"table = "grants""#), "seed changed: {toml}");
+
+    set_storage(&root, "none");
+    assert!(run(&root, &["derive"]).status.success());
+}

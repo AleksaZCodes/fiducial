@@ -96,7 +96,24 @@ fn run_derive(
         match run_pipeline_command(pipeline, &working_dir) {
             Ok(_) => {
                 println!(" ✓");
+                let skip = outputs_not_applicable(pipeline, root);
                 for out in &pipeline.outputs {
+                    if skip.contains(out) {
+                        // Stop tracking an artifact this configuration no
+                        // longer derives, and say so if the old file is still
+                        // sitting there. Removing it is not ours to do — it
+                        // may have been applied to a real database — but
+                        // leaving it unmentioned is how a product ships a
+                        // migration nothing generates.
+                        lock.artifacts.remove(out.as_str());
+                        if root.join(out).exists() {
+                            println!(
+                                "      note: `{out}` is no longer derived \
+                                 ([identity] storage = \"none\") but still exists"
+                            );
+                        }
+                        continue;
+                    }
                     let abs = root.join(out);
                     match std::fs::read(&abs) {
                         Ok(content) => {
@@ -128,11 +145,108 @@ fn run_derive(
 
 // ── Check mode ────────────────────────────────────────────────────────────────
 
+/// Outputs a pipeline declares that this product's configuration does not produce.
+///
+/// A pipeline's `outputs` list is written by the capability author, who cannot
+/// know which of them a given product will want: `[identity] storage = "none"`
+/// installs the authorization rule without deriving a table, so the migration
+/// in that list is never written. Without this, `fid derive --check` demands an
+/// artifact the declaration says should not exist — reporting a correctly
+/// configured product as broken.
+///
+/// Kept as a lookup here rather than a field on `Pipeline` because it is a
+/// question about *this product's config*, which a TOML file installed once
+/// cannot answer.
+fn outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<String> {
+    if pipeline.executor != "fid-identity" {
+        return Vec::new();
+    }
+    let Ok(config) = Config::load(&root.join(crate::config::CONFIG_FILE)) else {
+        return Vec::new();
+    };
+    // `storage = "none"` derives no table at all, so every `.sql` output goes.
+    if !config.identity.stores_grants() {
+        return pipeline
+            .outputs
+            .iter()
+            .filter(|o| {
+                Path::new(o.as_str())
+                    .extension()
+                    .is_some_and(|e| e == "sql")
+            })
+            .cloned()
+            .collect();
+    }
+    // The audit table is opt-in, so its migration is an output this product
+    // does not produce unless it asked for one.
+    if !config.identity.audit {
+        return pipeline
+            .outputs
+            .iter()
+            .filter(|o| o.ends_with("0002_audit.sql"))
+            .cloned()
+            .collect();
+    }
+    Vec::new()
+}
+
+/// Artifacts whose *inputs* moved, found by regenerating and comparing.
+///
+/// `fid derive --check` hashes declared outputs against `fiducial.lock`. That
+/// catches a hand-edited artifact, and misses the opposite: adding
+/// `migrations/0003_x.sql` and forgetting to re-run `fid derive` leaves a
+/// manifest whose file is byte-identical to what the lock recorded, so the
+/// check passes — and the migration silently never runs. That is precisely the
+/// class of failure the migration system exists to prevent, so it cannot be
+/// the one it ships with.
+///
+/// `fid-schema` is a pure function of `migrations/`, so the honest check is to
+/// run it and compare. Only this executor is covered: the others either read
+/// declarations the lock already tracks, or shell out to tools that are not
+/// pure and cannot be re-run for free. Generalizing needs each executor to say
+/// whether it is deterministic, which is a change worth making when a second
+/// one needs it.
+fn outputs_with_moved_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
+    if pipeline.executor != "fid-schema" {
+        return Vec::new();
+    }
+    let Ok(migrations) = crate::schema::discover(root) else {
+        // A migration set that does not validate is reported by `fid derive`
+        // with the reason. Repeating it here as "stale" would be worse
+        // information, not more.
+        return Vec::new();
+    };
+    let expected = crate::schema::render_manifest(&migrations);
+
+    pipeline
+        .outputs
+        .iter()
+        .filter(|out| {
+            Path::new(out.as_str())
+                .extension()
+                .is_some_and(|e| e == "ts")
+                && std::fs::read_to_string(root.join(out.as_str()))
+                    .map(|actual| actual != expected)
+                    .unwrap_or(false)
+        })
+        .cloned()
+        .collect()
+}
+
 fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
     let mut issues: Vec<String> = Vec::new();
 
     for pipeline in pipelines {
+        for out in outputs_with_moved_inputs(pipeline, root) {
+            issues.push(format!(
+                "  {out}: stale — its inputs changed (run `fid derive`)"
+            ));
+        }
+        let skip = outputs_not_applicable(pipeline, root);
         for out in &pipeline.outputs {
+            if skip.contains(out) {
+                continue;
+            }
             let abs = root.join(out);
             match lock.artifacts.get(out.as_str()) {
                 None => {
@@ -717,6 +831,16 @@ fn run_fid_identity(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         .context("fid-identity needs [identity] in fiducial.toml")?;
     config.identity.validate(&config.adapters)?;
 
+    // `storage = "none"` installs the rule without the table. `can()` still
+    // works — it takes grants as an argument and does not care where they came
+    // from — so the TypeScript module is still generated, saying so.
+    if !config.identity.stores_grants() {
+        if let Some(ts_target) = output_with_extension(pipeline, "ts") {
+            write_output(working_dir, ts_target, &render_identity_module_none())?;
+        }
+        return Ok(());
+    }
+
     let table = config.identity.table_name();
     let dialect = config.identity.resolve_dialect(&config.adapters)?;
 
@@ -739,6 +863,16 @@ fn run_fid_identity(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     let timestamp_type = match dialect {
         SqlDialect::Sqlite => "TEXT",
         SqlDialect::Postgres => "TIMESTAMPTZ",
+    };
+    // `expires_at` holds milliseconds since the epoch, which is ~1.79e12 and
+    // does not fit Postgres's 4-byte INTEGER — it errors with "integer out of
+    // range" on every insert. SQLite's INTEGER is up to 8 bytes, so the same
+    // DDL worked there and the defect was invisible until a real Postgres
+    // server ran it. The same shape as `GLOB`: SQL is not one language, and a
+    // schema asserted as text is not a schema that has been tried.
+    let epoch_millis_type = match dialect {
+        SqlDialect::Sqlite => "INTEGER",
+        SqlDialect::Postgres => "BIGINT",
     };
 
     let mut out = String::new();
@@ -772,6 +906,28 @@ fn run_fid_identity(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         quoted(GRANT_ROLES)
     ));
     out.push_str(&format!("  granted_at     {timestamp_type} NOT NULL,\n"));
+    out.push_str("  -- NULL is a permanent grant. A grant that has to be remembered to\n");
+    out.push_str("  -- be revoked is one that is not revoked, so a support engineer's\n");
+    out.push_str("  -- access carries its own end date. Milliseconds since the epoch,\n");
+    out.push_str("  -- matching `Timestamp` in both languages.\n");
+    out.push_str(&format!("  expires_at     {epoch_millis_type},\n"));
+    out.push_str("  -- Who delegated this grant, if anyone. A delegated grant is worth\n");
+    out.push_str("  -- exactly what the delegator's own authority is worth AT THE TIME\n");
+    out.push_str("  -- IT IS EVALUATED — so revoking a manager revokes everything they\n");
+    out.push_str("  -- handed out, without anyone having to go and find it. Stored, not\n");
+    out.push_str("  -- flattened into the grant, for exactly that reason.\n");
+    out.push_str(&format!(
+        "  delegated_by_kind TEXT CHECK (delegated_by_kind IS NULL OR delegated_by_kind IN ({})),\n",
+        quoted(GRANT_PRINCIPAL_KINDS)
+    ));
+    out.push_str("  delegated_by_id   TEXT,\n");
+    out.push_str("  -- Both halves of a delegator, or neither. Half a principal is not\n");
+    out.push_str("  -- one, and a row with an id and no kind would be silently ignored.\n");
+    out.push_str(&format!(
+        "  CONSTRAINT {table}_delegator_whole CHECK (\n    \
+         (delegated_by_kind IS NULL AND delegated_by_id IS NULL)\n    \
+         OR (delegated_by_kind IS NOT NULL AND delegated_by_id IS NOT NULL)\n  ),\n"
+    ));
     out.push_str("  -- An all-zero id is the uninitialized sentinel at every level: an\n");
     out.push_str("  -- unprovisioned device must not hold a grant as \"device zero\".\n");
     out.push_str(&format!("  CONSTRAINT {not_all_zero},\n"));
@@ -800,9 +956,32 @@ fn run_fid_identity(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     // and the two facts a product would otherwise retype to construct a store
     // against it. Retyping them is exactly how a Postgres migration ends up
     // queried with SQLite placeholders.
-    let sql_target = output_with_extension(pipeline, "sql")
+    let sql_target = pipeline
+        .outputs
+        .iter()
+        .find(|o| o.ends_with("0001_grants.sql"))
+        .map(String::as_str)
+        .or_else(|| output_with_extension(pipeline, "sql"))
         .ok_or_else(|| anyhow::anyhow!("fid-identity: no `.sql` output declared"))?;
     write_output(working_dir, sql_target, &out)?;
+
+    // A SECOND migration, not an edit to the first. Editing an applied
+    // migration is the one thing `Migrator.apply()` refuses outright, and a
+    // generator that exempted itself from the rule it generates for would be
+    // producing exactly the drift it warns about.
+    if config.identity.audit {
+        if let Some(target) = pipeline
+            .outputs
+            .iter()
+            .find(|o| o.ends_with("0002_audit.sql"))
+        {
+            write_output(
+                working_dir,
+                target,
+                &render_audit_migration(table, dialect, timestamp_type),
+            )?;
+        }
+    }
 
     if let Some(ts_target) = output_with_extension(pipeline, "ts") {
         write_output(
@@ -812,6 +991,24 @@ fn run_fid_identity(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         )?;
     }
     Ok(())
+}
+
+/// `fid-schema` — the ordered migration manifest, from `migrations/*.sql`.
+///
+/// The SQL files are the declaration; this is the derivation that makes them
+/// applicable somewhere with no filesystem. Validation (ordering, unique
+/// numbers, names that are actually migrations) happens in `schema::discover`,
+/// so a set that cannot be applied safely fails here rather than at deploy.
+fn run_fid_schema(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    let migrations = crate::schema::discover(working_dir)?;
+
+    let target = output_with_extension(pipeline, "ts")
+        .ok_or_else(|| anyhow::anyhow!("fid-schema: no `.ts` output declared for the manifest"))?;
+    write_output(
+        working_dir,
+        target,
+        &crate::schema::render_manifest(&migrations),
+    )
 }
 
 /// The pipeline's output with this extension, if it declares one.
@@ -846,6 +1043,117 @@ fn write_output(working_dir: &Path, target: &str, contents: &str) -> Result<()> 
 /// A marker template rather than `format!`: the output is full of braces, and
 /// escaping every one of them makes the generated TypeScript unreadable in the
 /// generator, which is where anyone edits it.
+/// The append-only log of authorization decisions.
+///
+/// `explain()` produces the record and this is where it goes. The columns are
+/// the `Decision` fields, so a reason the rule can return and the table cannot
+/// store is a `CHECK` failure rather than a row that silently loses why.
+///
+/// Append-only by convention and by grant, not by trigger: SQLite and Postgres
+/// disagree about how to forbid an UPDATE, and a log whose immutability is
+/// enforced differently on each vendor is one whose guarantee nobody can state.
+fn render_audit_migration(table: &str, dialect: SqlDialect, timestamp_type: &str) -> String {
+    let reasons = AUDIT_REASONS
+        .iter()
+        .map(|r| format!("'{r}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let bool_type = match dialect {
+        SqlDialect::Sqlite => "INTEGER",
+        SqlDialect::Postgres => "BOOLEAN",
+    };
+    let audit = format!("{table}_audit");
+
+    format!(
+        "-- generated by `fid derive` — do not edit\n\
+         -- source of truth: `Decision` and `Reason` in `fiducial-identity`.\n\
+         --\n\
+         -- Every authorization decision, with WHY. The verdict alone is not an\n\
+         -- audit trail: reconstructing the reason afterwards from the grants table\n\
+         -- is guesswork, because the table has moved on by the time anyone reads\n\
+         -- the log.\n\
+         --\n\
+         -- A SECOND migration rather than an edit to 0001. Editing an applied\n\
+         -- migration is the one thing the runner refuses outright.\n\
+         \n\
+         CREATE TABLE IF NOT EXISTS {audit} (\n  \
+           id             INTEGER PRIMARY KEY{autoinc},\n  \
+           decided_at     {timestamp_type} NOT NULL,\n  \
+           principal_kind TEXT NOT NULL,\n  \
+           principal_id   TEXT NOT NULL,\n  \
+           action         TEXT NOT NULL CHECK (action IN ('read', 'write', 'admin')),\n  \
+           resource_kind  TEXT NOT NULL,\n  \
+           resource_id    TEXT NOT NULL,\n  \
+           allowed        {bool_type} NOT NULL,\n  \
+           -- The `Reason` variants themselves. A reason the rule can return and\n  \
+           -- this cannot store fails here rather than losing why.\n  \
+           reason         TEXT NOT NULL CHECK (reason IN ({reasons}))\n\
+         );\n\
+         \n\
+         -- The query an audit answers: what happened to this principal, latest first.\n\
+         CREATE INDEX IF NOT EXISTS {audit}_principal_idx\n  \
+           ON {audit} (principal_kind, principal_id, decided_at);\n\
+         \n\
+         -- And the other one: who was refused, and why.\n\
+         CREATE INDEX IF NOT EXISTS {audit}_denied_idx\n  \
+           ON {audit} (allowed, decided_at);\n",
+        autoinc = match dialect {
+            SqlDialect::Sqlite => "",
+            SqlDialect::Postgres => " GENERATED BY DEFAULT AS IDENTITY",
+        },
+    )
+}
+
+/// Every `Reason` the rule can return. Mirrors `Reason` in `fiducial-identity`.
+const AUDIT_REASONS: &[&str] = &[
+    "granted",
+    "device_reading_itself",
+    "not_identified",
+    "no_grant",
+    "role_too_weak",
+    "expired",
+    "no_clock",
+    "delegator_lacks_authority",
+    "delegation_too_deep",
+];
+
+/// The module a product gets when it wants the rule and not the table.
+///
+/// It exports something rather than nothing on purpose: a product importing
+/// `./identity.generated.js` should get a clear compile error pointing at the
+/// declaration, not a module-not-found that says nothing about why.
+fn render_identity_module_none() -> String {
+    r#"// generated by `fid derive` — do not edit
+//
+// `[identity] storage = "none"` — this product installs the authorization
+// RULE without deriving a table for it. No migration is generated.
+//
+// `can()` is unaffected. It takes grants as an argument and does not care
+// where they came from, which is what makes `none` a real configuration
+// rather than a disabled one:
+//
+//   import { can, MemoryGrantStore } from "@fiducial/identity";
+//
+//   const store = new MemoryGrantStore(grantsFromYourOwnSource);
+//   if (can(principal, "read", resource, await store.grantsFor(principal))) …
+//
+// To derive a table instead, set `[identity] storage = "sql"` in
+// fiducial.toml and re-run `fid derive`.
+
+/** `[identity] storage`, carried into TypeScript so a consumer can branch. */
+export const grantStorage = "none" as const;
+
+/** Constructing a SQL store is a mistake this product's declaration forbids. */
+export function grantStore(): never {
+  throw new Error(
+    '[identity] storage = "none": no grants table is derived for this product. ' +
+      'Use MemoryGrantStore, or set storage = "sql" in fiducial.toml.',
+  );
+}
+"#
+    .to_string()
+}
+
 fn render_identity_module(table: &str, dialect: SqlDialect) -> String {
     const TEMPLATE: &str = r#"// generated by `fid derive` — do not edit
 //
@@ -868,6 +1176,9 @@ import type {
   SqlDialect,
   SqlGrantStoreOptions,
 } from "@fiducial/identity";
+
+/** `[identity] storage`, carried into TypeScript so a consumer can branch. */
+export const grantStorage = "sql" as const;
 
 /** `[identity] table`. */
 export const grantsTable = "__TABLE__";
@@ -1194,10 +1505,11 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             "fid-deploy" => return run_fid_deploy(pipeline, working_dir),
             "fid-identity" => return run_fid_identity(pipeline, working_dir),
             "fid-adapters" => return run_fid_adapters(pipeline, working_dir),
+            "fid-schema" => return run_fid_schema(pipeline, working_dir),
             other => bail!(
                 "unknown executor `{other}` \
                  (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n, fid-brand, \
-                 fid-adapters, fid-deploy, fid-identity)"
+                 fid-adapters, fid-deploy, fid-identity, fid-schema)"
             ),
         };
 

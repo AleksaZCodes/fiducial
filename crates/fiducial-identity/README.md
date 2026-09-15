@@ -22,20 +22,20 @@ let owner = Principal::User(UserId::new([7; 16]));
 let thermostat = Resource::Device(DeviceId::new([1, 2, 3, 4, 5, 6, 7, 8]));
 let grants = [Grant::new(owner, thermostat, Role::Owner)];
 
-assert!(can(&owner, Action::Write, &thermostat, &grants));
+assert!(can(&owner, Action::Write, &thermostat, &grants, None));
 
 // Deny is the default: a stranger gets nothing.
 let stranger = Principal::User(UserId::new([9; 16]));
-assert!(!can(&stranger, Action::Read, &thermostat, &grants));
+assert!(!can(&stranger, Action::Read, &thermostat, &grants, None));
 
 // A device may read itself with no grant — provisioning depends on it
 // being able to say "I am here, I am unclaimed" before anyone owns it.
 let itself = Principal::Device(DeviceId::new([1, 2, 3, 4, 5, 6, 7, 8]));
-assert!(can(&itself, Action::Read, &thermostat, &[]));
+assert!(can(&itself, Action::Read, &thermostat, &[], None));
 
 // But not write itself: a compromised device must not be able to rewrite
 // its own configuration and call it self-service.
-assert!(!can(&itself, Action::Write, &thermostat, &[]));
+assert!(!can(&itself, Action::Write, &thermostat, &[], None));
 ```
 
 ## The rule

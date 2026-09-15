@@ -1,6 +1,12 @@
 name     = "identity"
 executor = "fid-identity"
-outputs  = ["migrations/0001_grants.sql", "src/identity.generated.ts"]
+outputs  = [
+  "migrations/0001_grants.sql",
+  # Only when [identity] audit = true. A second migration, never an edit to
+  # the first — editing an applied migration is what the runner refuses.
+  "migrations/0002_audit.sql",
+  "src/identity.generated.ts",
+]
 
 # The grants table is a derivation of the identity model.
 #

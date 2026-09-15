@@ -1,0 +1,170 @@
+{
+  "cases": [
+    {
+      "checks": [
+        {
+          "expect": "ok",
+          "now": 1789516800000
+        },
+        {
+          "expect": "ok",
+          "now": 1789516800001
+        },
+        {
+          "expect": "ok",
+          "now": 1789520399999
+        },
+        {
+          "expect": "expired",
+          "now": 1789520400000
+        },
+        {
+          "expect": "expired",
+          "now": 1789520400001
+        },
+        {
+          "expect": "not_yet_valid",
+          "now": 1789516799999
+        },
+        {
+          "expect": "no_clock",
+          "now": null
+        }
+      ],
+      "claims": {
+        "expires_at": 1789520400000,
+        "issued_at": 1789516800000,
+        "nonce": "1",
+        "principal": {
+          "id": "dadadadadadadada",
+          "kind": "device"
+        }
+      },
+      "name": "device_token",
+      "token": "02dadadadadadadada0000000000000000000001a0a7836000000001a0a7ba4e800000000000000001dfc0312c042b86762e994199f9691a4f7fa13bb50c3d670e9b65c5f558546a4a77b2077a61cbf3f67f9c5a65e97dca245bb8c0439fe819a679bdc77aa37ab008",
+      "why": "a device proving it is that device, offline"
+    },
+    {
+      "checks": [
+        {
+          "expect": "ok",
+          "now": 1789516800000
+        },
+        {
+          "expect": "ok",
+          "now": 1789516800001
+        },
+        {
+          "expect": "ok",
+          "now": 1789520399999
+        },
+        {
+          "expect": "expired",
+          "now": 1789520400000
+        },
+        {
+          "expect": "expired",
+          "now": 1789520400001
+        },
+        {
+          "expect": "not_yet_valid",
+          "now": 1789516799999
+        },
+        {
+          "expect": "no_clock",
+          "now": null
+        }
+      ],
+      "claims": {
+        "expires_at": 1789520400000,
+        "issued_at": 1789516800000,
+        "nonce": "2",
+        "principal": {
+          "id": "5c5c5c5c5c5c5c5c",
+          "kind": "service"
+        }
+      },
+      "name": "service_token",
+      "token": "035c5c5c5c5c5c5c5c0000000000000000000001a0a7836000000001a0a7ba4e800000000000000002c87db7e58c15c64eaa0ddfc082ddc56a040a0ba52243101ebf0c50e20cef3676652cdddde996945382ddb8bdfa3d7a53c94d88091c780069057e0124a3b1c809",
+      "why": "a backend service; same id bytes as a device would be a different token, because the kind is signed"
+    },
+    {
+      "checks": [
+        {
+          "expect": "ok",
+          "now": 1789516800000
+        },
+        {
+          "expect": "ok",
+          "now": 1789516800001
+        },
+        {
+          "expect": "ok",
+          "now": 1789520399999
+        },
+        {
+          "expect": "expired",
+          "now": 1789520400000
+        },
+        {
+          "expect": "expired",
+          "now": 1789520400001
+        },
+        {
+          "expect": "not_yet_valid",
+          "now": 1789516799999
+        },
+        {
+          "expect": "no_clock",
+          "now": null
+        }
+      ],
+      "claims": {
+        "expires_at": 1789520400000,
+        "issued_at": 1789516800000,
+        "nonce": "3",
+        "principal": {
+          "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+          "kind": "user"
+        }
+      },
+      "name": "user_token",
+      "token": "010a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a000001a0a7836000000001a0a7ba4e8000000000000000034fe3f0d2dc0e777b8754e21dcd7bb4a72a83e2eee4e3146305a75fc9bbbb5eeecafe4e04169cd54fb089860aabed89f9bf92f0b2136889f927c57fb7c8f5a10e",
+      "why": "a 16-byte user id, where device and service ids are 8"
+    },
+    {
+      "checks": [
+        {
+          "expect": "ok",
+          "now": 1789516800000
+        }
+      ],
+      "claims": {
+        "expires_at": 1789520400000,
+        "issued_at": 1789516800000,
+        "nonce": "999",
+        "principal": {
+          "id": "dadadadadadadada",
+          "kind": "device"
+        }
+      },
+      "name": "same_principal_different_nonce",
+      "token": "02dadadadadadadada0000000000000000000001a0a7836000000001a0a7ba4e8000000000000003e7b471f2e5a7a8553ff6caae453f10ba32e76f304c1b5b075fcf81358dfabae8f7a8aeebf139e429212fa2d1a0c3aa3071792c21b4dcec8508f177cd6a27c7cb06",
+      "why": "two tokens for one principal over one second must not be byte-identical, or a captured token is indistinguishable from a fresh one"
+    }
+  ],
+  "format": {
+    "claims_len": 41,
+    "domain": "fiducial-identity-token-v1",
+    "layout": "kind:u8 | id:16 | issued_at:u64be | expires_at:u64be | nonce:u64be | sig:64",
+    "principal_kinds": {
+      "device": 2,
+      "service": 3,
+      "user": 1
+    },
+    "signature_len": 64,
+    "token_len": 105
+  },
+  "note": "Generated from crates/fiducial-identity. Do not edit by hand — run FIDUCIAL_WRITE_VECTORS=1 cargo test -p fiducial-identity --features ed25519 --test token_vectors",
+  "public_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c"
+}
