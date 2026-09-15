@@ -159,6 +159,18 @@ jobs:
       - name: Agent context matches the code
         run: cargo run -p fiducial-cli -- context --check
 
+      # The half the two gates above cannot see: hand-written prose.
+      #
+      # A paragraph cannot be generated — one explaining WHY a contract is
+      # shaped a certain way would carry nothing the code does not, if it
+      # could. So what is gated is the obligation to revisit it: a prose block
+      # names the source it describes, and this fails when that source moved
+      # and the paragraph did not. AGENTS.md claimed every adapter contract
+      # implemented only `none` for six vendors after that stopped being true,
+      # with every other gate green throughout.
+      - name: Prose still describes what it claims to
+        run: cargo run -p fiducial-cli -- docs --check
+
   # ── WASM: wasm-pack build ─────────────────────────────────────────────────
   wasm-pack:
     name: wasm-pack (fiducial-wasm)

@@ -127,11 +127,15 @@ product actually needs.
 | `worker-cloudflare` | 1 template file(s) | `fid add capability worker-cloudflare` |
 <!-- fid:end capabilities -->
 
+<!-- fid:describes crates/fiducial-cli/src/adapter.rs#pub static CONTRACTS -->
+
 Vendors sit behind **adapter contracts**, chosen per product in `[adapters]`.
 Every contract ships with `none` — a real, working no-op, not a placeholder,
 which is what makes it cost nothing to wire in from the first commit. A name
 under *Planned* cannot be selected and fails with a message saying so: a
 selectable name with nothing behind it is a promise the platform does not keep.
+
+<!-- fid:end-describes -->
 
 <!-- fid:begin adapters -->
 | Contract | For | Selectable today | Planned |
@@ -187,12 +191,16 @@ its description from the first line of prose in its own skill.
 
 ### The four kinds, and why the difference is not cosmetic
 
+<!-- fid:describes crates/fiducial-cli/src/capability/manifest.rs#pub fn derive -->
+
 | Kind | Is | Example |
 |---|---|---|
 | **Declaration** | a typed fact, written once, inert | `board/board.interface.json`, the `[i18n]` block |
 | **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/eda.toml` |
 | **Adapter** | a swappable vendor behind a fixed contract | `storage = "r2"` |
 | **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
+
+<!-- fid:end-describes -->
 
 The test for a declaration: *could two different pipelines read this and both be
 correct?* If yes it is a declaration; if it is one tool's config file it is a
@@ -220,11 +228,15 @@ outputs  = [
 `fiducial.lock`, and `fid derive --check` fails when a hash no longer matches
 what the declaration implies.
 
+<!-- fid:describes crates/fiducial-cli/src/commands/derive.rs#fn run_pipeline_command -->
+
 Executors are `shell` and `cargo-test` — which need no platform change at all —
 plus the in-process ones (`fid-validate`, `fid-mesh`, `fid-i18n`, `fid-brand`,
 `fid-deploy`, `fid-identity`, `fid-adapters`). Reach for `shell` first; a new
 in-process executor is warranted only when the work is genuinely a Rust library
 call rather than a tool invocation.
+
+<!-- fid:end-describes -->
 
 ### Adding a vendor to a contract
 

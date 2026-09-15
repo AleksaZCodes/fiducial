@@ -116,6 +116,41 @@ Use `get_me` first to confirm current user context.
 | `docs/guides/first-product.md` | Nothing → board → generated enclosure → CI gate |
 | `docs/guides/harvesting.md` | Getting the good parts out of a codebase already built |
 
+## Documentation that cannot go stale quietly
+
+Three mechanisms, and between them they cover the whole surface:
+
+| What | Gate | Fix when it fails |
+|---|---|---|
+| Derived blocks (`<!-- fid:begin … -->`) | `fid context --check` | `fid context` |
+| Terminal output in the guides | `cargo test -p fiducial-cli --test captures` | `FIDUCIAL_WRITE_CAPTURES=1 cargo test …` |
+| **Hand-written prose** | `fid docs --check` | read it, fix it, `fid docs --accept` |
+
+The third is the one that is not automatic, because it cannot be. A paragraph
+explaining *why* something is shaped a certain way cannot be generated from the
+thing it explains — if it could, it would carry nothing the code does not.
+
+So what is derived is **the obligation to revisit it.** A prose block names the
+source it describes:
+
+```markdown
+<!-- fid:describes crates/fiducial-cli/src/adapter.rs#pub static CONTRACTS -->
+Every contract ships with `none` — a real, working no-op…
+<!-- fid:end-describes -->
+```
+
+`docs/prose.lock` records that source's hash as it stood when someone last read
+the paragraph against it. When it moves and the paragraph does not, the gate
+fails and names both.
+
+**`fid docs --accept` means "I have read this against its source."** Running it
+to make a red build green, without reading, is the one thing that makes the
+mechanism worthless — it is a separate command from `--check` for that reason.
+Narrow a block with `#Symbol`: a whole-file watch fires on every unrelated edit,
+and a gate that cries wolf trains you to accept without reading.
+
+Spec: `docs/specs/2026-09-15-prose-is-gated-not-generated.md`.
+
 Terminal output in those guides is **generated from the real binary** and gated
 in CI. Never hand-edit a block showing `fid` output — regenerate it with
 `FIDUCIAL_WRITE_CAPTURES=1 cargo test -p fiducial-cli --test captures`.
@@ -177,6 +212,8 @@ Everything that decides *how* it builds is committed, so a cloud checkout — Cl
 Code on the web, a Codespace, a new contributor — gets the same answers as a
 laptop:
 
+<!-- fid:describes rust-toolchain.toml -->
+
 | Pinned by | What |
 |---|---|
 | `rust-toolchain.toml` | channel, `rustfmt`/`clippy`, **and the three cross-compilation targets** the spine check needs |
@@ -184,6 +221,8 @@ laptop:
 | `.nvmrc` + `engines` | Node |
 | `pnpm-lock.yaml` + `Cargo.lock` | every dependency |
 | `.claude/settings.json` | the plugin, so the guard is active |
+
+<!-- fid:end-describes -->
 
 The targets line matters: without it, `cargo check --target wasm32-unknown-unknown`
 fails on a fresh machine and looks like a code problem rather than a missing
@@ -213,6 +252,7 @@ rule that matters most.
 | `fid dash` | The workbench — one read-only view of roadmap, decisions, CI, graph, freshness |
 | `fid harvest` | Survey an existing codebase for reusable logic, art, UI and principles |
 | `fid context` | Regenerate the derivable parts of AGENTS.md / CLAUDE.md |
+| `fid docs` | Documentation freshness, including prose nothing can generate |
 | `fid doctor` | Check for drift: outdated deps, stale templates, un-applied migrations |
 <!-- fid:end commands -->
 
@@ -224,12 +264,16 @@ a schedule is a fact `SHIPPED.md` owns, and a second copy of it drifts.
 Four kinds, and the difference is not cosmetic — see
 `docs/specs/2026-09-14-capability-taxonomy.md`.
 
+<!-- fid:describes crates/fiducial-cli/src/capability/manifest.rs#pub fn derive -->
+
 | Kind | Is | Example |
 |---|---|---|
 | **Declaration** | a typed fact, written once, inert | `board/board.interface.json`, the `[i18n]` block |
 | **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/eda.toml` |
 | **Adapter** | a swappable vendor behind a fixed contract, selected in `[adapters]` | `storage = "none"` |
 | **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
+
+<!-- fid:end-describes -->
 
 The test for a declaration: *could two different pipelines read this and both be
 correct?* If yes it is a declaration; if it is one tool's config file it is a
@@ -308,6 +352,8 @@ is none for anyone else.
 
 ## Contributions from outside
 
+<!-- fid:describes .github/cla-exempt.txt -->
+
 `CLA.md` binds outside contributors so the project keeps the option to
 relicense; `IP-POLICY.md` rule 3 is where that requirement is authored. Every
 commit from a non-maintainer needs `Signed-off-by:` matching its author, gated
@@ -315,6 +361,8 @@ by `outside_contributions_carry_a_cla_sign_off` in
 `crates/fiducial-cli/tests/commit_hygiene.rs`. Maintainers and automation are
 listed in `.github/cla-exempt.txt`, which is the only place that decides who is
 exempt.
+
+<!-- fid:end-describes -->
 
 ## What not to do
 

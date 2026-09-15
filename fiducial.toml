@@ -46,6 +46,8 @@ gates = [
     # own agent context.
     "cargo test -p fiducial-cli --test captures",
     "context --check",
+    # Hand-written prose, against the sources it describes.
+    "docs --check",
     # Generated TypeScript: the wasm bridge, and the adapter factory a product
     # gets from `fid derive`.
     "git diff --exit-code packages/wasm-bridge/src/generated.ts",
