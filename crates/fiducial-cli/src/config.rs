@@ -98,6 +98,19 @@ impl SqlDialect {
 /// database of its own).
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Identity {
+    /// Where the permission rows live: `sql` (the default) or `none`.
+    ///
+    /// `fid add identity` used to install the *rule* and the *storage*
+    /// together. A product that wants `can()` and seeds its grants from config
+    /// or `MemoryGrantStore` still got a migration it will never apply and a
+    /// generated module it will never import.
+    ///
+    /// `none` is this platform's existing word for "wired in, reported, does
+    /// nothing" — see the `NONE` adapter, which is a real implementation
+    /// rather than a placeholder. Splitting identity into two capabilities was
+    /// the alternative, and is more surface for the same result.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub storage: String,
     /// Table holding the permission rows. Defaults to `grants`.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub table: String,
@@ -126,10 +139,20 @@ pub struct Identity {
 
 impl Identity {
     pub fn is_empty(&self) -> bool {
-        self.table.is_empty()
+        self.storage.is_empty()
+            && self.table.is_empty()
             && self.dialect.is_empty()
             && !self.rls
             && self.current_user_sql.is_empty()
+    }
+
+    /// Whether this product derives grant storage at all.
+    ///
+    /// Empty means `sql`: the default has to stay what it was, or adding this
+    /// option would silently delete the migration of every product that
+    /// already has one.
+    pub fn stores_grants(&self) -> bool {
+        !matches!(self.storage.as_str(), "none")
     }
 
     /// The table name to generate against, defaulted.
@@ -175,6 +198,45 @@ impl Identity {
 
     /// Everything the pipeline needs, each problem named.
     pub fn validate(&self, adapters: &Adapters) -> Result<()> {
+        match self.storage.as_str() {
+            "" | "sql" | "none" => {}
+            other => bail!(
+                "[identity] storage = \"{other}\" is not a kind of grant storage \
+                 this generates. Known: sql (the default), none.\n\
+                 `none` installs the rule without the table — `can()` still works, \
+                 against grants you supply yourself."
+            ),
+        }
+
+        if !self.stores_grants() {
+            // Every other key here configures a table that will not exist.
+            // Silently ignoring them is how a product ends up believing `rls =
+            // true` protects something.
+            let ignored: Vec<&str> = [
+                // `table = "grants"` is what the capability seeds, so it is
+                // present in every product that ran `fid add identity` and
+                // says nothing about intent. Only a name someone chose does.
+                (!self.table.is_empty() && self.table != "grants").then_some("table"),
+                (!self.dialect.is_empty()).then_some("dialect"),
+                self.rls.then_some("rls"),
+                (!self.current_user_sql.is_empty()).then_some("current_user_sql"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
+            if !ignored.is_empty() {
+                bail!(
+                    "[identity] storage = \"none\", so no table is generated — but \
+                     `{}` configure{} one.\n\
+                     Remove {}, or set storage = \"sql\".",
+                    ignored.join("`, `"),
+                    if ignored.len() == 1 { "s" } else { "" },
+                    if ignored.len() == 1 { "it" } else { "them" },
+                );
+            }
+            return Ok(());
+        }
+
         let name = self.table_name();
         let ok = !name.is_empty()
             && name

@@ -334,7 +334,24 @@ supplies its own `{ query, execute }`. Also no device/service token issuance
 cryptographic choices — and no grant expiry, delegation, audit log or
 caching.
 
-**Open: `fid add identity` is one opt-in doing two jobs.** Everything here is
+**Closed 2026-09-15: `fid add identity` was one opt-in doing two jobs.**
+`[identity] storage = "none"` installs the rule without the table, exactly as
+sketched below. `can()` is unaffected — it takes grants as an argument and does
+not care where they came from, which is what makes `none` a real configuration
+rather than a disabled one. The generated TypeScript module still appears and
+names its storage kind, so a product importing it gets a clear error rather
+than a module-not-found.
+
+Building it needed one mechanism that did not exist: a pipeline's `outputs` are
+written by the capability author, who cannot know which of them a given product
+wants, so `fid derive --check` demanded a migration the declaration said must
+not exist. Outputs a configuration does not produce are now skipped by both the
+record and the check, and switching to `none` stops tracking the old migration
+and says so rather than deleting a file that may already have been applied.
+
+The original note follows.
+
+**`fid add identity` is one opt-in doing two jobs.** Everything here is
 already opt-in — `fid new` generates none of it, the way all twelve
 capabilities work, every adapter contract defaults to `none`, and
 `[spine] enabled = false`. But installing the capability installs the *rule*
