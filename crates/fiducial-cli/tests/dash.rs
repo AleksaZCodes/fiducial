@@ -1007,3 +1007,122 @@ fn upgrade_keeps_a_locally_modified_file_at_a_renamed_path() {
         "local edits must survive"
     );
 }
+
+/// A repository that gates freshness by something other than `fid derive`.
+///
+/// This is the platform's own situation, and dash used to get it exactly
+/// backwards: it equated "gated" with "runs `fid derive --check`" and reported
+/// this repository as ungated while nine gates ran on every commit. The
+/// protocol vectors and the terminal captures are gated by Rust tests on
+/// purpose — a gate that runs through the tool it gates is blind exactly where
+/// it matters — so the answer cannot be pattern-matched and is declared.
+#[test]
+fn a_declared_gate_counts_as_a_freshness_check() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+
+    write(
+        &root,
+        ".github/workflows/gates.yml",
+        "name: Gates\n\
+         on:\n  push:\n\
+         jobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n\
+         - run: cargo test -p demo-protocol --test vectors\n",
+    );
+
+    // Before declaring it, the gate is invisible — the workflow runs no
+    // `fid derive --check`.
+    let before = dash(&root);
+    let w = |d: &serde_json::Value| {
+        d["ci"]["workflows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|w| w["name"] == "Gates")
+            .cloned()
+            .expect("Gates workflow")
+    };
+    assert_eq!(
+        w(&before)["checks_freshness"],
+        false,
+        "an undeclared command is not yet a known gate"
+    );
+
+    let config = root.join("fiducial.toml");
+    let text = std::fs::read_to_string(&config).unwrap();
+    std::fs::write(
+        &config,
+        format!("{text}\n[freshness]\ngates = [\"cargo test -p demo-protocol --test vectors\"]\n"),
+    )
+    .unwrap();
+
+    let after = dash(&root);
+    let gates = w(&after);
+    assert_eq!(
+        gates["checks_freshness"], true,
+        "a declared gate the workflow runs is a freshness check"
+    );
+    assert_eq!(
+        gates["gates"][0], "cargo test -p demo-protocol --test vectors",
+        "dash names which gate it matched, so the claim can be audited"
+    );
+}
+
+/// A gate declared and then never run is the more dangerous drift.
+///
+/// It reads as protection in `fiducial.toml` whether or not any workflow runs
+/// it — the same shape as the commented-out `fid derive --check` that dash
+/// already refuses to count.
+#[test]
+fn a_declared_gate_no_workflow_runs_is_reported() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+
+    let config = root.join("fiducial.toml");
+    let text = std::fs::read_to_string(&config).unwrap();
+    std::fs::write(
+        &config,
+        format!("{text}\n[freshness]\ngates = [\"cargo test --test nobody-runs-this\"]\n"),
+    )
+    .unwrap();
+
+    let d = dash(&root);
+    let unrun = d["ci"]["gates_declared_but_unrun"]
+        .as_array()
+        .expect("gates_declared_but_unrun");
+    assert_eq!(
+        unrun.len(),
+        1,
+        "a declared gate nothing runs must be reported: {unrun:?}"
+    );
+    assert_eq!(unrun[0], "cargo test --test nobody-runs-this");
+}
+
+/// `fid derive --check` still counts without being declared.
+///
+/// It is what a scaffolded product uses, and requiring every product to
+/// restate it in `[freshness]` would be the second declaration that block
+/// exists to avoid.
+#[test]
+fn fid_derive_check_is_recognised_without_being_declared() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    write(
+        &root,
+        ".github/workflows/derive.yml",
+        "name: Derive\n\
+         on:\n  push:\n\
+         jobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n\
+         - run: fid derive --check\n",
+    );
+
+    let d = dash(&root);
+    let w = d["ci"]["workflows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|w| w["name"] == "Derive")
+        .expect("Derive");
+    assert_eq!(w["checks_freshness"], true);
+    assert_eq!(w["gates"][0], "fid derive --check");
+}

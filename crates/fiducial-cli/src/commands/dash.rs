@@ -182,6 +182,11 @@ struct Decision {
 #[derive(Debug, Serialize)]
 struct CiView {
     workflows: Vec<Workflow>,
+    /// Gates declared in `[freshness]` that no workflow actually runs.
+    ///
+    /// The inverse drift, and the more dangerous one: a declared gate reads as
+    /// protection whether or not anything runs it.
+    gates_declared_but_unrun: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -190,8 +195,10 @@ struct Workflow {
     name: String,
     /// Event names the workflow declares a trigger for.
     triggers: Vec<String>,
-    /// Whether it runs `fid derive --check`, the guard against stale artifacts.
+    /// Whether it runs a freshness gate — the guard against stale artifacts.
     checks_freshness: bool,
+    /// Which gates it runs, named so the reader can see what is covered.
+    gates: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -268,7 +275,7 @@ impl Dash {
             git: git_view(root),
             roadmap: roadmap_view(root),
             decisions: decisions_view(root),
-            ci: ci_view(root),
+            ci: ci_view(root, &config.freshness.gates),
             // Read once and shared. Freshness needs the declared outputs as
             // well as the lock, so it can report an output nothing has derived
             // yet — invisible if you only look at what the lock tracks. Reading
@@ -663,7 +670,7 @@ fn workflow_triggers(text: &str) -> Vec<String> {
     events
 }
 
-fn ci_view(root: &Path) -> CiView {
+fn ci_view(root: &Path, declared: &[String]) -> CiView {
     let dir = root.join(".github/workflows");
     let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
         .ok()
@@ -675,7 +682,7 @@ fn ci_view(root: &Path) -> CiView {
         .collect();
     files.sort();
 
-    let workflows = files
+    let workflows: Vec<Workflow> = files
         .iter()
         .filter_map(|p| {
             let text = std::fs::read_to_string(p).ok()?;
@@ -698,12 +705,27 @@ fn ci_view(root: &Path) -> CiView {
             // Comment-stripped: a commented-out `fid derive --check` used to
             // report the repository as guarded when it was not, which inverts
             // the most useful thing this section says.
-            let checks_freshness = text
-                .lines()
-                .map(strip_comment)
-                .any(|l| l.contains("derive --check"));
+            let live: Vec<&str> = text.lines().map(strip_comment).collect();
+
+            // `fid derive --check` is recognised without being declared: it is
+            // what a scaffolded product uses, and making every product restate
+            // it would be the second declaration `[freshness]` exists to
+            // avoid. Anything else is a judgment, so the repository declares
+            // it — this is the fix for dash reporting its own repository as
+            // ungated while seven gates ran on every commit.
+            let mut gates: Vec<String> = Vec::new();
+            if live.iter().any(|l| l.contains("derive --check")) {
+                gates.push("fid derive --check".to_string());
+            }
+            for gate in declared {
+                if live.iter().any(|l| l.contains(gate.as_str())) {
+                    gates.push(gate.clone());
+                }
+            }
+
             Some(Workflow {
-                checks_freshness,
+                checks_freshness: !gates.is_empty(),
+                gates,
                 file,
                 name,
                 triggers: workflow_triggers(&text),
@@ -711,7 +733,16 @@ fn ci_view(root: &Path) -> CiView {
         })
         .collect();
 
-    CiView { workflows }
+    let gates_declared_but_unrun: Vec<String> = declared
+        .iter()
+        .filter(|gate| !workflows.iter().any(|w| w.gates.contains(gate)))
+        .cloned()
+        .collect();
+
+    CiView {
+        workflows,
+        gates_declared_but_unrun,
+    }
 }
 
 fn summarise(pipelines: &[pipeline::Pipeline]) -> Vec<PipelineSummary> {
@@ -1111,10 +1142,21 @@ impl Dash {
                         ""
                     };
                     println!("  {:<28} on {triggers}{guard}", w.name);
+                    // Naming the gates, not just counting them: "freshness is
+                    // checked" is the claim a reader most needs to be able to
+                    // audit, and it is worth nothing if they cannot see which
+                    // artifact each gate actually covers.
+                    for gate in &w.gates {
+                        println!("  {:<28}   └ {gate}", "");
+                    }
                 }
                 if !self.ci.workflows.iter().any(|w| w.checks_freshness) {
-                    println!("  note: no workflow runs `fid derive --check`, so a stale");
-                    println!("        artifact would reach main unnoticed");
+                    println!("  note: no workflow runs `fid derive --check`, and no other");
+                    println!("        gate is declared in [freshness], so a stale artifact");
+                    println!("        would reach main unnoticed");
+                }
+                for gate in &self.ci.gates_declared_but_unrun {
+                    println!("  ! [freshness] declares `{gate}`, which no workflow runs");
                 }
                 println!(
                     "  (declared workflows, not live run status — dash makes no network calls)"

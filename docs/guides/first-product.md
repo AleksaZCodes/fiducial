@@ -149,6 +149,7 @@ $ fid dash --section ci
 
 CI
   CI                           on push, pull_request  [checks artifact freshness]
+                                 └ fid derive --check
   Claude Review                on pull_request
   (declared workflows, not live run status — dash makes no network calls)
 ```

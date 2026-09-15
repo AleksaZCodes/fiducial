@@ -37,6 +37,35 @@ pub struct Config {
     /// `[identity]` — where this product keeps its permission rows.
     #[serde(default, skip_serializing_if = "Identity::is_empty")]
     pub identity: Identity,
+    /// `[freshness]` — gates other than `fid derive --check`.
+    #[serde(default, skip_serializing_if = "Freshness::is_empty")]
+    pub freshness: Freshness,
+}
+
+/// `[freshness]` — how this repository stops a stale artifact reaching `main`.
+///
+/// `fid dash` used to equate "gated" with "a workflow runs `fid derive
+/// --check`", and reported *this* repository as ungated while seven gates ran
+/// on every commit. The reason is in `fiducial.toml`: the protocol vectors and
+/// the terminal captures are gated by Rust tests on purpose, because a gate
+/// that runs through the tool it gates is blind exactly where it matters.
+///
+/// That is a judgment, so it is declared rather than guessed. `fid derive
+/// --check` stays recognised without being listed — it is the default for a
+/// scaffolded product, and requiring every product to restate it would be the
+/// second declaration this block exists to avoid.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct Freshness {
+    /// Commands that gate a generated artifact, matched as substrings against
+    /// each workflow's text.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub gates: Vec<String>,
+}
+
+impl Freshness {
+    pub fn is_empty(&self) -> bool {
+        self.gates.is_empty()
+    }
 }
 
 /// Which SQL dialect the grants table is generated for.

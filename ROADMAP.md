@@ -434,7 +434,7 @@ step 3 delivers.
 | **Rust release versioning** | Changesets drives npm; the thirteen crates move in lockstep at 0.1.0 with nothing driving a bump |
 | **Tagged releases + Zenodo DOI** | No release exists, so there is nothing to archive or cite |
 | **Claude chat plugin** | The making philosophy, as a skill for claude.ai — see below |
-| **`fid dash` freshness detection** | Dash equates "gated" with "a workflow runs `fid derive --check`". This repository gates three artifacts by other means on purpose, so dash reports a false positive. Found by adopting level 2 self-hosting |
+| ~~**`fid dash` freshness detection**~~ ✅ | Shipped 2026-09-15. Dash equated "gated" with "a workflow runs `fid derive --check`" and reported this repository as ungated while nine gates ran on every commit. `[freshness] gates` declares the others — which command gates an artifact is a judgment, not something to pattern-match — and a gate declared but run by nothing is now reported too |
 
 ### Out of band — risk, not priority ⬜
 
