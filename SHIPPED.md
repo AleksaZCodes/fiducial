@@ -362,7 +362,8 @@ built because no product has one yet.
 
 **Phase 22 — i18n: localized by construction ✅ (2026-09-14)**
 
-> Principle **1c** made mechanical. Spec: `ROADMAP.md` § i18n.
+> Implements the roadmap item **i18n — localized by construction**. Principle
+> **1c** made mechanical; spec: `ROADMAP.md` § i18n.
 
 | Deliverable | Status |
 | --- | --- |
@@ -379,11 +380,31 @@ built because no product has one yet.
 | Installing a capability **seeds the declaration it needs**; a pipeline with an empty declaration fails on the next derive | ✅ |
 | 43 runtime tests, 10 comparison unit tests, 10 end-to-end. 395 across the workspace | ✅ |
 
+**Phase 25 — context sync ✅ (2026-09-15)**
+
+> Implements the roadmap item **context sync**: the derivable parts of agent
+> context are generated, so they cannot drift.
+> Spec: `docs/specs/2026-09-15-context-sync.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| `fid context` / `fid context --check` — regenerate, or fail, every marked block | ✅ |
+| Four generated blocks: the **layout tree** (from the workspace manifests), the **command list** (from the binary's own `clap` definition), the **capability list** (from the registry), and **where the skills live** | ✅ |
+| A member's one-line summary is its own `description` — the field crates.io and npm already show. A second summary in `AGENTS.md` is how the tree went stale in the first place | ✅ |
+| Markers are HTML comments, so a generated block renders as nothing and does not announce itself to a reader who wants the content | ✅ |
+| **Opt-in per file and per block.** A file with no markers is left completely alone, so a product can adopt one block without surrendering its `AGENTS.md` | ✅ |
+| A marker naming a block the generator does not know is an **error**, not a no-op — skipping it leaves a block that looks generated, is frozen, and drifts | ✅ |
+| **Detection became prevention.** `agent_context_layout_tree_names_every_crate_and_package` is gone; the roadmap's objection to it was the reason for this item — *"a test that fails after the fact is detection, not sync"*. What remains checks the blocks are still *marked*, because a file that lost its markers goes back to hand-written and stale with nothing saying so | ✅ |
+| A command rather than a `fid derive` pipeline: agent context exists in the platform repo too, which declares no pipelines on purpose | ✅ |
+| CI gate next to the captures — a crate added without regenerating fails there rather than reaching main as a tree that omits it. Verified by adding a crate and watching it fail | ✅ |
+| 8 unit tests incl. character-boundary truncation, since these descriptions are full of em-dashes and `truncate` panics on one | ✅ |
+| **Deliberately not done:** `CLAUDE.md` stays hand-written (58 lines, all Claude-specific judgment, nothing derivable); no generated prose, because sentences written by nobody read worse than a slightly stale sentence written by someone; the product `AGENTS.md` template is not marked until a product asks | ✅ |
+
 **Phase 24 — external capabilities ✅ (2026-09-15)**
 
-> A capability is a directory, resolvable from outside the binary.
-> Spec: `docs/specs/2026-09-15-external-capabilities.md`. Roadmap item 3 — the
-> keystone, and the one whose cost of delay was measurable.
+> Implements the roadmap item **external capabilities** — the keystone, and the
+> one whose cost of delay was measurable.
+> Spec: `docs/specs/2026-09-15-external-capabilities.md`.
 
 | Deliverable | Status |
 | --- | --- |
@@ -410,7 +431,8 @@ built because no product has one yet.
 
 **Phase 23 — capability taxonomy, made real ✅ (2026-09-15)**
 
-> Declarations, pipelines and adapters become first-class in the CLI.
+> Implements the roadmap item **capability taxonomy, made real**: declarations,
+> pipelines and adapters become first-class in the CLI.
 > Spec: `docs/specs/2026-09-15-capability-taxonomy-made-real.md`, extending the
 > accepted `2026-09-14-capability-taxonomy.md`.
 
@@ -438,7 +460,8 @@ built because no product has one yet.
 
 **Phase 22b — i18n, closed out ✅ (2026-09-14)**
 
-> The two items Phase 22 left open. Nothing on i18n remains.
+> Closes the roadmap item **i18n — localized by construction**: the two pieces
+> Phase 22 left open. Nothing on i18n remains.
 
 | Deliverable | Status |
 | --- | --- |

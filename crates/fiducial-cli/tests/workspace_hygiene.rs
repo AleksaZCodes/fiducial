@@ -383,57 +383,31 @@ fn pnpm_workspace_globs_all_resolve() {
     );
 }
 
-/// Every crate and package directory is named in the layout tree of the agent
-/// context files.
+/// The layout tree in `AGENTS.md` is generated, not checked.
 ///
-/// `CLAUDE.md` carried a hand-maintained tree that had gone stale twice over —
-/// it was missing `fiducial-ota`, `fiducial-sim` and `packages/realtime`. The
-/// file even documented its own unreliability, telling readers to run
-/// `ls crates packages` rather than trust it. A disclaimer is not a fix: agents
-/// read that tree to decide what exists, and a crate missing from it is a crate
-/// they will not use or will rebuild.
+/// This used to be a test that read `crates/` and `packages/` and asserted
+/// every member appeared in the hand-written tree. It caught drift, and the
+/// roadmap's objection to it is the whole reason context sync exists:
+/// **a test that fails after the fact is detection, not sync.** Someone still
+/// had to edit the tree, and until they did the build was red.
 ///
-/// Checking is cheaper than disclaiming, so this test does the checking.
+/// The tree is now produced by `fid context` from the workspace manifests, so
+/// what is left to check is that it *is* generated — a file that quietly lost
+/// its markers would go back to being hand-written and stale, with nothing
+/// saying so.
 #[test]
-fn agent_context_layout_tree_names_every_crate_and_package() {
+fn agent_context_is_generated_rather_than_asserted() {
     let root = workspace_root();
+    let text = std::fs::read_to_string(root.join("AGENTS.md")).expect("reading AGENTS.md");
 
-    let mut expected: Vec<String> = Vec::new();
-    for dir in ["crates", "packages"] {
-        let entries = std::fs::read_dir(root.join(dir)).expect("directory is readable");
-        for entry in entries.flatten() {
-            if !entry.path().is_dir() {
-                continue;
-            }
-            expected.push(entry.file_name().to_string_lossy().to_string());
-        }
+    for block in ["layout", "commands", "capabilities", "skills"] {
+        assert!(
+            text.contains(&format!("<!-- fid:begin {block} -->")),
+            "AGENTS.md no longer generates its `{block}` block — it is a fact \
+             about this repository, and hand-written it goes stale. Run \
+             `fid context` and keep the markers."
+        );
     }
-    expected.sort();
-
-    let mut missing: Vec<String> = Vec::new();
-    for doc in ["CLAUDE.md", "AGENTS.md"] {
-        let path = root.join(doc);
-        let Ok(text) = std::fs::read_to_string(&path) else {
-            continue; // Not every context file has to exist.
-        };
-        // Only check a file that actually draws a layout tree.
-        if !text.contains("├──") {
-            continue;
-        }
-        for name in &expected {
-            if !text.contains(name.as_str()) {
-                missing.push(format!("  {doc} — does not mention `{name}`"));
-            }
-        }
-    }
-
-    assert!(
-        missing.is_empty(),
-        "the layout tree in the agent context files must name every crate and \
-         package. Agents read it to decide what already exists, and anything \
-         absent gets rebuilt:\n\n{}\n",
-        missing.join("\n")
-    );
 }
 
 /// No tracked file lives inside a build-output directory.
@@ -614,25 +588,42 @@ fn nothing_points_at_shipped_for_what_is_next() {
     );
 }
 
+/// The ordered roadmap items: every `###` heading under *Order of work*.
+///
+/// Scoped by section rather than by a leading digit. The items used to be
+/// `### 1 ·`, `### 2 ·` — ordinals sitting next to `SHIPPED.md`'s phase numbers,
+/// so the same work answered to both "item 3" and "Phase 24". They are named
+/// now, which means a check keyed to a digit would quietly match nothing and
+/// pass forever. This one did, for exactly as long as it took to notice.
+fn roadmap_items(text: &str) -> Vec<&str> {
+    text.lines()
+        .skip_while(|l| !l.starts_with("## Order of work"))
+        .skip(1)
+        .take_while(|l| !l.starts_with("## "))
+        .filter(|l| l.starts_with("### "))
+        .collect()
+}
+
 /// Every ordered roadmap item carries a status marker.
 ///
 /// `fid dash` counts ⬜ 🟡 ✅ and ignores unmarked prose — deliberately, so a
 /// sentence is not counted as an item. The cost is that an *item* without a
-/// marker is invisible: items 4–9 carried none, and the dashboard reported the
+/// marker is invisible: six carried none, and the dashboard reported the
 /// platform's own roadmap as "5 done, 0 to do".
 #[test]
 fn every_roadmap_item_carries_a_marker() {
     let root = workspace_root();
     let text = std::fs::read_to_string(root.join("ROADMAP.md")).expect("reading ROADMAP.md");
 
-    let unmarked: Vec<&str> = text
-        .lines()
-        // The ordered items are `### <n> · …`; other headings are prose.
-        .filter(|l| {
-            l.starts_with("### ")
-                && l.trim_start_matches("### ")
-                    .starts_with(|c: char| c.is_ascii_digit())
-        })
+    let items = roadmap_items(&text);
+    assert!(
+        !items.is_empty(),
+        "no roadmap items found under `## Order of work` — a check that matches \
+         nothing passes forever"
+    );
+
+    let unmarked: Vec<&&str> = items
+        .iter()
         .filter(|l| !l.contains('⬜') && !l.contains('🟡') && !l.contains('✅'))
         .collect();
 
@@ -640,5 +631,75 @@ fn every_roadmap_item_carries_a_marker() {
         unmarked.is_empty(),
         "a roadmap item with no marker is invisible to `fid dash`, which then \
          reports the roadmap as finished.\nUnmarked: {unmarked:?}"
+    );
+}
+
+/// There is exactly one numbering, and it is `SHIPPED.md`'s.
+///
+/// A roadmap item carrying its own number puts a second set of ordinals beside
+/// the phase numbers, so one piece of work answers to two names. `ROADMAP.md`
+/// decided against that — *"items have names, not numbers"* — and kept the
+/// ordinals anyway, which is how the confusion outlived the decision.
+#[test]
+fn roadmap_items_are_named_not_numbered() {
+    let root = workspace_root();
+    let text = std::fs::read_to_string(root.join("ROADMAP.md")).expect("reading ROADMAP.md");
+
+    let items = roadmap_items(&text);
+    let numbered: Vec<&&str> = items
+        .iter()
+        .filter(|l| {
+            l.trim_start_matches("### ")
+                .starts_with(|c: char| c.is_ascii_digit())
+        })
+        .collect();
+
+    assert!(
+        numbered.is_empty(),
+        "roadmap items are named; phases are numbered. An ordinal here is a \
+         second numbering for the same work.\n{numbered:?}"
+    );
+}
+
+/// A phase that implements a roadmap item says which one.
+///
+/// This sentence is the only link between the two files, and the thing that
+/// stops them being two competing trackers. Checked from Phase 22 on, which is
+/// where the roadmap took over ordering — earlier phases predate it and were
+/// ordered by the design spec's own build order.
+#[test]
+fn a_phase_built_from_the_roadmap_names_its_item() {
+    let root = workspace_root();
+    let text = std::fs::read_to_string(root.join("SHIPPED.md")).expect("reading SHIPPED.md");
+
+    let lines: Vec<&str> = text.lines().collect();
+    let mut missing: Vec<String> = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        let Some(rest) = line.strip_prefix("**Phase ") else {
+            continue;
+        };
+        let number: u32 = rest
+            .chars()
+            .take_while(char::is_ascii_digit)
+            .collect::<String>()
+            .parse()
+            .unwrap_or(0);
+        if number < 22 {
+            continue;
+        }
+        // The blockquote under the heading is where a phase says what it is.
+        let names_item = lines[i..(i + 6).min(lines.len())]
+            .iter()
+            .any(|l| l.contains("roadmap item"));
+        if !names_item {
+            missing.push((*line).to_string());
+        }
+    }
+
+    assert!(
+        missing.is_empty(),
+        "a phase from Phase 22 on implements a roadmap item and must name it — \
+         that sentence is the only link between ROADMAP.md and SHIPPED.md.\n{}",
+        missing.join("\n")
     );
 }

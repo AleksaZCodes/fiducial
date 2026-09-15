@@ -39,43 +39,40 @@ what the product is for rather than the platform's rules. It is generated into
 the product's `AGENTS.md` from this file at scaffold time — see
 `crates/fiducial-cli/build.rs`.)
 
-## Repo layout## Repo layout
+## Repo layout
 
+<!-- fid:begin layout -->
 ```
 fiducial/
-├── MISSION.md, STACK.md, SHIPPED.md
-├── crates/               13 Rust members
-│   ├── fiducial-core         no_std spine — DeviceId, version
-│   ├── fiducial-protocol     no_std frame codec — the waist
-│   ├── fiducial-quantity     no_std units + tolerance algebra
-│   ├── fiducial-model        Fact, Decision, PipelineMeta
-│   ├── fiducial-geometry     no_std primitives, tolerance profiles
-│   ├── fiducial-mesh         no_std case generation, STL + GLB
-│   ├── fiducial-eda          board.interface.json schema + validation
-│   ├── fiducial-ota          no_std signed, resumable firmware update
-│   ├── fiducial-sim          ODE simulation — native (rayon) + WASM
-│   ├── fiducial-cli          the `fid` binary + capability templates
-│   ├── fiducial-wasm         wasm-bindgen wrapper
-│   ├── fiducial-tauri        serial transport for the desktop host
-│   └── fiducial              crates.io name claim + signpost
-├── firmware/             Separate workspace (Embassy; rp2040 + stm32)
-├── packages/             12 JS/TS packages (pnpm + Turborepo)
-│   ├── tokens, headless      design tokens, Result<T,E>, OfflineQueue
-│   ├── ui-react, ui-svelte   component registry sources (copy-in)
-│   ├── board-schema          TS mirror of fiducial-eda
-│   ├── transport-web         Web Serial / WebUSB / BLE + codec
-│   ├── viewer3d-react        GLB viewer (Three.js)
-│   ├── realtime              broadcast, presence, postgres-changes
-│   ├── i18n                  locales, messages, money, dates, plurals
-│   ├── wasm-bridge           GENERATED TS types — never hand-edit
-│   ├── cli                   @fiducial/cli npm shim
-│   └── fiducial              @fiducial/fiducial npm name claim
-├── docs/
-│   ├── specs/            Design decisions (append-only, date-prefixed)
-│   ├── protocol/         Wire spec + conformance vectors
-│   └── compat/           Wire version policy (matrix.toml)
-└── .github/workflows/    CI (ci.yml) + release (release.yml)
+├── crates/               13 members
+│   ├── fiducial                 Declare each fact once. Derive every artifact from it.
+│   ├── fiducial-cli             fid — the Fiducial platform CLI
+│   ├── fiducial-core            no_std spine: IDs, time primitives, validation, state machi…
+│   ├── fiducial-eda             no_std EDA pipeline types — the BoardInterface schema for b…
+│   ├── fiducial-geometry        no_std geometry for Fiducial: points, tolerance profiles, c…
+│   ├── fiducial-mesh            no_std case generation from a board outline: gasket-sealed…
+│   ├── fiducial-model           no_std Fact, Decision and Pipeline contract types.
+│   ├── fiducial-ota             no_std over-the-air firmware update protocol: signed manife…
+│   ├── fiducial-protocol        no_std transport-agnostic protocol: framing, checksums, seq…
+│   ├── fiducial-quantity        no_std typed quantities with tolerance algebra and assertions.
+│   ├── fiducial-sim             Numerical simulation — ODE integration that runs native (wi…
+│   ├── fiducial-tauri           Serial transport and device discovery for Fiducial Tauri apps.
+│   └── fiducial-wasm            WASM bindings for fiducial-core — browser, edge, and Cloudf…
+└── packages/             12 members
+    ├── board-schema             TypeScript types for board.interface.json — mirrors the Rus…
+    ├── cli                      fid — the Fiducial platform CLI
+    ├── fiducial                 Declare each fact once. Derive every artifact from it.
+    ├── headless                 Framework-agnostic headless utilities for Fiducial — Result…
+    ├── i18n                     Localized by construction — typed message keys, locale nego…
+    ├── realtime                 Supabase Realtime typed wrappers — Broadcast, Presence, and…
+    ├── tokens                   Design tokens for Fiducial — OKLCH theme vars, Tailwind v4…
+    ├── transport-web            Web Serial, WebUSB, and BLE transports for Fiducial — same…
+    ├── ui-react                 Fiducial component registry source — React. Use `fid add co…
+    ├── ui-svelte                Fiducial component registry source — Svelte. Use `fid add c…
+    ├── viewer3d-react           React component for rendering Fiducial board GLB files in a…
+    └── wasm-bridge              Generated TypeScript types for the fiducial WASM boundary.
 ```
+<!-- fid:end layout -->
 
 This tree is checked by `crates/fiducial-cli/tests/workspace_hygiene.rs`, which
 fails the build when a crate or package is missing from it. It used to carry a
@@ -169,20 +166,21 @@ context **every** agent reads — Codex, Copilot Workspace and Cursor included.
 An agent that does not know `fid derive --check` exists cannot honour the one
 rule that matters most.
 
+<!-- fid:begin commands -->
 | Command | Does |
 |---|---|
-| `fid dash [--json]` | The whole product in one view. `--json` is for you. Start here |
-| `fid doctor` | Config, lock, template integrity, pending migrations |
-| `fid derive` | Run the pipelines; record every artifact hash |
-| `fid derive --check` | **Fail when an artifact drifted from its declaration.** The CI gate |
-| `fid graph` | Every pipeline: inputs → executor → outputs. Use it to find which declaration produced a file |
-| `fid new <name>` | Scaffold a product |
-| `fid add <capability>` | Install a capability |
-| `fid upgrade [--dry-run]` | 3-way merge upstream template changes; apply codemods |
-| `fid harvest <path>` | Survey another codebase for reusable work |
-| `fid release check` | Fail when the compatibility matrix and `WIRE_VERSION` disagree |
-| `fid capability list [--all]` | What each capability declares, derives and requires; `--all` also lists the adapter contracts |
-| `fid add capability <id> [--from <source>]` | Install a capability, built-in or resolved from a directory or git repository |
+| `fid new` | Scaffold a new product repository |
+| `fid add` | Add an app, module, or firmware target to this product |
+| `fid capability` | Manage capabilities installed in this product |
+| `fid derive` | Run declared pipelines (`--check` fails CI on stale artifacts) |
+| `fid upgrade` | Pull upstream template and package updates into this product |
+| `fid graph` | Emit the facts → pipelines → artifacts dependency graph |
+| `fid release` | Platform version management and version-skew enforcement |
+| `fid dash` | The workbench — one read-only view of roadmap, decisions, CI, graph, freshness |
+| `fid harvest` | Survey an existing codebase for reusable logic, art, UI and principles |
+| `fid context` | Regenerate the derivable parts of AGENTS.md / CLAUDE.md |
+| `fid doctor` | Check for drift: outdated deps, stale templates, un-applied migrations |
+<!-- fid:end commands -->
 
 Every command takes `--help`, and the help names no phase numbers on purpose —
 a schedule is a fact `SHIPPED.md` owns, and a second copy of it drifts.
@@ -214,6 +212,21 @@ capability need not be compiled into `fid` — `--from <path>` or
 `--from git:<url>#<rev>` installs one through the same derivation, the same
 conformance checks and the same lock entry as a built-in.
 
+The capabilities this platform ships:
+
+<!-- fid:begin capabilities -->
+| Capability | Contributes | Install |
+|---|---|---|
+| `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
+| `firmware-rp2040` | 10 template file(s) | `fid add capability firmware-rp2040` |
+| `firmware-stm32` | 9 template file(s) | `fid add capability firmware-stm32` |
+| `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
+| `tauri` | 5 template file(s) | `fid add capability tauri` |
+| `web-next` | 8 template file(s) | `fid add capability web-next` |
+| `web-svelte` | 8 template file(s) | `fid add capability web-svelte` |
+| `worker-cloudflare` | 1 template file(s) | `fid add capability worker-cloudflare` |
+<!-- fid:end capabilities -->
+
 **Adapters name contracts, not vendors.** Every contract currently implements
 only `none` — a real, working no-op. The vendors each is intended to carry are
 listed as *planned* and cannot be selected, because a selectable name with
@@ -221,11 +234,13 @@ nothing behind it is a promise the platform does not keep.
 
 ## Skills this repository authors
 
+<!-- fid:begin skills -->
 | File | Invoked as (Claude Code) | Does |
 |---|---|---|
-| `commands/platform.md` | `/fiducial:platform` | Load platform context at session start |
-| `commands/harvest.md` | `/fiducial:harvest` | Extract reusable work from another codebase |
+| `commands/harvest.md` | `/fiducial:harvest` | Translate an existing codebase into reusable assets — extra… |
+| `commands/platform.md` | `/fiducial:platform` | Load Fiducial platform context — run at session start in an… |
 | `crates/fiducial-cli/capabilities/*/SKILL.md` | installed per capability | How to use that capability |
+<!-- fid:end skills -->
 
 **The content is portable; only discovery is not.** These are plain Markdown
 instructions — an agent without Claude Code's slash commands can read the file
