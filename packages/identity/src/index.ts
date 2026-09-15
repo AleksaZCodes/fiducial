@@ -45,6 +45,64 @@ export interface Grant {
   principal: Principal;
   resource: Resource;
   role: Role;
+  /**
+   * When this grant stops being valid, in milliseconds since the Unix epoch.
+   *
+   * `undefined` or `null` is a permanent grant. A support engineer's access is
+   * the case this exists for: a grant that has to be remembered to be revoked
+   * is one that is not revoked.
+   */
+  expiresAt?: Timestamp | null;
+  /**
+   * Who handed this grant out, when it was not the platform.
+   *
+   * A delegated grant is worth exactly what its delegator's authority is worth
+   * *right now* — revoke the manager and everything they issued stops working,
+   * without anyone having to go and find it.
+   */
+  delegatedBy?: Principal | null;
+}
+
+/** Milliseconds since the Unix epoch — what `Date.now()` returns. */
+export type Timestamp = number;
+
+/** How many delegation links deep a chain may go. Mirrors Rust. */
+export const MAX_DELEGATION_DEPTH = 4;
+
+/** The specific ground for a decision. Mirrors `Reason` in Rust. */
+export type Reason =
+  | "granted"
+  | "device_reading_itself"
+  | "not_identified"
+  | "no_grant"
+  | "role_too_weak"
+  | "expired"
+  | "no_clock"
+  | "delegator_lacks_authority"
+  | "delegation_too_deep";
+
+/** Why a principal may or may not act — the audit record. */
+export interface Decision {
+  allowed: boolean;
+  reason: Reason;
+  /** The grant that decided it, when one did. */
+  via?: Grant | null;
+}
+
+/**
+ * `true` when `grant` has not expired as of `now`.
+ *
+ * **Fails closed without a clock.** A grant that expires cannot be honoured by
+ * a caller that does not know the time, and a device whose RTC has not synced
+ * is exactly such a caller. Treating "no clock" as "not expired" would make
+ * expiry a suggestion that evaporates in the one environment least able to
+ * notice.
+ */
+export function isLive(grant: Grant, now: Timestamp | null): boolean {
+  const expiry = grant.expiresAt;
+  if (expiry === undefined || expiry === null) return true;
+  if (now === null) return false;
+  return now < expiry;
 }
 
 const ACTION_RANK: Record<Action, number> = { read: 0, write: 1, admin: 2 };
@@ -122,8 +180,38 @@ export function can(
   action: Action,
   resource: Resource,
   grants: readonly Grant[],
+  now: Timestamp | null = null,
 ): boolean {
-  if (!isIdentified(principal)) return false;
+  return explain(principal, action, resource, grants, now).allowed;
+}
+
+/** How specific a denial is — the most specific one is the one reported. */
+const DENIAL_RANK: Record<string, number> = {
+  no_grant: 0,
+  role_too_weak: 1,
+  delegation_too_deep: 2,
+  delegator_lacks_authority: 3,
+  no_clock: 4,
+  expired: 5,
+};
+
+/**
+ * `can`, with the reason attached.
+ *
+ * The gate throws the reason away; an audit log needs it, and reconstructing
+ * it afterwards from the grant table is guesswork — the table has moved on by
+ * the time anyone reads the log.
+ */
+export function explain(
+  principal: Principal,
+  action: Action,
+  resource: Resource,
+  grants: readonly Grant[],
+  now: Timestamp | null = null,
+): Decision {
+  if (!isIdentified(principal)) {
+    return { allowed: false, reason: "not_identified", via: null };
+  }
 
   if (
     principal.kind === "device" &&
@@ -131,12 +219,65 @@ export function can(
     principal.id === resource.id &&
     action === "read"
   ) {
-    return true;
+    return { allowed: true, reason: "device_reading_itself", via: null };
   }
 
-  return grants.some(
-    (g) => covers(g, principal, resource) && roleAllows(g.role, action),
-  );
+  // The most specific denial wins, so the reason reported is the one a reader
+  // can act on: "expired" tells them to renew, where "no grant" would send
+  // them to create one that is already there.
+  let best: Reason = "no_grant";
+  const note = (reason: Reason) => {
+    if ((DENIAL_RANK[reason] ?? 0) > (DENIAL_RANK[best] ?? 0)) best = reason;
+  };
+
+  for (const grant of grants) {
+    if (!covers(grant, principal, resource)) continue;
+    if (!roleAllows(grant.role, action)) {
+      note("role_too_weak");
+      continue;
+    }
+    if (!isLive(grant, now)) {
+      note(now === null ? "no_clock" : "expired");
+      continue;
+    }
+    const delegation = delegationOk(grant, resource, grants, now, 0);
+    if (delegation === null) {
+      return { allowed: true, reason: "granted", via: grant };
+    }
+    note(delegation);
+  }
+
+  return { allowed: false, reason: best, via: null };
+}
+
+/**
+ * `null` when the grant's delegation chain holds, otherwise why it does not.
+ *
+ * The delegator must be able to `admin` the resource — the action defined as
+ * "change who else may act" — so a member cannot mint grants they could not
+ * use. Depth is bounded because a cycle (A delegated by B, B delegated by A)
+ * is a table anyone with admin can write, and an unbounded walk there is a
+ * stack overflow in the authorization path.
+ */
+function delegationOk(
+  grant: Grant,
+  resource: Resource,
+  grants: readonly Grant[],
+  now: Timestamp | null,
+  depth: number,
+): Reason | null {
+  const delegator = grant.delegatedBy;
+  if (delegator === undefined || delegator === null) return null;
+  if (depth >= MAX_DELEGATION_DEPTH) return "delegation_too_deep";
+  if (!isIdentified(delegator)) return "delegator_lacks_authority";
+
+  for (const g of grants) {
+    if (!covers(g, delegator, resource)) continue;
+    if (!roleAllows(g.role, "admin")) continue;
+    if (!isLive(g, now)) continue;
+    if (delegationOk(g, resource, grants, now, depth + 1) === null) return null;
+  }
+  return "delegator_lacks_authority";
 }
 
 /**
@@ -149,11 +290,14 @@ export function effectiveRole(
   principal: Principal,
   resource: Resource,
   grants: readonly Grant[],
+  now: Timestamp | null = null,
 ): Role | null {
   if (!isIdentified(principal)) return null;
   let best: Role | null = null;
   for (const g of grants) {
     if (!covers(g, principal, resource)) continue;
+    if (!isLive(g, now)) continue;
+    if (delegationOk(g, resource, grants, now, 0) !== null) continue;
     if (best === null || ROLE_RANK[g.role] > ROLE_RANK[best]) best = g.role;
   }
   return best;
@@ -226,3 +370,6 @@ export type {
   SqlGrantStoreOptions,
 } from "./grants.js";
 export { MemoryGrantStore, SqlGrantStore } from "./grants.js";
+export type { GrantOptions } from "./grants.js";
+export { AuditLog, DecisionCache } from "./audit.js";
+export type { AuditEntry, AuditDatabase } from "./audit.js";

@@ -34,6 +34,7 @@ import {
   SqlGrantStore,
   MemoryGrantStore,
   can,
+  isLive,
   effectiveRole,
   ANONYMOUS,
 } from '../dist/index.js'
@@ -116,7 +117,9 @@ describe('grant storage', () => {
         () =>
           db.raw
             .prepare(
-              `INSERT INTO grants VALUES ('anonymous','x','device','d','owner','now')`,
+              `INSERT INTO grants
+                 (principal_kind, principal_id, resource_kind, resource_id, role, granted_at)
+               VALUES ('anonymous','x','device','d','owner','now')`,
             )
             .run(),
         /CHECK constraint failed/,
@@ -129,7 +132,9 @@ describe('grant storage', () => {
         () =>
           db.raw
             .prepare(
-              `INSERT INTO grants VALUES ('device','0000000000000000','device','d','owner','now')`,
+              `INSERT INTO grants
+                 (principal_kind, principal_id, resource_kind, resource_id, role, granted_at)
+               VALUES ('device','0000000000000000','device','d','owner','now')`,
             )
             .run(),
         /CHECK constraint failed/,
@@ -142,7 +147,9 @@ describe('grant storage', () => {
         () =>
           db.raw
             .prepare(
-              `INSERT INTO grants VALUES ('user','alice','device','d','superuser','now')`,
+              `INSERT INTO grants
+                 (principal_kind, principal_id, resource_kind, resource_id, role, granted_at)
+               VALUES ('user','alice','device','d','superuser','now')`,
             )
             .run(),
         /CHECK constraint failed/,
@@ -342,8 +349,12 @@ describe('grant storage', () => {
       const store = new SqlGrantStore(db, { dialect: 'postgres' })
       await store.grant(ALICE, R_DEV, 'owner')
       const { sql, params } = db.seen[0]
-      assert.match(sql, /VALUES \(\$1, \$2, \$3, \$4, \$5, \$6\)/)
-      assert.equal(params.length, 6)
+      // Every placeholder, not just the first — the defect this was written
+      // for numbered `$1` and left the rest as `?`. Derived from the parameter
+      // count so adding a column does not silently narrow the assertion.
+      const expected = params.map((_, i) => `$${i + 1}`).join(', ')
+      assert.match(sql, new RegExp(`VALUES \\(${expected.replace(/\$/g, '\\$')}\\)`))
+      assert.ok(params.length >= 9, `expiry and delegator are stored: ${params.length}`)
       assert.ok(!sql.includes('?'), sql)
     })
 
@@ -371,5 +382,78 @@ describe('grant storage', () => {
         }
       }
     })
+  })
+})
+
+// ── Expiry and delegation, round-tripped through the real schema ────────────
+//
+// The columns exist because the model grew them; these check that a grant
+// written with an expiry or a delegator comes back with one. A store that
+// dropped either would not fail any test above — it would just quietly hand
+// `can()` a permanent, direct grant, which is strictly more access than was
+// granted.
+
+describe('expiry and delegation survive the database', () => {
+  const SCHEMA_2 = generatedSchema()
+
+  it('an expiry round-trips as a number', async () => {
+    const db = sqliteDb(SCHEMA_2)
+    const store = new SqlGrantStore(db)
+    await store.grant(ALICE, R_DEV, 'admin', { expiresAt: 1_789_516_800_000 })
+
+    const [grant] = await store.grantsFor(ALICE)
+    assert.equal(grant.expiresAt, 1_789_516_800_000)
+    assert.equal(grant.delegatedBy, null)
+  })
+
+  it('a permanent grant comes back with no expiry, not zero', async () => {
+    // `null` and `0` are very different to `isLive`: zero is an expiry in
+    // 1970, which denies everything.
+    const db = sqliteDb(SCHEMA_2)
+    const store = new SqlGrantStore(db)
+    await store.grant(ALICE, R_DEV, 'owner')
+
+    const [grant] = await store.grantsFor(ALICE)
+    assert.equal(grant.expiresAt, null)
+    assert.ok(isLive(grant, Date.now()))
+  })
+
+  it('a delegator round-trips as a principal', async () => {
+    const db = sqliteDb(SCHEMA_2)
+    const store = new SqlGrantStore(db)
+    await store.grant(BOB, R_DEV, 'admin', { delegatedBy: ALICE })
+
+    const [grant] = await store.grantsFor(BOB)
+    assert.deepEqual(grant.delegatedBy, ALICE)
+  })
+
+  it('the database refuses half a delegator', () => {
+    // A row with an id and no kind would be read as a direct grant — a
+    // delegated grant silently promoted, which is more access than intended.
+    const db = sqliteDb(SCHEMA_2)
+    assert.throws(
+      () =>
+        db.raw
+          .prepare(
+            `INSERT INTO grants
+               (principal_kind, principal_id, resource_kind, resource_id, role,
+                granted_at, delegated_by_id)
+             VALUES ('user','bbbb','device','dddd','admin','now','aaaa')`,
+          )
+          .run(),
+      /CHECK constraint failed/,
+    )
+  })
+
+  it('a stored expired grant denies through the real rule', async () => {
+    // End to end: schema → store → can(). This is the property the columns
+    // exist for, and the only test here that exercises all three.
+    const db = sqliteDb(SCHEMA_2)
+    const store = new SqlGrantStore(db)
+    await store.grant(BOB, R_DEV, 'owner', { expiresAt: 1_000 })
+
+    const grants = await store.grantsFor(BOB)
+    assert.equal(can(BOB, 'read', R_DEV, grants, 2_000), false)
+    assert.equal(can(BOB, 'read', R_DEV, grants, 500), true)
   })
 })

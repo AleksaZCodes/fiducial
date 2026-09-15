@@ -22,6 +22,7 @@
     {
       "grants": [],
       "name": "no_grants",
+      "now": 1789516800000,
       "probes": [
         {
           "action": "read",
@@ -31,6 +32,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -44,6 +46,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -57,6 +60,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -70,6 +74,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -83,6 +88,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -96,6 +102,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -109,6 +116,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -122,6 +130,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -135,6 +144,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -148,6 +158,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -161,6 +172,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -174,6 +186,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -187,6 +200,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "device_reading_itself",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -200,6 +214,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -213,6 +228,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -226,6 +242,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -239,6 +256,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -252,6 +270,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -265,6 +284,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -278,6 +298,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -291,6 +312,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -304,6 +326,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "device_reading_itself",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -317,6 +340,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -330,6 +354,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -343,6 +368,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -356,6 +382,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -369,6 +396,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -382,6 +410,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -395,6 +424,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -408,6 +438,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -420,6 +451,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -432,6 +464,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -444,6 +477,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -456,6 +490,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -468,6 +503,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -480,6 +516,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -491,6 +528,8 @@
     {
       "grants": [
         {
+          "delegated_by": null,
+          "expires_at": null,
           "principal": {
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
@@ -503,6 +542,7 @@
         }
       ],
       "name": "alice_owns_device_a",
+      "now": 1789516800000,
       "probes": [
         {
           "action": "read",
@@ -512,6 +552,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "granted",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -525,6 +566,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "granted",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -538,6 +580,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "granted",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -551,6 +594,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -564,6 +608,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -577,6 +622,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -590,6 +636,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -603,6 +650,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -616,6 +664,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -629,6 +678,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -642,6 +692,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -655,6 +706,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -668,6 +720,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "device_reading_itself",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -681,6 +734,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -694,6 +748,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -707,6 +762,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -720,6 +776,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -733,6 +790,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -746,6 +804,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -759,6 +818,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -772,6 +832,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -785,6 +846,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "device_reading_itself",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -798,6 +860,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -811,6 +874,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -824,6 +888,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -837,6 +902,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -850,6 +916,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -863,6 +930,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -876,6 +944,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -889,6 +958,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -901,6 +971,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -913,6 +984,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -925,6 +997,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -937,6 +1010,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -949,6 +1023,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -961,6 +1036,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -972,6 +1048,8 @@
     {
       "grants": [
         {
+          "delegated_by": null,
+          "expires_at": null,
           "principal": {
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
@@ -983,6 +1061,8 @@
           "role": "owner"
         },
         {
+          "delegated_by": null,
+          "expires_at": null,
           "principal": {
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
@@ -995,6 +1075,7 @@
         }
       ],
       "name": "bob_views_device_a",
+      "now": 1789516800000,
       "probes": [
         {
           "action": "read",
@@ -1004,6 +1085,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "granted",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1017,6 +1099,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "granted",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1030,6 +1113,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "granted",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1043,6 +1127,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "granted",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1056,6 +1141,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "role_too_weak",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1069,6 +1155,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "role_too_weak",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1082,6 +1169,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "device_reading_itself",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1095,6 +1183,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1108,6 +1197,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1121,6 +1211,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1134,6 +1225,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1147,6 +1239,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1160,6 +1253,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1173,6 +1267,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1186,6 +1281,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1198,6 +1294,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1210,6 +1307,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1222,6 +1320,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1233,6 +1332,8 @@
     {
       "grants": [
         {
+          "delegated_by": null,
+          "expires_at": null,
           "principal": {
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
@@ -1245,6 +1346,7 @@
         }
       ],
       "name": "member_may_command",
+      "now": 1789516800000,
       "probes": [
         {
           "action": "read",
@@ -1254,6 +1356,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1267,6 +1370,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1280,6 +1384,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1293,6 +1398,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "granted",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1306,6 +1412,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "granted",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1319,6 +1426,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "role_too_weak",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1332,6 +1440,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "device_reading_itself",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1345,6 +1454,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1358,6 +1468,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1371,6 +1482,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1384,6 +1496,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1397,6 +1510,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1410,6 +1524,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1423,6 +1538,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1436,6 +1552,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1448,6 +1565,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1460,6 +1578,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1472,6 +1591,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1483,6 +1603,8 @@
     {
       "grants": [
         {
+          "delegated_by": null,
+          "expires_at": null,
           "principal": {
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
@@ -1494,6 +1616,7 @@
         }
       ],
       "name": "service_admin_platform",
+      "now": 1789516800000,
       "probes": [
         {
           "action": "read",
@@ -1503,6 +1626,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1516,6 +1640,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1529,6 +1654,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1542,6 +1668,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1555,6 +1682,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1568,6 +1696,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1581,6 +1710,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1594,6 +1724,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1607,6 +1738,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1620,6 +1752,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1633,6 +1766,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1646,6 +1780,7 @@
             "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
             "kind": "user"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1659,6 +1794,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "device_reading_itself",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1672,6 +1808,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1685,6 +1822,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1698,6 +1836,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1711,6 +1850,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1724,6 +1864,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1737,6 +1878,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1750,6 +1892,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1763,6 +1906,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1776,6 +1920,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "device_reading_itself",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1789,6 +1934,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1802,6 +1948,7 @@
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1815,6 +1962,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "granted",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1828,6 +1976,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "granted",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1841,6 +1990,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "granted",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1854,6 +2004,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "granted",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1867,6 +2018,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "granted",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1880,6 +2032,7 @@
             "id": "5c5c5c5c5c5c5c5c",
             "kind": "service"
           },
+          "reason": "granted",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1892,6 +2045,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1904,6 +2058,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1916,6 +2071,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -1928,6 +2084,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1940,6 +2097,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1952,6 +2110,7 @@
           "principal": {
             "kind": "anonymous"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -1963,6 +2122,8 @@
     {
       "grants": [
         {
+          "delegated_by": null,
+          "expires_at": null,
           "principal": {
             "id": "0000000000000000",
             "kind": "device"
@@ -1974,6 +2135,7 @@
         }
       ],
       "name": "zero_sentinel_is_not_an_identity",
+      "now": 1789516800000,
       "probes": [
         {
           "action": "read",
@@ -1983,6 +2145,7 @@
             "id": "0000000000000000",
             "kind": "device"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "0000000000000000",
             "kind": "device"
@@ -1996,6 +2159,7 @@
             "id": "0000000000000000",
             "kind": "device"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -2009,6 +2173,7 @@
             "id": "00000000000000000000000000000000",
             "kind": "user"
           },
+          "reason": "not_identified",
           "resource": {
             "id": "00000000000000000000000000000000",
             "kind": "user"
@@ -2022,6 +2187,7 @@
             "id": "0000000000000000",
             "kind": "service"
           },
+          "reason": "not_identified",
           "resource": {
             "kind": "platform"
           }
@@ -2032,6 +2198,8 @@
     {
       "grants": [
         {
+          "delegated_by": null,
+          "expires_at": null,
           "principal": {
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
@@ -2044,6 +2212,7 @@
         }
       ],
       "name": "device_reports_to_its_owner",
+      "now": 1789516800000,
       "probes": [
         {
           "action": "read",
@@ -2053,6 +2222,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "device_reading_itself",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -2066,6 +2236,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -2079,6 +2250,7 @@
             "id": "dadadadadadadada",
             "kind": "device"
           },
+          "reason": "no_grant",
           "resource": {
             "id": "dbdbdbdbdbdbdbdb",
             "kind": "device"
@@ -2092,6 +2264,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "granted",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -2105,6 +2278,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "granted",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -2118,6 +2292,7 @@
             "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
             "kind": "user"
           },
+          "reason": "granted",
           "resource": {
             "id": "dadadadadadadada",
             "kind": "device"
@@ -2125,6 +2300,2283 @@
         }
       ],
       "why": "the whole loop: device reads itself, owner reads and commands it"
+    },
+    {
+      "grants": [
+        {
+          "delegated_by": null,
+          "expires_at": null,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "role": "owner"
+        },
+        {
+          "delegated_by": null,
+          "expires_at": 1789430400000,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "role": "admin"
+        }
+      ],
+      "name": "expired_grant_is_not_a_grant",
+      "now": 1789516800000,
+      "probes": [
+        {
+          "action": "read",
+          "allowed": true,
+          "effective_role": "owner",
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": true,
+          "effective_role": "owner",
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": true,
+          "effective_role": "owner",
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "expired",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "expired",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "expired",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": true,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "device_reading_itself",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        }
+      ],
+      "why": "a support engineer's access lapses without anyone remembering to revoke it"
+    },
+    {
+      "grants": [
+        {
+          "delegated_by": null,
+          "expires_at": null,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "role": "owner"
+        },
+        {
+          "delegated_by": null,
+          "expires_at": 1789603200000,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "role": "admin"
+        }
+      ],
+      "name": "unexpired_grant_still_works",
+      "now": 1789516800000,
+      "probes": [
+        {
+          "action": "read",
+          "allowed": true,
+          "effective_role": "owner",
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": true,
+          "effective_role": "owner",
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": true,
+          "effective_role": "owner",
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": true,
+          "effective_role": "admin",
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": true,
+          "effective_role": "admin",
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": true,
+          "effective_role": "admin",
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": true,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "device_reading_itself",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        }
+      ],
+      "why": "the same grant, before its expiry — the other half of the pair"
+    },
+    {
+      "grants": [
+        {
+          "delegated_by": null,
+          "expires_at": null,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "role": "owner"
+        },
+        {
+          "delegated_by": null,
+          "expires_at": 1789603200000,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "role": "admin"
+        }
+      ],
+      "name": "no_clock_refuses_an_expiring_grant",
+      "now": null,
+      "probes": [
+        {
+          "action": "read",
+          "allowed": true,
+          "effective_role": "owner",
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": true,
+          "effective_role": "owner",
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": true,
+          "effective_role": "owner",
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "no_clock",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "no_clock",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "no_clock",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": true,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "device_reading_itself",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        }
+      ],
+      "why": "a device with no synced RTC cannot honour an expiry, so it must not honour the grant; the permanent grant beside it is unaffected"
+    },
+    {
+      "grants": [
+        {
+          "delegated_by": null,
+          "expires_at": null,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "role": "owner"
+        },
+        {
+          "delegated_by": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "expires_at": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "role": "admin"
+        }
+      ],
+      "name": "delegated_grant_follows_its_delegator",
+      "now": 1789516800000,
+      "probes": [
+        {
+          "action": "read",
+          "allowed": true,
+          "effective_role": "owner",
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": true,
+          "effective_role": "owner",
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": true,
+          "effective_role": "owner",
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": true,
+          "effective_role": "admin",
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": true,
+          "effective_role": "admin",
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": true,
+          "effective_role": "admin",
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": true,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "device_reading_itself",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        }
+      ],
+      "why": "alice owns the device and delegates admin to bob; bob's grant is worth exactly what alice's authority is worth"
+    },
+    {
+      "grants": [
+        {
+          "delegated_by": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "expires_at": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "role": "admin"
+        }
+      ],
+      "name": "revoking_the_delegator_revokes_the_delegation",
+      "now": 1789516800000,
+      "probes": [
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "delegator_lacks_authority",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "delegator_lacks_authority",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "delegator_lacks_authority",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": true,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "device_reading_itself",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        }
+      ],
+      "why": "alice's own grant is gone, so bob's delegated grant stops working without anyone having to find it"
+    },
+    {
+      "grants": [
+        {
+          "delegated_by": null,
+          "expires_at": null,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "role": "member"
+        },
+        {
+          "delegated_by": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "expires_at": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "role": "admin"
+        }
+      ],
+      "name": "a_member_cannot_delegate_what_they_lack",
+      "now": 1789516800000,
+      "probes": [
+        {
+          "action": "read",
+          "allowed": true,
+          "effective_role": "member",
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": true,
+          "effective_role": "member",
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "granted",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": "member",
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "role_too_weak",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "delegator_lacks_authority",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "delegator_lacks_authority",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "delegator_lacks_authority",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": true,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "device_reading_itself",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        }
+      ],
+      "why": "delegation needs Admin — the action defined as changing who else may act — so a Member cannot mint grants they could not use"
+    },
+    {
+      "grants": [
+        {
+          "delegated_by": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "expires_at": null,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "role": "admin"
+        },
+        {
+          "delegated_by": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "expires_at": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "role": "admin"
+        }
+      ],
+      "name": "a_delegation_cycle_terminates",
+      "now": 1789516800000,
+      "probes": [
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "delegator_lacks_authority",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "delegator_lacks_authority",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "delegator_lacks_authority",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "delegator_lacks_authority",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "delegator_lacks_authority",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "delegator_lacks_authority",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": true,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "device_reading_itself",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        }
+      ],
+      "why": "alice delegated by bob, bob delegated by alice — a table anyone with Admin can write, and an unbounded walk there is a crash in the authorization path"
+    },
+    {
+      "grants": [
+        {
+          "delegated_by": null,
+          "expires_at": 1789430400000,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "role": "owner"
+        },
+        {
+          "delegated_by": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "expires_at": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "role": "admin"
+        }
+      ],
+      "name": "an_expired_delegator_cannot_sustain_a_delegation",
+      "now": 1789516800000,
+      "probes": [
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "expired",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "expired",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+            "kind": "user"
+          },
+          "reason": "expired",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "delegator_lacks_authority",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "delegator_lacks_authority",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "kind": "user"
+          },
+          "reason": "delegator_lacks_authority",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": true,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "device_reading_itself",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "dbdbdbdbdbdbdbdb",
+            "kind": "device"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "id": "5c5c5c5c5c5c5c5c",
+            "kind": "service"
+          },
+          "reason": "no_grant",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "read",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "write",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        },
+        {
+          "action": "admin",
+          "allowed": false,
+          "effective_role": null,
+          "principal": {
+            "kind": "anonymous"
+          },
+          "reason": "not_identified",
+          "resource": {
+            "id": "dadadadadadadada",
+            "kind": "device"
+          }
+        }
+      ],
+      "why": "expiry and delegation compose: the chain is only live while every link in it is"
     }
   ]
 }

@@ -337,8 +337,20 @@ Tested against real SQLite.
 resolve the dialect correctly but remain `candidates`, so such a product
 supplies its own `{ query, execute }`. Also no device/service token issuance
 — how a device *proves* it is that device needs its own pass with real
-cryptographic choices — and no grant expiry, delegation, audit log or
-caching.
+cryptographic choices.
+
+**Grant expiry, delegation, audit and caching shipped 2026-09-15**
+(`docs/specs/2026-09-15-grant-lifecycle.md`). A grant carries an expiry and a
+delegator; `can()` takes the current time, and **fails closed without one** —
+a device whose RTC has not synced cannot honour an expiry, and treating "no
+clock" as "not expired" would make expiry evaporate in the one environment
+least able to notice. A delegated grant is worth what its delegator's
+authority is worth *at evaluation time*, so revoking a manager revokes
+everything they issued. `explain()` returns the reason, which is the audit
+record — reconstructing it afterwards is guesswork, because the grants table
+has moved on by the time anyone reads the log. All of it mirrored in
+TypeScript and pinned by 8 new conformance scenarios covering verdict,
+effective role *and* reason.
 
 **Closed 2026-09-15: `fid add identity` was one opt-in doing two jobs.**
 `[identity] storage = "none"` installs the rule without the table, exactly as

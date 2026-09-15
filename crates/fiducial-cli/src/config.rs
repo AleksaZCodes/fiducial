@@ -114,6 +114,18 @@ pub struct Identity {
     /// Table holding the permission rows. Defaults to `grants`.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub table: String,
+    /// Derive an append-only log of authorization decisions.
+    ///
+    /// Off by default. An audit log is a write on every decision and a
+    /// retention obligation on every row, so it is a choice a product makes
+    /// rather than something it acquires by installing identity.
+    ///
+    /// It arrives as `migrations/0002_audit.sql` — a *second* migration, not
+    /// an edit to the first. Editing an applied migration is the one thing the
+    /// migration runner refuses outright, and the generator does not get an
+    /// exemption from the rule it generates for.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub audit: bool,
     /// `sqlite` | `postgres`. Empty means "derive it from `[adapters]
     /// database`", which is the normal case.
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -140,6 +152,7 @@ pub struct Identity {
 impl Identity {
     pub fn is_empty(&self) -> bool {
         self.storage.is_empty()
+            && !self.audit
             && self.table.is_empty()
             && self.dialect.is_empty()
             && !self.rls
@@ -219,6 +232,7 @@ impl Identity {
                 (!self.table.is_empty() && self.table != "grants").then_some("table"),
                 (!self.dialect.is_empty()).then_some("dialect"),
                 self.rls.then_some("rls"),
+                self.audit.then_some("audit"),
                 (!self.current_user_sql.is_empty()).then_some("current_user_sql"),
             ]
             .into_iter()

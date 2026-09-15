@@ -74,7 +74,7 @@ product="$work/p"
 python3 - "$product/fiducial.toml" <<'PY'
 import sys
 p = sys.argv[1]
-s = open(p).read().replace("[identity]", '[identity]\ndialect = "postgres"\nrls = true')
+s = open(p).read().replace("[identity]", '[identity]\ndialect = "postgres"\nrls = true\naudit = true')
 open(p, "w").write(s)
 PY
 ( cd "$product" && "$fid" derive >/dev/null )
@@ -187,10 +187,94 @@ expect "the store's grantsFor query runs as Postgres numbers it" \
 
 expect "the store's upsert runs, and replaces rather than duplicating" \
   "admin" "$(psql -X -At -q \
-    -c "INSERT INTO grants VALUES ('user','$alice_id','device','thermostat','admin',now())
+    -c "INSERT INTO grants
+          (principal_kind, principal_id, resource_kind, resource_id, role, granted_at)
+        VALUES ('user','$alice_id','device','thermostat','admin',now())
         ON CONFLICT (principal_kind, principal_id, resource_kind, resource_id)
         DO UPDATE SET role = excluded.role, granted_at = excluded.granted_at" \
     -c "SELECT role FROM grants WHERE principal_id = '$alice_id'")"
+
+# ── Expiry and delegation, on the server rather than in a string ────────────
+#
+# These columns are new, and Postgres disagrees with SQLite about more of their
+# spelling than is comfortable: SQLite has no BOOLEAN, and a CHECK spanning two
+# nullable columns is the kind of thing that parses and then does nothing.
+
+expect "an expiry stores and reads back as a number" \
+  "1789516800000" "$(psql -X -At -q \
+    -c "INSERT INTO grants
+          (principal_kind, principal_id, resource_kind, resource_id, role,
+           granted_at, expires_at)
+        VALUES ('user','$bob_id','device','lamp','viewer',now(),1789516800000)" \
+    -c "SELECT expires_at FROM grants WHERE principal_id = '$bob_id' AND resource_id = 'lamp'")"
+
+expect "a permanent grant stores NULL, not zero" \
+  "t" "$(psql -X -At -q -c \
+    "SELECT expires_at IS NULL FROM grants
+      WHERE principal_id = '$alice_id' AND resource_id = 'thermostat'")"
+
+expect "a delegator stores and reads back whole" \
+  "user|$alice_id" "$(psql -X -At -q \
+    -c "INSERT INTO grants
+          (principal_kind, principal_id, resource_kind, resource_id, role,
+           granted_at, delegated_by_kind, delegated_by_id)
+        VALUES ('user','$bob_id','device','kettle','admin',now(),'user','$alice_id')" \
+    -c "SELECT delegated_by_kind || '|' || delegated_by_id FROM grants
+         WHERE principal_id = '$bob_id' AND resource_id = 'kettle'")"
+
+# Half a delegator would be read as a DIRECT grant — strictly more access than
+# was intended, and invisible.
+if psql -X -q -v ON_ERROR_STOP=1 -c \
+  "INSERT INTO grants
+     (principal_kind, principal_id, resource_kind, resource_id, role,
+      granted_at, delegated_by_id)
+   VALUES ('user','$bob_id','device','half','admin',now(),'$alice_id')" >/dev/null 2>&1
+then bad "half a delegator is refused"
+else ok "half a delegator is refused"
+fi
+
+# ── The audit table ─────────────────────────────────────────────────────────
+
+audit="$product/migrations/0002_audit.sql"
+[ -f "$audit" ] || { echo "no audit migration generated"; exit 1; }
+
+psql_ -f "$audit"
+ok "the generated audit migration applies"
+
+expect "every reason the rule can return is storable" \
+  "9" "$(psql -X -At -q \
+    -c "INSERT INTO grants_audit
+          (decided_at, principal_kind, principal_id, action,
+           resource_kind, resource_id, allowed, reason)
+        SELECT now(), 'user', '$alice_id', 'read', 'device', 'd', false, r
+          FROM unnest(ARRAY['granted','device_reading_itself','not_identified',
+                            'no_grant','role_too_weak','expired','no_clock',
+                            'delegator_lacks_authority','delegation_too_deep']) AS r" \
+    -c "SELECT count(*) FROM grants_audit")"
+
+if psql -X -q -v ON_ERROR_STOP=1 -c \
+  "INSERT INTO grants_audit
+     (decided_at, principal_kind, principal_id, action,
+      resource_kind, resource_id, allowed, reason)
+   VALUES (now(),'user','$alice_id','read','device','d',false,'vibes')" >/dev/null 2>&1
+then bad "a reason the rule cannot return is refused"
+else ok "a reason the rule cannot return is refused"
+fi
+
+# `allowed` is BOOLEAN here and INTEGER on SQLite. The store reads both as the
+# same thing, and this is the half of that claim a real server can check.
+expect "allowed is a real boolean on postgres" \
+  "boolean" "$(psql -X -At -q -c \
+    "SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'grants_audit' AND column_name = 'allowed'")"
+
+expect "the audit id is generated rather than supplied" \
+  "t" "$(psql -X -At -q \
+    -c "INSERT INTO grants_audit
+          (decided_at, principal_kind, principal_id, action,
+           resource_kind, resource_id, allowed, reason)
+        VALUES (now(),'user','$bob_id','write','device','d',true,'granted')" \
+    -c "SELECT count(*) > 0 FROM grants_audit WHERE principal_id = '$bob_id' AND id IS NOT NULL")"
 
 echo
 if [ "$fail" -eq 0 ]; then
