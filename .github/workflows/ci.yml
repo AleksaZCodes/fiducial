@@ -470,6 +470,23 @@ jobs:
   identity:
     name: identity (one rule, both languages)
     runs-on: ubuntu-latest
+    # The grants schema is generated for two dialects, and node has no
+    # Postgres. Without a real server the Postgres half is only ever asserted
+    # as text — which is how a migration that does not run (`GLOB` is SQLite
+    # syntax) and policies that recurse into themselves both got written and
+    # looked correct. SQLite's half needs no service: `node:sqlite` is built in.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -498,6 +515,15 @@ jobs:
 
       - name: TypeScript — same verdict on every vector, and the schema on real SQLite
         run: pnpm --filter @fiducial/identity test
+
+      - name: Postgres — the other dialect, on a real server
+        run: scripts/verify-postgres.sh
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
 
   # ── portfolio: workbench v1 ───────────────────────────────────────────────
   #

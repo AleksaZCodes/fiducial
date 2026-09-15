@@ -251,13 +251,13 @@ describe('grant storage', () => {
   describe('SqlGrantStore specifics', () => {
     it('rejects a table name that is not a plain identifier', () => {
       const db = sqliteDb(SCHEMA)
-      assert.throws(() => new SqlGrantStore(db, 'grants; DROP TABLE users'))
-      assert.throws(() => new SqlGrantStore(db, ''))
+      assert.throws(() => new SqlGrantStore(db, { table: 'grants; DROP TABLE users' }))
+      assert.throws(() => new SqlGrantStore(db, { table: '' }))
     })
 
     it('accepts a custom table name', () => {
       const db = sqliteDb(SCHEMA.replaceAll('grants', 'access_grants'))
-      const store = new SqlGrantStore(db, 'access_grants')
+      const store = new SqlGrantStore(db, { table: 'access_grants' })
       assert.ok(store)
     })
 
@@ -284,6 +284,75 @@ describe('grant storage', () => {
       const [row] = db.raw.prepare('SELECT * FROM grants').all()
       assert.equal(row.resource_kind, 'platform')
       assert.equal(row.resource_id, '')
+    })
+  })
+
+  // ── Dialect ───────────────────────────────────────────────────────────────
+  //
+  // These assert the SQL *text*, which is the one thing a real engine cannot
+  // tell us here: node has no Postgres. The engine-level proof — the generated
+  // migration, its RLS policies and these queries run against PostgreSQL 16 —
+  // is `scripts/verify-postgres.sh`, and what it demonstrated is in
+  // `docs/specs/2026-09-15-postgres-dialect-and-rls.md`.
+  describe('dialect', () => {
+    /** A database that records the SQL instead of running it. */
+    function recorder() {
+      const seen = []
+      return {
+        seen,
+        async query(sql, params) {
+          seen.push({ sql, params })
+          return []
+        },
+        async execute(sql, params) {
+          seen.push({ sql, params })
+          return { rowsAffected: 0 }
+        },
+      }
+    }
+
+    it('numbers placeholders on postgres', async () => {
+      const db = recorder()
+      const store = new SqlGrantStore(db, { dialect: 'postgres' })
+      await store.grantsFor(ALICE)
+      const { sql } = db.seen[0]
+      assert.ok(!sql.includes('?'), `postgres rejects ?: ${sql}`)
+      assert.match(sql, /principal_kind = \$1 AND principal_id = \$2/)
+    })
+
+    it('numbers every placeholder in order, not just the first', async () => {
+      const db = recorder()
+      const store = new SqlGrantStore(db, { dialect: 'postgres' })
+      await store.grant(ALICE, R_DEV, 'owner')
+      const { sql, params } = db.seen[0]
+      assert.match(sql, /VALUES \(\$1, \$2, \$3, \$4, \$5, \$6\)/)
+      assert.equal(params.length, 6)
+      assert.ok(!sql.includes('?'), sql)
+    })
+
+    it('leaves ? alone on sqlite, which is the default', async () => {
+      const db = recorder()
+      await new SqlGrantStore(db).grantsFor(ALICE)
+      assert.match(db.seen[0].sql, /principal_kind = \? AND principal_id = \?/)
+    })
+
+    // The whole reason the dialect is derived rather than declared: this is
+    // the query that silently goes wrong when a product on Supabase leaves
+    // the store at its SQLite default.
+    it('a postgres store never emits a sqlite placeholder, on any method', async () => {
+      const db = recorder()
+      const store = new SqlGrantStore(db, { dialect: 'postgres' })
+      await store.grantsFor(ALICE)
+      await store.grantsOn(R_DEV)
+      await store.grant(ALICE, R_DEV, 'owner')
+      await store.revoke(ALICE, R_DEV)
+      assert.equal(db.seen.length, 4)
+      for (const { sql, params } of db.seen) {
+        assert.ok(!sql.includes('?'), sql)
+        for (let i = 1; i <= params.length; i++) {
+          assert.ok(sql.includes(`$${i}`), `missing $${i} in ${sql}`)
+        }
+      }
     })
   })
 })

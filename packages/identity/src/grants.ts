@@ -52,6 +52,28 @@ export interface GrantDatabase {
   ): Promise<{ rowsAffected: number }>;
 }
 
+/**
+ * Which SQL dialect the database speaks.
+ *
+ * Not a style preference — the two are different languages at the point this
+ * package touches them. A bound parameter is `?` on SQLite and `$1` on
+ * Postgres, and each engine rejects the other's spelling outright.
+ *
+ * This is **derived, not declared**: `fid derive` resolves it from `[adapters]
+ * database` and writes it to `src/identity.generated.ts`, next to the table
+ * name and the migration that was generated for the same dialect. Import it
+ * from there rather than retyping it here.
+ */
+export type SqlDialect = "sqlite" | "postgres";
+
+/** Construction facts `fid derive` writes to `src/identity.generated.ts`. */
+export interface SqlGrantStoreOptions {
+  /** `[identity] table`. Defaults to `grants`. */
+  table?: string;
+  /** Resolved from `[adapters] database`. Defaults to `sqlite`. */
+  dialect?: SqlDialect;
+}
+
 /** Reading and writing the permission rows. */
 export interface GrantStore {
   /**
@@ -119,10 +141,16 @@ function rowToGrant(row: { get(column: string): unknown }): Grant {
  * model, and `fid derive --check` fails when it is stale.
  */
 export class SqlGrantStore implements GrantStore {
+  private readonly table: string;
+  private readonly dialect: SqlDialect;
+
   constructor(
     private readonly db: GrantDatabase,
-    private readonly table = "grants",
+    options: SqlGrantStoreOptions = {},
   ) {
+    const table = options.table ?? "grants";
+    this.table = table;
+    this.dialect = options.dialect ?? "sqlite";
     // The table name reaches SQL by interpolation — parameters cannot bind an
     // identifier — so it is validated here rather than trusted. It comes from
     // `[identity] table` in fiducial.toml, which is not user input, but "not
@@ -135,15 +163,35 @@ export class SqlGrantStore implements GrantStore {
     }
   }
 
+  /**
+   * Renumber `?` placeholders for the dialect.
+   *
+   * The queries below are written once, in SQLite's spelling, and rewritten
+   * for Postgres — which numbers its parameters (`$1`, `$2`) and rejects `?`
+   * with a syntax error. Writing each query twice would be two declarations
+   * of one query, and they would drift.
+   *
+   * Textual rewriting is safe *here* specifically: every query in this class
+   * is a literal in this file, and none contains a `?` outside a placeholder.
+   * It is not a general-purpose SQL translator and must not be used as one.
+   */
+  private sql(query: string): string {
+    if (this.dialect !== "postgres") return query;
+    let n = 0;
+    return query.replace(/\?/g, () => `$${++n}`);
+  }
+
   async grantsFor(principal: Principal): Promise<Grant[]> {
     // Anonymous can hold no grant — the schema refuses to store one, and
     // `can()` refuses it anyway. Not querying says so without a round trip.
     if (principal.kind === "anonymous") return [];
 
     const rows = await this.db.query(
-      `SELECT principal_kind, principal_id, resource_kind, resource_id, role
-         FROM ${this.table}
-        WHERE principal_kind = ? AND principal_id = ?`,
+      this.sql(
+        `SELECT principal_kind, principal_id, resource_kind, resource_id, role
+           FROM ${this.table}
+          WHERE principal_kind = ? AND principal_id = ?`,
+      ),
       [principal.kind, principal.id],
     );
     return rows.map(rowToGrant);
@@ -151,9 +199,11 @@ export class SqlGrantStore implements GrantStore {
 
   async grantsOn(resource: Resource): Promise<Grant[]> {
     const rows = await this.db.query(
-      `SELECT principal_kind, principal_id, resource_kind, resource_id, role
-         FROM ${this.table}
-        WHERE resource_kind = ? AND resource_id = ?`,
+      this.sql(
+        `SELECT principal_kind, principal_id, resource_kind, resource_id, role
+           FROM ${this.table}
+          WHERE resource_kind = ? AND resource_id = ?`,
+      ),
       [resource.kind, resourceId(resource)],
     );
     return rows.map(rowToGrant);
@@ -171,11 +221,13 @@ export class SqlGrantStore implements GrantStore {
       );
     }
     await this.db.execute(
-      `INSERT INTO ${this.table}
-         (principal_kind, principal_id, resource_kind, resource_id, role, granted_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT (principal_kind, principal_id, resource_kind, resource_id)
-       DO UPDATE SET role = excluded.role, granted_at = excluded.granted_at`,
+      this.sql(
+        `INSERT INTO ${this.table}
+           (principal_kind, principal_id, resource_kind, resource_id, role, granted_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (principal_kind, principal_id, resource_kind, resource_id)
+         DO UPDATE SET role = excluded.role, granted_at = excluded.granted_at`,
+      ),
       [
         principal.kind,
         principal.id,
@@ -190,9 +242,11 @@ export class SqlGrantStore implements GrantStore {
   async revoke(principal: Principal, resource: Resource): Promise<void> {
     if (principal.kind === "anonymous") return;
     await this.db.execute(
-      `DELETE FROM ${this.table}
-        WHERE principal_kind = ? AND principal_id = ?
-          AND resource_kind = ? AND resource_id = ?`,
+      this.sql(
+        `DELETE FROM ${this.table}
+          WHERE principal_kind = ? AND principal_id = ?
+            AND resource_kind = ? AND resource_id = ?`,
+      ),
       [principal.kind, principal.id, resource.kind, resourceId(resource)],
     );
   }

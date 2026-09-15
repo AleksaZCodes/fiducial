@@ -219,5 +219,10 @@ export function principalFromSession(
 
 // ── Grant storage ────────────────────────────────────────────────────────────
 
-export type { GrantDatabase, GrantStore } from "./grants.js";
+export type {
+  GrantDatabase,
+  GrantStore,
+  SqlDialect,
+  SqlGrantStoreOptions,
+} from "./grants.js";
 export { MemoryGrantStore, SqlGrantStore } from "./grants.js";

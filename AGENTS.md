@@ -143,6 +143,18 @@ cargo build --workspace
 cargo test --workspace --all-features         # includes the freshness gates
 ```
 
+One suite needs a server and so is not in the default run:
+
+```sh
+PGHOST=localhost PGUSER=postgres PGPASSWORD=postgres scripts/verify-postgres.sh
+```
+
+It applies the generated grants migration and its RLS policies to a real
+PostgreSQL server. CI runs it on a `postgres:16` service. It exists because
+node has no Postgres, so that half of the derivation was previously only ever
+asserted as *text* — which is how a migration that does not apply, and
+policies that refuse every query they guard, both shipped looking correct.
+
 Everything that decides *how* it builds is committed, so a cloud checkout — Claude
 Code on the web, a Codespace, a new contributor — gets the same answers as a
 laptop:

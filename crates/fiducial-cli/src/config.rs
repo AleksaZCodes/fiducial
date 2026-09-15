@@ -39,23 +39,68 @@ pub struct Config {
     pub identity: Identity,
 }
 
-/// `[identity]` — the one fact grant storage cannot derive.
+/// Which SQL dialect the grants table is generated for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SqlDialect {
+    Sqlite,
+    Postgres,
+}
+
+impl SqlDialect {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SqlDialect::Sqlite => "sqlite",
+            SqlDialect::Postgres => "postgres",
+        }
+    }
+}
+
+/// `[identity]` — what grant storage cannot derive from the model.
 ///
-/// Everything about the grants table's *shape* follows from the identity
-/// model: its `CHECK` constraints are the `Principal`, `Resource` and `Role`
-/// variants. Its **name** does not — a product may already have a `grants`
-/// table, or prefer `access_grants`, and no amount of looking at the model
-/// reveals which.
+/// The grants table's *shape* follows from the identity model: its `CHECK`
+/// constraints are the `Principal`, `Resource` and `Role` variants. Three
+/// things do not follow from it, and live here.
+///
+/// **The dialect is derived, not declared** — by default. `[adapters]
+/// database` already names the vendor, and the vendor implies the dialect:
+/// `d1` is SQLite, `supabase`/`neon`/`postgres` are Postgres. Declaring it
+/// again would be the copy that goes wrong, so `dialect` is an *override* for
+/// the case the platform cannot see (a product pointing `none` at a real
+/// database of its own).
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Identity {
     /// Table holding the permission rows. Defaults to `grants`.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub table: String,
+    /// `sqlite` | `postgres`. Empty means "derive it from `[adapters]
+    /// database`", which is the normal case.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub dialect: String,
+    /// Generate row-level security policies on the grants table.
+    ///
+    /// Postgres only — SQLite has no RLS. Off by default: a policy that
+    /// cannot identify the current user locks the table rather than
+    /// protecting it, and whether the database *can* identify them depends on
+    /// how the product connects (see `current_user_sql`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub rls: bool,
+    /// The SQL expression yielding the current user's id, for RLS.
+    ///
+    /// Defaults to Supabase's `auth.uid()`. A product connecting with a
+    /// per-request role instead would use something like
+    /// `current_setting('app.user_id', true)`. Normalized to this platform's
+    /// hex form by the generator, because `auth.uid()` returns a hyphenated
+    /// UUID and `principal_id` holds 32 hex characters.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub current_user_sql: String,
 }
 
 impl Identity {
     pub fn is_empty(&self) -> bool {
         self.table.is_empty()
+            && self.dialect.is_empty()
+            && !self.rls
+            && self.current_user_sql.is_empty()
     }
 
     /// The table name to generate against, defaulted.
@@ -67,11 +112,40 @@ impl Identity {
         }
     }
 
-    /// The name reaches SQL by interpolation — a parameter cannot bind an
-    /// identifier — so it is validated rather than trusted. `fiducial.toml` is
-    /// not user input, but "not user input today" is how injection sites are
-    /// introduced, and the same check exists in `SqlGrantStore`.
-    pub fn validate(&self) -> Result<()> {
+    /// The expression that yields the current user id in SQL, defaulted.
+    pub fn current_user_expr(&self) -> &str {
+        if self.current_user_sql.is_empty() {
+            "auth.uid()"
+        } else {
+            &self.current_user_sql
+        }
+    }
+
+    /// The dialect to generate: declared if overridden, otherwise **derived
+    /// from the database vendor the product already selected**.
+    ///
+    /// An unknown or absent vendor falls back to SQLite, which is what `fid
+    /// new` scaffolds toward and what D1 — the one real vendor — runs.
+    pub fn resolve_dialect(&self, adapters: &Adapters) -> Result<SqlDialect> {
+        if !self.dialect.is_empty() {
+            return match self.dialect.as_str() {
+                "sqlite" => Ok(SqlDialect::Sqlite),
+                "postgres" | "postgresql" => Ok(SqlDialect::Postgres),
+                other => bail!(
+                    "[identity] dialect = \"{other}\" is not a SQL dialect this \
+                     generates. Known: sqlite, postgres. Leave it empty to derive \
+                     the dialect from [adapters] database."
+                ),
+            };
+        }
+        Ok(match adapters.get("database") {
+            Some("supabase") | Some("neon") | Some("postgres") => SqlDialect::Postgres,
+            _ => SqlDialect::Sqlite,
+        })
+    }
+
+    /// Everything the pipeline needs, each problem named.
+    pub fn validate(&self, adapters: &Adapters) -> Result<()> {
         let name = self.table_name();
         let ok = !name.is_empty()
             && name
@@ -83,6 +157,17 @@ impl Identity {
             bail!(
                 "[identity] table = \"{name}\" is not a valid SQL identifier \
                  (letters, digits and underscore; not starting with a digit)."
+            );
+        }
+
+        let dialect = self.resolve_dialect(adapters)?;
+        if self.rls && dialect != SqlDialect::Postgres {
+            bail!(
+                "[identity] rls = true, but the dialect resolves to {}. Row-level \
+                 security is a Postgres feature; SQLite has none. Either select a \
+                 Postgres vendor in [adapters] database, or set rls = false and \
+                 rely on `can()` in the application.",
+                dialect.as_str()
             );
         }
         Ok(())

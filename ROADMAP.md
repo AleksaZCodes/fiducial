@@ -303,12 +303,33 @@ consumer of the `database` contract, not a ninth contract beside it, so it
 works on D1 today and any future vendor free. Tested against real SQLite
 (what D1 runs) on the real generated schema.
 
+**Postgres and RLS shipped**
+(`docs/specs/2026-09-15-postgres-dialect-and-rls.md`), correcting the above:
+the migration was SQLite-only and said so nowhere, so `GLOB '*[^0]*'` — a
+constraint that spec was pleased with — is a syntax error on Postgres and a
+Supabase product could not apply its own derived schema. The dialect is now
+derived from `[adapters] database`, the store renumbers its placeholders
+(`?` → `$1`), and `src/identity.generated.ts` carries both facts into
+TypeScript so nothing is retyped. `rls = true` adds Postgres policies as
+defence in depth — `can()` is still the rule, because it is the one both
+languages share and the only one firmware can run.
+
+Three defects, none of which a test that reads generated text can see: the
+`GLOB` migration, the store's `?` placeholders, and a policy on `grants`
+that reads `grants` and therefore refuses every query it guards
+(*"infinite recursion detected in policy"*). `scripts/verify-postgres.sh`
+runs the real thing against a real server — 14 checks, in CI on a
+`postgres:16` service — and reproduces all three when the fixes are reverted.
+
 **Deliberately not done:** it is **not a migrations system** — it generates
 the first table; schema *change* needs ordering, idempotency and drift
 detection against a live database, and that is the next real design question
-here. Also no device/service token issuance — how a device *proves* it is
-that device needs its own pass with real cryptographic choices — and no
-grant expiry, delegation, audit log or caching.
+here. No Postgres `database` adapter either: `supabase`/`neon`/`postgres`
+resolve the dialect correctly but remain `candidates`, so such a product
+supplies its own `{ query, execute }`. Also no device/service token issuance
+— how a device *proves* it is that device needs its own pass with real
+cryptographic choices — and no grant expiry, delegation, audit log or
+caching.
 
 ### AI — *terminal, product-critical* ⬜
 

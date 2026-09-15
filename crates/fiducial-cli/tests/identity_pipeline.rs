@@ -6,9 +6,10 @@
 //! fails `fid derive --check` rather than shipping a table that silently
 //! rejects the new value.
 //!
-//! The SQL is *executed* — against real SQLite, which is what D1 runs — in
-//! `packages/identity/src/grants.test.js`. These tests cover the generation
-//! and the gate.
+//! The SQL is *executed* rather than only read: against real SQLite, which is
+//! what D1 runs, in `packages/identity/src/grants.test.js`; and against a real
+//! PostgreSQL server, policies included, in `scripts/verify-postgres.sh`.
+//! These tests cover the generation and the gate.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -51,6 +52,24 @@ fn product_with_identity(tmp: &Path) -> PathBuf {
 
 fn schema(root: &Path) -> String {
     std::fs::read_to_string(root.join("migrations/0001_grants.sql")).unwrap()
+}
+
+fn module(root: &Path) -> String {
+    std::fs::read_to_string(root.join("src/identity.generated.ts")).unwrap()
+}
+
+/// Rewrite `[identity]` with the given body and re-derive.
+fn with_identity(root: &Path, body: &str) -> String {
+    let path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        config.replace("[identity]", &format!("[identity]\n{body}")),
+    )
+    .unwrap();
+    let out = run(root, &["derive"]);
+    assert!(out.status.success(), "{}", text(&out));
+    schema(root)
 }
 
 // ── Installation ──────────────────────────────────────────────────────────────
@@ -120,6 +139,197 @@ fn the_schema_refuses_rows_the_rule_would_ignore() {
         sql.contains("principal_id GLOB '*[^0]*'"),
         "zero-sentinel ids must be refused: {sql}"
     );
+}
+
+// ── Dialect ──────────────────────────────────────────────────────────────────
+//
+// "SQL" is not one language where this touches it. The first version of this
+// pipeline generated `GLOB` unconditionally — SQLite syntax that Postgres
+// rejects with a plain syntax error, so a product on Supabase could not run
+// its own generated migration.
+
+#[test]
+fn the_default_dialect_is_sqlite_because_d1_is() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+    let sql = schema(&root);
+
+    assert!(sql.contains("Dialect: sqlite"), "{sql}");
+    assert!(sql.contains("GLOB"), "{sql}");
+    assert!(sql.contains("granted_at     TEXT"), "{sql}");
+}
+
+#[test]
+fn postgres_gets_postgres_syntax_and_no_sqlite_syntax() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    let sql = with_identity(&root, "dialect = \"postgres\"");
+
+    assert!(sql.contains("Dialect: postgres"), "{sql}");
+    assert!(sql.contains("principal_id ~ '[^0]'"), "{sql}");
+    assert!(sql.contains("granted_at     TIMESTAMPTZ"), "{sql}");
+    // The actual defect: SQLite syntax reaching a Postgres server.
+    assert!(!sql.contains("GLOB"), "GLOB is SQLite-only: {sql}");
+}
+
+/// The dialect is **derived** from the vendor the product already selected.
+/// Declaring it again is the copy that goes wrong.
+#[test]
+fn a_postgres_vendor_implies_the_postgres_dialect_with_nothing_declared() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+
+    let path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&path).unwrap();
+    assert!(
+        !config.contains("dialect"),
+        "nothing about a dialect is declared: {config}"
+    );
+    std::fs::write(
+        &path,
+        format!("{config}\n[adapters]\ndatabase = \"supabase\"\n"),
+    )
+    .unwrap();
+
+    assert!(run(&root, &["derive"]).status.success());
+    let sql = schema(&root);
+    assert!(sql.contains("Dialect: postgres"), "{sql}");
+    assert!(!sql.contains("GLOB"), "{sql}");
+}
+
+// ── Row-level security ───────────────────────────────────────────────────────
+
+#[test]
+fn rls_is_off_unless_asked_for() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+    assert!(!schema(&root).contains("ROW LEVEL SECURITY"));
+}
+
+#[test]
+fn rls_generates_policies_for_all_four_statements() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    let sql = with_identity(&root, "dialect = \"postgres\"\nrls = true");
+
+    assert!(
+        sql.contains("ALTER TABLE grants ENABLE ROW LEVEL SECURITY"),
+        "{sql}"
+    );
+    for verb in ["SELECT", "INSERT", "UPDATE", "DELETE"] {
+        assert!(
+            sql.contains(&format!("FOR {verb}")),
+            "no {verb} policy: {sql}"
+        );
+    }
+}
+
+/// The bug this shape exists to avoid: a policy on `grants` that reads
+/// `grants` re-enters itself, and Postgres refuses the query at runtime with
+/// "infinite recursion detected in policy". The lookup has to sit in a
+/// `SECURITY DEFINER` function, which runs as the owner and is therefore not
+/// subject to the policies.
+#[test]
+fn the_administers_check_is_a_security_definer_function_not_an_inline_subquery() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    let sql = with_identity(&root, "dialect = \"postgres\"\nrls = true");
+
+    assert!(sql.contains("SECURITY DEFINER"), "{sql}");
+    assert!(sql.contains("grants_administers"), "{sql}");
+    // An inherited search_path in a SECURITY DEFINER function lets the caller
+    // run its own code as the owner.
+    assert!(sql.contains("SET search_path = ''"), "{sql}");
+    // Forcing RLS onto the owner would put the helper back inside the loop.
+    assert!(!sql.contains("FORCE ROW LEVEL SECURITY"), "{sql}");
+
+    let policies = sql.split("ENABLE ROW LEVEL SECURITY").nth(1).unwrap();
+    let body = policies.split("$fn$").nth(2).unwrap(); // after the function
+    assert!(
+        !body.contains("SELECT 1 FROM"),
+        "a policy must not read the table it guards: {body}"
+    );
+}
+
+#[test]
+fn rls_on_sqlite_is_refused_rather_than_silently_ignored() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+
+    let path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        config.replace("[identity]", "[identity]\nrls = true"),
+    )
+    .unwrap();
+
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success(), "{}", text(&out));
+    assert!(text(&out).contains("Postgres feature"), "{}", text(&out));
+}
+
+#[test]
+fn the_current_user_expression_can_be_something_other_than_supabase() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    let sql = with_identity(
+        &root,
+        "dialect = \"postgres\"\nrls = true\ncurrent_user_sql = \"current_setting('app.user_id', true)\"",
+    );
+
+    assert!(
+        sql.contains("current_setting('app.user_id', true)"),
+        "{sql}"
+    );
+    assert!(!sql.contains("auth.uid()"), "{sql}");
+}
+
+// ── The facts a product would otherwise retype ───────────────────────────────
+
+/// The schema and the code that queries it are generated from the same two
+/// declarations. A Postgres table queried with SQLite's `?` placeholders is a
+/// syntax error on every statement, found at runtime — so the dialect reaches
+/// TypeScript rather than being retyped there.
+#[test]
+fn the_dialect_and_table_reach_typescript_too() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+    let ts = module(&root);
+
+    assert!(ts.contains("do not edit"), "{ts}");
+    assert!(ts.contains("export const grantsTable = \"grants\""), "{ts}");
+    assert!(ts.contains("sqlDialect: SqlDialect = \"sqlite\""), "{ts}");
+    assert!(
+        ts.contains("new SqlGrantStore(db, grantStoreOptions)"),
+        "{ts}"
+    );
+}
+
+#[test]
+fn the_typescript_module_follows_the_dialect_and_the_table_name() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_identity(tmp.path());
+
+    let path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        config
+            .replace("[identity]", "[identity]\ndialect = \"postgres\"")
+            .replace("table = \"grants\"", "table = \"acl\""),
+    )
+    .unwrap();
+    assert!(run(&root, &["derive"]).status.success());
+
+    let ts = module(&root);
+    assert!(ts.contains("sqlDialect: SqlDialect = \"postgres\""), "{ts}");
+    assert!(ts.contains("export const grantsTable = \"acl\""), "{ts}");
+    // And the migration it describes was generated for the same dialect.
+    assert!(schema(&root).contains("Dialect: postgres"));
 }
 
 #[test]

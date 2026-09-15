@@ -434,6 +434,34 @@ built because no product has one yet.
 | Clippy (0 warnings), fmt, full Rust suite (all workspace crates), JS build/typecheck/test/lint all green | ✅ |
 | **Deliberately not done, and said so in `ROADMAP.md` and the spec**: an automated CI typecheck of the generated factory (the bug above was caught by hand, not by a new test — a real, recorded gap), Clerk/Auth.js implementations, a Rust-side `SupabaseAuth`, multi-factor auth, magic links, organizations | ✅ |
 
+**Phase 32 — two SQL dialects, and RLS ✅ (2026-09-15)**
+
+> Corrects the roadmap item **Identity at every level** where Phase 31 shipped
+> it one dialect short: the grants migration was SQLite-only and said so
+> nowhere, so a Postgres product got a migration that does not apply. Adds
+> row-level security as defence in depth, which the previous spec had rejected
+> outright on reasoning that only ruled out RLS *as the rule*.
+> Spec: `docs/specs/2026-09-15-postgres-dialect-and-rls.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **A shipped defect, confirmed against a live server before it was fixed**: `CHECK (principal_id GLOB '*[^0]*')` is SQLite syntax. On PostgreSQL 16 the generated migration fails outright — `ERROR: syntax error at or near "GLOB"` — so a product on Supabase or Neon could not apply its own derived schema | ✅ |
+| **The dialect is derived from the vendor, not declared**: `[adapters] database` already names it (`d1` → SQLite; `supabase`/`neon`/`postgres` → Postgres). `[identity] dialect` is an *override* for what the platform cannot see (`none` in front of the product's own database) | ✅ |
+| Dialect-correct DDL — `GLOB '*[^0]*'` vs `~ '[^0]'`, `TEXT` vs `TIMESTAMPTZ` — and the generated file names its dialect in a header comment, so an applied migration and its engine can be compared by eye | ✅ |
+| **A second latent defect, one level along**: `SqlGrantStore` hard-coded `?` placeholders. A Postgres product would have got a migration that applies and then a syntax error on *every query*, at runtime. The store now takes `{ table, dialect }` and renumbers `?` → `$1, $2` — one copy of each query, because two hand-written variants of one query drift | ✅ |
+| **`src/identity.generated.ts` — a second pipeline output**, carrying `grantsTable`, `sqlDialect` and `grantStore(db)` into TypeScript. Passing the dialect by hand would be the same trap again: a fact declared in `fiducial.toml` and retyped in TS. Fixes the table name's identical hand-copy at the same time. Typechecked against the real built package under `strict` | ✅ |
+| Pipeline outputs are matched **by extension, not by position**, so declaring them in either order works | ✅ |
+| **RLS (Postgres, `rls = true`)**: a principal reads its own grants; an administrator of a resource reads every grant over it; only an admin or owner may write one. Generated from the same model as `can()`, which is what makes a second enforcement point safe rather than a second source of truth | ✅ |
+| **`can()` is still the rule** — the one both languages share, the one `docs/identity/vectors.json` checks, and the only one firmware can run. RLS is defence in depth: a missed check in a handler stops being a data breach | ✅ |
+| **A third defect, found only by running it**: a policy on `grants` whose `EXISTS` reads `grants` re-enters itself — `ERROR: infinite recursion detected in policy for relation "grants"`. It parses, it applies cleanly, and then it refuses every query it guards. The lookup is now a `SECURITY DEFINER` function running as the owner, who is not subject to the policies | ✅ |
+| `SET search_path = ''` with fully-qualified names — a `SECURITY DEFINER` function inheriting the caller's search path is a privilege-escalation shape, not a style question. And **no `FORCE ROW LEVEL SECURITY`**, deliberately: forcing policies onto the owner would put the helper back inside the recursion it exists to break | ✅ |
+| `rls = true` on SQLite is **refused at derive time**, not ignored. A security control that silently does nothing is worse than one you know you do not have | ✅ |
+| `current_user_sql` — defaults to Supabase's `auth.uid()`, normalized to this platform's 32-hex-char id form (`auth.uid()` returns a hyphenated UUID). A product using `current_setting('app.user_id', true)` instead is one declaration | ✅ |
+| **`scripts/verify-postgres.sh` — 14 checks against a real PostgreSQL 16 server**: the migration applies, both `CHECK` constraints bite, all four policies behave from each side, and the store's own SQL runs in the shape Postgres numbers it. The `identity` CI job now starts a `postgres:16` service and runs it on every push | ✅ |
+| **Verified adversarially**: restoring the inlined-`EXISTS` policy turns every read into the recursion error, and the `GLOB` migration fails to apply. Both defects reproduce on demand — neither is visible to a test that only reads the generated text, which is exactly how all three shipped | ✅ |
+| 18 end-to-end CLI tests (was 8), 206 TypeScript tests (was 202), 14 live Postgres checks (was 0); clippy clean, fmt, full workspace suite green | ✅ |
+| **Deliberately not done**: still not a migrations system (turning `rls` on regenerates `0001_grants.sql`, which is the *first* migration — applying it to a live database is the product's problem); no Postgres `database` adapter, so those vendors remain `candidates` and a product supplies its own `{ query, execute }`; policies cover the grants table only, though `grants_administers(kind, id)` is a plain function a product's own policies can call; no `device`/`service` principal in the policies, because `auth.uid()` is a user's id | ✅ |
+
 **Phase 31 — grant storage ✅ (2026-09-15)**
 
 > Implements the roadmap item **Identity at every level**'s open half: the
