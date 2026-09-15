@@ -17,9 +17,10 @@ const PLATFORM_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
-pub fn run(name: &str, locales: &str, default_locale: Option<&str>) -> Result<()> {
+pub fn run(name: &str, locales: Option<&str>, default_locale: Option<&str>) -> Result<()> {
     validate_name(name)?;
-    let locales = parse_locales(locales)?;
+    let requested = locales.map(str::to_string).unwrap_or_else(default_locales);
+    let locales = parse_locales(&requested)?;
     let default_locale = resolve_default_locale(&locales, default_locale)?;
 
     let dest = PathBuf::from(name);
@@ -115,12 +116,33 @@ fn parse_locales(raw: &str) -> Result<Vec<String>> {
     Ok(out)
 }
 
+/// The locale set a product is born with, owned by the `i18n` capability.
+///
+/// Not a constant here: the capability declares what it seeds, and `fid new`
+/// asking it is the difference between one declaration and two.
+fn default_locales() -> String {
+    capability::seeded_locales()
+        .map(|(l, _)| l.join(","))
+        .unwrap_or_else(|| "none".to_string())
+}
+
+/// The fallback the capability declares.
+fn fallback_locale() -> String {
+    capability::seeded_locales()
+        .map(|(_, d)| d)
+        .unwrap_or_default()
+}
+
 /// The fallback locale: declared, never inferred from list order.
 fn resolve_default_locale(locales: &[String], declared: Option<&str>) -> Result<String> {
     if locales.is_empty() {
         return Ok(String::new());
     }
-    let candidate = declared.unwrap_or(config::DEFAULT_LOCALE);
+    let candidate = match declared {
+        Some(d) => d.to_string(),
+        None => fallback_locale(),
+    };
+    let candidate = candidate.as_str();
     if locales.iter().any(|l| l == candidate) {
         return Ok(candidate.to_string());
     }
@@ -141,11 +163,9 @@ fn resolve_default_locale(locales: &[String], declared: Option<&str>) -> Result<
 
 /// Write the declared locale set into the product's `fiducial.toml`.
 ///
-/// Runs after `capability::install`, which seeds [`DEFAULT_LOCALES`] when the
-/// block is empty. Overwriting that is cheaper and less brittle than teaching
-/// `install` about a locale set only `fid new` has.
-///
-/// [`DEFAULT_LOCALES`]: crate::config::DEFAULT_LOCALES
+/// Runs after `capability::install`, which seeds the capability's own locales
+/// when the block is empty. Overwriting that is cheaper and less brittle than
+/// teaching `install` about a locale set only `fid new` has.
 fn seed_locales(root: &Path, locales: &[String], default_locale: &str) -> Result<()> {
     let path = root.join(config::CONFIG_FILE);
     let mut cfg = config::Config::load(&path)?;

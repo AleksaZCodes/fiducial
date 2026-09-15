@@ -1,0 +1,11 @@
+description = "Localized by construction: JSON catalogs in, typed message keys out"
+
+# A declaration with no file of its own: a `fiducial.toml` block.
+#
+# Seeded on install, because a pipeline whose declaration is an empty block
+# fails on the next `fid derive` — the capability would install clean and break
+# the first time anyone used it. `seed` is applied only when the product has
+# not already declared the block, so it never overwrites a decision.
+[[declarations.config]]
+block = "i18n"
+seed = { locales = ["sr", "en"], default = "sr" }

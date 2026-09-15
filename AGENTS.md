@@ -166,6 +166,7 @@ rule that matters most.
 | `fid harvest <path>` | Survey another codebase for reusable work |
 | `fid release check` | Fail when the compatibility matrix and `WIRE_VERSION` disagree |
 | `fid capability list [--all]` | What each capability declares, derives and requires; `--all` also lists the adapter contracts |
+| `fid add capability <id> [--from <source>]` | Install a capability, built-in or resolved from a directory or git repository |
 
 Every command takes `--help`, and the help names no phase numbers on purpose —
 a schedule is a fact `SHIPPED.md` owns, and a second copy of it drifts.
@@ -189,6 +190,13 @@ template.
 Filing one as another is not a style mistake. A pipeline outside `pipelines/` is
 installed and never runs; a `pipelines/` file listed as a template is installed
 and never gated. `fid capability check` rejects both.
+
+**A capability is a directory, and its manifest is derived from it.** `SKILL.md`
+is the only required file; `declarations/` and `pipelines/` say what each file
+is; `capability.toml` is optional and carries only what a layout cannot. A
+capability need not be compiled into `fid` — `--from <path>` or
+`--from git:<url>#<rev>` installs one through the same derivation, the same
+conformance checks and the same lock entry as a built-in.
 
 **Adapters name contracts, not vendors.** Every contract currently implements
 only `none` — a real, working no-op. The vendors each is intended to carry are

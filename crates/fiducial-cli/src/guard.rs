@@ -490,7 +490,7 @@ mod tests {
     fn every_declared_guard_rule_is_implemented() {
         let mut declared: Vec<String> = crate::config::Guard::default().rules;
 
-        for cap in crate::capability::BUILTIN_CAPABILITIES {
+        for cap in crate::capability::builtins() {
             declared.extend(cap.guard_rules.iter().map(|r| r.to_string()));
         }
 

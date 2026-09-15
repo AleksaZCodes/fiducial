@@ -32,6 +32,44 @@ pub struct Lock {
     /// Derived artifact records, keyed by repo-relative path.
     #[serde(default)]
     pub artifacts: BTreeMap<String, ArtifactRecord>,
+    /// Installed capabilities, keyed by id.
+    ///
+    /// Written by `fid add`. Before capabilities could be resolved from
+    /// outside the binary, every consumer looked one up in the built-in
+    /// registry — which silently stopped being the whole truth the moment a
+    /// product could install one from a git repository. The lock is where a
+    /// product records what it actually has.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub capabilities: BTreeMap<String, CapabilityRecord>,
+}
+
+/// What a product installed, and from where.
+///
+/// Enough to report the capability without re-resolving it: `fid dash` must
+/// not reach the network, and `fid doctor` must work offline on a plane.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CapabilityRecord {
+    /// How it was resolved — `built-in`, `path:…`, or `git:…#<commit>`.
+    ///
+    /// A git source is pinned at the **commit**, never the branch: `#main` is
+    /// a question whose answer changes, and a lock that records the question
+    /// pins nothing.
+    pub source: String,
+    /// Platform version that installed it.
+    pub source_version: String,
+    /// SHA-256 over the capability's files, so tampering is visible.
+    pub hash: String,
+    /// One-line description, for `fid capability list` without re-resolving.
+    pub description: String,
+    /// Declaration names, in install order.
+    #[serde(default)]
+    pub declarations: Vec<String>,
+    /// Installed pipeline paths.
+    #[serde(default)]
+    pub pipelines: Vec<String>,
+    /// Adapter contracts it needs a vendor for.
+    #[serde(default)]
+    pub requires_adapters: Vec<String>,
 }
 
 /// A record of a derived artifact produced by a pipeline.
@@ -77,6 +115,7 @@ impl Lock {
             templates: BTreeMap::new(),
             applied_migrations: Vec::new(),
             artifacts: BTreeMap::new(),
+            capabilities: BTreeMap::new(),
         }
     }
 

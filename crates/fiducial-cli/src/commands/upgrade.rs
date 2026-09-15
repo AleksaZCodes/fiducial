@@ -60,14 +60,23 @@ pub fn run(dry_run: bool, portfolio: bool) -> Result<()> {
     };
 
     let mut any_changes = false;
+    // Which capability's version of a shared path is the right one depends on
+    // what this product installed — `firmware/Cargo.toml` ships from both
+    // firmware capabilities with different content.
+    let enabled = cfg.capabilities.enabled.clone();
 
     // ── 1. Template 3-way merge ───────────────────────────────────────────────
     println!("  Templates");
     let template_paths: Vec<String> = lock.templates.keys().cloned().collect();
     for rel_path in &template_paths {
-        if let Some(outcome) =
-            merge_one_template(&root, rel_path, &cfg.product.name, &mut lock, dry_run)?
-        {
+        if let Some(outcome) = merge_one_template(
+            &root,
+            rel_path,
+            &cfg.product.name,
+            &enabled,
+            &mut lock,
+            dry_run,
+        )? {
             any_changes = true;
             match outcome {
                 TemplateOutcome::Clean(msg) => println!("  ✓ {rel_path}: {msg}"),
@@ -117,7 +126,7 @@ pub fn run(dry_run: bool, portfolio: bool) -> Result<()> {
             }
 
             // Install the new path from the current template.
-            if let Some(template) = templates::raw(new) {
+            if let Some(template) = templates::raw_for(new, &cfg.capabilities.enabled) {
                 let content = templates::expand(template, &cfg.product.name, PLATFORM_VERSION);
                 if let Some(parent) = new_path.parent() {
                     std::fs::create_dir_all(parent)
@@ -264,6 +273,7 @@ fn merge_one_template(
     root: &std::path::Path,
     rel_path: &str,
     product_name: &str,
+    enabled: &[String],
     lock: &mut Lock,
     dry_run: bool,
 ) -> Result<Option<TemplateOutcome>> {
@@ -273,7 +283,7 @@ fn merge_one_template(
     };
 
     // Look up the current (in-binary) template and expand placeholders.
-    let raw = match templates::raw(rel_path) {
+    let raw = match templates::raw_for(rel_path, enabled) {
         Some(r) => r,
         None => {
             // Template path not in registry — third-party or removed capability.

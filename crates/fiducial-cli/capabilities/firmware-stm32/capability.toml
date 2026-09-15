@@ -1,0 +1,2 @@
+description = "STM32F401 Embassy firmware with defmt logging and probe-rs flashing"
+guard_rules = ["no-unpinned-cli-fetch"]

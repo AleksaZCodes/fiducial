@@ -179,6 +179,41 @@ EXAMPLES
         #[arg(value_name = "TARGET")]
         target: String,
     },
+
+    /// Install a capability by id, from the built-ins or an external source
+    #[command(
+        name = "capability",
+        long_about = "\
+Install a capability that is not one of the named targets above.
+
+A capability need not be compiled into `fid`. With --from, it is resolved from
+a directory or a git repository and installed exactly as a built-in one is —
+same derivation, same conformance checks, same lock entry. Shipping a
+capability does not require releasing the CLI.",
+        after_long_help = "\
+EXAMPLES
+  fid add capability eda
+  fid add capability stripe --from ./capabilities/stripe
+  fid add capability stripe --from git:https://github.com/acme/fid-stripe
+  fid add capability stripe --from git:https://github.com/acme/caps#v1.2.0::stripe
+
+SOURCES
+  <path>                        a directory whose name is the capability id
+  git:<url>                     a repository's default branch
+  git:<url>#<rev>               a tag, branch or commit
+  git:<url>#<rev>::<subdir>     one capability inside a repository of several
+
+A git source is always pinned in fiducial.lock at the commit it resolved to,
+never at the branch name — so the same lock installs the same capability."
+    )]
+    Capability {
+        /// Capability id, which must match the source directory's name
+        #[arg(value_name = "ID")]
+        id: String,
+        /// Where to resolve it from; omit for a built-in
+        #[arg(long, value_name = "SOURCE")]
+        from: Option<String>,
+    },
 }
 
 // ── Dispatch ─────────────────────────────────────────────────────────────────
@@ -193,7 +228,44 @@ pub fn run(target: AddTarget) -> Result<()> {
         }
         AddTarget::Eda => install_capability("eda"),
         AddTarget::I18n => install_capability("i18n"),
+        AddTarget::Capability { id, from } => match from {
+            Some(spec) => install_external(&id, &spec),
+            None => install_capability(&id),
+        },
     }
+}
+
+/// Install a capability resolved from outside the binary.
+///
+/// The only difference from a built-in is where the bytes came from: the
+/// derivation, the conformance check and the installer are the same code. That
+/// is the whole claim of this feature, so it is worth stating where it is true.
+fn install_external(id: &str, spec: &str) -> Result<()> {
+    let cwd = std::env::current_dir().context("getting current directory")?;
+    let root = Config::find_root(&cwd)?;
+
+    let spec = capability::source::Spec::parse(spec)?;
+    let cache = root.join(".fiducial/capabilities");
+    let cap = capability::source::resolve(&spec, id, &cache)?;
+
+    // A third party's capability is held to the rules a first party's is. It
+    // arrives as files written into someone's repository, so "it came from
+    // outside" is a reason for more checking, not less.
+    let problems = capability::check_capability(&cap);
+    if !problems.is_empty() {
+        for p in &problems {
+            eprintln!("  ✗ {p}");
+        }
+        anyhow::bail!(
+            "`{id}` does not conform, so it was not installed.\n\
+             These are the same checks every built-in capability passes."
+        );
+    }
+
+    let cfg = Config::load(&root.join(CONFIG_FILE))?;
+    capability::install(&cap, &root, &cfg.product.name)?;
+    println!("  ✓ source: {}", cap.source.label());
+    Ok(())
 }
 
 fn add_app(target: &str) -> Result<()> {

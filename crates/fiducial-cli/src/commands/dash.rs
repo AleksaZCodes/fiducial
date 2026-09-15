@@ -795,35 +795,79 @@ fn i18n_view(root: &Path, config: &Config) -> I18nView {
     }
 }
 
+/// One installed capability, however it was resolved.
+///
+/// A flattened view rather than a `&Capability`: an externally resolved
+/// capability is not in the binary, so the facts come from the lock.
+struct InstalledCapability {
+    id: String,
+    /// `(name, is_file)` — a config block has no path to test for.
+    declarations: Vec<(String, bool)>,
+    requires_adapters: Vec<String>,
+}
+
 /// What the installed capabilities declare, derive and require.
 fn taxonomy_view(root: &Path, config: &Config) -> TaxonomyView {
-    let installed: Vec<&'static crate::capability::CapabilityDef> = config
+    // The lock first, the built-in registry second. A capability resolved from
+    // a git repository is not in the registry, and reporting only what `fid`
+    // was compiled with would silently omit exactly the capabilities this
+    // product went out of its way to add.
+    let lock = Lock::load(&root.join(LOCK_FILE)).ok();
+    let installed: Vec<InstalledCapability> = config
         .capabilities
         .enabled
         .iter()
-        .filter_map(|id| crate::capability::find(id))
+        .map(|id| {
+            let record = lock.as_ref().and_then(|l| l.capabilities.get(id));
+            let builtin = crate::capability::find(id);
+            InstalledCapability {
+                id: id.clone(),
+                declarations: match (record, builtin) {
+                    (Some(r), _) => r
+                        .declarations
+                        .iter()
+                        .map(|n| (n.clone(), n.contains('/')))
+                        .collect(),
+                    (None, Some(b)) => b
+                        .declarations
+                        .iter()
+                        .map(|d| {
+                            (
+                                d.name().to_string(),
+                                matches!(d, crate::capability::Declaration::File(_)),
+                            )
+                        })
+                        .collect(),
+                    (None, None) => Vec::new(),
+                },
+                requires_adapters: match (record, builtin) {
+                    (Some(r), _) => r.requires_adapters.clone(),
+                    (None, Some(b)) => b.requires_adapters.clone(),
+                    (None, None) => Vec::new(),
+                },
+            }
+        })
         .collect();
 
     let mut declarations = Vec::new();
     for cap in &installed {
-        for decl in cap.declarations {
-            let (kind, present) = match decl {
-                crate::capability::Declaration::File { path, .. } => {
-                    ("file", root.join(path).exists())
-                }
-                crate::capability::Declaration::ConfigBlock { name, .. } => (
+        for (name, is_file) in &cap.declarations {
+            let (kind, present) = if *is_file {
+                ("file", root.join(name).exists())
+            } else {
+                (
                     "config-block",
                     // Only `i18n` exists as a block today; a second one adds a
                     // match arm here rather than a new reporting path.
-                    match *name {
+                    match name.as_str() {
                         "i18n" => !config.i18n.is_empty(),
                         _ => true,
                     },
-                ),
+                )
             };
             declarations.push(DeclarationView {
-                capability: cap.id.to_string(),
-                name: decl.name().to_string(),
+                capability: cap.id.clone(),
+                name: name.clone(),
                 kind,
                 present,
             });
@@ -844,8 +888,8 @@ fn taxonomy_view(root: &Path, config: &Config) -> TaxonomyView {
                 selected,
                 required_by: installed
                     .iter()
-                    .filter(|cap| cap.requires_adapters.contains(&c.name))
-                    .map(|cap| cap.id.to_string())
+                    .filter(|cap| cap.requires_adapters.iter().any(|a| a == c.name))
+                    .map(|cap| cap.id.clone())
                     .collect(),
             }
         })

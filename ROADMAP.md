@@ -103,10 +103,16 @@ Changing a format after third parties have published against it is a breaking
 change for other people's work. Format first, publishing second — the order is
 not interchangeable.
 
-### 3 · External capabilities — *debt-accruing, and the keystone*
+### 3 · External capabilities — *debt-accruing, and the keystone* ✅
 
-Capabilities resolve from npm / crates / git instead of `include_str!` in the
-`fid` binary.
+Complete. Capabilities resolve from a directory or a git repository instead of
+`include_str!` in the `fid` binary; see
+`docs/specs/2026-09-15-external-capabilities.md`.
+
+**npm and crates are deferred** rather than built: a registry adds a packaging
+format — what a published capability contains, how a version range resolves,
+which registry is authoritative — and nothing needs that yet. Design spec §3.3
+names git as the source model, and git is the one with a consumer.
 
 **This is the item whose cost of delay is highest and most measurable.** Every
 capability built before it exists is one more compiled into the binary that later

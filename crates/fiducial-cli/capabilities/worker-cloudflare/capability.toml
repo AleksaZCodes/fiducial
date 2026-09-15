@@ -1,0 +1,2 @@
+description = "Cloudflare Worker / Durable Object with Wrangler and Miniflare"
+guard_rules = ["no-unpinned-cli-fetch"]

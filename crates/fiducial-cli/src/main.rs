@@ -121,7 +121,7 @@ gap.
 Pass `--locales none` for a product that genuinely has no user-visible text,
 such as a CLI or a firmware image."
         )]
-        locales: String,
+        locales: Option<String>,
 
         /// Locale a reader falls back to; must be one of --locales
         #[arg(
@@ -479,7 +479,7 @@ fn main() -> Result<()> {
             name,
             locales,
             default_locale,
-        } => commands::new::run(&name, &locales, default_locale.as_deref()),
+        } => commands::new::run(&name, locales.as_deref(), default_locale.as_deref()),
         Commands::Add { target } => commands::add::run(target),
         Commands::Capability { action } => commands::capability::run(action),
         Commands::Derive { check, pipeline } => commands::derive::run(check, pipeline),

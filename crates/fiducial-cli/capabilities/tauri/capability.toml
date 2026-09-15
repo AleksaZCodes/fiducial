@@ -1,0 +1,2 @@
+description = "Tauri 2 desktop app with fiducial-tauri serial transport"
+guard_rules = ["no-unpinned-cli-fetch"]

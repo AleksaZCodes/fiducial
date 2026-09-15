@@ -24,99 +24,6 @@ const TMPL_ROADMAP: &str = include_str!("../templates/ROADMAP.md.tmpl");
 
 // ── Capability templates ──────────────────────────────────────────────────────
 
-const CAP_WEB_NEXT_PKG: &str = include_str!("../capabilities/web-next/apps/web/package.json");
-const CAP_WEB_NEXT_CONFIG: &str = include_str!("../capabilities/web-next/apps/web/next.config.ts");
-const CAP_WEB_NEXT_TSCONFIG: &str = include_str!("../capabilities/web-next/apps/web/tsconfig.json");
-const CAP_WEB_NEXT_PAGE: &str = include_str!("../capabilities/web-next/apps/web/src/app/page.tsx");
-const CAP_WEB_BOARD_PAGE: &str =
-    include_str!("../capabilities/web-next/apps/web/src/app/board/page.tsx");
-const CAP_WEB_NEXT_LAYOUT: &str =
-    include_str!("../capabilities/web-next/apps/web/src/app/layout.tsx");
-const CAP_WEB_NEXT_GLOBALS: &str =
-    include_str!("../capabilities/web-next/apps/web/src/app/globals.css");
-const CAP_WEB_NEXT_COMPONENTS_JSON: &str =
-    include_str!("../capabilities/web-next/apps/web/components.json");
-
-// ── web-svelte capability templates ──────────────────────────────────────────
-
-const CAP_WEB_SVELTE_SVELTE_CONFIG: &str =
-    include_str!("../capabilities/web-svelte/apps/web/svelte.config.js");
-const CAP_WEB_SVELTE_VITE_CONFIG: &str =
-    include_str!("../capabilities/web-svelte/apps/web/vite.config.ts");
-const CAP_WEB_SVELTE_APP_HTML: &str =
-    include_str!("../capabilities/web-svelte/apps/web/src/app.html");
-const CAP_WEB_SVELTE_APP_CSS: &str =
-    include_str!("../capabilities/web-svelte/apps/web/src/app.css");
-const CAP_WEB_SVELTE_LAYOUT: &str =
-    include_str!("../capabilities/web-svelte/apps/web/src/routes/+layout.svelte");
-const CAP_WEB_SVELTE_PAGE: &str =
-    include_str!("../capabilities/web-svelte/apps/web/src/routes/+page.svelte");
-
-// ── firmware-rp2040 capability templates ─────────────────────────────────────
-
-const CAP_FIRMWARE_RP2040_WORKSPACE: &str =
-    include_str!("../capabilities/firmware-rp2040/firmware/Cargo.toml");
-const CAP_FIRMWARE_RP2040_TOOLCHAIN: &str =
-    include_str!("../capabilities/firmware-rp2040/firmware/rust-toolchain.toml");
-const CAP_FIRMWARE_RP2040_SHARED_CARGO: &str =
-    include_str!("../capabilities/firmware-rp2040/firmware/shared/Cargo.toml");
-const CAP_FIRMWARE_RP2040_SHARED_LIB: &str =
-    include_str!("../capabilities/firmware-rp2040/firmware/shared/src/lib.rs");
-const CAP_FIRMWARE_RP2040_CARGO_CONFIG: &str =
-    include_str!("../capabilities/firmware-rp2040/firmware/rp2040/.cargo/config.toml");
-const CAP_FIRMWARE_RP2040_CARGO: &str =
-    include_str!("../capabilities/firmware-rp2040/firmware/rp2040/Cargo.toml");
-const CAP_FIRMWARE_RP2040_BUILD: &str =
-    include_str!("../capabilities/firmware-rp2040/firmware/rp2040/build.rs");
-const CAP_FIRMWARE_RP2040_MEMORY: &str =
-    include_str!("../capabilities/firmware-rp2040/firmware/rp2040/memory.x");
-const CAP_FIRMWARE_RP2040_MAIN: &str =
-    include_str!("../capabilities/firmware-rp2040/firmware/rp2040/src/main.rs");
-const CAP_FIRMWARE_README: &str =
-    include_str!("../capabilities/firmware-rp2040/firmware/rp2040/README.md");
-
-// ── firmware-stm32 capability templates ──────────────────────────────────────
-
-const CAP_FIRMWARE_STM32_WORKSPACE: &str =
-    include_str!("../capabilities/firmware-stm32/firmware/Cargo.toml");
-const CAP_FIRMWARE_STM32_TOOLCHAIN: &str =
-    include_str!("../capabilities/firmware-stm32/firmware/rust-toolchain.toml");
-const CAP_FIRMWARE_STM32_SHARED_CARGO: &str =
-    include_str!("../capabilities/firmware-stm32/firmware/shared/Cargo.toml");
-const CAP_FIRMWARE_STM32_SHARED_LIB: &str =
-    include_str!("../capabilities/firmware-stm32/firmware/shared/src/lib.rs");
-const CAP_FIRMWARE_STM32_CARGO_CONFIG: &str =
-    include_str!("../capabilities/firmware-stm32/firmware/stm32/.cargo/config.toml");
-const CAP_FIRMWARE_STM32_CARGO: &str =
-    include_str!("../capabilities/firmware-stm32/firmware/stm32/Cargo.toml");
-const CAP_FIRMWARE_STM32_BUILD: &str =
-    include_str!("../capabilities/firmware-stm32/firmware/stm32/build.rs");
-const CAP_FIRMWARE_STM32_MEMORY: &str =
-    include_str!("../capabilities/firmware-stm32/firmware/stm32/memory.x");
-const CAP_FIRMWARE_STM32_MAIN: &str =
-    include_str!("../capabilities/firmware-stm32/firmware/stm32/src/main.rs");
-
-const CAP_TAURI_CONF: &str =
-    include_str!("../capabilities/tauri/apps/desktop/src-tauri/tauri.conf.json");
-const CAP_TAURI_CARGO: &str =
-    include_str!("../capabilities/tauri/apps/desktop/src-tauri/Cargo.toml.tmpl");
-const CAP_TAURI_BUILD: &str = include_str!("../capabilities/tauri/apps/desktop/src-tauri/build.rs");
-const CAP_TAURI_LIB: &str = include_str!("../capabilities/tauri/apps/desktop/src-tauri/src/lib.rs");
-const CAP_TAURI_MAIN: &str =
-    include_str!("../capabilities/tauri/apps/desktop/src-tauri/src/main.rs");
-
-const CAP_WORKER_WRANGLER: &str =
-    include_str!("../capabilities/worker-cloudflare/apps/worker/wrangler.toml");
-
-// ── eda capability templates ──────────────────────────────────────────────────
-
-const CAP_EDA_MAIN_ATO: &str = include_str!("../capabilities/eda/board/main.ato");
-const CAP_EDA_BOARD_INTERFACE: &str =
-    include_str!("../capabilities/eda/board/board.interface.json");
-const CAP_EDA_PIPELINE: &str = include_str!("../capabilities/eda/pipelines/eda.toml");
-const CAP_EDA_ENCLOSURE_PIPELINE: &str =
-    include_str!("../capabilities/eda/pipelines/enclosure.toml");
-
 /// The platform's principles, extracted from `MISSION.md` by `build.rs`.
 ///
 /// One declaration, one derivation. See `build.rs` for why this is generated
@@ -183,6 +90,10 @@ pub const RENAMED_TEMPLATES: &[(&str, &str)] = &[
 
 /// Look up the raw (unexpanded) template for a repo-relative path.
 ///
+/// Scaffold templates only. For a file a capability installed, use
+/// [`raw_for`] — which capability's version of a path is correct depends on
+/// which capabilities the product has.
+///
 /// Returns `None` for paths that are not tracked as templates.
 pub fn raw(rel_path: &str) -> Option<&'static str> {
     match rel_path {
@@ -198,61 +109,74 @@ pub fn raw(rel_path: &str) -> Option<&'static str> {
         ".github/workflows/claude-review.yml" => Some(TMPL_CI_REVIEW),
         "README.md" => Some(TMPL_README),
         "ROADMAP.md" => Some(TMPL_ROADMAP),
-        // web-next capability
-        "apps/web/package.json" => Some(CAP_WEB_NEXT_PKG),
-        "apps/web/next.config.ts" => Some(CAP_WEB_NEXT_CONFIG),
-        "apps/web/tsconfig.json" => Some(CAP_WEB_NEXT_TSCONFIG),
-        "apps/web/src/app/page.tsx" => Some(CAP_WEB_NEXT_PAGE),
-        "apps/web/src/app/layout.tsx" => Some(CAP_WEB_NEXT_LAYOUT),
-        "apps/web/src/app/globals.css" => Some(CAP_WEB_NEXT_GLOBALS),
-        "apps/web/components.json" => Some(CAP_WEB_NEXT_COMPONENTS_JSON),
-        // web-svelte capability (paths not shared with web-next)
-        "apps/web/svelte.config.js" => Some(CAP_WEB_SVELTE_SVELTE_CONFIG),
-        "apps/web/vite.config.ts" => Some(CAP_WEB_SVELTE_VITE_CONFIG),
-        "apps/web/src/app.html" => Some(CAP_WEB_SVELTE_APP_HTML),
-        "apps/web/src/app.css" => Some(CAP_WEB_SVELTE_APP_CSS),
-        "apps/web/src/routes/+layout.svelte" => Some(CAP_WEB_SVELTE_LAYOUT),
-        "apps/web/src/routes/+page.svelte" => Some(CAP_WEB_SVELTE_PAGE),
-        // firmware-rp2040 capability
-        "firmware/Cargo.toml" => Some(CAP_FIRMWARE_RP2040_WORKSPACE),
-        "firmware/rust-toolchain.toml" => Some(CAP_FIRMWARE_RP2040_TOOLCHAIN),
-        "firmware/shared/Cargo.toml" => Some(CAP_FIRMWARE_RP2040_SHARED_CARGO),
-        "firmware/shared/src/lib.rs" => Some(CAP_FIRMWARE_RP2040_SHARED_LIB),
-        "firmware/rp2040/.cargo/config.toml" => Some(CAP_FIRMWARE_RP2040_CARGO_CONFIG),
-        "firmware/rp2040/Cargo.toml" => Some(CAP_FIRMWARE_RP2040_CARGO),
-        "firmware/rp2040/build.rs" => Some(CAP_FIRMWARE_RP2040_BUILD),
-        "firmware/rp2040/memory.x" => Some(CAP_FIRMWARE_RP2040_MEMORY),
-        "firmware/rp2040/src/main.rs" => Some(CAP_FIRMWARE_RP2040_MAIN),
-        "firmware/rp2040/README.md" => Some(CAP_FIRMWARE_README),
-        // firmware-stm32 capability
-        // Note: firmware/Cargo.toml and firmware/rust-toolchain.toml are shared
-        // path keys; stm32 variants are referenced here under stm32-prefixed keys
-        // so they are accessible for upgrade checks when both capabilities coexist.
-        "firmware-stm32/Cargo.toml" => Some(CAP_FIRMWARE_STM32_WORKSPACE),
-        "firmware-stm32/rust-toolchain.toml" => Some(CAP_FIRMWARE_STM32_TOOLCHAIN),
-        "firmware-stm32/shared/Cargo.toml" => Some(CAP_FIRMWARE_STM32_SHARED_CARGO),
-        "firmware-stm32/shared/src/lib.rs" => Some(CAP_FIRMWARE_STM32_SHARED_LIB),
-        "firmware/stm32/.cargo/config.toml" => Some(CAP_FIRMWARE_STM32_CARGO_CONFIG),
-        "firmware/stm32/Cargo.toml" => Some(CAP_FIRMWARE_STM32_CARGO),
-        "firmware/stm32/build.rs" => Some(CAP_FIRMWARE_STM32_BUILD),
-        "firmware/stm32/memory.x" => Some(CAP_FIRMWARE_STM32_MEMORY),
-        "firmware/stm32/src/main.rs" => Some(CAP_FIRMWARE_STM32_MAIN),
-        // tauri capability
-        "apps/desktop/src-tauri/tauri.conf.json" => Some(CAP_TAURI_CONF),
-        "apps/desktop/src-tauri/Cargo.toml" => Some(CAP_TAURI_CARGO),
-        "apps/desktop/src-tauri/build.rs" => Some(CAP_TAURI_BUILD),
-        "apps/desktop/src-tauri/src/lib.rs" => Some(CAP_TAURI_LIB),
-        "apps/desktop/src-tauri/src/main.rs" => Some(CAP_TAURI_MAIN),
-        // worker-cloudflare capability
-        "apps/worker/wrangler.toml" => Some(CAP_WORKER_WRANGLER),
-        // eda capability
-        "board/main.ato" => Some(CAP_EDA_MAIN_ATO),
-        "board/board.interface.json" => Some(CAP_EDA_BOARD_INTERFACE),
-        "pipelines/eda.toml" => Some(CAP_EDA_PIPELINE),
-        "pipelines/enclosure.toml" => Some(CAP_EDA_ENCLOSURE_PIPELINE),
-        "apps/web/src/app/board/page.tsx" => Some(CAP_WEB_BOARD_PAGE),
         _ => None,
     }
+}
+
+/// Look up a template, scaffold or capability, for a product.
+///
+/// The capability half used to be 86 `include_str!` constants and a 40-line
+/// match, sitting next to the directories that already held exactly those
+/// files. It is now read from the capability registry, which `build.rs` derives
+/// from those same directories.
+///
+/// # Why this takes the product's capability list
+///
+/// `firmware/Cargo.toml`, `firmware/rust-toolchain.toml` and
+/// `firmware/shared/src/lib.rs` are installed by **both** firmware
+/// capabilities, with different content. The old match had one arm each,
+/// always resolving to the RP2040 version — so a product with `firmware-stm32`
+/// had `fid doctor` and `fid upgrade` comparing its files against the wrong
+/// board's template. Silent, and wrong in the direction that matters: it
+/// reports drift that is not drift, and would overwrite a correct file on
+/// upgrade.
+///
+/// Resolving against the capabilities the product actually installed removes
+/// the ambiguity in every real case. Where a path is still ambiguous — two
+/// installed capabilities shipping the same path with different content — this
+/// returns `None` rather than guessing, and the caller skips the file. A
+/// comparison against the wrong template is worse than no comparison.
+pub fn raw_for(rel_path: &str, enabled: &[String]) -> Option<&'static str> {
+    if let Some(t) = raw(rel_path) {
+        return Some(t);
+    }
+
+    let mut found: Option<&'static str> = None;
+    for id in enabled {
+        let Some(cap) = crate::capability::find(id) else {
+            continue;
+        };
+        let Some(content) = capability_file(cap, rel_path) else {
+            continue;
+        };
+        match found {
+            Some(existing) if existing != content => return None,
+            _ => found = Some(content),
+        }
+    }
+    found
+}
+
+/// The content a capability installs at `rel_path`, across all three kinds.
+fn capability_file(
+    cap: &'static crate::capability::Capability,
+    rel_path: &str,
+) -> Option<&'static str> {
+    use crate::capability::Declaration;
+
+    cap.declarations
+        .iter()
+        .find_map(|d| match d {
+            Declaration::File(f) if f.path == rel_path => Some(f.content.as_str()),
+            _ => None,
+        })
+        .or_else(|| {
+            cap.pipelines
+                .iter()
+                .chain(cap.templates.iter())
+                .find(|f| f.path == rel_path)
+                .map(|f| f.content.as_str())
+        })
 }
 
 /// Expand `{{name}}` and `{{version}}` placeholders in a raw template.

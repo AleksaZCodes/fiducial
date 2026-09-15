@@ -81,20 +81,6 @@ pub struct Capabilities {
     pub enabled: Vec<String>,
 }
 
-/// Locales a product is born with.
-///
-/// Declared here once, because `fid new --locales` and the `i18n` capability's
-/// seeding both need them and two copies of a default drift the first time one
-/// is changed.
-pub const DEFAULT_LOCALES: &[&str] = &["sr", "en"];
-
-/// The fallback locale a product is born with.
-///
-/// A separate constant, not `DEFAULT_LOCALES[0]`: which language a reader falls
-/// back to is a decision, and taking it from list order is the implicit fact
-/// `I18n::default_locale` refuses to infer.
-pub const DEFAULT_LOCALE: &str = "sr";
-
 /// `[i18n]` — the locales this product ships.
 ///
 /// Declared rather than inferred. `default` is **not** `locales[0]`: which
@@ -103,7 +89,7 @@ pub const DEFAULT_LOCALE: &str = "sr";
 ///
 /// Empty `locales` means the product is not localized. That is a valid state
 /// for a CLI or a firmware image, and `fid new --locales none` asks for it — but
-/// `fid new` seeds [`DEFAULT_LOCALES`] otherwise, because a product that can be
+/// `fid new` seeds the `i18n` capability's own locales otherwise, because a product that can be
 /// built monolingual will be, and principle 1c says monolingual is a state you
 /// pass through before the first commit.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -200,22 +186,6 @@ fn default_rules() -> Vec<String> {
 }
 
 impl Config {
-    /// The smallest valid config, for tests and for seeding probes.
-    #[cfg(test)]
-    pub fn minimal(name: &str) -> Self {
-        Self {
-            product: Product {
-                name: name.to_string(),
-                version: default_version(),
-            },
-            spine: Spine::default(),
-            capabilities: Capabilities::default(),
-            guard: Guard::default(),
-            i18n: I18n::default(),
-            adapters: Adapters::default(),
-        }
-    }
-
     /// Load from a specific path.
     pub fn load(path: &Path) -> Result<Self> {
         let raw =
