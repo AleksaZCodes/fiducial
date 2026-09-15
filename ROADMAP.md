@@ -324,10 +324,16 @@ that reads `grants` and therefore refuses every query it guards
 runs the real thing against a real server — 14 checks, in CI on a
 `postgres:16` service — and reproduces all three when the fixes are reverted.
 
-**Deliberately not done:** it is **not a migrations system** — it generates
-the first table; schema *change* needs ordering, idempotency and drift
-detection against a live database, and that is the next real design question
-here. No Postgres `database` adapter either: `supabase`/`neon`/`postgres`
+**The migrations system shipped 2026-09-15**
+(`docs/specs/2026-09-15-schema-migrations.md`): `fid add migrations` derives an
+ordered manifest from `migrations/NNNN_slug.sql`, and `Migrator` in
+`@fiducial/adapters/migrate` applies it through the `database` contract — so it
+works on D1 today and any future vendor free. Ordering is numeric, the ledger
+makes re-application a no-op, and a migration edited after it was applied stops
+`apply()` entirely rather than compounding a schema nobody has reconciled.
+Tested against real SQLite.
+
+**Deliberately not done:** No Postgres `database` adapter either: `supabase`/`neon`/`postgres`
 resolve the dialect correctly but remain `candidates`, so such a product
 supplies its own `{ query, execute }`. Also no device/service token issuance
 — how a device *proves* it is that device needs its own pass with real

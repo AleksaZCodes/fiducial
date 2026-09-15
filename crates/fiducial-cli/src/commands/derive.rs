@@ -179,10 +179,58 @@ fn outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<String> {
         .collect()
 }
 
+/// Artifacts whose *inputs* moved, found by regenerating and comparing.
+///
+/// `fid derive --check` hashes declared outputs against `fiducial.lock`. That
+/// catches a hand-edited artifact, and misses the opposite: adding
+/// `migrations/0003_x.sql` and forgetting to re-run `fid derive` leaves a
+/// manifest whose file is byte-identical to what the lock recorded, so the
+/// check passes — and the migration silently never runs. That is precisely the
+/// class of failure the migration system exists to prevent, so it cannot be
+/// the one it ships with.
+///
+/// `fid-schema` is a pure function of `migrations/`, so the honest check is to
+/// run it and compare. Only this executor is covered: the others either read
+/// declarations the lock already tracks, or shell out to tools that are not
+/// pure and cannot be re-run for free. Generalizing needs each executor to say
+/// whether it is deterministic, which is a change worth making when a second
+/// one needs it.
+fn outputs_with_moved_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
+    if pipeline.executor != "fid-schema" {
+        return Vec::new();
+    }
+    let Ok(migrations) = crate::schema::discover(root) else {
+        // A migration set that does not validate is reported by `fid derive`
+        // with the reason. Repeating it here as "stale" would be worse
+        // information, not more.
+        return Vec::new();
+    };
+    let expected = crate::schema::render_manifest(&migrations);
+
+    pipeline
+        .outputs
+        .iter()
+        .filter(|out| {
+            Path::new(out.as_str())
+                .extension()
+                .is_some_and(|e| e == "ts")
+                && std::fs::read_to_string(root.join(out.as_str()))
+                    .map(|actual| actual != expected)
+                    .unwrap_or(false)
+        })
+        .cloned()
+        .collect()
+}
+
 fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
     let mut issues: Vec<String> = Vec::new();
 
     for pipeline in pipelines {
+        for out in outputs_with_moved_inputs(pipeline, root) {
+            issues.push(format!(
+                "  {out}: stale — its inputs changed (run `fid derive`)"
+            ));
+        }
         let skip = outputs_not_applicable(pipeline, root);
         for out in &pipeline.outputs {
             if skip.contains(out) {
@@ -879,6 +927,24 @@ fn run_fid_identity(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// `fid-schema` — the ordered migration manifest, from `migrations/*.sql`.
+///
+/// The SQL files are the declaration; this is the derivation that makes them
+/// applicable somewhere with no filesystem. Validation (ordering, unique
+/// numbers, names that are actually migrations) happens in `schema::discover`,
+/// so a set that cannot be applied safely fails here rather than at deploy.
+fn run_fid_schema(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    let migrations = crate::schema::discover(working_dir)?;
+
+    let target = output_with_extension(pipeline, "ts")
+        .ok_or_else(|| anyhow::anyhow!("fid-schema: no `.ts` output declared for the manifest"))?;
+    write_output(
+        working_dir,
+        target,
+        &crate::schema::render_manifest(&migrations),
+    )
+}
+
 /// The pipeline's output with this extension, if it declares one.
 fn output_with_extension<'a>(pipeline: &'a Pipeline, ext: &str) -> Option<&'a str> {
     pipeline
@@ -1299,10 +1365,11 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             "fid-deploy" => return run_fid_deploy(pipeline, working_dir),
             "fid-identity" => return run_fid_identity(pipeline, working_dir),
             "fid-adapters" => return run_fid_adapters(pipeline, working_dir),
+            "fid-schema" => return run_fid_schema(pipeline, working_dir),
             other => bail!(
                 "unknown executor `{other}` \
                  (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n, fid-brand, \
-                 fid-adapters, fid-deploy, fid-identity)"
+                 fid-adapters, fid-deploy, fid-identity, fid-schema)"
             ),
         };
 

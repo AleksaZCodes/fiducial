@@ -121,6 +121,7 @@ product actually needs.
 | `firmware-stm32` | 9 template file(s) | `fid add capability firmware-stm32` |
 | `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
+| `migrations` | declares `migrations`; 1 pipeline(s) | `fid add capability migrations` |
 | `tauri` | 5 template file(s) | `fid add capability tauri` |
 | `web-next` | 8 template file(s) | `fid add capability web-next` |
 | `web-svelte` | 8 template file(s) | `fid add capability web-svelte` |
@@ -166,7 +167,7 @@ checks and the same lock entry as a built-in.
 my-capability/
 ├── SKILL.md              ← the only required file: how an agent uses this
 ├── capability.toml       ← optional: description, guard rules, [config] seed,
-│                           required adapter contracts
+│                           declared directories, required adapter contracts
 ├── declarations/         ← typed facts, installed at the path below this dir
 │   └── messages/en.json
 ├── pipelines/
@@ -195,7 +196,7 @@ its description from the first line of prose in its own skill.
 
 | Kind | Is | Example |
 |---|---|---|
-| **Declaration** | a typed fact, written once, inert | `board/board.interface.json`, the `[i18n]` block |
+| **Declaration** | a typed fact, written once, inert — a file, a `fiducial.toml` block, or a directory the product fills | `board/board.interface.json`, the `[i18n]` block, `migrations/` |
 | **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/eda.toml` |
 | **Adapter** | a swappable vendor behind a fixed contract | `storage = "r2"` |
 | **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
@@ -232,9 +233,9 @@ what the declaration implies.
 
 Executors are `shell` and `cargo-test` — which need no platform change at all —
 plus the in-process ones (`fid-validate`, `fid-mesh`, `fid-i18n`, `fid-brand`,
-`fid-deploy`, `fid-identity`, `fid-adapters`). Reach for `shell` first; a new
-in-process executor is warranted only when the work is genuinely a Rust library
-call rather than a tool invocation.
+`fid-deploy`, `fid-identity`, `fid-adapters`, `fid-schema`). Reach for `shell`
+first; a new in-process executor is warranted only when the work is genuinely a
+Rust library call rather than a tool invocation.
 
 <!-- fid:end-describes -->
 

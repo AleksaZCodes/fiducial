@@ -134,6 +134,20 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
     files.extend(cap.pipelines.iter());
     files.extend(cap.templates.iter());
 
+    // A declared directory is created empty. The product fills it — that is
+    // what makes it a declaration of the product's rather than the
+    // capability's — but leaving it absent means the first `fid derive` reads
+    // a directory that is not there, and the reader has nowhere obvious to put
+    // the first file.
+    for decl in &cap.declarations {
+        if let Declaration::Directory { path } = decl {
+            let abs = root.join(path);
+            std::fs::create_dir_all(&abs)
+                .with_context(|| format!("creating declared directory `{path}`"))?;
+            println!("  wrote  {path}/");
+        }
+    }
+
     for FileEntry { path: rel, content } in files {
         let expanded = content
             .replace("{{name}}", product_name)
@@ -385,6 +399,7 @@ fn content_hash(cap: &Capability) -> String {
     for decl in &cap.declarations {
         match decl {
             Declaration::File(f) => parts.push(format!("decl\u{1f}{}\u{1f}{}", f.path, f.content)),
+            Declaration::Directory { path } => parts.push(format!("decldir\u{1f}{path}")),
             Declaration::ConfigBlock { name, seed } => {
                 let seed_str = seed.as_ref().map(|s| s.to_string()).unwrap_or_default();
                 parts.push(format!("block\u{1f}{name}\u{1f}{seed_str}"))

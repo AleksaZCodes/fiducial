@@ -592,6 +592,13 @@ jobs:
       - name: tsc against the real generated factory
         run: pnpm --filter @fiducial/adapters test:generated
 
+      # The migration runner, against real SQLite — which is what D1 runs.
+      # Ordering, idempotency and drift are properties of what a database ends
+      # up containing, and against a mock all three pass whether or not the
+      # code is right. This is the same argument as verify-postgres.sh.
+      - name: The migration runner, on a real database
+        run: pnpm --filter @fiducial/adapters test
+
   # ── portfolio: workbench v1 ───────────────────────────────────────────────
   #
   # Phase 17. `fid dash --portfolio` aggregates multiple product repos from a

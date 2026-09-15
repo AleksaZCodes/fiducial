@@ -268,7 +268,7 @@ Four kinds, and the difference is not cosmetic — see
 
 | Kind | Is | Example |
 |---|---|---|
-| **Declaration** | a typed fact, written once, inert | `board/board.interface.json`, the `[i18n]` block |
+| **Declaration** | a typed fact, written once, inert — a file, a `fiducial.toml` block, or a directory the product fills | `board/board.interface.json`, the `[i18n]` block, `migrations/` |
 | **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/eda.toml` |
 | **Adapter** | a swappable vendor behind a fixed contract, selected in `[adapters]` | `storage = "none"` |
 | **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
@@ -303,6 +303,7 @@ The capabilities this platform ships:
 | `firmware-stm32` | 9 template file(s) | `fid add capability firmware-stm32` |
 | `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
+| `migrations` | declares `migrations`; 1 pipeline(s) | `fid add capability migrations` |
 | `tauri` | 5 template file(s) | `fid add capability tauri` |
 | `web-next` | 8 template file(s) | `fid add capability web-next` |
 | `web-svelte` | 8 template file(s) | `fid add capability web-svelte` |

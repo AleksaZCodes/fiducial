@@ -13,6 +13,7 @@ mod lock;
 mod migration;
 mod pipeline;
 mod prose;
+mod schema;
 mod templates;
 
 // ── Top-level CLI ────────────────────────────────────────────────────────────

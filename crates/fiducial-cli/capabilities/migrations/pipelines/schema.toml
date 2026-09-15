@@ -1,0 +1,26 @@
+name     = "schema"
+executor = "fid-schema"
+outputs  = ["src/migrations.generated.ts"]
+
+# `migrations/NNNN_slug.sql` in, an ordered manifest out.
+#
+# NOT the same thing as the codemod migrations `fid upgrade` applies to source
+# files. These are SQL, applied to a database.
+#
+# The manifest embeds each migration's SQL and a hash of it, because the runner
+# has no filesystem — a Worker applying migrations at deploy time cannot open
+# `migrations/`. Embedding is also what makes the hash mean anything: it is
+# taken over the text that actually shipped.
+#
+# `fid derive` fails rather than generating a manifest that cannot be applied
+# safely: two files sharing a number have no order, and a `.sql` file not named
+# `NNNN_slug.sql` is a migration that silently never runs.
+#
+# Apply it with the runner in @fiducial/adapters, which goes through the
+# `database` contract and therefore works on D1 today and any future vendor
+# free:
+#
+#   import { Migrator } from "@fiducial/adapters/migrate";
+#   import { migrations, ledgerTable } from "./migrations.generated.js";
+#
+#   const report = await new Migrator(db, migrations, { ledgerTable }).apply();
