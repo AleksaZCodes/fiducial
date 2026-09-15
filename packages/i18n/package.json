@@ -1,6 +1,6 @@
 {
   "name": "@fiducial/i18n",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Localized by construction — typed message keys, locale negotiation, and locale-aware formatting of dates, numbers, plurals and money.",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
