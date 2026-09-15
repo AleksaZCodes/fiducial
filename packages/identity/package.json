@@ -1,0 +1,31 @@
+{
+  "name": "@fiducial/identity",
+  "version": "0.1.0",
+  "description": "One identity model across users, devices and services — mirrors the Rust fiducial-identity crate",
+  "license": "MIT",
+  "author": "Aleksa Zdravkovic",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AleksaZCodes/fiducial.git"
+  },
+  "homepage": "https://github.com/AleksaZCodes/fiducial",
+  "keywords": ["identity", "authorization", "principal", "fiducial", "cross-platform"],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'no linter configured yet'",
+    "test": "node --test src/identity.test.js"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

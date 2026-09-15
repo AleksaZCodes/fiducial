@@ -434,6 +434,33 @@ built because no product has one yet.
 | Clippy (0 warnings), fmt, full Rust suite (all workspace crates), JS build/typecheck/test/lint all green | ✅ |
 | **Deliberately not done, and said so in `ROADMAP.md` and the spec**: an automated CI typecheck of the generated factory (the bug above was caught by hand, not by a new test — a real, recorded gap), Clerk/Auth.js implementations, a Rust-side `SupabaseAuth`, multi-factor auth, magic links, organizations | ✅ |
 
+**Phase 29b — identity at every level, and auth hardened ✅ (2026-09-15)**
+
+> Implements the roadmap item **Identity at every level**, and hardens the
+> roadmap item **Auth** shipped hours earlier in Phase 29 — an audit of that
+> same-day work found two real defects, one of them a security hole. Spec:
+> `docs/specs/2026-09-15-identity-at-every-level.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **Defect 1, security, fixed:** `SupabaseAuth.getSession()` verified *nothing* — it called the SDK's `getSession()`, which reads the session out of storage and checks only `expires_at`. On a server that storage is a **client-supplied cookie**, so a forged one was a valid session with any `user.id` the caller wrote in it. Every path now verifies the access token through `getClaims()` — local JWKS check when the signing key is asymmetric, network `getUser()` fallback otherwise | ✅ |
+| Cookie delivery additionally refuses a session whose **stored user id disagrees with the verified token's subject** — trusting the user object without pinning it to the token it arrived with would re-open the same hole one level down | ✅ |
+| **Defect 2, correctness, fixed:** bearer delivery never worked at all. `BearerKeyValueStore` wrote the raw JWT under `sb-access-token`; `@supabase/auth-js` reads its session from `storageKey` (default `supabase.auth.token`) and expects a **JSON session object**. Every bearer `getSession()` returned `null` — silently, with passing tests, because they asserted the adapter *called* the SDK rather than that the call produced a session | ✅ |
+| `AuthSessionContext` replaces the bare store: `{ storage, bearerToken }`, with `CookieSessionContext` and `BearerSessionContext`. Bearer is now a field the adapter reads, not a value smuggled through a key the SDK never looks at | ✅ |
+| `AuthUser.emailVerified`/`createdAt` and `AuthSession.refreshToken` became nullable — a session verified from a bearer JWT genuinely does not carry them, and `null` ("this delivery model cannot tell you") beats a fabricated `false`/`""` that claims something untrue | ✅ |
+| **`crates/fiducial-identity` (`no_std`)** — one `Principal` spanning `User`, `Device`, `Service`, `Anonymous`, **reusing `fiducial_core::DeviceId`** rather than minting a second device identity. `no_std` so firmware runs the same rule as the edge | ✅ |
+| `can(principal, action, resource, grants)` — the whole authorization rule, one function. Deny by default; `Grant` is the user↔device link that had nowhere to live before; `Role` ordered `Viewer < Member < Admin < Owner` | ✅ |
+| **An unidentified principal is refused** — anonymous, or an all-zero sentinel id. Concretely: a device that has not read its UID out of OTP would otherwise authenticate as "device zero," an identity every unprovisioned device shares | ✅ |
+| **A device may read itself with no grant, but not write itself.** Requiring a grant to read would mean every device needs provisioning before it can send the "I am here, I am unclaimed" message provisioning depends on; allowing the write would let a compromised device rewrite its own configuration and call it self-service | ✅ |
+| `packages/identity` — `@fiducial/identity`, the same rule for the Worker and the app; ids as lowercase hex, `userIdFromUuid()` the single normalizing boundary so one user in two casings is one identity | ✅ |
+| **`docs/identity/vectors.json` — the rule as a conformance artifact.** 2,130 lines, seven scenarios, every principal probed against every action and resource, generated from the Rust crate and replayed by both suites. An authorization divergence does not look like a bug, it looks like access | ✅ |
+| **Both tables verified adversarially**, as the protocol vectors were: letting a device write itself in the TypeScript copy fails 10 of 167 tests; regressing `getSession()` to its unverified form fails 3 adapter tests. Neither table merely passes | ✅ |
+| Bridge kept **structural** — `principalFromSession(session)` / `user_principal(&uuid)` take the id, not the session type, so `@fiducial/identity` depends on nothing and `fiducial-identity` stays `no_std`. An absent or unverified session is `ANONYMOUS`, which `can()` refuses: verification and authorization fail closed together | ✅ |
+| `fiducial-identity` entered the 4-target `no_std` spine matrix **with no CI edit** — that matrix derives its crate list by grepping `#![no_std]`. The Phase 18 derivation paying off | ✅ |
+| New CI job `identity` — the Rust rule, the vectors freshness gate, and the TypeScript conformance replay | ✅ |
+| 19 Rust tests + 2 doctests, 167 TypeScript identity tests, 6 new adapter verification tests; clippy, fmt, full Rust suite and the JS workspace all green | ✅ |
+| **Deliberately not done, and said so in `ROADMAP.md` and the spec**: grant storage (where grants live is a product's decision), device/service token issuance (how a device *proves* it is that device needs its own pass with real cryptographic choices), roles beyond the four, delegation or expiry on grants, and still no automated CI typecheck of the generated factory | ✅ |
+
 **Phase 26 — brand ✅ (2026-09-15)**
 
 > Implements the roadmap item **Brand**: one declaration derives a favicon,

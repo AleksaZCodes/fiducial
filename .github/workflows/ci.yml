@@ -456,6 +456,44 @@ jobs:
       - name: Test @fiducial/realtime
         run: pnpm --filter @fiducial/realtime test
 
+  # ── identity: one authorization rule, two implementations ─────────────────
+  #
+  # `can()` exists in Rust (firmware, desktop, CLI) and in TypeScript (Worker,
+  # app). An authorization rule is the worst place for drift — a divergence
+  # does not look like a bug, it looks like access — so the decision table is
+  # generated from the Rust crate into docs/identity/vectors.json and replayed
+  # by both suites.
+  #
+  # This job runs the generator WITHOUT FIDUCIAL_WRITE_VECTORS, so a rule
+  # change that skipped regeneration fails here rather than reaching main with
+  # the two levels quietly disagreeing. Same mechanism as the protocol vectors.
+  identity:
+    name: identity (one rule, both languages)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        run: rustup toolchain install stable --profile minimal
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Rust — rule, and vectors are fresh
+        run: cargo test -p fiducial-identity
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript — same verdict on every vector
+        run: pnpm --filter @fiducial/identity test
+
   # ── portfolio: workbench v1 ───────────────────────────────────────────────
   #
   # Phase 17. `fid dash --portfolio` aggregates multiple product repos from a

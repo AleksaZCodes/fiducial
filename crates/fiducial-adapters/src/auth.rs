@@ -32,21 +32,29 @@ use thiserror::Error;
 
 use crate::BoxFuture;
 
-/// The signed-in principal.
+/// The signed-in user.
+///
+/// `email_verified` and `created_at` are optional because a session verified
+/// from a bearer JWT alone does not carry them — the claims have a subject
+/// and an email, not a confirmation timestamp. `None` means "this delivery
+/// model cannot tell you," which a caller can act on; a fabricated `false`
+/// would be a claim about the user that is not true.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AuthUser {
     pub id: String,
     pub email: Option<String>,
-    pub email_verified: bool,
-    /// ISO 8601.
-    pub created_at: String,
+    pub email_verified: Option<bool>,
+    /// ISO 8601, or `None` when unknown from this session's material.
+    pub created_at: Option<String>,
 }
 
 /// A live session: the tokens plus the user they belong to.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AuthSession {
     pub access_token: String,
-    pub refresh_token: String,
+    /// `None` under bearer delivery: the client holds its own refresh token
+    /// and the server never sees one.
+    pub refresh_token: Option<String>,
     /// Unix seconds.
     pub expires_at: i64,
     pub user: AuthUser,

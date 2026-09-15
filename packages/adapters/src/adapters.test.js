@@ -24,7 +24,9 @@ import {
   NoneAuth,
   AuthError,
   CookieKeyValueStore,
-  BearerKeyValueStore,
+  CookieSessionContext,
+  BearerSessionContext,
+  MemoryKeyValueStore,
   SupabaseAuth,
   createNoneAdapters,
 } from '../dist/index.js'
@@ -423,23 +425,33 @@ describe('@fiducial/adapters', () => {
     })
   })
 
-  describe('BearerKeyValueStore', () => {
+  describe('BearerSessionContext', () => {
     it('fromAuthorizationHeader extracts the bearer token', () => {
-      const store = BearerKeyValueStore.fromAuthorizationHeader('Bearer abc123')
-      assert.equal(store.getItem('sb-access-token'), 'abc123')
+      const ctx = BearerSessionContext.fromAuthorizationHeader('Bearer abc123')
+      assert.equal(ctx.bearerToken, 'abc123')
     })
 
-    it('fromAuthorizationHeader with no header is empty', () => {
-      const store = BearerKeyValueStore.fromAuthorizationHeader(null)
-      assert.equal(store.getItem('sb-access-token'), null)
+    it('is case-insensitive about the scheme', () => {
+      assert.equal(
+        BearerSessionContext.fromAuthorizationHeader('bearer abc123').bearerToken,
+        'abc123',
+      )
     })
 
-    it('setItem/getItem/removeItem round-trip in memory', () => {
-      const store = new BearerKeyValueStore()
-      store.setItem('k', 'v')
-      assert.equal(store.getItem('k'), 'v')
-      store.removeItem('k')
-      assert.equal(store.getItem('k'), null)
+    it('with no header carries no token', () => {
+      assert.equal(BearerSessionContext.fromAuthorizationHeader(null).bearerToken, null)
+    })
+
+    it('ignores a non-bearer scheme', () => {
+      assert.equal(
+        BearerSessionContext.fromAuthorizationHeader('Basic dXNlcjpwdw==').bearerToken,
+        null,
+      )
+    })
+
+    it('carries an in-memory storage for the SDK scratch use', () => {
+      const ctx = new BearerSessionContext('tok')
+      assert.ok(ctx.storage instanceof MemoryKeyValueStore)
     })
   })
 
@@ -471,6 +483,15 @@ describe('@fiducial/adapters', () => {
           async updateUser() {
             return { error: null }
           },
+          // Verification: the real SDK checks the signature here (locally via
+          // JWKS, or by calling getUser). The fake says "valid, subject is
+          // user-1" unless a test overrides it to reject.
+          async getClaims(jwt) {
+            return {
+              data: { claims: { sub: 'user-1', email: 'a@example.com', exp: 9999999999 } },
+              error: null,
+            }
+          },
           ...overrides,
         },
       }
@@ -498,9 +519,9 @@ describe('@fiducial/adapters', () => {
       return { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_ANON_KEY: 'anon-key' }
     }
 
-    function cookieStore() {
+    function cookieCtx() {
       const jar = new Map()
-      return new CookieKeyValueStore({
+      return new CookieSessionContext({
         get: (n) => jar.get(n),
         set: (n, v) => jar.set(n, v),
         delete: (n) => jar.delete(n),
@@ -508,11 +529,11 @@ describe('@fiducial/adapters', () => {
     }
 
     it('throws when env is missing SUPABASE_URL/SUPABASE_ANON_KEY', () => {
-      assert.throws(() => new SupabaseAuth({}, cookieStore(), fakeSupabaseClient), AuthError)
+      assert.throws(() => new SupabaseAuth({}, cookieCtx(), fakeSupabaseClient), AuthError)
     })
 
     it('signUp maps the returned session', async () => {
-      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      const auth = new SupabaseAuth(env(), cookieCtx(), () => fakeSupabaseClient())
       const session = await auth.signUp('a@example.com', 'pw')
       assert.equal(session.accessToken, 'access-tok')
       assert.equal(session.user.email, 'a@example.com')
@@ -525,12 +546,12 @@ describe('@fiducial/adapters', () => {
           return { data: { session: null, user: fakeUser() }, error: null }
         },
       })
-      const auth = new SupabaseAuth(env(), cookieStore(), () => client)
+      const auth = new SupabaseAuth(env(), cookieCtx(), () => client)
       await assert.rejects(() => auth.signUp('a@example.com', 'pw'), AuthError)
     })
 
     it('signIn maps the returned session', async () => {
-      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      const auth = new SupabaseAuth(env(), cookieCtx(), () => fakeSupabaseClient())
       const session = await auth.signIn('a@example.com', 'pw')
       assert.equal(session.refreshToken, 'refresh-tok')
     })
@@ -544,7 +565,7 @@ describe('@fiducial/adapters', () => {
           }
         },
       })
-      const auth = new SupabaseAuth(env(), cookieStore(), () => client)
+      const auth = new SupabaseAuth(env(), cookieCtx(), () => client)
       await assert.rejects(() => auth.signIn('a@example.com', 'wrong'), (err) => {
         assert.ok(err instanceof AuthError)
         assert.match(err.message, /invalid credentials/)
@@ -561,12 +582,12 @@ describe('@fiducial/adapters', () => {
           }
         },
       })
-      const auth = new SupabaseAuth(env(), cookieStore(), () => client)
+      const auth = new SupabaseAuth(env(), cookieCtx(), () => client)
       await assert.rejects(() => auth.signIn('a@example.com', 'pw'), /rate limited/)
     })
 
     it('signInWithOAuth returns the redirect URL under a cookie store', async () => {
-      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      const auth = new SupabaseAuth(env(), cookieCtx(), () => fakeSupabaseClient())
       const { url } = await auth.signInWithOAuth('google', 'https://app.example/callback')
       assert.equal(url, 'https://provider.example/authorize')
     })
@@ -574,7 +595,7 @@ describe('@fiducial/adapters', () => {
     it('signInWithOAuth throws under a bearer store', async () => {
       const auth = new SupabaseAuth(
         env(),
-        new BearerKeyValueStore(),
+        new BearerSessionContext(),
         () => fakeSupabaseClient(),
       )
       await assert.rejects(
@@ -584,7 +605,7 @@ describe('@fiducial/adapters', () => {
     })
 
     it('exchangeCodeForSession maps the session under a cookie store', async () => {
-      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      const auth = new SupabaseAuth(env(), cookieCtx(), () => fakeSupabaseClient())
       const session = await auth.exchangeCodeForSession('code-123')
       assert.equal(session.accessToken, 'access-tok')
     })
@@ -592,14 +613,14 @@ describe('@fiducial/adapters', () => {
     it('exchangeCodeForSession throws under a bearer store', async () => {
       const auth = new SupabaseAuth(
         env(),
-        new BearerKeyValueStore(),
+        new BearerSessionContext(),
         () => fakeSupabaseClient(),
       )
       await assert.rejects(() => auth.exchangeCodeForSession('code-123'), AuthError)
     })
 
     it('signOut calls through and resolves', async () => {
-      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      const auth = new SupabaseAuth(env(), cookieCtx(), () => fakeSupabaseClient())
       await auth.signOut()
     })
 
@@ -609,23 +630,117 @@ describe('@fiducial/adapters', () => {
           return { data: { session: null }, error: null }
         },
       })
-      const auth = new SupabaseAuth(env(), cookieStore(), () => client)
+      const auth = new SupabaseAuth(env(), cookieCtx(), () => client)
       assert.equal(await auth.getSession(), null)
     })
 
     it('getSession maps a present session', async () => {
-      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      const auth = new SupabaseAuth(env(), cookieCtx(), () => fakeSupabaseClient())
       const session = await auth.getSession()
       assert.equal(session.user.id, 'user-1')
     })
 
+    // ── Verification ─────────────────────────────────────────────────────
+    // The SDK's own getSession() reads the session out of storage and checks
+    // only expires_at. On a server, storage is a *client-supplied cookie* —
+    // so without these, a forged cookie is a valid session with any user id
+    // the caller likes.
+
+    it('getSession refuses a session whose token does not verify', async () => {
+      const client = fakeSupabaseClient({
+        // A forged cookie: well-formed session, signature does not check out.
+        async getClaims() {
+          return { data: null, error: { message: 'invalid JWT signature' } }
+        },
+      })
+      const auth = new SupabaseAuth(env(), cookieCtx(), () => client)
+      assert.equal(
+        await auth.getSession(),
+        null,
+        'an unverified token must never become a session',
+      )
+    })
+
+    it('getSession refuses a cookie whose stored user is not the token subject', async () => {
+      const client = fakeSupabaseClient({
+        // Valid token for user-1, but the cookie claims to be somebody else.
+        async getClaims() {
+          return { data: { claims: { sub: 'user-1', exp: 9999999999 } }, error: null }
+        },
+        async getSession() {
+          const s = fakeSession()
+          s.user = { ...fakeUser(), id: 'somebody-else' }
+          return { data: { session: s }, error: null }
+        },
+      })
+      const auth = new SupabaseAuth(env(), cookieCtx(), () => client)
+      assert.equal(await auth.getSession(), null)
+    })
+
+    it('bearer delivery verifies the supplied token and builds a session from its claims', async () => {
+      const client = fakeSupabaseClient({
+        // Nothing is in storage under bearer delivery — if the adapter asked
+        // the SDK for a stored session it would get null, which is exactly
+        // the bug this path used to have.
+        async getSession() {
+          return { data: { session: null }, error: null }
+        },
+      })
+      const auth = new SupabaseAuth(
+        env(),
+        BearerSessionContext.fromAuthorizationHeader('Bearer forged-or-not'),
+        () => client,
+      )
+      const session = await auth.getSession()
+      assert.ok(session, 'a verified bearer token yields a session')
+      assert.equal(session.user.id, 'user-1')
+      assert.equal(session.accessToken, 'forged-or-not')
+      assert.equal(
+        session.refreshToken,
+        null,
+        'the server never sees a bearer client’s refresh token',
+      )
+      assert.equal(
+        session.user.emailVerified,
+        null,
+        'a JWT does not carry confirmation state; null says so rather than guessing',
+      )
+    })
+
+    it('bearer delivery refuses a token that does not verify', async () => {
+      const client = fakeSupabaseClient({
+        async getClaims() {
+          return { data: null, error: { message: 'invalid JWT signature' } }
+        },
+      })
+      const auth = new SupabaseAuth(
+        env(),
+        BearerSessionContext.fromAuthorizationHeader('Bearer nope'),
+        () => client,
+      )
+      assert.equal(await auth.getSession(), null)
+    })
+
+    it('bearer delivery with no token is signed out', async () => {
+      const auth = new SupabaseAuth(
+        env(),
+        BearerSessionContext.fromAuthorizationHeader(null),
+        () => fakeSupabaseClient({
+          async getSession() {
+            return { data: { session: null }, error: null }
+          },
+        }),
+      )
+      assert.equal(await auth.getSession(), null)
+    })
+
     it('resetPasswordForEmail calls through', async () => {
-      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      const auth = new SupabaseAuth(env(), cookieCtx(), () => fakeSupabaseClient())
       await auth.resetPasswordForEmail('a@example.com', 'https://app.example/reset')
     })
 
     it('updatePassword calls through', async () => {
-      const auth = new SupabaseAuth(env(), cookieStore(), () => fakeSupabaseClient())
+      const auth = new SupabaseAuth(env(), cookieCtx(), () => fakeSupabaseClient())
       await auth.updatePassword('new-password')
     })
 
@@ -635,7 +750,7 @@ describe('@fiducial/adapters', () => {
           return { error: { message: 'network blip' } }
         },
       })
-      const auth = new SupabaseAuth(env(), cookieStore(), () => client)
+      const auth = new SupabaseAuth(env(), cookieCtx(), () => client)
       await assert.rejects(() => auth.signOut(), /network blip/)
     })
   })

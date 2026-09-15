@@ -1,0 +1,30 @@
+[package]
+name        = "fiducial-identity"
+description = "no_std identity spine: one Principal across users, devices and services."
+version.workspace     = true
+edition.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+homepage.workspace    = true
+authors.workspace     = true
+rust-version.workspace = true
+keywords    = ["no-std", "identity", "authorization", "embedded", "fiducial"]
+categories  = ["no-std", "embedded", "authentication"]
+
+[lib]
+name = "fiducial_identity"
+
+# ── Features ────────────────────────────────────────────────────────────────
+# `no_std` by default so firmware can decide "is this command from my owner?"
+# offline, with the same rule the Worker applies. `std` is opt-in for the host.
+
+[features]
+default = []
+alloc   = []
+std     = ["alloc"]
+
+[dependencies]
+fiducial-core = { path = "../fiducial-core" }
+
+[dev-dependencies]
+serde_json = { workspace = true }

@@ -568,7 +568,7 @@ const ADAPTER_SLOTS: &[(&str, &str)] = &[
 /// (e.g. `d1`), the factory imports `D1Database` instead — no callers change.
 ///
 /// `auth` is **not** one of `ADAPTER_SLOTS` and does not join `AdapterSet` —
-/// it gets a second, separate `createAuth(env, store)` export in the same
+/// it gets a second, separate `createAuth(env, ctx)` export in the same
 /// file instead. Every other contract's vendor is env-scoped (a binding or an
 /// API key lives on `env` for the life of the Worker); a real `Auth`
 /// implementation is request-scoped, needing a session store bound to that
@@ -604,7 +604,7 @@ fn run_fid_adapters(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
          {}\n\
          {auth_import}\n\
          import type {{ AdapterSet }} from \"@fiducial/adapters\";\n\
-         import type {{ Auth, AuthKeyValueStore }} from \"@fiducial/adapters/auth\";\n\
+         import type {{ Auth, AuthSessionContext }} from \"@fiducial/adapters/auth\";\n\
          \n\
          // eslint-disable-next-line @typescript-eslint/no-explicit-any\n\
          export function createAdapters(env?: any): AdapterSet {{\n\
@@ -616,10 +616,10 @@ fn run_fid_adapters(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
          // `auth` is request-scoped (a session store, not just `env`) — see\n\
          // this file's own generator doc comment in derive.rs for why it is\n\
          // not part of AdapterSet/createAdapters above. Construct one\n\
-         // createAuth(env, store) call per request.\n\
+         // createAuth(env, ctx) call per request.\n\
          // eslint-disable-next-line @typescript-eslint/no-explicit-any\n\
-         export function createAuth(env: any, store: AuthKeyValueStore): Auth {{\n\
-         \u{20}\u{20}return new {auth_class}(env, store);\n\
+         export function createAuth(env: any, ctx: AuthSessionContext): Auth {{\n\
+         \u{20}\u{20}return new {auth_class}(env, ctx);\n\
          }}\n",
         imports.join("\n"),
         fields.join("\n"),

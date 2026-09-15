@@ -196,7 +196,7 @@ fn selecting_supabase_auth_derives_the_real_class() {
     // createAuth is a separate, request-scoped factory — auth never joins
     // AdapterSet/createAdapters.
     assert!(
-        factory.contains("export function createAuth(env: any, store: AuthKeyValueStore)"),
+        factory.contains("export function createAuth(env: any, ctx: AuthSessionContext)"),
         "{factory}"
     );
 }

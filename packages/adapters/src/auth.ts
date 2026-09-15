@@ -9,19 +9,31 @@
  * sign-out, password reset, and reading the current session.
  */
 
-/** The signed-in principal. */
+/**
+ * The signed-in user.
+ *
+ * `emailVerified` and `createdAt` are nullable because a session verified
+ * from a bearer JWT alone genuinely does not carry them — the claims have a
+ * subject and an email, not a confirmation timestamp. `null` there means
+ * "this delivery model cannot tell you," which a caller can act on; a
+ * fabricated `false`/`""` would be a claim about the user that is not true.
+ */
 export interface AuthUser {
   id: string;
   email: string | null;
-  emailVerified: boolean;
-  /** ISO 8601. */
-  createdAt: string;
+  emailVerified: boolean | null;
+  /** ISO 8601, or `null` when unknown from this session's material. */
+  createdAt: string | null;
 }
 
 /** A live session: the tokens plus the user they belong to. */
 export interface AuthSession {
   accessToken: string;
-  refreshToken: string;
+  /**
+   * `null` under bearer delivery: the client holds its own refresh token and
+   * the server never sees one.
+   */
+  refreshToken: string | null;
   /** Unix seconds. */
   expiresAt: number;
   user: AuthUser;
@@ -87,12 +99,12 @@ const NOT_CONFIGURED = 'auth = "none" — no auth vendor configured';
  * that always works."
  */
 export class NoneAuth implements Auth {
-  // Accepts and ignores `env` and `store` so `createAuth(env, store)` can
+  // Accepts and ignores `env` and `ctx` so `createAuth(env, ctx)` can
   // construct any vendor class uniformly — see the generated factory in
   // `fid-adapters`'s `derive.rs` executor.
   constructor(
     _env?: unknown,
-    _store?: AuthKeyValueStore,
+    _ctx?: AuthSessionContext,
   ) {}
 
   async signUp(): Promise<AuthSession> {
@@ -184,32 +196,12 @@ export class CookieKeyValueStore implements AuthKeyValueStore {
 }
 
 /**
- * In-memory store for bearer/native delivery (Tauri, a future mobile
- * client): the server does not persist anything between requests — the
- * calling client owns the session and sends its access token back itself.
- *
- * **Does not support the OAuth redirect flow.** PKCE state needs to survive
- * between the redirect-out request and the callback request; without a
- * cookie there is nowhere server-side to keep it, and this store's lifetime
- * is one request. `SupabaseAuth.signInWithOAuth`/`exchangeCodeForSession`
- * throw a clear `AuthError` under this store rather than silently losing
- * the verifier. A native client performs OAuth directly against Supabase
- * itself instead — see `Auth.signInWithOAuth`'s doc comment.
+ * In-memory store — the SDK's scratch space when nothing should persist
+ * between requests. Used by `BearerSessionContext`, where the calling client
+ * owns the session and re-sends its access token itself.
  */
-export class BearerKeyValueStore implements AuthKeyValueStore {
+export class MemoryKeyValueStore implements AuthKeyValueStore {
   private readonly data = new Map<string, string>();
-
-  /** Seed the store with an incoming `Authorization: Bearer <token>` value. */
-  static fromAuthorizationHeader(header: string | null): BearerKeyValueStore {
-    const store = new BearerKeyValueStore();
-    const token = header?.match(/^Bearer\s+(.+)$/i)?.[1];
-    if (token) {
-      // Matches the key `@supabase/supabase-js` itself uses for the access
-      // token half of a session under its default storage key prefix.
-      store.data.set("sb-access-token", token);
-    }
-    return store;
-  }
 
   getItem(key: string): string | null {
     return this.data.get(key) ?? null;
@@ -221,6 +213,81 @@ export class BearerKeyValueStore implements AuthKeyValueStore {
 
   removeItem(key: string): void {
     this.data.delete(key);
+  }
+}
+
+// ── Session context: how this request carries its session ────────────────────
+
+/**
+ * How one request carries its session — the second argument to
+ * `createAuth(env, ctx)`.
+ *
+ * Two things, because the two delivery models genuinely need two different
+ * things and an earlier design that tried to express both as "a key/value
+ * store" shipped broken: bearer delivery had its token written under a key
+ * the SDK never reads (`sb-access-token`, where the SDK reads a JSON session
+ * from its own `storageKey`), so `getSession()` silently returned null for
+ * every bearer request. Naming the token separately is what makes the bearer
+ * path exist at all.
+ */
+export interface AuthSessionContext {
+  /** Where the vendor SDK persists session and PKCE state. */
+  readonly storage: AuthKeyValueStore;
+  /**
+   * The access token this request supplied directly, for bearer delivery.
+   * `null`/absent means the session lives in `storage` instead (cookies).
+   */
+  readonly bearerToken?: string | null;
+}
+
+/**
+ * Cookie-delivered sessions — server-rendered apps (web-next, web-svelte).
+ *
+ * Supports the full OAuth redirect flow: the PKCE verifier written during
+ * `signInWithOAuth` survives to the callback request because it is in a
+ * cookie.
+ */
+export class CookieSessionContext implements AuthSessionContext {
+  readonly storage: AuthKeyValueStore;
+
+  constructor(
+    cookies: {
+      get(name: string): string | undefined;
+      set(name: string, value: string, options?: Record<string, unknown>): void;
+      delete(name: string): void;
+    },
+    cookieOptions?: Record<string, unknown>,
+  ) {
+    this.storage = new CookieKeyValueStore(cookies, cookieOptions);
+  }
+}
+
+/**
+ * Bearer-delivered sessions — a Tauri desktop app, a future mobile client,
+ * or any API caller that holds its own token and sends it per request.
+ *
+ * Nothing persists server-side: `storage` is in-memory for the SDK's own
+ * scratch use, and the session itself is whatever `bearerToken` verifies to.
+ *
+ * **Does not support the OAuth redirect flow.** PKCE state must survive
+ * between the redirect-out request and the callback request, and without a
+ * cookie there is nowhere server-side to keep it. `signInWithOAuth` and
+ * `exchangeCodeForSession` throw a clear `AuthError` under this context
+ * rather than silently losing the verifier. A native client performs OAuth
+ * directly against the vendor and sends the resulting access token here
+ * afterward — this server's job there is verification, not orchestrating a
+ * redirect it has no page to render.
+ */
+export class BearerSessionContext implements AuthSessionContext {
+  readonly storage: AuthKeyValueStore = new MemoryKeyValueStore();
+
+  constructor(readonly bearerToken: string | null = null) {}
+
+  /** Build from an incoming `Authorization: Bearer <token>` header value. */
+  static fromAuthorizationHeader(header: string | null): BearerSessionContext {
+    return new BearerSessionContext(
+      header?.match(/^Bearer\s+(.+)$/i)?.[1] ?? null,
+    );
   }
 }
 
@@ -253,6 +320,26 @@ interface SupabaseAuthClient {
   updateUser(attrs: {
     password: string;
   }): Promise<{ error: SupabaseAuthApiError | null }>;
+  /**
+   * Verifies a JWT and returns its claims — locally against the project's
+   * JWKS when the signing key is asymmetric and WebCrypto is available,
+   * falling back to a network `getUser()` validation otherwise. Either way
+   * the signature is checked, which is the whole reason `getSession` below
+   * is never trusted on its own.
+   */
+  getClaims(jwt?: string): Promise<{
+    data: { claims: SupabaseJwtClaims } | null;
+    error: SupabaseAuthApiError | null;
+  }>;
+}
+
+/** The subset of Supabase's JWT claims this adapter reads. */
+interface SupabaseJwtClaims {
+  sub: string;
+  email?: string;
+  exp?: number;
+  role?: string;
+  is_anonymous?: boolean;
 }
 
 interface SupabaseClientLike {
@@ -322,7 +409,7 @@ export type SupabaseClientFactory = (
   url: string,
   anonKey: string,
   store: AuthKeyValueStore,
-) => SupabaseClientLike;
+) => SupabaseClientLike | Promise<SupabaseClientLike>;
 
 async function defaultClientFactory(
   url: string,
@@ -344,39 +431,54 @@ async function defaultClientFactory(
 /**
  * Supabase Auth — real `Auth` implementation over `@supabase/supabase-js`.
  *
- * Session and PKCE-verifier persistence go through the injected
+ * Session and PKCE-verifier persistence go through the session context's
  * `AuthKeyValueStore` (`storage` in the client's own `auth` options) rather
  * than the SDK's default `localStorage`/`AsyncStorage`, which do not exist
  * in a Worker or a Next.js server action. This is the SDK's own documented
  * extension point, not a workaround.
  *
- * Construct one `SupabaseAuth` **per request**, with a store scoped to that
- * request (`CookieKeyValueStore` wrapping that request's cookie jar, or
- * `BearerKeyValueStore.fromAuthorizationHeader` for that request's header) —
- * the same reason a fresh `createServerClient` is constructed per request in
- * `@supabase/ssr`'s own documented pattern. This is why `auth` is not part
- * of `AdapterSet`/`createAdapters(env)`: every other slot there is
- * env-scoped, and this one is request-scoped.
+ * Construct one `SupabaseAuth` **per request**, with a context scoped to that
+ * request (`new CookieSessionContext(cookieJar)`, or
+ * `BearerSessionContext.fromAuthorizationHeader(header)`) — the same reason a
+ * fresh `createServerClient` is constructed per request in `@supabase/ssr`'s
+ * own documented pattern. This is why `auth` is not part of
+ * `AdapterSet`/`createAdapters(env)`: every other slot there is env-scoped,
+ * and this one is request-scoped.
+ *
+ * ## Every session this returns has had its signature verified
+ *
+ * `getSession()` never trusts the SDK's own `getSession()` on its own. That
+ * call reads the session out of storage and checks only `expires_at` — on a
+ * server, storage is a *client-supplied cookie*, so a forged cookie would
+ * otherwise yield a "valid" session with any `user.id` the caller liked.
+ * Every path here runs the access token through `getClaims()`, which
+ * verifies the signature locally against the project's JWKS when the signing
+ * key is asymmetric, and falls back to a network `getUser()` validation
+ * otherwise.
  */
 export class SupabaseAuth implements Auth {
   private readonly clientPromise: Promise<SupabaseClientLike>;
+  private readonly ctx: AuthSessionContext;
 
   constructor(
     env: { SUPABASE_URL?: string; SUPABASE_ANON_KEY?: string },
-    private readonly store: AuthKeyValueStore,
-    clientFactory: (
-      url: string,
-      anonKey: string,
-      store: AuthKeyValueStore,
-    ) => SupabaseClientLike | Promise<SupabaseClientLike> = defaultClientFactory,
+    ctx: AuthSessionContext,
+    clientFactory: SupabaseClientFactory = defaultClientFactory,
   ) {
     if (!env?.SUPABASE_URL || !env?.SUPABASE_ANON_KEY) {
       throw new AuthError(
         "SupabaseAuth: env needs SUPABASE_URL and SUPABASE_ANON_KEY",
       );
     }
+    if (!ctx?.storage) {
+      throw new AuthError(
+        "SupabaseAuth: needs an AuthSessionContext — CookieSessionContext for " +
+          "server-rendered apps, BearerSessionContext for a token-bearing client",
+      );
+    }
+    this.ctx = ctx;
     this.clientPromise = Promise.resolve(
-      clientFactory(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, store),
+      clientFactory(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, ctx.storage),
     );
   }
 
@@ -406,16 +508,21 @@ export class SupabaseAuth implements Auth {
     return toAuthSession(data.session);
   }
 
+  /** OAuth needs somewhere to keep PKCE state across the redirect. */
+  private requireRedirectCapableContext(method: string): void {
+    if (this.ctx.bearerToken != null || !(this.ctx instanceof CookieSessionContext)) {
+      throw new AuthError(
+        `${method} needs a cookie-backed session context to persist PKCE ` +
+          "state across the redirect — see BearerSessionContext's doc comment",
+      );
+    }
+  }
+
   async signInWithOAuth(
     provider: string,
     redirectTo: string,
   ): Promise<{ url: string }> {
-    if (this.store instanceof BearerKeyValueStore) {
-      throw new AuthError(
-        "signInWithOAuth needs a cookie-backed store to persist PKCE state " +
-          "across the redirect — see BearerKeyValueStore's doc comment",
-      );
-    }
+    this.requireRedirectCapableContext("signInWithOAuth");
     const { data, error } = await (
       await this.client()
     ).signInWithOAuth({ provider, options: { redirectTo } });
@@ -427,12 +534,7 @@ export class SupabaseAuth implements Auth {
   }
 
   async exchangeCodeForSession(code: string): Promise<AuthSession> {
-    if (this.store instanceof BearerKeyValueStore) {
-      throw new AuthError(
-        "exchangeCodeForSession needs a cookie-backed store to read the " +
-          "PKCE verifier saved by signInWithOAuth — see BearerKeyValueStore's doc comment",
-      );
-    }
+    this.requireRedirectCapableContext("exchangeCodeForSession");
     const { data, error } = await (await this.client()).exchangeCodeForSession(code);
     throwIfError(error);
     if (!data.session) {
@@ -446,10 +548,58 @@ export class SupabaseAuth implements Auth {
     throwIfError(error);
   }
 
+  /**
+   * The current session, **signature-verified**, or `null`.
+   *
+   * Bearer delivery verifies the token the request supplied. Cookie delivery
+   * reads the stored session for its access token and user, then verifies
+   * that token before returning anything — see this class's doc comment for
+   * why the SDK's own `getSession()` is never trusted alone.
+   */
   async getSession(): Promise<AuthSession | null> {
-    const { data, error } = await (await this.client()).getSession();
+    const client = await this.client();
+
+    if (this.ctx.bearerToken != null) {
+      const claims = await this.verifiedClaims(client, this.ctx.bearerToken);
+      if (!claims) return null;
+      return {
+        accessToken: this.ctx.bearerToken,
+        // A bearer client holds its own refresh token; the server never sees
+        // one, and inventing an empty string here would read as "there is a
+        // refresh token and it is blank."
+        refreshToken: null,
+        expiresAt: claims.exp ?? 0,
+        user: {
+          id: claims.sub,
+          email: claims.email ?? null,
+          // Not carried in the JWT: a caller that needs confirmation state
+          // reads the user record, rather than this claiming to know.
+          emailVerified: null,
+          createdAt: null,
+        },
+      };
+    }
+
+    const { data, error } = await client.getSession();
     throwIfError(error);
-    return data.session ? toAuthSession(data.session) : null;
+    if (!data.session) return null;
+
+    const claims = await this.verifiedClaims(client, data.session.access_token);
+    if (!claims) return null;
+    // The stored user is only trusted once the token carrying it verified,
+    // and only when the token's subject is the user the cookie claims.
+    if (claims.sub !== data.session.user.id) return null;
+    return toAuthSession(data.session);
+  }
+
+  /** Verified claims for `token`, or `null` when it does not verify. */
+  private async verifiedClaims(
+    client: SupabaseAuthClient,
+    token: string,
+  ): Promise<SupabaseJwtClaims | null> {
+    const { data, error } = await client.getClaims(token);
+    if (error || !data?.claims?.sub) return null;
+    return data.claims;
   }
 
   async resetPasswordForEmail(email: string, redirectTo: string): Promise<void> {

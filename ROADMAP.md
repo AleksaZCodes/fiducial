@@ -250,6 +250,46 @@ because nothing had ever run `tsc` against a generated
 `adapters.generated.ts`. Fixed; **not** turned into an automated CI check
 this round (a real gap, recorded in the spec rather than silently closed).
 
+**Hardened immediately afterward**, and two further defects in the same
+day's work found and fixed — `getSession()` verified nothing, and bearer
+delivery never worked at all. See **Identity at every level** below; spec:
+`docs/specs/2026-09-15-identity-at-every-level.md`.
+
+### Identity at every level — *multiplying* ✅
+
+Auth answers *who*. This answers *may they* — and does it once, for users,
+devices and services alike. Spec:
+`docs/specs/2026-09-15-identity-at-every-level.md`.
+
+`crates/fiducial-identity` (`no_std`) defines one `Principal` spanning
+`User`, `Device`, `Service` and `Anonymous`, **reusing
+`fiducial_core::DeviceId`** rather than minting a second device identity.
+`can(principal, action, resource, grants)` is the whole authorization rule,
+in a crate firmware can run — so a device deciding "is this command from my
+owner?" offline reaches the same verdict as the Worker deciding it at the
+edge. `Grant` is the user↔device link that had nowhere to live before.
+
+**The rule is a conformance artifact, not two implementations trusted to
+agree.** `can()` also exists in TypeScript (`@fiducial/identity`) for the
+Worker and the app; an authorization divergence does not look like a bug, it
+looks like access. So the decision table is generated from the Rust crate
+into `docs/identity/vectors.json` and replayed by both suites, with CI
+running the generator without the write flag — the same mechanism
+`docs/protocol/vectors.json` uses for the wire format. Verified
+adversarially: changing one rule in the TypeScript copy fails 10 tests.
+
+**Also hardened `auth` in the same pass**, after an audit found two real
+defects in it shipped hours earlier: `getSession()` verified no signature at
+all (a forged cookie was a valid session with any user id), and bearer
+delivery silently never worked (its token was written under a storage key
+the SDK never reads). Both fixed and pinned by tests that fail if either
+regresses.
+
+**Deliberately not done:** no grant storage (where grants live is a
+product's decision), and no device/service token issuance — how a device
+*proves* it is that device needs its own pass with real cryptographic
+choices.
+
 ### AI — *terminal, product-critical* ⬜
 
 "Some way to run AI on the edge or connect to an internet API" — named

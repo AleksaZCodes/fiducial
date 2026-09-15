@@ -157,6 +157,36 @@ const session = await auth.getSession();
 
 See `docs/specs/2026-09-15-auth-contract.md` for the full design record.
 
+### Every session this returns is signature-verified
+
+`getSession()` never trusts the vendor SDK's own `getSession()` alone. That
+call reads the session out of storage and checks only `expires_at` — and on
+a server, storage is a *client-supplied cookie*, so a forged one would
+otherwise be a valid session with any `user.id` the caller liked. Every path
+runs the access token through `getClaims()`, which verifies the signature
+locally against the project's JWKS when the signing key is asymmetric, and
+falls back to a network `getUser()` validation otherwise. A cookie whose
+stored user disagrees with the verified token's subject is refused too.
+
+### Auth answers *who*; identity answers *may they*
+
+The session stops at "this is user X." What X is allowed to do lives in
+`@fiducial/identity` — one rule shared with the Rust `fiducial-identity`
+crate that firmware, the desktop backend and the CLI run:
+
+```ts
+import { can, principalFromSession } from "@fiducial/identity";
+
+const who = principalFromSession(await auth.getSession());
+if (!can(who, "write", { kind: "device", id: deviceId }, grants)) {
+  return new Response("forbidden", { status: 403 });
+}
+```
+
+An unverified or absent session becomes `ANONYMOUS`, which `can()` refuses
+outright — so the verification above and the authorization here fail closed
+together.
+
 ## The contracts
 
 Each contract is defined twice, in lock-step, for the **contract and the

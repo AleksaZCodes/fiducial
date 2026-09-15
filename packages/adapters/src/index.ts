@@ -40,11 +40,19 @@ export { CloudflareQueue, NoneQueue, QueueError } from "./queue.js";
 // implementation is request-scoped (it needs a session store bound to the
 // current request's cookies or Authorization header). `createAuth(env, store)`
 // is a separate factory `fid derive` generates alongside `createAdapters(env)`.
-export type { Auth, AuthKeyValueStore, AuthSession, AuthUser } from "./auth.js";
+export type {
+  Auth,
+  AuthKeyValueStore,
+  AuthSession,
+  AuthSessionContext,
+  AuthUser,
+} from "./auth.js";
 export {
   AuthError,
-  BearerKeyValueStore,
+  BearerSessionContext,
   CookieKeyValueStore,
+  CookieSessionContext,
+  MemoryKeyValueStore,
   NoneAuth,
   SupabaseAuth,
 } from "./auth.js";
