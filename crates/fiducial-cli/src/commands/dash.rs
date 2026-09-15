@@ -153,6 +153,14 @@ struct RoadmapView {
     /// Lines marked in-progress, which is what someone opening a dashboard
     /// wants to see first.
     active: Vec<String>,
+    /// The first to-do item in file order, when nothing is in progress.
+    ///
+    /// **Derived, never written down.** The order of work and the markers
+    /// already say what comes next; a sentence saying it again is a second
+    /// declaration, and it is the copy that goes stale. One lived in
+    /// `SHIPPED.md` — put back by the same commit whose spec said it had been
+    /// removed — and it had to be hand-edited every time a phase shipped.
+    next: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -378,9 +386,12 @@ fn tidy_roadmap_line(line: &str) -> String {
     /// sentence. The task-list forms are multi-character, so they are removed
     /// before the single characters.
     const DROP_STRS: &[&str] = &["- [ ]", "- [x]", "- [X]"];
-    const DROP_CHARS: &[char] = &['|', '🟡', '🚧'];
+    const DROP_CHARS: &[char] = &['|', '🟡', '🚧', '⬜', '✅', '⏸', '*', '`'];
 
-    let mut cleaned = line.to_string();
+    // A roadmap item may be a heading rather than a table row — the platform's
+    // own items are `### 4 · Context sync …`. Leaving the hashes in prints
+    // markdown at someone who asked for a status line.
+    let mut cleaned = line.trim_start().trim_start_matches('#').trim().to_string();
     for pat in DROP_STRS {
         cleaned = cleaned.replace(pat, " ");
     }
@@ -416,6 +427,7 @@ fn roadmap_view(root: &Path) -> RoadmapView {
             in_progress: 0,
             todo: 0,
             active: Vec::new(),
+            next: None,
         };
     };
     let Ok(text) = std::fs::read_to_string(&path) else {
@@ -425,16 +437,22 @@ fn roadmap_view(root: &Path) -> RoadmapView {
             in_progress: 0,
             todo: 0,
             active: Vec::new(),
+            next: None,
         };
     };
 
     let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
     let mut active = Vec::new();
+    let mut next: Option<String> = None;
     for line in text.lines() {
         if let Some(status) = roadmap_status(line) {
             *counts.entry(status).or_insert(0) += 1;
-            if status == "in_progress" {
-                active.push(tidy_roadmap_line(line));
+            match status {
+                "in_progress" => active.push(tidy_roadmap_line(line)),
+                // First in file order, because the file is ordered — that is
+                // what "order of work" means.
+                "todo" if next.is_none() => next = Some(tidy_roadmap_line(line)),
+                _ => {}
             }
         }
     }
@@ -444,6 +462,9 @@ fn roadmap_view(root: &Path) -> RoadmapView {
         done: counts.get("done").copied().unwrap_or(0),
         in_progress: counts.get("in_progress").copied().unwrap_or(0),
         todo: counts.get("todo").copied().unwrap_or(0),
+        // What is in progress beats what is next: a dashboard answers "what am
+        // I doing" before "what would I do".
+        next: if active.is_empty() { next } else { None },
         active,
     }
 }
@@ -1039,6 +1060,9 @@ impl Dash {
                     );
                     for line in &self.roadmap.active {
                         println!("  → {line}");
+                    }
+                    if let Some(next) = &self.roadmap.next {
+                        field("next", next);
                     }
                 }
             }

@@ -9,13 +9,13 @@ numbering is unchanged._
 
 ---
 
-## Current phase: between phases — next is context sync
-
-_Roadmap items 1–3 are complete. The debt that grew with every phase — each new
-capability compiled into the binary — has stopped accruing: a capability is a
-directory now, and shipping one does not require releasing the CLI._
-
-> Build order beyond this phase: [`ROADMAP.md`](ROADMAP.md).
+> **This file looks backwards only.** What is next is in
+> [`ROADMAP.md`](ROADMAP.md), which holds the order of work and the ⬜ 🟡 ✅
+> markers; `fid dash` derives the next item from them. A "current phase" line
+> lived here until 2026-09-15 — reinstated by the very commit whose spec said it
+> had been removed "precisely so it would hold only the record" — and it was
+> wrong twice over: it duplicated the roadmap, and "between phases" was a state
+> the numbering cannot express, because a phase does not exist until work ships.
 
 **Phase 0 — complete ✅ (2026-09-06)**
 
