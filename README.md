@@ -117,15 +117,16 @@ product actually needs.
 | `brand` | declares `brand`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability brand` |
 | `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
-| `firmware-rp2040` | 10 template file(s) | `fid add capability firmware-rp2040` |
-| `firmware-stm32` | 9 template file(s) | `fid add capability firmware-stm32` |
+| `firmware-rp2040` | 10 template file(s); guard rules | `fid add capability firmware-rp2040` |
+| `firmware-stm32` | 9 template file(s); guard rules | `fid add capability firmware-stm32` |
 | `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
 | `migrations` | declares `migrations`; 1 pipeline(s) | `fid add capability migrations` |
-| `tauri` | 5 template file(s) | `fid add capability tauri` |
-| `web-next` | 8 template file(s) | `fid add capability web-next` |
-| `web-svelte` | 8 template file(s) | `fid add capability web-svelte` |
-| `worker-cloudflare` | 1 template file(s) | `fid add capability worker-cloudflare` |
+| `realtime` | a skill | `fid add capability realtime` |
+| `tauri` | 5 template file(s); guard rules | `fid add capability tauri` |
+| `web-next` | 8 template file(s); guard rules | `fid add capability web-next` |
+| `web-svelte` | 8 template file(s); guard rules | `fid add capability web-svelte` |
+| `worker-cloudflare` | 1 template file(s); guard rules | `fid add capability worker-cloudflare` |
 <!-- fid:end capabilities -->
 
 <!-- fid:describes crates/fiducial-cli/src/adapter.rs#pub static CONTRACTS -->
@@ -144,7 +145,8 @@ selectable name with nothing behind it is a promise the platform does not keep.
 | `database` | Relational storage: queries, migrations, transactions | `none`, `d1` | `supabase`, `neon`, `postgres` |
 | `storage` | Object storage: put, get, signed URLs | `none`, `r2` | `s3`, `supabase-storage` |
 | `deploy` | Where the product ships and how a release is promoted | `none`, `cloudflare` | `vercel`, `fly` |
-| `email` | Transactional email: send, template, verify a domain | `none` | `resend`, `ses`, `cloudflare-email` |
+| `email` | Transactional email: send, template, verify a domain | `none`, `resend` | `ses`, `cloudflare-email` |
+| `newsletter` | Subscriber list management: subscribe, unsubscribe, status | `none`, `resend` | — |
 | `errors` | Error tracking and diagnostics | `none` | `sentry`, `workers-analytics` |
 | `botProtection` | Bot / abuse challenge verification | `none`, `turnstile` | `recaptcha`, `hcaptcha` |
 | `queue` | Asynchronous job/message queue (producer side) | `none`, `cloudflare-queues` | `sqs` |
