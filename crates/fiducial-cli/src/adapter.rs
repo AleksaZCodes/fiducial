@@ -113,6 +113,12 @@ pub static CONTRACTS: &[Contract] = &[
         candidates: &["sqs"],
     },
     Contract {
+        name: "ai",
+        description: "Language-model calls: chat, streaming, tool use",
+        implementations: &[NONE, "openrouter"],
+        candidates: &["workers-ai", "anthropic", "openai"],
+    },
+    Contract {
         name: "auth",
         description: "Users and authentication: sign-up, sign-in, sessions",
         implementations: &[NONE, "supabase"],

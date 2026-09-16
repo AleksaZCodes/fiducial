@@ -192,9 +192,13 @@ fn every_contract_is_listed_whether_selected_or_not() {
 
     let d = dash(&root);
     let adapters = d["taxonomy"]["adapters"].as_array().unwrap();
+    // A literal, not `CONTRACTS.len()` — this crate has no lib target, so the
+    // test reaches the registry through the binary. Bumping it is the point:
+    // adding a contract has to be acknowledged here, the same tripwire
+    // `REAL_VENDORS` is for vendors in the generated-factory suite.
     assert_eq!(
         adapters.len(),
-        9,
+        10,
         "every contract is a fact about the product"
     );
     for a in adapters {

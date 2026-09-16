@@ -37,9 +37,61 @@ pub struct Config {
     /// `[identity]` — where this product keeps its permission rows.
     #[serde(default, skip_serializing_if = "Identity::is_empty")]
     pub identity: Identity,
+    /// `[ai]` — the model this product talks to, and how it identifies itself.
+    #[serde(default, skip_serializing_if = "Ai::is_empty")]
+    pub ai: Ai,
     /// `[freshness]` — gates other than `fid derive --check`.
     #[serde(default, skip_serializing_if = "Freshness::is_empty")]
     pub freshness: Freshness,
+}
+
+/// `[ai]` — what an AI gateway needs that nothing can derive.
+///
+/// The contract targets a gateway rather than a model vendor, so the vendor
+/// axis (`[adapters] ai`) and the *model* axis are different facts: switching
+/// from Claude to GPT is a one-line change here and no adapter change at all.
+/// That is the whole point of the gateway decision, and it only holds if the
+/// model is a declaration.
+///
+/// So it is declared once here and derived into the generated factory, where
+/// `fid derive --check` gates it like every other derived fact. A per-call
+/// `request.model` still wins — an agent that classifies with a small model
+/// and answers with a large one is a normal agent, and forcing it to build a
+/// second adapter would make this declaration a lie rather than a default.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct Ai {
+    /// Gateway model id, e.g. `anthropic/claude-opus-5`.
+    ///
+    /// Deliberately **not defaulted**. Any default the platform picked would
+    /// be a vendor choice made on the product's behalf, and would age into a
+    /// model that no longer exists — silently, since a gateway reports an
+    /// unknown model at the first call rather than at deploy.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub model: String,
+}
+
+impl Ai {
+    /// True when the product declares no AI facts at all.
+    pub fn is_empty(&self) -> bool {
+        self.model.is_empty()
+    }
+
+    /// The facts the selected vendor needs, named when missing.
+    ///
+    /// `ai = "none"` needs nothing: `NoneAi` fails at the call site with its
+    /// own message, and demanding a model from a product that has not chosen a
+    /// vendor would make the no-op cost something — which is the one thing
+    /// `none` exists not to do.
+    pub fn validate(&self, adapters: &Adapters) -> Result<()> {
+        if adapters.get("ai") == Some("openrouter") && self.model.is_empty() {
+            bail!(
+                "[ai] model is missing, and `[adapters] ai = \"openrouter\"` \
+                 needs one — a gateway routes by model id. Declare one (e.g. \
+                 model = \"anthropic/claude-opus-5\")."
+            );
+        }
+        Ok(())
+    }
 }
 
 /// `[freshness]` — how this repository stops a stale artifact reaching `main`.

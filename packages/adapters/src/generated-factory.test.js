@@ -70,6 +70,7 @@ const REAL_VENDORS = {
   queue: 'cloudflare-queues',
   newsletter: 'resend',
   auth: 'supabase',
+  ai: 'openrouter',
   // `errors` has no real vendor yet — `none` is a real implementation, so it
   // belongs in the typechecked set rather than omitted.
   errors: 'none',
@@ -99,7 +100,11 @@ function productWith(vendors) {
     .map(([contract, vendor]) => `${contract} = "${vendor}"`)
     .join('\n')
   const config = join(root, 'fiducial.toml')
-  writeFileSync(config, `${readFileSync(config, 'utf8')}\n[adapters]\n${block}\n`)
+  // `ai = "openrouter"` needs a model: a gateway routes by model id, so derive
+  // refuses without one. That refusal is tested in adapters_pipeline.rs; here
+  // the point is to compile the factory it produces.
+  const ai = vendors.ai === 'openrouter' ? '\n[ai]\nmodel = "anthropic/claude-opus-5"\n' : ''
+  writeFileSync(config, `${readFileSync(config, 'utf8')}\n[adapters]\n${block}\n${ai}`)
 
   execFileSync(fid, ['derive'], { cwd: root, stdio: 'ignore' })
 
@@ -166,7 +171,7 @@ describe('the generated adapter factory compiles', () => {
   it('constructs every contract, so the typecheck actually covered them', () => {
     // A factory that emitted nothing would typecheck trivially.
     const factory = readFileSync(join(allReal, 'src/adapters.generated.ts'), 'utf8')
-    for (const contract of ['database', 'storage', 'email', 'diagnostics', 'botProtection', 'queue', 'newsletter']) {
+    for (const contract of ['database', 'storage', 'email', 'diagnostics', 'botProtection', 'queue', 'newsletter', 'ai']) {
       assert.match(factory, new RegExp(`${contract}:\\s*new `), `${contract} is not constructed`)
     }
     assert.match(factory, /export function createAuth\(/)

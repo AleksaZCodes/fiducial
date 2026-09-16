@@ -279,3 +279,115 @@ fn doctor_still_rejects_an_unimplemented_candidate() {
         text(&out)
     );
 }
+
+// ── AI ────────────────────────────────────────────────────────────────────────
+
+/// Append an `[ai]` block declaring the model.
+fn set_ai_model(root: &Path, model: &str) {
+    let path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(&path, format!("{config}\n[ai]\nmodel = \"{model}\"\n")).unwrap();
+}
+
+#[test]
+fn selecting_openrouter_derives_the_real_class() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "ai", "openrouter");
+    set_ai_model(&root, "anthropic/claude-opus-5");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("OpenRouterAi"), "{factory}");
+    assert!(factory.contains("@fiducial/adapters/ai"), "{factory}");
+}
+
+/// The whole point of declaring the model: it reaches the generated factory,
+/// so `fid derive --check` gates it like every other derived fact. A model
+/// that lived only in a vendor dashboard or a hand-set env var would not be
+/// gated by anything.
+#[test]
+fn the_declared_model_reaches_the_factory() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "ai", "openrouter");
+    set_ai_model(&root, "anthropic/claude-opus-5");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(
+        factory.contains("ai: new OpenRouterAi(env, \"anthropic/claude-opus-5\"),"),
+        "{factory}"
+    );
+}
+
+/// Changing only the model restages the factory, so a stale one fails
+/// `--check`. This is the property that makes `[ai] model` a declaration
+/// rather than documentation.
+#[test]
+fn changing_only_the_model_makes_the_factory_stale() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "ai", "openrouter");
+    set_ai_model(&root, "anthropic/claude-opus-5");
+    assert!(run(&root, &["derive"]).status.success());
+    assert!(run(&root, &["derive", "--check"]).status.success());
+
+    let path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        config.replace("anthropic/claude-opus-5", "openai/gpt-5"),
+    )
+    .unwrap();
+
+    let out = run(&root, &["derive", "--check"]);
+    assert!(!out.status.success(), "{}", text(&out));
+}
+
+/// A gateway routes by model id, so `openrouter` without one is a
+/// configuration that cannot work. It fails at derive, naming the missing key
+/// — not at the first completion in production.
+#[test]
+fn openrouter_without_a_model_fails_derive_and_names_the_key() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "ai", "openrouter");
+
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success(), "{}", text(&out));
+    let msg = text(&out);
+    assert!(msg.contains("[ai] model"), "{msg}");
+}
+
+/// `none` demands nothing. Requiring a model from a product that has not
+/// chosen a vendor would make the no-op cost something, which is the one
+/// thing `none` exists not to do.
+#[test]
+fn ai_none_needs_no_model() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("ai: new NoneAi(env),"), "{factory}");
+}
+
+/// The same hole, on the axis that existed before `[ai]` did.
+///
+/// `--check` hashes outputs against the lock, so changing a *vendor* and
+/// forgetting to re-run derive left a byte-identical file and a passing check
+/// — shipping a Worker that still constructs `NoneDatabase`. Regression test
+/// for the generalized input check, not for AI.
+#[test]
+fn changing_only_a_vendor_makes_the_factory_stale() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    assert!(run(&root, &["derive", "--check"]).status.success());
+
+    set_adapter(&root, "database", "d1");
+
+    let out = run(&root, &["derive", "--check"]);
+    assert!(!out.status.success(), "{}", text(&out));
+    assert!(text(&out).contains("inputs changed"), "{}", text(&out));
+}
