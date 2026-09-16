@@ -85,8 +85,14 @@ pub static CONTRACTS: &[Contract] = &[
     Contract {
         name: "email",
         description: "Transactional email: send, template, verify a domain",
-        implementations: &[NONE],
-        candidates: &["resend", "ses", "cloudflare-email"],
+        implementations: &[NONE, "resend"],
+        candidates: &["ses", "cloudflare-email"],
+    },
+    Contract {
+        name: "newsletter",
+        description: "Subscriber list management: subscribe, unsubscribe, status",
+        implementations: &[NONE, "resend"],
+        candidates: &[],
     },
     Contract {
         name: "errors",
@@ -235,5 +241,20 @@ mod tests {
     #[test]
     fn a_working_selection_has_no_problem() {
         assert!(problem("errors", NONE).is_none());
+    }
+
+    #[test]
+    fn email_resend_is_selectable() {
+        assert!(problem("email", "resend").is_none());
+    }
+
+    #[test]
+    fn newsletter_none_is_selectable() {
+        assert!(problem("newsletter", NONE).is_none());
+    }
+
+    #[test]
+    fn newsletter_resend_is_selectable() {
+        assert!(problem("newsletter", "resend").is_none());
     }
 }

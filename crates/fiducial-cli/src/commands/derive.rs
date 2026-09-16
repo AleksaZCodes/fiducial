@@ -762,14 +762,29 @@ fn run_fid_deploy(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     // Secrets are named, never written. `wrangler secret put` is the only
     // place a secret's value belongs; a generated file in the repository is
     // the one place it must never be.
+    //
+    // RESEND_API_KEY is required by both `email = "resend"` and
+    // `newsletter = "resend"`, so we collect into a Vec and deduplicate
+    // (preserving first-occurrence order) before rendering — otherwise a
+    // product selecting both would emit the line twice.
     let mut secrets: Vec<&str> = Vec::new();
     if config.adapters.get("botProtection") == Some("turnstile") {
         secrets.push("TURNSTILE_SECRET_KEY");
+    }
+    if config.adapters.get("email") == Some("resend") {
+        secrets.push("RESEND_API_KEY");
+    }
+    if config.adapters.get("newsletter") == Some("resend") {
+        secrets.push("RESEND_API_KEY");
+        secrets.push("RESEND_AUDIENCE_ID");
     }
     if config.adapters.get("auth") == Some("supabase") {
         secrets.push("SUPABASE_URL");
         secrets.push("SUPABASE_ANON_KEY");
     }
+    // Deduplicate while preserving first-occurrence order.
+    let mut seen = std::collections::HashSet::new();
+    secrets.retain(|s| seen.insert(*s));
     if !secrets.is_empty() {
         out.push_str("\n# Secrets this product's adapters read. Set each with:\n");
         for s in &secrets {
@@ -1346,6 +1361,7 @@ const ADAPTER_SLOTS: &[(&str, &str)] = &[
     ("errors", "diagnostics"),
     ("botProtection", "botProtection"),
     ("queue", "queue"),
+    ("newsletter", "newsletter"),
 ];
 
 /// Generate adapter factory code from `[adapters]` in `fiducial.toml`.
@@ -1455,6 +1471,7 @@ fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
         "errors" => ("NoneDiagnostics", "@fiducial/adapters/diagnostics"),
         "botProtection" => ("NoneBotProtection", "@fiducial/adapters/bot-protection"),
         "queue" => ("NoneQueue", "@fiducial/adapters/queue"),
+        "newsletter" => ("NoneNewsletter", "@fiducial/adapters/newsletter"),
         "auth" => ("NoneAuth", "@fiducial/adapters/auth"),
         _ => ("NoneDatabase", "@fiducial/adapters"),
     };
@@ -1466,8 +1483,10 @@ fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
     let real = match (contract, vendor) {
         ("database", "d1") => Some(("D1Database", "@fiducial/adapters/database")),
         ("storage", "r2") => Some(("R2Storage", "@fiducial/adapters/storage")),
+        ("email", "resend") => Some(("ResendEmail", "@fiducial/adapters/email")),
         ("botProtection", "turnstile") => Some(("Turnstile", "@fiducial/adapters/bot-protection")),
         ("queue", "cloudflare-queues") => Some(("CloudflareQueue", "@fiducial/adapters/queue")),
+        ("newsletter", "resend") => Some(("ResendNewsletter", "@fiducial/adapters/newsletter")),
         ("auth", "supabase") => Some(("SupabaseAuth", "@fiducial/adapters/auth")),
         _ => None,
     };
