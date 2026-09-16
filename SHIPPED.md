@@ -17,6 +17,25 @@ numbering is unchanged._
 > wrong twice over: it duplicated the roadmap, and "between phases" was a state
 > the numbering cannot express, because a phase does not exist until work ships.
 
+**`fid dash` counts prose as items — fixed ✅ (2026-09-16)**
+
+> **On demand item.** `roadmap_status` treated any line carrying a marker as a roadmap item.
+> Three fixes removed known false positives (multi-marker lines, blockquotes) while leaving
+> the underlying premise — "an item is any line with a marker" — intact. The third instance
+> (marked paragraphs nested inside items) was structural. Fixed by inverting the premise:
+> a marker is counted only where an item can be *declared* — a heading, a table row, or a
+> task list entry. Everything else is body text. Spec: this file and `ROADMAP.md` §`fid dash counts prose as items`.
+
+| Deliverable | Status |
+| --- | --- |
+| `declares_an_item(line)` helper — recognises headings (`#`…), table rows (`\|`…), and `- [ ]`/`- [x]` task list entries; rejects everything else | ✅ |
+| `roadmap_status` now gates on `declares_an_item` before checking markers — prose paragraphs, blockquotes and numbered sub-findings are body text regardless of what markers they contain | ✅ |
+| Two new tests: `a_marked_paragraph_inside_an_item_is_not_a_new_item`, `a_numbered_sub_finding_is_not_a_roadmap_item` | ✅ |
+| Real repo count corrects from **29 done of 37** to **21 of 29** (the item itself now ✅) | ✅ |
+| `fid dash --section roadmap` on the real `ROADMAP.md` reports **Supabase, fully** as `next` — the correct answer | ✅ |
+
+---
+
 **Phase 0 — complete ✅ (2026-09-06)**
 
 | Deliverable | Status |

@@ -710,6 +710,59 @@ fn two_markers_meaning_the_same_thing_are_still_one_item() {
     assert_eq!(dash(&root)["roadmap"]["done"], 1);
 }
 
+/// A done-marked paragraph nested inside a roadmap item is body text, not a
+/// new item. Fiducial's own ROADMAP.md had nine such paragraphs — each a
+/// `**Fixed 2026-09-16…**` sentence — making `fid dash` report 29 done of 37
+/// when the truth was 20 of 28.
+///
+/// The structural fix is to count a marker only where an item can be
+/// *declared*: a heading, a table row, or a task list entry. A bare prose line,
+/// however many markers it names, is body text.
+#[test]
+fn a_marked_paragraph_inside_an_item_is_not_a_new_item() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    write(
+        &root,
+        "ROADMAP.md",
+        "# Roadmap\n\n\
+         ### Release pipeline ✅\n\n\
+         **Fixed 2026-09-15.** The tag step was gated on a broken signal ✅\n\
+         **Fixed 2026-09-16.** crates.io rate-limit was not waited out ✅\n\
+         \n\
+         ### Supabase, fully ⬜\n",
+    );
+
+    let d = dash(&root);
+    // The two `**Fixed…**` paragraphs are body text; the two headings are items.
+    assert_eq!(d["roadmap"]["done"], 1, "only the ✅ heading counts");
+    assert_eq!(d["roadmap"]["todo"], 1, "only the ⬜ heading counts");
+    assert_eq!(d["roadmap"]["next"], "Supabase, fully");
+}
+
+/// A numbered sub-finding inside an item is also body text.
+/// `1. **Fixed …** ✅` is a prose paragraph that happens to be in a list.
+/// Ordered list items are not roadmap declaration sites.
+#[test]
+fn a_numbered_sub_finding_is_not_a_roadmap_item() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    write(
+        &root,
+        "ROADMAP.md",
+        "# Roadmap\n\n\
+         ### Pipeline item ✅\n\n\
+         1. First failure ✅\n\
+         2. Second failure ✅\n\
+         \n\
+         ### Next item ⬜\n",
+    );
+
+    let d = dash(&root);
+    assert_eq!(d["roadmap"]["done"], 1, "only the ✅ heading counts");
+    assert_eq!(d["roadmap"]["todo"], 1, "only the ⬜ heading counts");
+}
+
 #[test]
 fn a_commented_out_freshness_check_does_not_count_as_one() {
     // The inversion that mattered most: dash's most useful finding is "no

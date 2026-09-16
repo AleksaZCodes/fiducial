@@ -361,21 +361,82 @@ fn git_view(root: &Path) -> GitView {
     }
 }
 
+/// Whether a line is a place a roadmap item can be **declared**.
+///
+/// Three forms, and nothing else: a markdown heading, a table row, or a task
+/// list entry. Everything else in a roadmap file — paragraphs, blockquotes,
+/// legends, numbered prose — is body text, and a marker written there is
+/// describing an item rather than declaring one.
+///
+/// # Why this is a structural rule rather than another guard
+///
+/// The premise until 2026-09-16 was "an item is any line carrying a marker",
+/// and it failed three times, each fix removing one kind of false positive
+/// while leaving the premise intact:
+///
+/// 1. A legend line (`✅ done · 🟡 in progress · ⬜ not started`) scored as one
+///    finished item. Fixed by rejecting lines carrying several distinct
+///    markers.
+/// 2. A blockquote reminding authors that every item carries a marker scored as
+///    a to-do — and surfaced as `next` the moment nothing was in progress to
+///    outrank it. Fixed by rejecting blockquotes.
+/// 3. A done-marked `**Fixed …**` paragraph nested *inside* an item. Fiducial's
+///    own roadmap had nine, which made `fid dash` report 29 done of 37 when the
+///    truth was 20 of 28.
+///
+/// The wrong percentage was the cosmetic half. The half that bites is `next`:
+/// all nine sub-findings happened to be done, so `next` was right by luck, and
+/// one sub-finding written as not-started would have been reported to every
+/// agent as the next thing to build — `AGENTS.md` sends them all here.
+///
+/// So the premise is inverted instead of guarded again. The rule a person can
+/// hold is: **put a marker in a heading, a table row or a task list entry;
+/// write whatever you like in the body.** It costs the ability to mark a bare
+/// prose line as an item, which is the thing that was never wanted.
+fn declares_an_item(line: &str) -> bool {
+    let t = line.trim_start();
+
+    // A blockquote is commentary *about* the roadmap. Checked before the forms
+    // below because a quoted proposal can contain a task list, and quoting
+    // someone else's checklist does not add items to ours.
+    if t.starts_with('>') {
+        return false;
+    }
+
+    // A heading: `#` repeated, then whitespace. `#hashtag` is not a heading.
+    let after_hashes = t.trim_start_matches('#');
+    if after_hashes.len() < t.len() && after_hashes.starts_with(char::is_whitespace) {
+        return true;
+    }
+
+    // A table row. The `---|---` separator carries no marker, so it needs no
+    // special case.
+    if t.starts_with('|') {
+        return true;
+    }
+
+    // A task list entry: `-`, `*` or `+`, then a checkbox. The marker may be
+    // the checkbox itself or an emoji later in the row.
+    if let Some(rest) = t
+        .strip_prefix("- ")
+        .or_else(|| t.strip_prefix("* "))
+        .or_else(|| t.strip_prefix("+ "))
+    {
+        let rest = rest.trim_start();
+        return rest.starts_with("[ ]") || rest.starts_with("[x]") || rest.starts_with("[X]");
+    }
+
+    false
+}
+
 /// Classify a roadmap line by the status marker it carries.
 ///
 /// Recognises both the emoji table markers this project uses and GitHub task
-/// list syntax, because a product's roadmap is its own to format. A line with no
-/// marker is not a roadmap item and is ignored — which is what keeps prose from
-/// being counted.
+/// list syntax, because a product's roadmap is its own to format. A line that
+/// does not *declare* an item — see [`declares_an_item`] — is body text, and
+/// its markers are ignored however they are written.
 fn roadmap_status(line: &str) -> Option<&'static str> {
-    // A blockquote is commentary *about* the roadmap, not an item in it. The
-    // multi-marker guard below already caught the legend; it did not catch a
-    // sentence carrying one marker, and this file opens with
-    // "Every ⬜ item below now carries a …" — counted as a to-do item, and
-    // reported as `next` the moment nothing was in progress to outrank it.
-    // `fid dash` is what AGENTS.md points every agent at to learn what comes
-    // next, so it pointed them at a sentence about the format.
-    if line.trim_start().starts_with('>') {
+    if !declares_an_item(line) {
         return None;
     }
 
@@ -383,9 +444,10 @@ fn roadmap_status(line: &str) -> Option<&'static str> {
     let in_progress = line.contains('🟡') || line.contains('🚧');
     let todo = line.contains("- [ ]") || line.contains('⬜') || line.contains('⏸');
 
-    // A line carrying more than one *distinct* status is a legend or a sentence
-    // about the roadmap, not an item in it. Counting `Legend: ✅ done · 🟡 in
-    // progress · ⬜ not started` as one finished item is the kind of quietly
+    // A declaration site carrying more than one *distinct* status is a legend
+    // written as a table row, not an item. The structural rule above catches a
+    // legend written as a sentence; this catches one written in the table it
+    // documents. Counting either as a finished item is the kind of quietly
     // wrong number a dashboard must not produce.
     //
     // Two markers meaning the same thing — `- [x]` and `✅` on one row — are
