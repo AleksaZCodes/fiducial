@@ -5,6 +5,18 @@
 > once, so no part of it has to be re-derived from memory or a chat log.
 >
 > `SHIPPED.md` records what is *built*. This records what is *intended*, and why.
+> **Picking this up cold** (a new session, a cloud agent, another vendor's
+> agent): read [`AGENTS.md`](AGENTS.md) first, then run
+> `fid dash --section roadmap`. It derives what to work on from the order and
+> the markers in this file — which is why there is no sentence here naming it.
+>
+> Every ⬜ item below now carries a **"Where it lands"** paragraph naming the
+> files and functions it touches, what is already built that it can reuse, and
+> the decisions that must be made *before* code rather than discovered during
+> it. Those paragraphs are the handoff. Where something is genuinely unresolved
+> they say "resolve first" and say what to check — treat those as blocking, not
+> as caveats.
+>
 > `fid dash` reads the ⬜ 🟡 ✅ markers below — so **every item carries one**. An
 > unmarked item is invisible to the dashboard, which then reports the roadmap as
 > finished; that is exactly what happened to items 4–9 until 2026-09-15.
@@ -475,6 +487,58 @@ different shapes), so a first attempt is the likeliest of all these items to
 need a redesign. No product has a concrete AI feature yet to generalize the
 contract from.
 
+### Supabase, fully — *terminal, product-critical* ⬜
+
+**Requested directly:** *"I also need supabase to be fully supported,
+including database, storage, auth and all those nice things."*
+
+**What already exists**, so this is smaller than it looks:
+
+| Piece | State |
+|---|---|
+| `auth = "supabase"` | ✅ shipped — `SupabaseAuth`, full flows, cookie **and** bearer sessions |
+| Postgres SQL dialect + RLS policy generation | ✅ shipped for identity grants — `docs/specs/2026-09-15-postgres-dialect-and-rls.md` |
+| `scripts/verify-postgres.sh` | ✅ applies the derivation to a real PostgreSQL server in CI |
+| `@fiducial/realtime` + the `realtime` capability | ✅ Broadcast, Presence, Postgres Changes |
+| `database = "supabase"` | ⬜ listed in `candidates`, nothing behind it |
+| `storage = "supabase-storage"` | ⬜ listed in `candidates`, nothing behind it |
+
+So the remaining work is **two adapters**, and the hard parts of both —
+Postgres dialect, RLS, a verified migration path — were already built for
+identity.
+
+**The seam is the same one `d1`/`r2`/`resend` used**, and it is four edits:
+move the vendor from `candidates` to `implementations` in
+`adapter::CONTRACTS`; add a `vendor_ts_class_and_path` arm in
+`commands/derive.rs`; write the class in `packages/adapters/src/`; add its
+secrets to the `run_fid_deploy` list. `docs/specs/2026-09-16-resend-and-the-newsletter-contract.md`
+§4 tabulates the whole seam, and `resend` is the closest worked example
+because it is secret-reached rather than binding-reached, as Supabase is.
+
+**Decide before writing `SupabaseDatabase`:** the `Database` contract is
+`execute` / `query` / `queryOne` / `batch` with positional `SqlValue[]`
+params. `supabase-js` is PostgREST, not SQL — it has `.from().select()`, not
+`query("SELECT …")`. The two honest routes are the `rpc()` escape hatch onto
+a SQL function, or a direct Postgres connection (`postgres.js` / Hyperdrive),
+which is **not** what `auth = "supabase"` already talks to. Picking the
+second means a product selecting Supabase for both contracts holds two
+different connections to the same project, which is fine but should be a
+decision on the record rather than a discovery.
+
+**`batch` is where the contract will strain.** It promises atomicity, and
+PostgREST has no transaction spanning multiple requests. Whatever route is
+chosen has to satisfy it or the contract is being quietly weakened for one
+vendor — which is the failure the adapter module doc calls "lock-in wearing a
+portability costume."
+
+**`supabase-storage` is the easier of the two** and should probably go first:
+its API is much closer to `Storage`'s `put`/`get`/signed-URL shape, and R2
+is a worked precedent for the same contract.
+
+**Also decide:** whether `neon` and `postgres` fall out of `SupabaseDatabase`
+nearly free if the direct-connection route is taken. If they do, say so
+rather than shipping three near-identical classes.
+
 ### Legal & compliance — *terminal* ⬜
 
 Depends on **i18n** (legal text is long-form localized copy) and **brand** (it is
@@ -487,6 +551,33 @@ earlier, it gets built twice.
 taxonomy and external capabilities to exist first, or there is nothing to extract
 *into*.
 
+**Where it lands.** `crates/fiducial-cli/src/commands/` has `add`,
+`capability`, `derive`, `harvest`, `new`, `upgrade` and the rest; there is no
+`extract`. The inverse operation already exists in two halves worth reading
+first: `capability::builtins()` derives a manifest *from* a directory, and
+`fid capability check` rejects a directory whose layout contradicts its
+manifest. Extraction is the same derivation run backwards against a product.
+
+**The hard part is not the file copying, it is the generalizing.** A
+capability lifted verbatim from one product carries that product's
+assumptions — the exact failure `docs/guides/harvesting.md` exists to
+prevent, and the reason `harvest/` is a staging area that is never the
+product. `extract` should stage, not install, and should **name what it could
+not generalize**: hardcoded product names, absolute paths, a `fiducial.toml`
+key it read that no declaration provides.
+
+**It mechanizes the second-use rule**, so the natural check is the rule
+itself: refuse, or at least warn, when the thing being extracted has exactly
+one consumer. `MISSION.md` anti-goal 2 says a capability is generalized when
+a *second* product needs it, and a command that makes extraction one keystroke
+makes speculative extraction one keystroke too.
+
+**Validate it on something real.** The `realtime` capability and the
+open-source bootstrap files are both plausible first subjects — the second
+especially, since the **Open-source bootstrap** item below is explicitly
+waiting on "the command that produces these for any repository," and Fiducial
+now has the files to generalize from.
+
 ### On demand ⬜
 
 None of these block a product; each is added when wanted, through the system
@@ -497,14 +588,14 @@ step 3 delivers.
 | **Claude Design bridge** | Registry source → design-system previews as a derivation. **Resolve first:** `DesignSync` references a `/design-sync` skill for this round trip; if it already exists, this is a thin adapter, not a pipeline |
 | **Fast path** | Matters once there is production to hotfix |
 | **Interactive seeding** | The cherry on top — `fid new` asks, or seeds brand and registry from a Claude Design project |
-| **Research & authoring** | Papers, references, DOIs, templated documents |
+| **Research & authoring** | Papers, references, DOIs, templated documents — see below |
 | **Demo & showcase** | Interactive landing-page demo, Storybook, feature toggles |
 | **Diagnostics** | Error tracking as an adapter with a no-op default |
 | **Small tools** | Backlinks, browser-compat banners |
-| **Framework currency** | Capability templates must track current majors — Next.js 16, SvelteKit, Tauri. Pinned versions in a scaffold rot silently and a product starts a major behind |
+| **Framework currency** | Capability templates must track current majors — Next.js 16, SvelteKit, Tauri. Pinned versions in a scaffold rot silently and a product starts a major behind — see below |
 | **Agent portability** | Skills and guard wiring are Claude-Code-only; author once, generate per vendor — see below |
-| **Rust release versioning** | Changesets drives npm; the thirteen crates move in lockstep at 0.1.0 with nothing driving a bump |
-| **Tagged releases + Zenodo DOI** | No release exists, so there is nothing to archive or cite |
+| **Rust release versioning** | Changesets drives npm; the fifteen crates move in lockstep at 0.1.0 with nothing driving a bump — and only *one* of them is published at all. See below |
+| **Tagged releases + Zenodo DOI** | No release exists, so there is nothing to archive or cite. Opt-in for child repos too — see below |
 | **Claude chat plugin** | The making philosophy, as a skill for claude.ai — see below |
 | ~~**`fid dash` freshness detection**~~ ✅ | Shipped 2026-09-15. Dash equated "gated" with "a workflow runs `fid derive --check`" and reported this repository as ungated while nine gates ran on every commit. `[freshness] gates` declares the others — which command gates an artifact is a judgment, not something to pattern-match — and a gate declared but run by nothing is now reported too |
 
@@ -719,6 +810,40 @@ system.
 
 ---
 
+**Where it lands.** Both dependencies are shipped: `i18n` (a missing
+translation already fails `fid derive --check`) and `brand` (the declared
+entity this copy is *about*). Nothing blocks this now.
+
+**It is a capability, and most of it is a pipeline.** `[legal]` declares the
+jurisdiction, the entity (from `[brand]`), the contact addresses and the
+cookie categories in use; the pipeline derives the pages into localized
+message files so they go through the i18n machinery rather than beside it.
+Legal text is long-form localized copy — that is the whole reason this item
+waited for i18n instead of growing its own string handling.
+
+**It inherits the newsletter's deferred work.** Double opt-in and the consent
+record were explicitly pushed here from
+`docs/specs/2026-09-16-resend-and-the-newsletter-contract.md`, to avoid
+building them twice. A consent record needs somewhere to live, which makes
+this the first capability to need **both** a `database` adapter and a
+`migrations` declaration — check that assumption early, because "generate a
+migration only if the product selected a database" is a shape no existing
+capability has.
+
+**The hard boundary, and it is the point of the item:** *GDPR compliance is a
+legal state, not a code state. No tool grants it.* What ships generated is
+the consent record, cookie categories, data export, account deletion, and the
+privacy/terms/cookie/imprint/accessibility pages. What ships as a **reviewed
+checklist with reasoning** is every decision a human must actually make. A
+generator that implies the second is done is worse than no generator —
+`SECURITY.md` takes the same posture about `botProtection = "none"`, and for
+the same reason.
+
+**Harvest** ROP's `LegalSection[]` pattern — legal text as structured
+localized data with `{email}` substitution, rendered by one component. Do not
+paste it; `docs/guides/harvesting.md` is the rule, and `fid harvest` stages
+into `harvest/`, which is never the product.
+
 ## Context sync
 
 **The problem, stated by the founder:** code, documentation, agent context and
@@ -797,6 +922,32 @@ endeavour.*
 
 ---
 
+**Fiducial is its own first customer, concretely.** There is an IEEE student
+conference paper intended about this work, and
+`docs/specs/2026-09-14-disclosure-authorship-and-citation.md` already frames
+the contribution, the evidence, and what not to claim. That document is the
+brief; this item is the tooling that lets it be written in the repository
+instead of beside it.
+
+**Sequence it after the DOI**, not before — a paper needs something citable,
+and the citation half of this item is the DOI work above. What is left here is
+authoring: Markdown in, submittable artifact out, the author never touching
+LaTeX boilerplate.
+
+**Where it lands.** This is a capability with a pipeline, like every other
+derivation: `[paper]` or `references/` as the declaration, the typeset
+artifact as the output, `fid derive --check` as the gate. A reference list
+that has drifted from the bibliography is the same class of bug as a stale
+generated type, and should fail the same way.
+
+**The repository already records the build**, which is the unusual asset here
+— decision records, `SHIPPED.md`, and specs that state what was believed at
+the time. A paper's methodology section is normally reconstructed afterwards;
+here it can be derived. That is worth designing for rather than discovering.
+
+**Video editing is named as later**, deliberately, and should stay later.
+
+
 ## Demo & showcase
 
 Not simulation in the numerical sense (`fiducial-sim` covers that). **Optional**,
@@ -843,6 +994,30 @@ same tokens, so brand → tokens → every registry → Claude Design is one cha
 
 **Requires** `/design-login` in the session to authorize the `DesignSync` tool
 against the user's claude.ai account.
+
+**Resolve this first, before writing any pipeline.** `DesignSync` references
+a `/design-sync` skill for exactly this incremental, component-at-a-time round
+trip. If that skill exists once `/design-login` has run, **this item is a thin
+adapter over it, not a pipeline to write** — and building the pipeline anyway
+would be a second implementation of a round trip that already works. Checking
+costs one session; guessing costs the item.
+
+**If it does need building**, the direction is fixed by the taxonomy:
+`packages/ui-react/src/*.tsx` and `packages/ui-svelte` are the **declaration**,
+the preview HTML with its `<!-- @dsCard … -->` first-line marker is the
+**derivation**, and `fid derive --check` keeps them honest. Generating the
+component *from* the preview would invert it and put the source of truth in a
+web app.
+
+**The chain that makes it worth doing** already half-exists: `[brand]` →
+`@fiducial/tokens` CSS custom properties → both registries. Claude Design
+becomes a third consumer of those same tokens rather than a fourth place
+design values live.
+
+**Requires** `/design-login` in the session to authorize `DesignSync` against
+the account. An agent without it cannot verify this item at all — say so
+rather than shipping something untested.
+
 
 ## Interactive seeding
 
@@ -908,6 +1083,31 @@ introduce. A third copy for chat makes it three. This should be **generated**
 from `MISSION.md` — which makes it a natural consumer of **context sync**, and a
 reason to keep that item where it is in the order rather than later.
 
+**Where it lands, and the constraint that dominates it.** The principles are
+declared in `MISSION.md` and restated in the scaffolded `AGENTS.md`, and that
+duplication is **already gated by a test** because introducing it was a
+violation. A third hand-written copy for chat makes it three and breaks that
+gate's premise. So this is a *generated* artifact or it should not be built:
+another output of `context.rs`, from `MISSION.md`, exactly like the
+`AGENTS.md` blocks.
+
+**Resolve before writing anything:** the packaging difference between a
+claude.ai skill and a Claude Code plugin. The two are close — `SKILL.md` with
+frontmatter — but distribution differs, and the honest status is that this
+has *not been verified*. Verify it; do not assume the formats are
+interchangeable because they look alike.
+
+**What it carries:** the principles including 1c and 5c, the
+declaration/pipeline/adapter/template taxonomy, the anti-goals — especially
+*the platform must never become the project* — the decision-record habit, and
+the cost-of-delay ordering rule. **Not the commands**: there is no `fid` in a
+chat, and a skill that names commands the reader cannot run teaches the wrong
+thing about what the platform is.
+
+**Done when** editing a principle in `MISSION.md` changes the chat skill on
+the next `fid context`, and `fid context --check` fails if it did not.
+
+
 ## Agent portability — author once, generate per vendor
 
 `AGENTS.md` is the cross-vendor convention and now carries the full command
@@ -936,6 +1136,37 @@ consumer of **context sync** rather than a separate mechanism.
 command is Claude-specific. An agent without hooks can still be told to run it,
 which is weaker but not nothing.
 
+**Where it lands.** `crates/fiducial-cli/src/context.rs` is already the
+generator for the derived blocks in `AGENTS.md` and `README.md` —
+`render_capabilities`, the layout tree, the command table, the adapters
+table, the skills table. It is the seam: this item adds outputs to a
+generator that exists, rather than building a second one.
+
+**The authored declaration is the capability directory.** Each capability
+already owns a `SKILL.md`, and `fid add` already installs it to
+`.fiducial/skills/<id>.md` with a Claude-discoverable pointer at
+`.claude/skills/<id>.md` — *that split was made for exactly this item.* What
+is missing is the other vendors' wiring generated off the same source.
+
+**Do the cheap, high-value half first.** A Codex or Cursor session installing
+`eda` today gets no instructions at all. Appending an installed-capabilities
+section to the product's `AGENTS.md` — which every vendor reads — fixes that
+for every non-Claude agent at once, and needs no per-vendor format research.
+`commands/*.md` and `.claude-plugin/plugin.json` are the narrower, harder
+half.
+
+**The guard is the interesting case, and the honest answer is a downgrade.**
+`fid guard-check` is a CLI any agent can run; only the `PreToolUse` hook that
+calls it before every shell command is Claude-specific. An agent without
+hooks can be *told* to run it, which is weaker than enforcement and should be
+described that way rather than presented as parity. Do not let the generated
+wording imply a guarantee the vendor cannot make.
+
+**Verify against the format, not against memory.** Vendor agent-config
+formats move; check current documentation before generating a file claiming
+to be one.
+
+
 ## Rust release versioning
 
 Changesets drives the JS side properly — `.changeset/*.md` declares
@@ -953,11 +1184,87 @@ is a single integer with a declared minimum-compatible floor in
 version answers a different question than a package version. That mechanism is
 already stricter than SemVer and should stay as it is.
 
+**Where it lands, and a correction to the paragraph above.** The statement
+"`release.yml` publishes to crates.io" is true of *one* crate. The actual
+loop is:
+
+```yaml
+for crate in fiducial; do
+```
+
+So fourteen of the fifteen workspace members have **never been published at
+all** — `fiducial-core`, `-identity`, `-protocol`, `-ota` and the rest exist
+only in this repository. That is a larger gap than "nothing drives a bump,"
+and it changes what this item is: not adding a version-decision mechanism to
+a working publish path, but building the publish path.
+
+Three things have to be decided, and only the first is mechanical:
+
+1. **Publish order.** `cargo publish` requires every path dependency to
+   already exist on crates.io at the declared version, so the fifteen have to
+   go in dependency order. `cargo metadata` has the graph; deriving the order
+   from it beats hand-maintaining a list, and hand-maintaining a list is what
+   the current single-crate loop would become.
+2. **Lockstep or independent.** They all inherit `version` from
+   `[workspace.package]` today. Lockstep is honest for a pre-1.0 spine whose
+   crates are really one artifact, and it is what `WIRE_VERSION` already
+   assumes about the protocol crates. Independent versions are more correct
+   and mean fifteen changelogs. **Decide this explicitly and record it** —
+   it is the kind of choice that is expensive to reverse once published
+   versions exist.
+3. **What declares the bump.** Changesets is JS-only. The options are a Rust
+   equivalent (`cargo-release`, `release-plz`), teaching the existing
+   `.changeset/*.md` files to carry crate bumps too, or a `fid release bump`
+   subcommand. `fid release` already exists and already owns version-skew
+   enforcement, which makes the third the most consistent with the platform
+   — and the most work.
+
+**Not this item:** `WIRE_VERSION` is deliberately not SemVer and its
+mechanism is already stricter. Leave it alone.
+
+**Done when:** a merge that bumps a crate publishes exactly that crate and
+its dependents in an order crates.io accepts, and a merge that bumps nothing
+publishes nothing. The second half is the one that breaks — the current guard
+exists precisely because a JS-only release used to fail on an unchanged Rust
+version.
+
 ## Tagged releases and the DOI
 
 No git tag or GitHub release exists. That blocks the Zenodo DOI, which blocks
 citing the work in the paper. Small, and on the critical path for
 `docs/specs/2026-09-14-disclosure-authorship-and-citation.md`.
+
+**Where it lands.** There is no tagging step in `release.yml` at all — the
+changesets action opens and merges a Release PR, and nothing creates a git
+tag or a GitHub release from it. Zenodo archives **GitHub releases**, so the
+chain is: version decision → tag → GitHub release → Zenodo webhook → DOI.
+Every link before the last one is missing.
+
+**Sequencing.** Blocked on Rust release versioning above, and on
+`CITATION.cff`, which shipped 2026-09-16. Zenodo reads `CITATION.cff` when
+minting, which is why the file went first.
+
+**`CITATION.cff` is deliberately incomplete and this item completes it.** It
+carries no `version` and no `date-released`, because both are facts about a
+release that did not exist when it was written, and `version: 0.1.0` would
+have been a second copy of `[product] version` in `fiducial.toml`. **Derive
+them at release time rather than hand-writing them** — a citation file whose
+version is edited by hand is a stale artifact with a DOI attached to it,
+which is worse than an absent field.
+
+**Opt-in for child repositories, as requested.** Scaffolded products get this
+the way they get everything else: a capability, off unless selected, with a
+`none`-equivalent default. Note what does *not* generalize — a DOI needs a
+Zenodo account and a repository the author controls, so the capability can
+derive the workflow and the citation file but cannot complete the webhook
+authorization. Say that in the skill rather than generating something that
+looks wired and is not.
+
+**Concept DOI vs. version DOI.** Zenodo mints both — one that always resolves
+to the latest release and one per release. The paper wants the concept DOI in
+`CITATION.cff` and the version DOI beside any measurement. Getting this
+backwards is the common mistake and is invisible until someone tries to cite
+a specific claim.
 
 ## Diagnostics
 
@@ -968,6 +1275,39 @@ Constraint: no self-hosted database for error tracking. The job is outsourced or
 it is not done.
 
 ---
+## Framework currency
+
+**The problem.** Capability templates pin framework versions —
+`web-next`, `web-svelte`, `tauri`, the firmware targets — and a pinned
+version in a scaffold rots silently. Nothing fails; a product scaffolded six
+months from now simply starts a major behind, and nobody finds out until an
+upgrade that should have been routine is a migration.
+
+**Why it is a freshness problem, not a maintenance chore.** This platform
+already holds that a derived artifact which has drifted from its declaration
+must fail the build. A template pinning Next.js 15 when 16 is current is
+exactly that shape — the difference is only that the source of truth is a
+registry rather than a file in the repo. Treat it the same way and it is one
+more gate; treat it as a chore and it depends on someone remembering.
+
+**Where it lands.** `fid doctor` already exists to "check for drift: outdated
+deps, stale templates, un-applied migrations" — this is the *stale templates*
+half, which is the one with nothing behind it. `fiducial.toml [freshness]`
+is the precedent for declaring a gate that is a judgment rather than a
+pattern-match.
+
+**Decide:** a currency check must not fail CI on the day upstream publishes a
+major — that makes an unrelated PR red for a reason its author cannot fix.
+A declared grace window, or a warning that escalates, or a scheduled job that
+opens an issue. The **Fast path** item's constraint applies here in reverse:
+whatever is tolerated must be *recorded*, or a permanently-yellow check is
+one nobody reads.
+
+**Do not hand-maintain a table of current majors.** That is the same
+duplication the item exists to catch, one level up.
+
+---
+
 
 ## Small tools
 
