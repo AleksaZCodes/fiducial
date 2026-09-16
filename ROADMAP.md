@@ -621,8 +621,8 @@ step 3 delivers.
 | **Small tools** | Backlinks, browser-compat banners |
 | **Framework currency** | Capability templates must track current majors — Next.js 16, SvelteKit, Tauri. Pinned versions in a scaffold rot silently and a product starts a major behind — see below |
 | **Agent portability** | Skills and guard wiring are Claude-Code-only; author once, generate per vendor — see below |
-| **Rust release versioning** | Changesets drives npm; the fifteen crates move in lockstep at 0.1.0 with nothing driving a bump — and **none of them is on crates.io at all**. See below |
-| **Tagged releases + Zenodo DOI** | No release exists, so there is nothing to archive or cite. Opt-in for child repos too — see below |
+| **Rust release versioning** | Changesets drives npm; the fifteen crates move in lockstep at 0.1.0 with nothing driving a bump. All fifteen reached crates.io on 2026-09-16. See below |
+| **Tagged releases + Zenodo DOI** | Tags exist as of 2026-09-16 and `create-github-releases` is on, so there is now something to archive. Opt-in for child repos too — see below |
 | **Claude chat plugin** | The making philosophy, as a skill for claude.ai — see below |
 | ~~**`fid dash` freshness detection**~~ ✅ | Shipped 2026-09-15. Dash equated "gated" with "a workflow runs `fid derive --check`" and reported this repository as ungated while nine gates ran on every commit. `[freshness] gates` declares the others — which command gates an artifact is a judgment, not something to pattern-match — and a gate declared but run by nothing is now reported too |
 
@@ -634,7 +634,7 @@ Not ranked by value. Ranked by **what accrues while we wait.**
 |---|---|
 | ~~**`CLA.md`**~~ ✅ | Shipped 2026-09-16 (written earlier). The repository is public and can accept pull requests. One contribution from a stranger permanently constrains re-licensing — you would need their permission to ever dual-license. Zero contributions was the best moment, and it stayed zero. |
 | ~~`CITATION.cff`, `CONTRIBUTING.md`, `SECURITY.md`~~ ✅ | Shipped 2026-09-16, with `CODE_OF_CONDUCT.md` and `AUTHORS`. Small, expected of a public project, and prerequisites for being cited correctly |
-| Zenodo DOI on a tagged release ⬜ | Needed before the paper; Fiducial is its own first customer for the research tooling. **Now the only thing left in this section**, and blocked on Rust release versioning below — there is still no tag to archive |
+| Zenodo DOI on a tagged release ⬜ | Needed before the paper; Fiducial is its own first customer for the research tooling. **Now the only thing left in this section.** No longer blocked: every package is tagged on origin and the release pipeline verifies against the registries rather than its own exit codes |
 
 ## i18n — *localized by construction*
 
@@ -927,6 +927,49 @@ or skill that turns any repository into one — the actual item — is still
 unbuilt**, and Fiducial having the files is what it should now be generalized
 from rather than designed against nothing. The second-use rule applies to the
 platform's own bootstrap the same way it applies to everything else.
+
+### The release *discipline* is part of this, not a separate item
+
+On 2026-09-16 five distinct release failures were found by running real
+releases — a gate reading a workflow output instead of the registry, a publish
+step reporting success for a package it did not publish, a queued run cancelled
+before it created a job, and a verification that failed a release which had
+worked. Every fix lives in files only this repository has: `release.yml`, three
+scripts, three tests in `workspace_hygiene.rs`, a PR template, a CLA exemption
+list.
+
+None of it propagates. A product scaffolded today gets `ci.yml` and nothing
+about releasing, publishing, verifying a publish, or repository hygiene — so it
+re-derives the same five failures, in the same order, on a real release.
+**Principle 7 says a fix that cannot propagate is only half-finished; these
+cannot propagate at all.**
+
+`docs/specs/2026-09-16-the-release-discipline-is-a-capability.md` works out what
+generalizes and what does not. The short version, because the division is the
+whole design:
+
+| Bucket | Goes to | Why there |
+|---|---|---|
+| **Principles** — "a publish step exiting 0 is not evidence anything was published" | `MISSION.md` | where principles are authored, and a scaffolded product already receives them |
+| **Portable artifacts** — PR template, Conventional Commits gate, CLA sign-off + exemption list, branch lifecycle | `SCAFFOLD_FILES` | read by `fid new` *and* `fid upgrade`, so it reaches products that already exist |
+| **Vendor mechanics** — npm and crates.io verification, `changesets/action`, `cargo publish --package` | a `release` capability | applies to some products and not others, which is what a capability is for |
+
+**Copying `release.yml` into the scaffold is the wrong shape.** Most products
+should not have it — the next one may publish nothing, or a container, or only
+deploy a Worker. A template assuming two specific registries gets edited in
+every product, which is a second declaration in fourteen places.
+
+**What the capability must carry beyond code: the evidence.** A settle window on
+a 404 looks like superstition; a schedule on a workflow that already triggers on
+merge looks redundant. Both get deleted by the next tidy-up unless the incident
+travels with the rule — *verify asked npm at 16:30:10Z and got a 404; npm began
+serving that version at 16:31:34Z.* A rule with its evidence survives; a rule
+without it is indistinguishable from cargo-culting.
+
+**Cost of delay:** debt-accruing, and **the meter starts at the first
+`fid new`.** Nothing accrues while Fiducial is the only repository. Every
+product scaffolded before this exists is a product that re-derives a day of
+release archaeology, so this belongs before the first real product, not after.
 
 ---
 
