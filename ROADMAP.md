@@ -581,7 +581,7 @@ declarations: privacy policy (jurisdiction-aware: GDPR, CCPA, Serbian DPA),
 terms of service, cookie notice, imprint (EU), and accessibility statement.
 Keys flow through `fid-i18n` so missing translations fail the build.
 
-### `fid capability extract` — *terminal* ⬜
+### `fid capability extract` — *terminal* ✅
 
 "It works in my product, now lift it." Mechanizes the second-use rule. Needs the
 taxonomy and external capabilities to exist first, or there is nothing to extract

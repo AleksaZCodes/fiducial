@@ -17,6 +17,33 @@ numbering is unchanged._
 > wrong twice over: it duplicated the roadmap, and "between phases" was a state
 > the numbering cannot express, because a phase does not exist until work ships.
 
+**`fid capability extract` ✅ (2026-09-16)**
+
+`fid capability extract <name> --files <paths…>` stages files from the current
+product as a new capability. Applies template generalisation (product name →
+`{{name}}`, brand domain → `{{domain}}`), reports unresolved lines (absolute
+paths, TODO/FIXME), and always prints a single-consumer warning per MISSION.md
+anti-goal 2. Output lands in `staged/<name>/` with a SKILL.md stub and a
+`capability.toml` listing the extracted files. `--output` and `--force` for
+custom destination and overwrite. 11 end-to-end tests in
+`tests/capability_extract.rs`.
+
+**`@fiducial/realtime` Durable Objects + local relay ✅ (2026-09-16)**
+
+`RealtimeDO` — Cloudflare Durable Object with WebSocket Hibernation. JSON frame
+protocol: broadcast / presence:track / presence:untrack in; broadcast /
+presence:join / presence:leave / presence:sync out. Presence lives in DO memory;
+on reconnect clients receive a `presence:sync` snapshot.
+
+`connectChannel(url)` — browser/Node/Bun/Deno client returning a `Channel` with
+`broadcastAdapter<E>()` and `presenceAdapter<T>(key)` satisfying `BroadcastAdapter`
+and `PresenceAdapter`. Works against a DO or the local relay unchanged.
+
+`createRelay({ port, host })` — same protocol over a plain Node `http` server +
+`ws`. LAN-only, air-gapped, embedded, and test use cases. Multiple channels over
+one port via `?channel=`. `realtime-relay` bin: `PORT=8787 npx @fiducial/realtime`.
+Postgres Changes (Supabase CDC) stays a separate re-export.
+
 **Legal & compliance capability ✅ (2026-09-16)**
 
 `fid add legal` → `[legal]` declaration → `fid-legal` derives `legal.*` keys into every locale catalog → `fid-i18n` types them. Jurisdiction-aware: EU/GDPR (DPO, lawful bases, data-subject rights, imprint), CCPA (US-CA), Serbian DPA (RS), generic for others. 10 end-to-end tests.
