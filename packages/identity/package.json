@@ -1,6 +1,6 @@
 {
   "name": "@fiducial/identity",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "One identity model across users, devices and services \u2014 mirrors the Rust fiducial-identity crate",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
