@@ -18,6 +18,7 @@
 //! | `Diagnostics`    | `errors`          |
 //! | `BotProtection`  | `botProtection`   |
 //! | `Queue`          | `queue`           |
+//! | `Newsletter`     | `newsletter`      |
 //! | `Auth`           | `auth`            |
 //! | (n/a)            | `deploy`          |
 //!
@@ -57,6 +58,7 @@ pub mod database;
 pub mod diagnostics;
 pub mod email;
 pub mod firmware;
+pub mod newsletter;
 pub mod queue;
 pub mod storage;
 
@@ -65,6 +67,7 @@ pub use bot_protection::{BotProtection, BotProtectionError, NoneBotProtection, V
 pub use database::{Database, DatabaseError, NoneDatabase};
 pub use diagnostics::{Diagnostics, DiagnosticsError, NoneDiagnostics};
 pub use email::{Email, EmailError, NoneEmail};
+pub use newsletter::{Newsletter, NewsletterError, NoneNewsletter, Subscription, SubscriberAttributes};
 pub use queue::{NoneQueue, Queue, QueueError};
 pub use storage::{NoneStorage, Storage, StorageError};
 
