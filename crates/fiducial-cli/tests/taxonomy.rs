@@ -194,7 +194,7 @@ fn every_contract_is_listed_whether_selected_or_not() {
     let adapters = d["taxonomy"]["adapters"].as_array().unwrap();
     assert_eq!(
         adapters.len(),
-        8,
+        9,
         "every contract is a fact about the product"
     );
     for a in adapters {

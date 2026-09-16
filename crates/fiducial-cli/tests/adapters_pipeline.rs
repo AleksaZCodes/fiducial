@@ -76,6 +76,7 @@ fn derive_writes_the_factory_file() {
     assert!(factory.contains("NoneDiagnostics"), "{factory}");
     assert!(factory.contains("NoneBotProtection"), "{factory}");
     assert!(factory.contains("NoneQueue"), "{factory}");
+    assert!(factory.contains("NoneNewsletter"), "{factory}");
     assert!(factory.contains("NoneAuth"), "{factory}");
     assert!(factory.contains("createAuth"), "{factory}");
     assert!(
@@ -226,6 +227,39 @@ fn selecting_cloudflare_queues_derives_the_real_class() {
     let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
     assert!(factory.contains("CloudflareQueue"), "{factory}");
     assert!(factory.contains("@fiducial/adapters/queue"), "{factory}");
+}
+
+#[test]
+fn selecting_resend_email_derives_the_real_class() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "email", "resend");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("ResendEmail"), "{factory}");
+    assert!(factory.contains("@fiducial/adapters/email"), "{factory}");
+}
+
+#[test]
+fn selecting_resend_newsletter_derives_the_real_class() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "newsletter", "resend");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("ResendNewsletter"), "{factory}");
+    assert!(factory.contains("@fiducial/adapters/newsletter"), "{factory}");
+}
+
+#[test]
+fn derive_writes_none_newsletter_for_default_selection() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("NoneNewsletter"), "{factory}");
 }
 
 #[test]
