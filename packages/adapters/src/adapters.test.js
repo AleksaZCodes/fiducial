@@ -14,6 +14,8 @@ import {
   R2Storage,
   StorageError,
   NoneEmail,
+  EmailError,
+  ResendEmail,
   NoneDiagnostics,
   NoneBotProtection,
   Turnstile,
@@ -21,6 +23,9 @@ import {
   NoneQueue,
   CloudflareQueue,
   QueueError,
+  NoneNewsletter,
+  NewsletterError,
+  ResendNewsletter,
   NoneAuth,
   AuthError,
   CookieKeyValueStore,
@@ -755,6 +760,211 @@ describe('@fiducial/adapters', () => {
     })
   })
 
+  // ── ResendEmail ──────────────────────────────────────────────────────────────
+
+  describe('ResendEmail', () => {
+    it('throws EmailError when no API key is present', () => {
+      assert.throws(() => new ResendEmail({}), EmailError)
+    })
+
+    it('posts to Resend and returns the message id on success', async () => {
+      let capturedUrl
+      let capturedBody
+      let capturedHeaders
+      const fakeFetch = async (url, init) => {
+        capturedUrl = url
+        capturedHeaders = init.headers
+        capturedBody = JSON.parse(init.body)
+        return {
+          ok: true,
+          status: 200,
+          async json() { return { id: 'msg-abc-123' } },
+        }
+      }
+      const email = new ResendEmail({ RESEND_API_KEY: 're_key' }, fakeFetch)
+      const id = await email.send({
+        from: 'hi@example.com',
+        to: ['user@example.com'],
+        subject: 'Hello',
+        html: '<p>Hi</p>',
+      })
+      assert.equal(capturedUrl, 'https://api.resend.com/emails')
+      assert.equal(capturedHeaders['Authorization'], 'Bearer re_key')
+      assert.equal(capturedBody.from, 'hi@example.com')
+      assert.deepEqual(capturedBody.to, ['user@example.com'])
+      assert.equal(id, 'msg-abc-123')
+    })
+
+    it('throws EmailError on HTTP 429 (rate limited)', async () => {
+      const fakeFetch = async () => ({ ok: false, status: 429 })
+      const email = new ResendEmail({ RESEND_API_KEY: 're_key' }, fakeFetch)
+      await assert.rejects(() => email.send({
+        from: 'hi@example.com',
+        to: ['u@example.com'],
+        subject: 'Hi',
+        html: '<p>Hi</p>',
+      }), EmailError)
+    })
+
+    it('throws EmailError on a non-OK HTTP response', async () => {
+      const fakeFetch = async () => ({ ok: false, status: 503 })
+      const email = new ResendEmail({ RESEND_API_KEY: 're_key' }, fakeFetch)
+      await assert.rejects(() => email.send({
+        from: 'hi@example.com',
+        to: ['u@example.com'],
+        subject: 'Hi',
+        html: '<p>Hi</p>',
+      }), EmailError)
+    })
+  })
+
+  // ── NoneNewsletter ────────────────────────────────────────────────────────────
+
+  describe('NoneNewsletter', () => {
+    it('subscribe returns a plausible Subscription with empty id', async () => {
+      const nl = new NoneNewsletter()
+      const sub = await nl.subscribe('a@example.com')
+      assert.equal(sub.id, '')
+      assert.equal(sub.email, 'a@example.com')
+      assert.equal(sub.subscribed, true)
+    })
+
+    it('subscribe with attributes still returns a Subscription', async () => {
+      const nl = new NoneNewsletter()
+      const sub = await nl.subscribe('a@example.com', { firstName: 'Alice' })
+      assert.equal(sub.subscribed, true)
+    })
+
+    it('unsubscribe succeeds silently', async () => {
+      const nl = new NoneNewsletter()
+      await nl.unsubscribe('a@example.com')
+    })
+
+    it('status returns null', async () => {
+      const nl = new NoneNewsletter()
+      assert.equal(await nl.status('a@example.com'), null)
+    })
+  })
+
+  // ── ResendNewsletter ──────────────────────────────────────────────────────────
+
+  describe('ResendNewsletter', () => {
+    it('throws NewsletterError when API key is absent', () => {
+      assert.throws(
+        () => new ResendNewsletter({ RESEND_AUDIENCE_ID: 'aud-1' }),
+        NewsletterError,
+      )
+    })
+
+    it('throws NewsletterError when audience ID is absent', () => {
+      assert.throws(
+        () => new ResendNewsletter({ RESEND_API_KEY: 're_key' }),
+        NewsletterError,
+      )
+    })
+
+    it('subscribe (fresh contact) posts and returns a Subscription', async () => {
+      let capturedUrl
+      let capturedBody
+      const fakeFetch = async (url, init) => {
+        capturedUrl = url
+        capturedBody = JSON.parse(init.body)
+        return {
+          ok: true,
+          status: 200,
+          async json() { return { object: 'contact', id: 'cid-1' } },
+        }
+      }
+      const nl = new ResendNewsletter(
+        { RESEND_API_KEY: 're_key', RESEND_AUDIENCE_ID: 'aud-1' },
+        fakeFetch,
+      )
+      const sub = await nl.subscribe('a@example.com', { firstName: 'Alice' })
+      assert.equal(capturedUrl, 'https://api.resend.com/audiences/aud-1/contacts')
+      assert.equal(capturedBody.email, 'a@example.com')
+      assert.equal(capturedBody.first_name, 'Alice')
+      assert.equal(sub.id, 'cid-1')
+      assert.equal(sub.email, 'a@example.com')
+      assert.equal(sub.subscribed, true)
+    })
+
+    it('subscribe (already-exists 409) falls back to status and returns existing record', async () => {
+      let callCount = 0
+      const fakeFetch = async (url, init) => {
+        callCount++
+        if ((init?.method ?? 'GET') === 'POST') {
+          return { ok: false, status: 409, async json() { return {} } }
+        }
+        // GET /audiences/{id}/contacts/{email}
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { id: 'cid-existing', email: 'a@example.com', unsubscribed: false }
+          },
+        }
+      }
+      const nl = new ResendNewsletter(
+        { RESEND_API_KEY: 're_key', RESEND_AUDIENCE_ID: 'aud-1' },
+        fakeFetch,
+      )
+      const sub = await nl.subscribe('a@example.com')
+      assert.equal(sub.id, 'cid-existing')
+      assert.equal(sub.subscribed, true)
+      assert.equal(callCount, 2)
+    })
+
+    it('unsubscribe PATCHes the contact with unsubscribed=true', async () => {
+      let capturedUrl
+      let capturedBody
+      const fakeFetch = async (url, init) => {
+        capturedUrl = url
+        capturedBody = JSON.parse(init.body)
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { id: 'cid-1', email: 'a@example.com', unsubscribed: true }
+          },
+        }
+      }
+      const nl = new ResendNewsletter(
+        { RESEND_API_KEY: 're_key', RESEND_AUDIENCE_ID: 'aud-1' },
+        fakeFetch,
+      )
+      await nl.unsubscribe('a@example.com')
+      assert.ok(capturedUrl.includes('/contacts/a%40example.com'), capturedUrl)
+      assert.equal(capturedBody.unsubscribed, true)
+    })
+
+    it('status returns a Subscription when the contact is found', async () => {
+      const fakeFetch = async () => ({
+        ok: true,
+        status: 200,
+        async json() {
+          return { id: 'cid-1', email: 'a@example.com', unsubscribed: false }
+        },
+      })
+      const nl = new ResendNewsletter(
+        { RESEND_API_KEY: 're_key', RESEND_AUDIENCE_ID: 'aud-1' },
+        fakeFetch,
+      )
+      const sub = await nl.status('a@example.com')
+      assert.ok(sub !== null)
+      assert.equal(sub.id, 'cid-1')
+      assert.equal(sub.subscribed, true)
+    })
+
+    it('status returns null on 404', async () => {
+      const fakeFetch = async () => ({ ok: false, status: 404 })
+      const nl = new ResendNewsletter(
+        { RESEND_API_KEY: 're_key', RESEND_AUDIENCE_ID: 'aud-1' },
+        fakeFetch,
+      )
+      assert.equal(await nl.status('nobody@example.com'), null)
+    })
+  })
+
   describe('createNoneAdapters', () => {
     it('builds a full no-op adapter set', () => {
       const adapters = createNoneAdapters()
@@ -764,6 +974,7 @@ describe('@fiducial/adapters', () => {
       assert.ok(adapters.diagnostics instanceof NoneDiagnostics)
       assert.ok(adapters.botProtection instanceof NoneBotProtection)
       assert.ok(adapters.queue instanceof NoneQueue)
+      assert.ok(adapters.newsletter instanceof NoneNewsletter)
     })
   })
 })
