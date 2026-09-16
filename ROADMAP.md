@@ -1200,19 +1200,15 @@ does not exist"**, as do `fiducial-core`, `fiducial-cli` and
 unrelated crates.
 
 **`SHIPPED.md` Phase 0 recorded `crates/fiducial` v0.1.0 as published.** The
-registry disagrees. That row is now marked ❌ with the verification date, but
-*why* it disagrees is unresolved and is the first thing to establish: either
-the publish never succeeded and the row recorded an intention, or it
-succeeded and the crate was later removed. A yanked crate still resolves —
-a 404 means absent, not yanked — which makes "never published" the more
-likely of the two. **Do not assume; check the crates.io account before
-writing any publish logic**, because "this name is taken by someone else" and
-"this name is free" need different first steps.
+registry disagrees, and the founder confirmed on 2026-09-16 that **the name is
+neither taken nor published** — so the row recorded an intention that never
+happened, rather than something later removed. Every crate name is still free
+to claim.
 
-So this item is not adding a version-decision mechanism to a working publish
-path. It is building the publish path, and the guard in `release.yml` that
-skips a crate whose version already exists has **never once taken its publish
-branch** — it is untested code on the only path that matters.
+So this item was never "add a version-decision mechanism to a working publish
+path." It was "build the publish path," and four separate things had to be
+true before a single crate could reach crates.io. **All four are now fixed**
+(see below); what remains of this item is the *decision* half.
 
 **Resolved 2026-09-16:** `@fiducial/identity` was absent from npm while every
 other workspace package was present. Not a misconfiguration — it was sitting
@@ -1240,35 +1236,56 @@ Three things have to be decided, and only the first is mechanical:
    enforcement, which makes the third the most consistent with the platform
    — and the most work.
 
-**Three failures observed on a real release, 2026-09-16**, when
-`@fiducial/adapters@0.2.0` and `@fiducial/identity@0.2.0` were published.
-Recorded because none of them is visible until you run the thing:
+**Four blockers, found by running a real release on 2026-09-16 and all fixed
+the same day.** Recorded because not one of them is visible from reading the
+workflow — the file looked correct and had looked correct for months:
 
-1. **The crates.io step is gated on a condition that did not fire.** It runs
-   `if: steps.changesets.outputs.published == 'true'`. On two consecutive runs
-   that *did* publish to npm, the step reported **skipped**. So even if the
-   loop named all fifteen crates and they existed, this step would still not
-   run. Fix the gate before fixing the loop — the loop is the visible half of
-   the bug and the smaller one.
+1. **`changesets/action@v1` never reported what it published.** It detects
+   published packages by parsing the CLI's stdout for `New tag:` lines, and
+   `@changesets/cli` 3.x prints a spinner-based `Successfully published:`
+   block instead. In the action's source `pushTags()` and
+   `setOutput("published")` sit inside the same branch, so **one failed parse
+   caused two symptoms that looked unrelated**: the crates.io step never ran,
+   and git tags were created in the runner and never pushed. Fixed by pinning
+   `changesets/action@v2.1.2`, which dropped v1 compatibility and reworked
+   this path. v2 renames every input and no longer accepts a token via the
+   `GITHUB_TOKEN` env var.
 
-2. **`changeset publish` reported success for a package it did not publish.**
-   The log read `Successfully published: @fiducial/adapters@0.2.0,
-   @fiducial/identity@0.2.0` — printed 1ms apart, after a `(1/2)` progress
-   line. Only `identity` reached the registry; `adapters` still showed
-   `0.1.0` with an unchanged `time.modified`. Re-running the workflow
-   published it correctly. **A publish step that exits 0 is not evidence
-   anything was published** — whatever this item builds should verify against
-   the registry afterwards rather than trusting the exit code, which is the
-   same "a green build is not evidence of consistency" finding the Phase 18
-   audit already produced once.
+2. **No internal dependency declared a version**, so every dependent crate was
+   unpublishable: *"all dependencies must have a version requirement specified
+   when publishing."* Only leaf crates could ever have been published, and
+   `fiducial` is a leaf — which is why the one-crate loop never failed loudly
+   enough to be noticed. Fixed by adding `version` beside each `path` in
+   `[workspace.dependencies]`, and routing `fiducial-identity`'s hand-written
+   path dependency through the workspace declaration.
 
-3. **CI on the Release PR sits in `action_required`.** Runs on
+3. **The publish loop named one crate of fifteen** (`for crate in fiducial`).
+   Fixed: the order is now derived from the dependency graph by
+   `scripts/crate-publish-order.py` and gated by
+   `the_derived_publish_order_is_topological`, because a wrong order fails a
+   release *partway through*, having already published some crates
+   permanently.
+
+4. **CI on the Release PR sits in `action_required`.** Runs on
    `changeset-release/main` have needed manual approval since 2026-09-15 —
    GitHub gates workflow runs on bot-authored PRs. Harmless until the branch
    ruleset began requiring status checks, at which point the Release PR became
-   permanently unmergeable and had to be approved by hand. The durable fix is
-   a PAT for `changesets/action` instead of `GITHUB_TOKEN`, so the PR is
-   authored by a human account and CI runs unattended.
+   permanently unmergeable. Fixed with a `RELEASE_PAT` secret passed to both
+   `actions/checkout` and the action's `github-token` input.
+
+**A fifth thing to keep in mind, not fixed because it is not ours:**
+`changeset publish` reported `Successfully published` for a package that did
+not reach the registry — `@fiducial/adapters@0.2.0` needed a second run. **A
+publish step that exits 0 is not evidence anything was published.** Verify
+against the registry, which is the Phase 18 audit's "a green build is not
+evidence of consistency" in a new place.
+
+**What is left of this item after all that:** the *decision*, which was always
+the interesting half. Nothing yet declares that a crate should be bumped —
+the three options are a Rust-native tool (`cargo-release`, `release-plz`),
+teaching `.changeset/*.md` to carry crate bumps, or a `fid release bump`
+subcommand. And lockstep-versus-independent is still unanswered; it is cheap
+now and expensive once versions are published.
 
 **Not this item:** `WIRE_VERSION` is deliberately not SemVer and its
 mechanism is already stricter. Leave it alone.
@@ -1291,15 +1308,31 @@ tag or a GitHub release from it. Zenodo archives **GitHub releases**, so the
 chain is: version decision → tag → GitHub release → Zenodo webhook → DOI.
 Every link before the last one is missing.
 
-**The tagging failure is a mechanism, not an absence.** `changeset publish`
-printed `Creating git tags… Created git tags.` during the 2026-09-16 release,
-and `git ls-remote --tags origin` was **empty afterwards**. The tags are
-created in the runner's clone and never pushed. So the chain's first link is
-not merely missing — it appears to succeed and silently drops its output,
-which is the hardest shape of bug to notice from a green workflow.
+**The tagging failure was a mechanism, not an absence — and it is fixed.**
+`changeset publish` printed `Creating git tags… Created git tags.` during the
+2026-09-16 release while `git ls-remote --tags origin` stayed **empty**. Root
+cause was the `changesets/action@v1` output parser described under **Rust
+release versioning** above: `pushTags()` sat behind the same failed detection
+as the crates.io gate. `changesets/action@v2.1.2` fixes both, and its
+`create-github-releases` input (default `true`) now produces **the GitHub
+release itself**, which is the object Zenodo archives.
 
-Whatever creates the tag must be verified against the **remote**, for the same
-reason the publish must be verified against the registry.
+So two of the five links exist as of 2026-09-16:
+
+```
+version decision → git tag ✅ → GitHub release ✅ → Zenodo webhook ⬜ → DOI into CITATION.cff ⬜
+```
+
+**Unverified until a real release runs.** The tag and release are what the
+workflow *should* now produce; no release has happened since the change.
+Confirm against `git ls-remote --tags origin` and `gh release list` rather
+than against a green workflow — that is precisely the mistake this item has
+already made once.
+
+**What is left:** linking Zenodo (a manual authorization in Zenodo's UI that
+no capability can perform for you), then feeding the minted DOI back into
+`CITATION.cff` along with `version` and `date-released`, derived rather than
+hand-written.
 
 **Sequencing.** Blocked on Rust release versioning above, and on
 `CITATION.cff`, which shipped 2026-09-16. Zenodo reads `CITATION.cff` when

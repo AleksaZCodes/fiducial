@@ -72,14 +72,34 @@ ts-rs             = { version = "10" }
 
 # ── Internal crates ─────────────────────────────────────────────────────────
 # Path declared once so moving a crate is a one-line change, not thirteen.
-fiducial-adapters = { path = "crates/fiducial-adapters" }
-fiducial-core     = { path = "crates/fiducial-core" }
-fiducial-quantity = { path = "crates/fiducial-quantity" }
-fiducial-model    = { path = "crates/fiducial-model" }
-fiducial-protocol = { path = "crates/fiducial-protocol" }
-fiducial-eda      = { path = "crates/fiducial-eda" }
-fiducial-geometry = { path = "crates/fiducial-geometry" }
-fiducial-mesh     = { path = "crates/fiducial-mesh" }
-fiducial-ota      = { path = "crates/fiducial-ota" }
-fiducial-sim      = { path = "crates/fiducial-sim" }
-fiducial-tauri    = { path = "crates/fiducial-tauri" }
+#
+# `version` is required, and it is the one duplication cargo leaves no way to
+# avoid: `cargo publish` rejects any dependency without a version requirement
+# ("all dependencies must have a version requirement specified when
+# publishing"), and `version.workspace = true` is not accepted inside
+# `[workspace.dependencies]`. Every dependent crate was unpublishable without
+# these — which is one of the reasons nothing has ever reached crates.io.
+#
+# It is a duplicate of `[workspace.package] version` that cannot be deleted —
+# but it needs no gate of its own, because **cargo already enforces it more
+# strictly than a test could.** The resolver compares this requirement against
+# the sibling's actual version, so a line here that disagrees fails every
+# build immediately:
+#
+#     error: failed to select a version for the requirement
+#     `fiducial-geometry = "^0.9.9"` … candidate versions found which didn't
+#     match: 0.1.0
+#
+# A test asserting the same thing was written here and deleted: a second gate
+# behind a stronger one is noise that still has to be maintained.
+fiducial-adapters = { path = "crates/fiducial-adapters", version = "0.1.0" }
+fiducial-core     = { path = "crates/fiducial-core", version = "0.1.0" }
+fiducial-quantity = { path = "crates/fiducial-quantity", version = "0.1.0" }
+fiducial-model    = { path = "crates/fiducial-model", version = "0.1.0" }
+fiducial-protocol = { path = "crates/fiducial-protocol", version = "0.1.0" }
+fiducial-eda      = { path = "crates/fiducial-eda", version = "0.1.0" }
+fiducial-geometry = { path = "crates/fiducial-geometry", version = "0.1.0" }
+fiducial-mesh     = { path = "crates/fiducial-mesh", version = "0.1.0" }
+fiducial-ota      = { path = "crates/fiducial-ota", version = "0.1.0" }
+fiducial-sim      = { path = "crates/fiducial-sim", version = "0.1.0" }
+fiducial-tauri    = { path = "crates/fiducial-tauri", version = "0.1.0" }

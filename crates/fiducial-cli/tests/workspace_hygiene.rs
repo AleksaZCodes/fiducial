@@ -703,3 +703,86 @@ fn a_phase_built_from_the_roadmap_names_its_item() {
         missing.join("\n")
     );
 }
+
+/// The derived crates.io publish order puts every crate after its dependencies.
+///
+/// `cargo publish` requires each path dependency to already exist on crates.io
+/// at the declared version, so the order `scripts/crate-publish-order.py` emits
+/// is load-bearing: get it wrong and a release fails partway through, having
+/// already published some crates **permanently** — crates.io versions cannot be
+/// unpublished after 72 hours.
+///
+/// That is not a failure you can iterate on, which is why the ordering is
+/// checked here rather than discovered during a release.
+#[test]
+fn the_derived_publish_order_is_topological() {
+    let root = workspace_root();
+
+    let metadata = std::process::Command::new("cargo")
+        .args(["metadata", "--no-deps", "--format-version", "1"])
+        .current_dir(&root)
+        .output()
+        .expect("running cargo metadata");
+    assert!(metadata.status.success(), "cargo metadata failed");
+
+    let mut child = std::process::Command::new("python3")
+        .arg(root.join("scripts/crate-publish-order.py"))
+        .current_dir(&root)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .expect("running scripts/crate-publish-order.py");
+    std::io::Write::write_all(child.stdin.as_mut().expect("stdin"), &metadata.stdout)
+        .expect("writing metadata to the script");
+    let out = child
+        .wait_with_output()
+        .expect("collecting the script output");
+    assert!(out.status.success(), "crate-publish-order.py failed");
+
+    let order: Vec<String> = String::from_utf8(out.stdout)
+        .expect("utf-8")
+        .lines()
+        .filter_map(|l| l.split_whitespace().next().map(str::to_string))
+        .collect();
+
+    // Every workspace member is in the list. A crate silently dropped from the
+    // order is one that never gets published, which is the bug this whole
+    // change exists to fix — in its quietest possible form.
+    let members = crate_manifests().len();
+    assert_eq!(
+        order.len(),
+        members,
+        "the publish order lists {} crates but the workspace has {members}:\n{order:?}",
+        order.len()
+    );
+
+    let json: serde_json::Value =
+        serde_json::from_slice(&metadata.stdout).expect("cargo metadata is JSON");
+    let packages = json["packages"].as_array().expect("packages array");
+    let names: Vec<&str> = packages
+        .iter()
+        .map(|p| p["name"].as_str().expect("name"))
+        .collect();
+
+    let mut position = std::collections::HashMap::new();
+    for (i, name) in order.iter().enumerate() {
+        position.insert(name.as_str(), i);
+    }
+
+    for package in packages {
+        let name = package["name"].as_str().expect("name");
+        let me = position[name];
+        for dep in package["dependencies"].as_array().expect("dependencies") {
+            let dep_name = dep["name"].as_str().expect("dep name");
+            if !names.contains(&dep_name) {
+                continue; // a crates.io dependency is already published
+            }
+            assert!(
+                position[dep_name] < me,
+                "`{name}` is published at position {me}, before its workspace \
+                 dependency `{dep_name}` at {} — cargo will reject it",
+                position[dep_name]
+            );
+        }
+    }
+}

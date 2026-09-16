@@ -31,6 +31,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # changesets needs full history for changelog
+          # A push made with GITHUB_TOKEN does not trigger other workflows, and
+          # a PR it opens has its checks held at `action_required`. That made
+          # the Release PR unmergeable the moment the branch ruleset began
+          # requiring status checks. RELEASE_PAT is a PAT with contents +
+          # pull-requests write; the fallback keeps a fork or a secret-less
+          # checkout working rather than failing with an empty token.
+          token: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
 
       - uses: pnpm/action-setup@v4
         # version read from packageManager field in package.json — do not set here
@@ -53,43 +60,67 @@ jobs:
       # changesets/action either:
       #   a) opens/updates a "Release PR" when changesets are pending, or
       #   b) publishes when merging a Release PR (no pending changesets).
+      #
+      # Pinned to v2 deliberately. On v1 this step published to npm and then
+      # reported `published` as empty, because v1 detects what was published by
+      # parsing the CLI's stdout for `New tag:` lines and @changesets/cli 3.x
+      # prints a spinner-based "Successfully published:" block instead. In the
+      # action's source `pushTags()` and `setOutput("published")` sit inside the
+      # same branch, so one failed parse caused both symptoms seen on
+      # 2026-09-16: the crates.io step below never ran, and the git tags were
+      # created in the runner and never pushed. v2.0.0 dropped Changesets v1
+      # compatibility and reworked exactly this path.
+      #
+      # v2 also renames every input (`publish` → `publish-script`, `title` →
+      # `pr-title`, `commit` → `commit-message`) and no longer accepts a token
+      # via the GITHUB_TOKEN environment variable — it must be passed to the
+      # `github-token` input explicitly, or the default `github.token` is used
+      # and the PAT above is silently ignored.
+      #
+      # `create-github-releases` and `push-git-tags` both default to true, and
+      # the GitHub release is what a Zenodo webhook archives to mint a DOI.
       - name: Create Release PR or Publish
         id: changesets # referenced by the crates.io step below — without this
         # id, `steps.changesets.outputs.published` is always empty and that step
         # silently never runs.
-        uses: changesets/action@v1
+        uses: changesets/action@v2.1.2
         with:
-          publish: pnpm release
-          title: "chore: version packages"
-          commit: "chore: version packages"
+          github-token: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
+          publish-script: pnpm release
+          pr-title: "chore: version packages"
+          commit-message: "chore: version packages"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       # ── Publish Rust crates ────────────────────────────────────────────────
-      # Only runs when the Release PR is merged (i.e. when changesets/action
-      # actually published — detected by the `published` output being truthy).
+      # Only runs when changesets/action actually published (`published` output).
+      # That gate reported empty on v1 for the reason documented above, which is
+      # why this step had never once run since it was written.
       #
-      # `cargo publish` errors when the version already exists on crates.io, so
-      # each crate is skipped when its current version is already published.
-      # Without that guard a JS-only release fails here, because the Rust crate
-      # version is unchanged and cannot be pushed twice.
+      # Publish order is DERIVED — see scripts/crate-publish-order.py, which
+      # topologically sorts the workspace because `cargo publish` requires every
+      # path dependency to already exist on crates.io at the declared version.
+      # This step previously read `for crate in fiducial`, publishing one of
+      # fifteen. That script also emits each version, so nothing re-parses the
+      # metadata a second way.
       #
-      # crates.io rejects requests without a User-Agent (403), which would make
-      # a naive check report "not published" for everything and then fail on the
-      # publish itself — so the header is required, not decorative.
+      # Each crate is skipped when its version is already on crates.io, so a
+      # JS-only release is a no-op here rather than a failure. crates.io rejects
+      # requests without a User-Agent (403), which would make a naive check
+      # report "not published" for everything and then fail on the publish
+      # itself — so the header is required, not decorative.
       - name: Publish crates to crates.io
         if: steps.changesets.outputs.published == 'true'
         run: |
           set -euo pipefail
           ua="fiducial-release (https://github.com/${{ github.repository }})"
-          for crate in fiducial; do
-            version=$(cargo metadata --no-deps --format-version 1 \
-              | jq -r --arg c "$crate" '.packages[] | select(.name == $c) | .version')
-            if [ -z "$version" ]; then
-              echo "could not resolve a version for $crate" >&2
-              exit 1
-            fi
+
+          cargo metadata --no-deps --format-version 1 \
+            | python3 scripts/crate-publish-order.py > /tmp/publish-order.txt
+          echo "publish order:"; cat /tmp/publish-order.txt
+
+          while read -r crate version; do
+            [ -n "$crate" ] || continue
             code=$(curl -sS -H "User-Agent: $ua" -o /dev/null -w '%{http_code}' \
               "https://crates.io/api/v1/crates/$crate/$version")
             case "$code" in
@@ -97,6 +128,6 @@ jobs:
               404) echo "publishing $crate $version"; cargo publish --package "$crate" ;;
               *)   echo "crates.io returned $code checking $crate $version" >&2; exit 1 ;;
             esac
-          done
+          done < /tmp/publish-order.txt
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
