@@ -250,6 +250,59 @@ fn a_non_cloudflare_deploy_vendor_is_refused_by_name() {
     assert!(text(&out).contains("vercel"), "{}", text(&out));
 }
 
+// ── Resend secrets ────────────────────────────────────────────────────────────
+
+#[test]
+fn selecting_email_resend_emits_resend_api_key_secret() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_deploy(tmp.path(), "deploy = \"cloudflare\"\nemail = \"resend\"");
+    assert!(run(&root, &["derive"]).status.success());
+
+    let w = wrangler(&root);
+    assert!(w.contains("wrangler secret put RESEND_API_KEY"), "{w}");
+    for line in w.lines() {
+        if line.contains("RESEND_API_KEY") {
+            assert!(
+                line.trim_start().starts_with('#'),
+                "a secret must never appear as an assignment: {line}"
+            );
+        }
+    }
+}
+
+#[test]
+fn selecting_newsletter_resend_emits_both_resend_secrets() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_deploy(
+        tmp.path(),
+        "deploy = \"cloudflare\"\nnewsletter = \"resend\"",
+    );
+    assert!(run(&root, &["derive"]).status.success());
+
+    let w = wrangler(&root);
+    assert!(w.contains("wrangler secret put RESEND_API_KEY"), "{w}");
+    assert!(w.contains("wrangler secret put RESEND_AUDIENCE_ID"), "{w}");
+}
+
+#[test]
+fn selecting_both_resend_email_and_newsletter_emits_resend_api_key_exactly_once() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_deploy(
+        tmp.path(),
+        "deploy = \"cloudflare\"\nemail = \"resend\"\nnewsletter = \"resend\"",
+    );
+    assert!(run(&root, &["derive"]).status.success());
+
+    let w = wrangler(&root);
+    // RESEND_API_KEY must appear in exactly one `wrangler secret put` comment.
+    let count = w
+        .lines()
+        .filter(|l| l.contains("wrangler secret put RESEND_API_KEY"))
+        .count();
+    assert_eq!(count, 1, "RESEND_API_KEY must not be duplicated:\n{w}");
+    assert!(w.contains("wrangler secret put RESEND_AUDIENCE_ID"), "{w}");
+}
+
 // ── Gate ─────────────────────────────────────────────────────────────────────
 
 #[test]

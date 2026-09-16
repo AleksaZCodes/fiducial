@@ -65,12 +65,13 @@ const REAL_VENDORS = {
   database: 'd1',
   storage: 'r2',
   deploy: 'cloudflare',
+  email: 'resend',
   botProtection: 'turnstile',
   queue: 'cloudflare-queues',
+  newsletter: 'resend',
   auth: 'supabase',
-  // `email` and `errors` have no real vendor yet — `none` is a real
-  // implementation, so it belongs in the typechecked set rather than omitted.
-  email: 'none',
+  // `errors` has no real vendor yet — `none` is a real implementation, so it
+  // belongs in the typechecked set rather than omitted.
   errors: 'none',
 }
 
@@ -165,7 +166,7 @@ describe('the generated adapter factory compiles', () => {
   it('constructs every contract, so the typecheck actually covered them', () => {
     // A factory that emitted nothing would typecheck trivially.
     const factory = readFileSync(join(allReal, 'src/adapters.generated.ts'), 'utf8')
-    for (const contract of ['database', 'storage', 'email', 'diagnostics', 'botProtection', 'queue']) {
+    for (const contract of ['database', 'storage', 'email', 'diagnostics', 'botProtection', 'queue', 'newsletter']) {
       assert.match(factory, new RegExp(`${contract}:\\s*new `), `${contract} is not constructed`)
     }
     assert.match(factory, /export function createAuth\(/)

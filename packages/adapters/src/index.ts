@@ -20,7 +20,10 @@ export type { Storage } from "./storage.js";
 export { NoneStorage, R2Storage, StorageError } from "./storage.js";
 
 export type { Email, Message } from "./email.js";
-export { EmailError, NoneEmail } from "./email.js";
+export { EmailError, NoneEmail, ResendEmail } from "./email.js";
+
+export type { Newsletter, Subscription, SubscriberAttributes } from "./newsletter.js";
+export { NewsletterError, NoneNewsletter, ResendNewsletter } from "./newsletter.js";
 
 export type { Diagnostics, DiagnosticsLevel } from "./diagnostics.js";
 export { NoneDiagnostics } from "./diagnostics.js";
@@ -63,12 +66,14 @@ import type { Email } from "./email.js";
 import type { Diagnostics } from "./diagnostics.js";
 import type { BotProtection } from "./bot-protection.js";
 import type { Queue } from "./queue.js";
+import type { Newsletter } from "./newsletter.js";
 import { NoneDatabase } from "./database.js";
 import { NoneStorage } from "./storage.js";
 import { NoneEmail } from "./email.js";
 import { NoneDiagnostics } from "./diagnostics.js";
 import { NoneBotProtection } from "./bot-protection.js";
 import { NoneQueue } from "./queue.js";
+import { NoneNewsletter } from "./newsletter.js";
 
 /**
  * The full adapter set — one of these per product, built from `[adapters]`
@@ -89,6 +94,7 @@ export interface AdapterSet {
   diagnostics: Diagnostics;
   botProtection: BotProtection;
   queue: Queue;
+  newsletter: Newsletter;
 }
 
 /**
@@ -106,5 +112,6 @@ export function createNoneAdapters(): AdapterSet {
     diagnostics: new NoneDiagnostics(),
     botProtection: new NoneBotProtection(),
     queue: new NoneQueue(),
+    newsletter: new NoneNewsletter(),
   };
 }

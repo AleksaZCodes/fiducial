@@ -195,6 +195,7 @@ Capabilities
   storage        not selected
   deploy         not selected
   email          not selected
+  newsletter     not selected
   errors         not selected
   botProtection  not selected
   queue          not selected

@@ -1,0 +1,153 @@
+# Skill: realtime
+
+**Capability:** `realtime` · **Package:** `@fiducial/realtime` · **Platform:** Fiducial {{version}}
+
+This skill is loaded by Claude Code automatically when the `realtime` capability
+is installed. Read it once at session start; do not re-derive it.
+
+---
+
+## What this capability adds
+
+`@fiducial/realtime` — typed wrappers over three Supabase Realtime contracts:
+
+| Contract | What it does |
+|---|---|
+| **Broadcast** | Fire-and-forget ephemeral messages to every channel subscriber |
+| **Presence** | Shared online state — who joined, who left, current snapshot |
+| **Postgres Changes** | CDC stream from a Postgres table: INSERT, UPDATE, DELETE |
+
+None of the three import `@supabase/supabase-js` directly. Each takes an
+**adapter** — an interface the caller satisfies by passing a Supabase channel.
+Tests run without a live connection; the Supabase client is never leaked into
+test setup.
+
+## Installing into a product package
+
+Add `@fiducial/realtime` to the product package that needs it:
+
+```sh
+pnpm add @fiducial/realtime @supabase/supabase-js --filter @{{name}}/web
+```
+
+## Wiring: one Supabase client, one channel per context
+
+```ts
+import { createClient } from '@supabase/supabase-js';
+import { createBroadcast, createPresence, createPostgresChanges } from '@fiducial/realtime';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+);
+
+// One channel groups related contracts — they share a single WebSocket.
+export function boardChannel(boardId: string) {
+  const ch = supabase.channel(`board:${boardId}`);
+  return {
+    broadcast: createBroadcast(ch),
+    presence:  createPresence(ch),
+    changes:   createPostgresChanges(ch),
+  };
+}
+```
+
+Supabase channels satisfy all three adapter interfaces directly — no shim needed.
+
+## Contract 1: Broadcast
+
+Fire-and-forget ephemeral events. No persistence, no history, no ordering guarantee.
+
+```ts
+// Declare the event map once.
+type BoardEvents = {
+  cursor: { userId: string; x: number; y: number };
+  lock:   { userId: string; component: string };
+};
+
+const { broadcast } = boardChannel('b1');
+
+// Send.
+await broadcast.send('cursor', { userId: 'u1', x: 120, y: 340 });
+
+// Receive. Returns an unsubscribe function.
+const off = broadcast.on('cursor', ({ userId, x, y }) => {
+  console.log(userId, x, y);
+});
+off(); // stop listening
+```
+
+## Contract 2: Presence
+
+Shared state about who is currently online. Supabase tracks join/leave and
+provides a snapshot of every connected client.
+
+```ts
+type UserPresence = { userId: string; name: string };
+
+const { presence } = boardChannel('b1');
+
+// Announce this client.
+await presence.track({ userId: 'u1', name: 'Alice' });
+
+// Read the current snapshot (Map<presenceKey, UserPresence>).
+const online = presence.state();
+
+// Listen for joins and leaves.
+const offJoin  = presence.onJoin(({ key, newPresences }) => { /* ... */ });
+const offLeave = presence.onLeave(({ key, leftPresences }) => { /* ... */ });
+
+// Leave gracefully.
+await presence.untrack();
+```
+
+## Contract 3: Postgres Changes
+
+CDC stream from a Postgres table. The row type `R` is the full row — UPDATE
+gives both `new` (after) and `old` (before, partial — only replica-identity
+fields). DELETE gives `old` only.
+
+```ts
+type Round = { id: string; state: 'pending' | 'active' | 'ended'; startedAt: string };
+
+const { changes } = boardChannel('b1');
+
+// All three events in one handler.
+changes.on({ schema: 'public', table: 'rounds' }, event => {
+  if (event.eventType === 'INSERT') console.log('new round', event.new);
+  if (event.eventType === 'UPDATE') console.log('updated',   event.new);
+  if (event.eventType === 'DELETE') console.log('deleted',   event.old);
+});
+
+// Or subscribe per type.
+changes.onInsert({ schema: 'public', table: 'rounds' }, e => console.log(e.new));
+changes.onUpdate({ schema: 'public', table: 'rounds' }, e => console.log(e.new, e.old));
+changes.onDelete({ schema: 'public', table: 'rounds' }, e => console.log(e.old));
+
+// Row filter (Supabase filter syntax).
+changes.onInsert(
+  { schema: 'public', table: 'rounds', filter: `board_id=eq.b1` },
+  e => console.log(e.new),
+);
+```
+
+Postgres Changes require the table to have `REPLICA IDENTITY FULL` set for
+UPDATE and DELETE old-row values to be populated. Without it `old` is `{}`.
+
+## No capability block in fiducial.toml
+
+`realtime` has no `[realtime]` config block and no pipeline. There is nothing
+to declare and nothing to derive — the contracts are typed wrappers, not
+generated code. Install the package, wire up a channel, and use it.
+
+## Key constraints
+
+- **One channel per logical context.** Channels share a WebSocket; opening many
+  channels for the same entity wastes connections.
+- **Subscribe before calling `channel.subscribe()`.** Handlers registered after
+  the channel is live may miss events. The `boardChannel` factory above returns
+  the channel before it subscribes — call `.subscribe()` on the channel object
+  after attaching all handlers.
+- **Postgres Changes are Supabase/Postgres only.** The contract does not abstract
+  over the database vendor — it is a CDC stream from a live Postgres instance.
+  SQLite (D1) does not support it.
