@@ -29,7 +29,7 @@ std     = ["alloc"]
 ed25519 = ["dep:ed25519-dalek"]
 
 [dependencies]
-fiducial-core = { path = "../fiducial-core" }
+fiducial-core = { workspace = true }
 ed25519-dalek = { workspace = true, optional = true }
 
 [dev-dependencies]

@@ -703,3 +703,70 @@ fn a_phase_built_from_the_roadmap_names_its_item() {
         missing.join("\n")
     );
 }
+
+/// Every internal crate's dependency version matches `[workspace.package]`.
+///
+/// `cargo publish` refuses a dependency with no version requirement — "all
+/// dependencies must have a version requirement specified when publishing" —
+/// because the published crate has no path to resolve. So the eleven internal
+/// entries in `[workspace.dependencies]` carry `version` alongside `path`, and
+/// that version is necessarily a **copy** of `[workspace.package] version`.
+/// Cargo has no way to inherit one into the other.
+///
+/// This is the one duplication this workspace cannot delete, so it is gated
+/// instead: bump the workspace version and this test names every line still
+/// carrying the old one. Without it, the next bump publishes crates that
+/// depend on versions of their siblings that do not exist — which fails at
+/// `cargo publish`, on the only path that matters, after the first few crates
+/// have already gone out and cannot be taken back.
+///
+/// Found by `cargo publish --dry-run` on 2026-09-16: not one crate in this
+/// workspace could be published, and nothing said so.
+#[test]
+fn internal_dependencies_pin_the_workspace_version() {
+    let root = workspace_root();
+    let text = std::fs::read_to_string(root.join("Cargo.toml")).expect("workspace manifest");
+
+    let workspace_version = text
+        .lines()
+        .find_map(|l| {
+            let t = l.trim();
+            t.strip_prefix("version")?
+                .trim_start()
+                .strip_prefix('=')
+                .map(|v| v.trim().trim_matches('"').to_string())
+        })
+        .expect("[workspace.package] declares a version");
+
+    let mut offenders: Vec<String> = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        let trimmed = line.trim();
+        // An internal crate is one declared with a path into `crates/`.
+        if !trimmed.contains("path = \"crates/") {
+            continue;
+        }
+        let name = trimmed.split_whitespace().next().unwrap_or("?");
+        match trimmed.split("version = \"").nth(1).and_then(|v| v.split('"').next()) {
+            None => offenders.push(format!(
+                "  Cargo.toml:{} — `{name}` declares no version, so `cargo publish` \
+                 rejects every crate that depends on it",
+                index + 1
+            )),
+            Some(v) if v != workspace_version => offenders.push(format!(
+                "  Cargo.toml:{} — `{name}` pins {v}, but [workspace.package] is \
+                 {workspace_version}",
+                index + 1
+            )),
+            Some(_) => {}
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "internal dependencies must pin the workspace version.\n\
+         Cargo cannot inherit `[workspace.package] version` into a dependency \
+         requirement, so this copy exists and has to be gated instead.\n\n\
+         {}\n",
+        offenders.join("\n")
+    );
+}
