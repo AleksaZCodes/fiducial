@@ -23,7 +23,7 @@ numbering is unchanged._
 | --- | --- |
 | Repo `AleksaZCodes/fiducial` (public, MIT) | ✅ https://github.com/AleksaZCodes/fiducial |
 | `MISSION.md`, `STACK.md`, `LICENSE`, `IP-POLICY.md` | ✅ |
-| `crates/fiducial` v0.1.0 → crates.io | ❌ **not on crates.io** — recorded as published, verified absent 2026-09-16 |
+| `crates/fiducial` v0.1.0 → crates.io | ❌ **not on crates.io** — recorded as published, verified absent 2026-09-16. **Resolved 2026-09-16:** never published, not published-then-removed — all fifteen names return "does not exist" and a yanked crate still resolves. This row recorded an intention. See `docs/specs/2026-09-16-the-rust-crates-release-in-lockstep.md` |
 | `@fiducial/fiducial` v0.1.0 → js registry (`@fiducial` org created) | ✅ published |
 | Design spec → `docs/specs/2026-09-06-fiducial-design.md` | ✅ |
 
@@ -383,6 +383,28 @@ built because no product has one yet.
 | `fid capability list --all` — `database`/`storage` now show `selectable: none, d1` / `none, r2` | ✅ |
 | **Deliberately not done, and said so in `ROADMAP.md`, `SHIPPED.md` and the spec**: Workers-as-`deploy` (needs its own design — `deploy` is pipeline-shaped, not a runtime trait), Access, Turnstile, Queues, Workers AI (no contract exists for any of the four, and designing one against zero consumers is the mistake *capability taxonomy, made real* already corrected once), a Rust-side D1/R2 client (would need Cloudflare's HTTP/S3 API over an API token, not a binding — no Tauri product needs it), a working `signedUrl` | ✅ |
 | Clippy (0 warnings), fmt, full Rust suite (all workspace crates) and the new JS test file all green | ✅ |
+
+**Phase 36 — the release actually reaches the registries ✅ (2026-09-16)**
+
+> Implements the roadmap item **Rust release versioning**, in the half that was
+> never a versioning problem: there was no publish path at all. Spec:
+> `docs/specs/2026-09-16-the-rust-crates-release-in-lockstep.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **The precondition was met before any publish logic was written**, as the roadmap demanded: all fifteen names return `crate … does not exist`. Nobody holds them, and a yanked crate still resolves — so "never published", not "published then removed". The Phase 0 row above recorded an intention | ✅ |
+| **Two failures found by `cargo publish --dry-run`, which had never been run** — neither visible in any workflow log, because neither got as far as a log | ✅ |
+| **Not one crate in this workspace could be published.** The eleven internal `[workspace.dependencies]` entries declared `path` and no `version`, which `cargo publish` refuses: a published crate has no path to resolve. The one-crate loop and the dead `if:` gate were symptoms sitting on top of this | ✅ |
+| **`fiducial-cli` could not be packaged** — `build.rs` read `MISSION.md` two directories up, and `cargo package` cannot reach outside a package directory. A symlink inside the crate fixes it without a second copy of the principles, verified present by `cargo package --list` | ✅ |
+| **All fifteen now package, verify and order by dependency** under `cargo publish --dry-run`, for the first time | ✅ |
+| **The gate was deleted, not repaired.** `if: steps.changesets.outputs.published == 'true'` reported skipped on two consecutive runs that did publish. The step asks crates.io what exists and publishes only what does not, so it needs no gate — and gating a registry check on a claim *about* the registry is the second declaration this platform exists to delete | ✅ |
+| **The `for crate in fiducial` loop is gone**, and nothing replaced it with fifteen names. `cargo publish` has ordered multi-package publishing since Rust 1.90; `scripts/publish-crates.sh` names only the missing crates and lets cargo order them | ✅ |
+| `scripts/verify-published.sh` — asks npm, crates.io and `git ls-remote --tags origin` whether what the repository declares is actually there. Run by `release.yml` with `if: always()`, because the step it checks has lied twice | ✅ |
+| **Tags are pushed and verified against the remote**, never the runner's clone — the clone is the thing that reported "Created git tags" while the remote stayed empty | ✅ |
+| **Lockstep decided and recorded**, per the roadmap's "decide this explicitly — expensive to reverse". They are one artifact with one story; fifteen independent changelogs would record the same commits fifteen times. Revisit when a crate first needs a version the others do not, which is a visible event | ✅ |
+| **The one duplication cargo forces is gated.** `version = "0.1.0"` on each internal dependency cannot inherit from `[workspace.package]`, so `internal_dependencies_pin_the_workspace_version` names every line still carrying the old version after a bump — before a fifteen-crate publish discovers it partway through and cannot be undone | ✅ |
+| `RELEASE_PAT` read with a fallback to `GITHUB_TOKEN`, so the file is correct before the secret exists and starts working the moment it does. Creating it is the one step only the account owner can take | 🟡 |
+| **Deliberately not done, and said so**: a Rust version-bump mechanism (the roadmap's third question — answerable against something real now that a publish path exists), the Zenodo DOI (needs a tag, then a GitHub release, then the webhook; this supplies and verifies the first link), and `WIRE_VERSION`, which is deliberately not SemVer | ✅ |
 
 **Phase 35 — the AI contract, targeting a gateway ✅ (2026-09-16)**
 

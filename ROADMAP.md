@@ -1246,20 +1246,42 @@ other workspace package was present. Not a misconfiguration — it was sitting
 in a Release PR that had never been merged, for the `action_required` reason
 in point 3 above. Published at `0.2.0` alongside `@fiducial/adapters@0.2.0`.
 
+**Resolved 2026-09-16, and two more failures found underneath.** The
+precondition above was met first: all fifteen names return `crate … does not
+exist`, so nobody holds them and "never published" is the answer — a yanked
+crate still resolves. Then `cargo publish --dry-run`, which had never been
+run, found two failures no workflow log could show, because neither got as far
+as a log:
+
+- The eleven internal entries in `[workspace.dependencies]` declared `path`
+  and no `version`, which `cargo publish` refuses. **Not one crate in this
+  workspace could be published**, whatever the workflow said. The one-crate
+  loop and the dead gate were symptoms sitting on top of this.
+- `fiducial-cli`'s `build.rs` read `MISSION.md` two directories above its
+  manifest, and `cargo package` cannot reach outside a package directory, so
+  the tarball had no `MISSION.md` and verification panicked.
+
+Both fixed; all fifteen now package, verify and order by dependency under
+`cargo publish --dry-run`. Spec:
+`docs/specs/2026-09-16-the-rust-crates-release-in-lockstep.md`.
+
 Three things have to be decided, and only the first is mechanical:
 
-1. **Publish order.** `cargo publish` requires every path dependency to
-   already exist on crates.io at the declared version, so the fifteen have to
-   go in dependency order. `cargo metadata` has the graph; deriving the order
-   from it beats hand-maintaining a list, and hand-maintaining a list is what
-   the current single-crate loop would become.
-2. **Lockstep or independent.** They all inherit `version` from
-   `[workspace.package]` today. Lockstep is honest for a pre-1.0 spine whose
-   crates are really one artifact, and it is what `WIRE_VERSION` already
-   assumes about the protocol crates. Independent versions are more correct
-   and mean fifteen changelogs. **Decide this explicitly and record it** —
-   it is the kind of choice that is expensive to reverse once published
-   versions exist.
+1. **Publish order.** ✅ **Done 2026-09-16, and it is cargo's job rather than
+   ours.** `cargo publish` has accepted several `--package` flags and ordered
+   them by dependency since Rust 1.90, waiting for each to reach the index
+   before its dependents. `scripts/publish-crates.sh` asks crates.io which
+   versions exist and names only the missing ones, so nothing hand-maintains
+   a list and nothing encodes the order.
+2. **Lockstep or independent.** ✅ **Decided 2026-09-16: lockstep**, and
+   recorded in the spec above. They are one artifact with one story — the
+   `no_std` spine and facets of it that are separate crates so a firmware
+   target links three instead of fifteen. Fifteen independent changelogs
+   would record the same commits fifteen times. Revisit when a crate first
+   needs a version the others do not, which is a visible event rather than a
+   judgment call. The forced copy of `[workspace.package] version` in each
+   internal dependency is gated by
+   `internal_dependencies_pin_the_workspace_version`.
 3. **What declares the bump.** Changesets is JS-only. The options are a Rust
    equivalent (`cargo-release`, `release-plz`), teaching the existing
    `.changeset/*.md` files to carry crate bumps too, or a `fid release bump`
@@ -1278,6 +1300,11 @@ Recorded because none of them is visible until you run the thing:
    run. Fix the gate before fixing the loop — the loop is the visible half of
    the bug and the smaller one.
 
+   ✅ **Fixed 2026-09-16 by deleting the gate, not repairing it.** The step
+   asks crates.io what exists and publishes only what does not, so it needs
+   no gate — and gating a registry check on a claim *about* the registry is
+   the second declaration this platform exists to delete.
+
 2. **`changeset publish` reported success for a package it did not publish.**
    The log read `Successfully published: @fiducial/adapters@0.2.0,
    @fiducial/identity@0.2.0` — printed 1ms apart, after a `(1/2)` progress
@@ -1289,6 +1316,10 @@ Recorded because none of them is visible until you run the thing:
    same "a green build is not evidence of consistency" finding the Phase 18
    audit already produced once.
 
+   ✅ **Fixed 2026-09-16.** `scripts/verify-published.sh` asks npm, crates.io
+   and the git remote whether what the repository declares is actually there,
+   and `release.yml` runs it with `if: always()`.
+
 3. **CI on the Release PR sits in `action_required`.** Runs on
    `changeset-release/main` have needed manual approval since 2026-09-15 —
    GitHub gates workflow runs on bot-authored PRs. Harmless until the branch
@@ -1296,6 +1327,11 @@ Recorded because none of them is visible until you run the thing:
    permanently unmergeable and had to be approved by hand. The durable fix is
    a PAT for `changesets/action` instead of `GITHUB_TOKEN`, so the PR is
    authored by a human account and CI runs unattended.
+
+   🟡 **Wired 2026-09-16, waiting on the secret.** The workflow reads
+   `${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}`, so nothing changes
+   until the secret exists and it starts working the moment it does. Creating
+   it is the one step here that only the account owner can take.
 
 **Not this item:** `WIRE_VERSION` is deliberately not SemVer and its
 mechanism is already stricter. Leave it alone.
@@ -1327,6 +1363,10 @@ which is the hardest shape of bug to notice from a green workflow.
 
 Whatever creates the tag must be verified against the **remote**, for the same
 reason the publish must be verified against the registry.
+
+✅ **Fixed 2026-09-16.** `release.yml` pushes tags after a publish, and
+`scripts/verify-published.sh tags` reads `git ls-remote --tags origin` — never
+the runner's own clone, which is the thing that lied.
 
 **Sequencing.** Blocked on Rust release versioning above, and on
 `CITATION.cff`, which shipped 2026-09-16. Zenodo reads `CITATION.cff` when

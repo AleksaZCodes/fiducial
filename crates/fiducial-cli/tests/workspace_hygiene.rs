@@ -746,7 +746,11 @@ fn internal_dependencies_pin_the_workspace_version() {
             continue;
         }
         let name = trimmed.split_whitespace().next().unwrap_or("?");
-        match trimmed.split("version = \"").nth(1).and_then(|v| v.split('"').next()) {
+        match trimmed
+            .split("version = \"")
+            .nth(1)
+            .and_then(|v| v.split('"').next())
+        {
             None => offenders.push(format!(
                 "  Cargo.toml:{} — `{name}` declares no version, so `cargo publish` \
                  rejects every crate that depends on it",
