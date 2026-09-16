@@ -384,6 +384,30 @@ built because no product has one yet.
 | **Deliberately not done, and said so in `ROADMAP.md`, `SHIPPED.md` and the spec**: Workers-as-`deploy` (needs its own design — `deploy` is pipeline-shaped, not a runtime trait), Access, Turnstile, Queues, Workers AI (no contract exists for any of the four, and designing one against zero consumers is the mistake *capability taxonomy, made real* already corrected once), a Rust-side D1/R2 client (would need Cloudflare's HTTP/S3 API over an API token, not a binding — no Tauri product needs it), a working `signedUrl` | ✅ |
 | Clippy (0 warnings), fmt, full Rust suite (all workspace crates) and the new JS test file all green | ✅ |
 
+**Phase 33 — Resend, and the newsletter contract ✅ (2026-09-16)**
+
+> Implements the roadmap item **Newsletter and transactional email**,
+> requested directly by the founder — "we also need a newsletter of some
+> sorts before the first product" — with Resend named as the vendor. Spec:
+> `docs/specs/2026-09-16-resend-and-the-newsletter-contract.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| `ResendEmail` — the `email` contract's first real vendor. `POST https://api.resend.com/emails` over plain HTTPS with `env.RESEND_API_KEY`, the secret-reached boundary `turnstile` established rather than the binding boundary `d1`/`r2` use | ✅ |
+| **New `newsletter` contract** — `subscribe` / `unsubscribe` / `status`, Rust trait + `NoneNewsletter` in `fiducial-adapters`, TS interface + `None*` in `@fiducial/adapters` | ✅ |
+| `ResendNewsletter` — real `Newsletter` over the audience-scoped Contacts API, with the audience ID read from `env` so Resend's in-progress Audiences→Segments migration is a config change rather than a code change | ✅ |
+| **The list is a second contract, not a method on `email`, and the spec says why**: SES and Cloudflare Email Routing — two of the three vendors `email` is designed against — have no subscriber list at all, so `subscribe` would be unimplementable across most of the contract's intended range | ✅ |
+| **Vendor shapes verified against current documentation via context7, not recalled**: Resend is mid-migration to a Global Contacts model, and training data alone would have modelled the adapter around `audience_id` and been wrong inside a year | ✅ |
+| `subscribe` is idempotent — re-submitting an address is the normal case for a landing page, not an error; a 409/422 falls back to a status read and re-subscribes a previously unsubscribed contact | ✅ |
+| **`unsubscribe` treats a contact the vendor does not have as success**, found in review after the first implementation threw on it. The caller asked for "this person is not subscribed" and that state already holds; throwing turns a correctly-handled unsubscribe link into an error page, on the one request a product is obliged to honour. Every other failure still throws, with its own test | ✅ |
+| **`RESEND_API_KEY` is required by two contracts, so the derived secrets list is deduplicated** — selecting both `email = "resend"` and `newsletter = "resend"` emitted the `wrangler secret put` line twice before; a test now counts occurrences and asserts exactly one | ✅ |
+| `ADAPTER_SLOTS` absorbed the seventh contract as one table row, which is the payoff the Phase 28b refactor was performed for and the first test of that claim | ✅ |
+| **Rust gets the contract and `none`, not the vendor** — and states which of the two reasons applies: not structural (a bearer-token POST is reachable from Rust), simply no consumer, since every product shape here renders forms and sends mail from TypeScript. `cloudflare-queues` is blocked by construction; `resend` is merely unbuilt, and conflating those would make a future Rust consumer look impossible | ✅ |
+| 5 new Rust unit tests, 22 new TypeScript tests, 6 new end-to-end CLI tests | ✅ |
+| Docs terminal captures regenerated; `fid context --check`, `fid docs --check` and `fid release check` green; prose block re-read against `pub static CONTRACTS` before acceptance | ✅ |
+| Full Rust suite, clippy (0 warnings), JS build/typecheck/test, and the generated-factory suite through real `tsc` all green | ✅ |
+| **Deliberately not done, and said so**: broadcast send, template rendering, segment management, double opt-in and the consent record (all deferred to **Legal & compliance**), Rust-side Resend classes, a `newsletter` capability directory, and unsubscribe-link generation | ✅ |
+
 **Phase 28b — Turnstile and Cloudflare Queues 🟡 (2026-09-15)**
 
 > Implements the roadmap item **Cloudflare adapter set**, two more of seven

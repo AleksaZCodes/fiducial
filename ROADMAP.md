@@ -393,6 +393,38 @@ table, and a contract shaped for a consumer that does not exist is the
 speculative-contract mistake this platform has already corrected once. The
 first product that hits it is the signal to build it.
 
+### Newsletter and transactional email — *terminal, product-critical* ✅
+
+Requested directly by the founder — "we also need a newsletter of some sorts
+before the first product" — with the vendor named: Resend. Spec:
+`docs/specs/2026-09-16-resend-and-the-newsletter-contract.md`.
+
+**Why it jumped the queue.** Every other item in this round can be built
+after the first product and lose only time. This one loses the audience that
+existed while it was missing: a landing page without a subscribe box does not
+collect zero addresses, it discards every visitor it gets, permanently and
+silently. That is the cost-of-delay ordering rule applied to itself.
+
+**Shipped:** `email = "resend"` — the transactional contract's first real
+vendor, `POST /emails` over plain HTTPS with `env.RESEND_API_KEY`, the same
+secret-reached boundary `turnstile` established. And a **new `newsletter`
+contract** (`subscribe` / `unsubscribe` / `status`) with `none` and `resend`.
+
+**Why the list is a second contract rather than a method on `email`.** SES
+and Cloudflare Email Routing — two of the three vendors `email` is designed
+against — have no concept of a subscriber list, so `subscribe` would be
+unimplementable on most of the contract's own intended range. The evidence
+that settled it came from the vendor: Resend is mid-migration from Audiences
+to Segments while `POST /emails` did not move at all. Two things with
+independent rates of change.
+
+**Deliberately not built:** broadcast send (composing a campaign is an
+editorial act performed in a dashboard, and no narrow intersection across
+vendors exists yet), and **double opt-in and the consent record**, which
+belong to **Legal & compliance** below — building them here means building
+them twice, which is the precise reason that item is sequenced after i18n
+and brand.
+
 ### AI — *terminal, product-critical* ⬜
 
 "Some way to run AI on the edge or connect to an internet API" — named
