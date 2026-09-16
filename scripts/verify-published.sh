@@ -36,8 +36,26 @@ cd "$repo"
 # not decorative.
 ua="fiducial-release (https://github.com/AleksaZCodes/fiducial)"
 
+LEGACY_FILE="docs/release/legacy-untagged.txt"
+
 section="${1:-all}"
 missing=()
+
+# Package versions come from the **committed** tree, never the working tree.
+#
+# `changesets/action` runs `changeset version` in place before opening its
+# Release PR, so by the time this script runs in `release.yml` the working
+# tree holds the *next* versions — ones deliberately not published yet. The
+# first run after this script landed duly reported
+# `@fiducial/adapters@0.3.0 — not on npm`, which was true and not a problem:
+# 0.3.0 was sitting in an unmerged Release PR.
+#
+# HEAD is the right question in both cases. On an ordinary merge it holds the
+# versions already released; on a Release PR merge it holds the versions this
+# very run publishes.
+committed() {
+  git show "HEAD:$1" 2>/dev/null
+}
 
 # ── npm ───────────────────────────────────────────────────────────────────────
 # Every workspace package that is not `private` is expected on the registry at
@@ -48,11 +66,13 @@ verify_npm() {
   echo "── npm ──"
   local pkg name version code
   while IFS= read -r pkg; do
-    if [ "$(jq -r '.private // false' "$pkg")" = "true" ]; then
+    json=$(committed "$pkg") || continue
+    [ -z "$json" ] && continue
+    if [ "$(jq -r '.private // false' <<<"$json")" = "true" ]; then
       continue
     fi
-    name=$(jq -r '.name' "$pkg")
-    version=$(jq -r '.version' "$pkg")
+    name=$(jq -r '.name' <<<"$json")
+    version=$(jq -r '.version' <<<"$json")
     code=$(curl -sS -o /dev/null -w '%{http_code}' \
       "https://registry.npmjs.org/${name//\//%2f}/$version")
     case "$code" in
@@ -88,18 +108,32 @@ verify_crates() {
 # for, not evidence against it.
 verify_tags() {
   echo "── git tags (remote) ──"
-  local remote_tags name version tag
+  local remote_tags name version tag legacy
   remote_tags=$(git ls-remote --tags origin | sed 's#.*refs/tags/##' | sed 's/\^{}$//' | sort -u)
+  # Versions published before anything pushed tags. See the file's own header.
+  legacy=$(grep -vE '^\s*(#|$)' "$LEGACY_FILE" 2>/dev/null || true)
 
   while IFS= read -r pkg; do
-    if [ "$(jq -r '.private // false' "$pkg")" = "true" ]; then
+    json=$(committed "$pkg") || continue
+    [ -z "$json" ] && continue
+    if [ "$(jq -r '.private // false' <<<"$json")" = "true" ]; then
       continue
     fi
-    name=$(jq -r '.name' "$pkg")
-    version=$(jq -r '.version' "$pkg")
+    name=$(jq -r '.name' <<<"$json")
+    version=$(jq -r '.version' <<<"$json")
     tag="$name@$version"
     if grep -qxF "$tag" <<<"$remote_tags"; then
-      printf '  ✓ %s\n' "$tag"
+      # A tag on the legacy list that now exists means the list is stale, and a
+      # stale exemption is how a gate quietly stops gating. Say so.
+      if grep -qxF "$tag" <<<"$legacy"; then
+        printf '  ✗ %s — exists, but is still listed in %s; remove that line\n' \
+          "$tag" "$LEGACY_FILE"
+        missing+=("stale-exemption:$tag")
+      else
+        printf '  ✓ %s\n' "$tag"
+      fi
+    elif grep -qxF "$tag" <<<"$legacy"; then
+      printf '  ~ %s — untagged, known (predates tag pushing)\n' "$tag"
     else
       printf '  ✗ %s — no such tag on origin\n' "$tag"
       missing+=("tag:$tag")

@@ -88,9 +88,18 @@ ts-rs             = { version = "10" }
 # crates.io", and it is invisible until `cargo publish --dry-run` runs.
 #
 # It is also the one duplication of `[workspace.package] version` that cargo
-# forces on us. `workspace_hygiene.rs::internal_dependencies_pin_the_workspace_version`
-# gates it, so the copy cannot drift: bump the workspace version and the test
-# names every line that still says the old one.
+# forces on us, and it needs no gate of its own — **cargo enforces it more
+# strictly than a test could.** The resolver compares this requirement against
+# the sibling's real version, so a line that disagrees fails every build
+# immediately:
+#
+#     error: failed to select a version for the requirement
+#     `fiducial-geometry = "^0.9.9"` … candidate versions found which didn't
+#     match: 0.1.0
+#
+# A test asserting the same thing was written here and deleted. A second gate
+# standing behind a stronger one is not defence in depth; it is one more thing
+# to maintain that can only ever fire later than the thing in front of it.
 fiducial-adapters = { path = "crates/fiducial-adapters", version = "0.1.0" }
 fiducial-core     = { path = "crates/fiducial-core", version = "0.1.0" }
 fiducial-quantity = { path = "crates/fiducial-quantity", version = "0.1.0" }

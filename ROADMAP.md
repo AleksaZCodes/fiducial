@@ -1368,6 +1368,41 @@ reason the publish must be verified against the registry.
 `scripts/verify-published.sh tags` reads `git ls-remote --tags origin` — never
 the runner's own clone, which is the thing that lied.
 
+**Root cause, found in PR #43 and adopted here.** The `published` output and
+the tag push are **one** bug, not two: `changesets/action@v1` detects what it
+published by parsing stdout for `New tag:` lines, `@changesets/cli` 3.x prints
+a different block, and `pushTags()` sits inside the same failed branch. Pinned
+to `changesets/action@v2.1.2`, which reworked that path — and whose
+`create-github-releases` default produces the GitHub release Zenodo archives.
+So the DOI chain gains two links from one pin.
+
+This was rediscovered rather than read: #43 was open from 08:02 that morning
+and a later session rebuilt the same fix worse. `AGENTS.md` now opens with
+"read the open pull requests" because of it.
+
+**First real publish, 2026-09-16 — five of fifteen, and the limit is
+documented policy.** `fiducial`, `fiducial-adapters`, `fiducial-core`,
+`fiducial-geometry` and `fiducial-model` are on crates.io. The sixth took a
+**429**: crates.io allows a burst of **5 brand-new crates**, then **1 per 10
+minutes** (new *versions* of existing crates get a burst of 30, then 1 per
+minute — a much looser bucket). So the publish branch works; it is throttled.
+
+This bites **once**. Every later release publishes versions of crates that now
+exist, and fifteen fits inside the burst of thirty. `publish-crates.sh` waits
+until the time crates.io names and goes round again, bounded by
+`PUBLISH_MAX_WAIT_SECS`, so the remaining ten complete in one run rather than
+ten re-runs.
+
+**Twelve published versions have no tag, and the workflow cannot create them.**
+Tag pushing is fixed going forward, but it cannot retroactively create what was
+dropped. `scripts/backfill-tags.sh --push` creates them at the commits that made
+each version — it needs credentials that may push tags, which the agent session
+does not have (a bare HTTP 403 on `refs/tags/*`, branches push fine).
+`docs/release/legacy-untagged.txt` records the twelve so the gate is honest
+rather than permanently red, and **fails if a listed tag turns out to exist** —
+so the exemption cannot outlive its purpose. An empty file is the goal, and it
+is the last thing standing between here and the DOI chain's first link.
+
 **Sequencing.** Blocked on Rust release versioning above, and on
 `CITATION.cff`, which shipped 2026-09-16. Zenodo reads `CITATION.cff` when
 minting, which is why the file went first.

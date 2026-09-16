@@ -28,6 +28,31 @@ to be hand-edited on every merge.
 
 Finish the item you are on before starting the next.
 
+## Before you start: read the open pull requests
+
+`ROADMAP.md` says what is *intended* and `SHIPPED.md` what is *built*. Neither
+says what is **in flight in a branch right now**, and an agent that reads only
+those two will cheerfully rebuild something already sitting in an open PR.
+
+That happened on 2026-09-16. PR #43 fixed the release pipeline at 08:02. A
+later session read the roadmap, saw the same problem described as unfixed,
+and rebuilt it from scratch — merging a weaker fix over a better one. The two
+diagnoses were not equivalent: #43 had found that `changesets/action@v1`
+reports what it published by parsing stdout, so **one** failed parse broke both
+the crates.io gate and tag pushing, while the rediscovery treated them as two
+unrelated bugs and patched each symptom. The symptom patch left the tag step
+gated on the same broken signal, so it would never have run.
+
+So, before starting any item:
+
+```sh
+gh pr list --state open          # or the GitHub MCP `list_pull_requests`
+```
+
+Read anything whose title touches your item. If a PR already does the work,
+**build on it or say so** — do not start again. A roadmap entry marked ⬜ means
+nobody has *finished* it, not that nobody is *doing* it.
+
 ## Principles
 
 **Read [`MISSION.md`](MISSION.md).** It is in this repository, it is where the
