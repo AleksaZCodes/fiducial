@@ -1417,7 +1417,9 @@ only CI happened to satisfy. They now read JSON through `scripts/lib/json.sh`
 (`node -e`), which this repository already requires everywhere. **A dependency
 the runner image donates is not a dependency anyone declared** — and the one
 place it surfaces is the one place it must not, a maintainer running the
-recovery script by hand.
+recovery script by hand. `release_scripts_invoke_no_undeclared_tool` in
+`workspace_hygiene.rs` holds it: it reads what the shell would run, ignoring
+comments, so the next convenient one-liner cannot reintroduce the gap.
 
 **Sequencing.** Blocked on Rust release versioning above, and on
 `CITATION.cff`, which shipped 2026-09-16. Zenodo reads `CITATION.cff` when
