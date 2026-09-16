@@ -28,15 +28,16 @@ set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo"
 
+. "$repo/scripts/lib/json.sh"
+
 push=""
 [ "${1:-}" = "--push" ] && push=1
 
 created=()
 while IFS= read -r pkg; do
   json=$(git show "HEAD:$pkg")
-  [ "$(jq -r '.private // false' <<<"$json")" = "true" ] && continue
-  name=$(jq -r '.name' <<<"$json")
-  version=$(jq -r '.version' <<<"$json")
+  IFS=$'\t' read -r name version private < <(json_package_fields <<<"$json")
+  [ "$private" = "true" ] && continue
   tag="$name@$version"
 
   if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then

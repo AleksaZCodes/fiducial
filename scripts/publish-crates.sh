@@ -55,6 +55,8 @@ set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo"
 
+. "$repo/scripts/lib/json.sh"
+
 dry_run=""
 if [ "${1:-}" = "--dry-run" ]; then
   dry_run="--dry-run"
@@ -99,8 +101,7 @@ missing_args() {
         exit 1
         ;;
     esac
-  done < <(cargo metadata --no-deps --format-version 1 \
-    | jq -r '.packages[] | select(.publish != []) | [.name, .version] | @tsv' | sort)
+  done < <(cargo_publishable_crates)
 }
 
 log=$(mktemp)
