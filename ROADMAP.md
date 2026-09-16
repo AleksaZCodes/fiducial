@@ -624,6 +624,7 @@ step 3 delivers.
 | **Rust release versioning** | Changesets drives npm; the fifteen crates move in lockstep at 0.1.0 with nothing driving a bump. All fifteen reached crates.io on 2026-09-16. See below |
 | **Tagged releases + Zenodo DOI** | Tags exist as of 2026-09-16 and `create-github-releases` is on, so there is now something to archive. Opt-in for child repos too — see below |
 | **Claude chat plugin** | The making philosophy, as a skill for claude.ai — see below |
+| **`fid dash` counts prose as items** | The progress number is wrong, and it is wrong in the flattering direction. `roadmap_status` gives any line one marker and takes it as an item, so a `✅ **Fixed …**` paragraph *inside* an item counts as an item of its own. On 2026-09-16 that made it read **29 done of 37** when the truth is **20 of 28** — 16 section headings plus 12 table rows are items; the other 9 are sub-findings of the release-pipeline entry. The blockquote guard already added for this class catches commentary *about* the roadmap; it does not catch a legitimately-marked sub-point *within* an item. **The latent half is worse than the wrong percentage:** all 9 happen to be ✅ today, so `next` is unharmed by luck — one sub-finding written `⬜` becomes what `fid dash` reports as the next thing to work on, and `AGENTS.md` sends every agent to that number. Likely fix is structural rather than another guard: count a marker only where an item can be declared — a heading or a table row — since "an item is a line with a marker" is the assumption that has now failed three times. See below |
 | ~~**`fid dash` freshness detection**~~ ✅ | Shipped 2026-09-15. Dash equated "gated" with "a workflow runs `fid derive --check`" and reported this repository as ungated while nine gates ran on every commit. `[freshness] gates` declares the others — which command gates an artifact is a judgment, not something to pattern-match — and a gate declared but run by nothing is now reported too |
 
 ### Out of band — risk, not priority ⬜
@@ -1546,6 +1547,69 @@ to the latest release and one per release. The paper wants the concept DOI in
 `CITATION.cff` and the version DOI beside any measurement. Getting this
 backwards is the common mistake and is invisible until someone tries to cite
 a specific claim.
+
+## `fid dash` counts prose as items
+
+`AGENTS.md` sends every agent here first:
+
+```sh
+fid dash --section roadmap    # progress, anything in flight, and the next item
+```
+
+On 2026-09-16 it answered **29 done of 37**. The real answer is **20 of 28**.
+
+`roadmap_status` treats any line carrying exactly one marker as a roadmap item.
+That is true of a section heading and of a table row, and false of a paragraph
+*inside* an item — and the release-pipeline entry has nine of those, each a
+done-marked `**Fixed 2026-09-16…**` paragraph recording one observed failure:
+
+| Kind of line | Count | An item? |
+|---|---|---|
+| `###` / `##` section headings | 16 | yes |
+| table rows in **On demand** / **Out of band** | 12 | yes |
+| indented sub-findings | 5 | **no** |
+| unindented sub-findings and numbered decisions | 4 | **no** |
+
+**The wrong percentage is the cosmetic half.** The one that bites is `next`.
+All nine sub-findings carry the done marker right now, so the reported next
+item is correct *by luck*. Mark one sub-finding not-started — a perfectly
+reasonable thing to do when recording a failure you have not fixed yet — and
+`fid dash` reports a sub-point of a finished item as the next thing to build,
+to every agent that asks.
+
+**This is the third instance of one assumption failing**, which is what makes it
+structural rather than another special case:
+
+1. A legend line (`✅ done · 🟡 in progress · ⬜ not started`) counted as one
+   finished item. Fixed by rejecting lines carrying more than one distinct
+   marker.
+2. A blockquote sentence near the top of this file, reminding authors that
+   every item carries a marker, counted as a to-do — and was reported as `next`
+   the moment nothing was in progress to outrank it. Fixed by rejecting
+   blockquotes.
+3. This one: a marked paragraph nested inside an item.
+
+Each fix removed one kind of false positive while leaving the premise intact:
+**"an item is any line with a marker."** That premise is the bug. A fourth
+special case is a fourth guard waiting to be written.
+
+**The fix is to invert it — count a marker only where an item can be
+declared**, a heading or a table row, and ignore markers in prose entirely.
+That also makes the rule something a person can hold: *put a marker in a
+heading or a table row; write whatever you like in the body.* It costs the
+ability to mark a bare prose line as an item, which nothing in this file does
+on purpose.
+
+**This section is its own evidence.** Writing it moved the count from 37 to 41,
+because four of its sentences named a marker while explaining the bug. Every
+one had to be reworded to say "done marker" instead of drawing it. A file that
+cannot describe its own notation without corrupting the number derived from it
+has the premise wrong, not the punctuation.
+
+**Check the `--json` consumers before changing the numbers.** `fid dash` is
+built to be read by agents as well as people, so the counts are an interface.
+
+---
 
 ## Diagnostics
 
