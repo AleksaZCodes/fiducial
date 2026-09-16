@@ -110,19 +110,56 @@ fn collect(root: &Path, dir: &Path, out: &mut Vec<String>) {
 
 fn principles() {
     let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
-    let mission = Path::new(&manifest)
-        .ancestors()
-        .nth(2)
-        .expect("fiducial-cli sits two levels below the workspace root")
-        .join("MISSION.md");
+    let manifest = Path::new(&manifest);
 
-    println!("cargo:rerun-if-changed={}", mission.display());
+    // Two candidates, and the order matters.
+    //
+    // `MISSION.md` beside this manifest is a **symlink** to the workspace root
+    // copy — one file, not two. It exists because `cargo package` cannot reach
+    // outside a package's own directory, so a published `fiducial-cli` tarball
+    // contained no MISSION.md and its build script panicked reading one two
+    // levels up:
+    //
+    //   reading /…/target/MISSION.md: No such file or directory
+    //
+    // That made `fiducial-cli` unpublishable, and nothing said so until
+    // `cargo publish --dry-run` ran for the first time on 2026-09-16.
+    //
+    // The workspace-root fallback is for a checkout where the symlink did not
+    // survive — git on Windows without symlink support writes a small text file
+    // holding the link target instead. That file parses as Markdown with no
+    // principles in it, so the fallback is keyed on *finding principles*, not
+    // on the file existing: a wrong answer here silently ships a product
+    // scaffold with an empty principles block.
+    let candidates = [
+        manifest.join("MISSION.md"),
+        manifest
+            .ancestors()
+            .nth(2)
+            .expect("fiducial-cli sits two levels below the workspace root")
+            .join("MISSION.md"),
+    ];
 
-    let text = std::fs::read_to_string(&mission)
-        .unwrap_or_else(|e| panic!("reading {}: {e}", mission.display()));
+    for path in &candidates {
+        println!("cargo:rerun-if-changed={}", path.display());
+    }
 
-    let principles = extract_principles(&text)
-        .unwrap_or_else(|| panic!("no principles section found in {}", mission.display()));
+    let principles = candidates
+        .iter()
+        .find_map(|path| {
+            let text = std::fs::read_to_string(path).ok()?;
+            extract_principles(&text)
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "no principles section found in any of: {}",
+                candidates
+                    .iter()
+                    .map(|p| p.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        });
 
     let out = Path::new(&std::env::var("OUT_DIR").expect("OUT_DIR")).join("principles.md");
     std::fs::write(&out, principles).expect("writing principles.md");

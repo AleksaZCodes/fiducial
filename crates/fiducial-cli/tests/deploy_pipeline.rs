@@ -322,3 +322,24 @@ fn check_catches_a_hand_edited_wrangler_toml() {
     );
     assert!(text(&out).contains("wrangler.toml"), "{}", text(&out));
 }
+
+#[test]
+fn selecting_openrouter_emits_the_openrouter_api_key_secret() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_deploy(tmp.path(), "deploy = \"cloudflare\"\nai = \"openrouter\"");
+    let path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        format!("{config}\n[ai]\nmodel = \"anthropic/claude-opus-5\"\n"),
+    )
+    .unwrap();
+    assert!(run(&root, &["derive"]).status.success());
+
+    let w = wrangler(&root);
+    assert!(w.contains("wrangler secret put OPENROUTER_API_KEY"), "{w}");
+    // The model is a declaration, not a secret: it belongs in the generated
+    // factory where `fid derive --check` gates it, never in a
+    // `wrangler secret put` line and never as a plaintext var beside one.
+    assert!(!w.contains("anthropic/claude-opus-5"), "{w}");
+}

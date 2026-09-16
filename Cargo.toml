@@ -59,6 +59,13 @@ thiserror  = { version = "2" }
 walkdir    = { version = "2" }
 tempfile   = { version = "3" }
 tokio      = { version = "1" }
+# `Stream` for the `Ai` contract's `stream()` method. futures-core is the
+# trait definition alone — no executor, no combinators — so the contract can
+# name a stream without every consumer inheriting an async runtime.
+futures-core = { version = "0.3" }
+# Combinators, dev-only: the contracts depend on `futures-core` alone so no
+# consumer inherits a runtime, but the tests that drive a stream need `next()`.
+futures-util = { version = "0.3", default-features = false }
 rayon      = { version = "1" }
 serialport = { version = "4", default-features = false }
 diffy      = { version = "0.4" }
@@ -72,14 +79,26 @@ ts-rs             = { version = "10" }
 
 # ── Internal crates ─────────────────────────────────────────────────────────
 # Path declared once so moving a crate is a one-line change, not thirteen.
-fiducial-adapters = { path = "crates/fiducial-adapters" }
-fiducial-core     = { path = "crates/fiducial-core" }
-fiducial-quantity = { path = "crates/fiducial-quantity" }
-fiducial-model    = { path = "crates/fiducial-model" }
-fiducial-protocol = { path = "crates/fiducial-protocol" }
-fiducial-eda      = { path = "crates/fiducial-eda" }
-fiducial-geometry = { path = "crates/fiducial-geometry" }
-fiducial-mesh     = { path = "crates/fiducial-mesh" }
-fiducial-ota      = { path = "crates/fiducial-ota" }
-fiducial-sim      = { path = "crates/fiducial-sim" }
-fiducial-tauri    = { path = "crates/fiducial-tauri" }
+#
+# `version` is required, not optional: `cargo publish` refuses a dependency
+# with no version requirement ("all dependencies must have a version
+# requirement specified when publishing"), because the published crate has no
+# path to resolve. Without these, **not one crate in this workspace could be
+# published at all** — which is the root cause under "none of them is on
+# crates.io", and it is invisible until `cargo publish --dry-run` runs.
+#
+# It is also the one duplication of `[workspace.package] version` that cargo
+# forces on us. `workspace_hygiene.rs::internal_dependencies_pin_the_workspace_version`
+# gates it, so the copy cannot drift: bump the workspace version and the test
+# names every line that still says the old one.
+fiducial-adapters = { path = "crates/fiducial-adapters", version = "0.1.0" }
+fiducial-core     = { path = "crates/fiducial-core", version = "0.1.0" }
+fiducial-quantity = { path = "crates/fiducial-quantity", version = "0.1.0" }
+fiducial-model    = { path = "crates/fiducial-model", version = "0.1.0" }
+fiducial-protocol = { path = "crates/fiducial-protocol", version = "0.1.0" }
+fiducial-eda      = { path = "crates/fiducial-eda", version = "0.1.0" }
+fiducial-geometry = { path = "crates/fiducial-geometry", version = "0.1.0" }
+fiducial-mesh     = { path = "crates/fiducial-mesh", version = "0.1.0" }
+fiducial-ota      = { path = "crates/fiducial-ota", version = "0.1.0" }
+fiducial-sim      = { path = "crates/fiducial-sim", version = "0.1.0" }
+fiducial-tauri    = { path = "crates/fiducial-tauri", version = "0.1.0" }

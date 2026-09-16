@@ -190,6 +190,35 @@ fn outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<String> {
     Vec::new()
 }
 
+/// What a deterministic executor would write for its first `.ts` output.
+///
+/// `None` for an executor that is not a pure function of committed
+/// declarations — one that shells out to a tool, or reads something the lock
+/// already tracks. Those cannot be re-run for free, and guessing at their
+/// output would report noise as staleness.
+///
+/// The doc on [`outputs_with_moved_inputs`] explains why this exists at all.
+/// It named generalizing beyond `fid-schema` as "a change worth making when a
+/// second one needs it"; `fid-adapters` is that second one.
+fn expected_output(pipeline: &Pipeline, root: &Path) -> Option<String> {
+    match pipeline.executor.as_str() {
+        "fid-schema" => {
+            // A migration set that does not validate is reported by `fid
+            // derive` with the reason. Repeating it here as "stale" would be
+            // worse information, not more.
+            let migrations = crate::schema::discover(root).ok()?;
+            Some(crate::schema::render_manifest(&migrations))
+        }
+        // Same reasoning: a config that does not load, or an `[ai]` block that
+        // does not validate, is `fid derive`'s error to report precisely.
+        "fid-adapters" => {
+            let config = Config::load(&root.join(crate::config::CONFIG_FILE)).ok()?;
+            render_adapters_factory(&config).ok()
+        }
+        _ => None,
+    }
+}
+
 /// Artifacts whose *inputs* moved, found by regenerating and comparing.
 ///
 /// `fid derive --check` hashes declared outputs against `fiducial.lock`. That
@@ -200,23 +229,18 @@ fn outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<String> {
 /// class of failure the migration system exists to prevent, so it cannot be
 /// the one it ships with.
 ///
-/// `fid-schema` is a pure function of `migrations/`, so the honest check is to
-/// run it and compare. Only this executor is covered: the others either read
-/// declarations the lock already tracks, or shell out to tools that are not
-/// pure and cannot be re-run for free. Generalizing needs each executor to say
-/// whether it is deterministic, which is a change worth making when a second
-/// one needs it.
+/// The same hole was open under `fid-adapters`, and nothing had noticed
+/// because until `[ai] model` there was no declaration a product would edit
+/// *often*: switching `database = "none"` to `"d1"` and forgetting to re-run
+/// derive passed `--check` and shipped a Worker still constructing
+/// `NoneDatabase`. A declaration nothing gates is documentation.
+///
+/// Both executors are pure functions of committed declarations, so the honest
+/// check is to run them and compare — see [`expected_output`].
 fn outputs_with_moved_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
-    if pipeline.executor != "fid-schema" {
-        return Vec::new();
-    }
-    let Ok(migrations) = crate::schema::discover(root) else {
-        // A migration set that does not validate is reported by `fid derive`
-        // with the reason. Repeating it here as "stale" would be worse
-        // information, not more.
+    let Some(expected) = expected_output(pipeline, root) else {
         return Vec::new();
     };
-    let expected = crate::schema::render_manifest(&migrations);
 
     pipeline
         .outputs
@@ -777,6 +801,9 @@ fn run_fid_deploy(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     if config.adapters.get("newsletter") == Some("resend") {
         secrets.push("RESEND_API_KEY");
         secrets.push("RESEND_AUDIENCE_ID");
+    }
+    if config.adapters.get("ai") == Some("openrouter") {
+        secrets.push("OPENROUTER_API_KEY");
     }
     if config.adapters.get("auth") == Some("supabase") {
         secrets.push("SUPABASE_URL");
@@ -1362,6 +1389,7 @@ const ADAPTER_SLOTS: &[(&str, &str)] = &[
     ("botProtection", "botProtection"),
     ("queue", "queue"),
     ("newsletter", "newsletter"),
+    ("ai", "ai"),
 ];
 
 /// Generate adapter factory code from `[adapters]` in `fiducial.toml`.
@@ -1387,6 +1415,29 @@ const ADAPTER_SLOTS: &[(&str, &str)] = &[
 fn run_fid_adapters(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     let config = Config::load(&working_dir.join(crate::config::CONFIG_FILE))
         .context("fid-adapters needs [adapters] in fiducial.toml")?;
+    let content = render_adapters_factory(&config)?;
+
+    let out = pipeline
+        .outputs
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("fid-adapters: pipeline declares no outputs"))?;
+
+    let abs = working_dir.join(out);
+    if let Some(parent) = abs.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("creating parent for `{out}`"))?;
+    }
+    std::fs::write(&abs, content).with_context(|| format!("writing {out}"))?;
+    Ok(())
+}
+
+/// The factory file's text, as a pure function of `fiducial.toml`.
+///
+/// Separated from the write so `fid derive --check` can regenerate and compare
+/// without touching the working tree — see [`expected_output`]. Two code paths
+/// producing "what the factory should say" is exactly the second declaration
+/// this platform exists to delete.
+fn render_adapters_factory(config: &Config) -> Result<String> {
+    config.ai.validate(&config.adapters)?;
     let adapters = &config.adapters;
 
     let mut imports = Vec::with_capacity(ADAPTER_SLOTS.len() + 1);
@@ -1395,7 +1446,8 @@ fn run_fid_adapters(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         let vendor = adapters.get(toml_key).unwrap_or("none");
         imports.push(vendor_ts_import(toml_key, vendor));
         let class = vendor_ts_class(toml_key, vendor);
-        fields.push(format!("    {field_name}: new {class}(env),"));
+        let extra = vendor_extra_args(toml_key, vendor, config);
+        fields.push(format!("    {field_name}: new {class}(env{extra}),"));
     }
 
     let auth_vendor = adapters.get("auth").unwrap_or("none");
@@ -1433,17 +1485,7 @@ fn run_fid_adapters(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         fields.join("\n"),
     );
 
-    let out = pipeline
-        .outputs
-        .first()
-        .ok_or_else(|| anyhow::anyhow!("fid-adapters: pipeline declares no outputs"))?;
-
-    let abs = working_dir.join(out);
-    if let Some(parent) = abs.parent() {
-        std::fs::create_dir_all(parent).with_context(|| format!("creating parent for `{out}`"))?;
-    }
-    std::fs::write(&abs, content).with_context(|| format!("writing {out}"))?;
-    Ok(())
+    Ok(content)
 }
 
 /// TypeScript import line for a contract + vendor pair.
@@ -1462,6 +1504,34 @@ fn vendor_ts_class(contract: &str, vendor: &str) -> String {
     vendor_ts_class_and_path(contract, vendor).0
 }
 
+/// Constructor arguments after `env`, as literal TypeScript source.
+///
+/// Empty for every vendor but one. `new {Class}(env)` is the shape
+/// `createAdapters` relies on, and `auth` was kept out of `AdapterSet`
+/// entirely rather than bend it — but that was about a *lifetime*: a session
+/// store is request-scoped and cannot be built from `env` at Worker scope.
+///
+/// A declared model is not that. It is a constant `fid derive` already knows,
+/// so writing it into the generated file as a literal is the same move every
+/// other derived fact makes, and it keeps the slot env-scoped. The alternative
+/// — a wrangler `[vars]` entry the class reads off `env` — puts the fact in a
+/// file only Cloudflare products generate, and this contract is reached from
+/// Next.js and SvelteKit server routes too.
+fn vendor_extra_args(contract: &str, vendor: &str, config: &Config) -> String {
+    match (contract, vendor) {
+        ("ai", "openrouter") => format!(", {}", ts_string(&config.ai.model)),
+        _ => String::new(),
+    }
+}
+
+/// A TypeScript string literal for a value that came from `fiducial.toml`.
+///
+/// Escaped rather than interpolated: a declaration is product-supplied text,
+/// and a stray quote in it would produce a generated file that does not parse.
+fn ts_string(value: &str) -> String {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
 /// `(ClassName, import-path)` for a contract + vendor pair.
 fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
     let none_class = match contract {
@@ -1472,6 +1542,7 @@ fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
         "botProtection" => ("NoneBotProtection", "@fiducial/adapters/bot-protection"),
         "queue" => ("NoneQueue", "@fiducial/adapters/queue"),
         "newsletter" => ("NoneNewsletter", "@fiducial/adapters/newsletter"),
+        "ai" => ("NoneAi", "@fiducial/adapters/ai"),
         "auth" => ("NoneAuth", "@fiducial/adapters/auth"),
         _ => ("NoneDatabase", "@fiducial/adapters"),
     };
@@ -1487,6 +1558,7 @@ fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
         ("botProtection", "turnstile") => Some(("Turnstile", "@fiducial/adapters/bot-protection")),
         ("queue", "cloudflare-queues") => Some(("CloudflareQueue", "@fiducial/adapters/queue")),
         ("newsletter", "resend") => Some(("ResendNewsletter", "@fiducial/adapters/newsletter")),
+        ("ai", "openrouter") => Some(("OpenRouterAi", "@fiducial/adapters/ai")),
         ("auth", "supabase") => Some(("SupabaseAuth", "@fiducial/adapters/auth")),
         _ => None,
     };

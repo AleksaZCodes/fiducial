@@ -33,6 +33,9 @@ import {
   BearerSessionContext,
   MemoryKeyValueStore,
   SupabaseAuth,
+  NoneAi,
+  AiError,
+  OpenRouterAi,
   createNoneAdapters,
 } from '../dist/index.js'
 
@@ -1001,6 +1004,268 @@ describe('@fiducial/adapters', () => {
       assert.ok(adapters.botProtection instanceof NoneBotProtection)
       assert.ok(adapters.queue instanceof NoneQueue)
       assert.ok(adapters.newsletter instanceof NoneNewsletter)
+      assert.ok(adapters.ai instanceof NoneAi)
     })
+  })
+})
+
+// ── AI ────────────────────────────────────────────────────────────────────────
+
+/** A `Response`-shaped stub whose body streams the given SSE text in chunks. */
+function sseResponse(chunks) {
+  const encoder = new TextEncoder()
+  let i = 0
+  return {
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    body: {
+      getReader() {
+        return {
+          async read() {
+            if (i >= chunks.length) return { done: true, value: undefined }
+            return { done: false, value: encoder.encode(chunks[i++]) }
+          },
+          releaseLock() {},
+        }
+      },
+    },
+  }
+}
+
+async function collect(iterable) {
+  const out = []
+  for await (const event of iterable) out.push(event)
+  return out
+}
+
+describe('NoneAi', () => {
+  it('fails loudly rather than returning an empty completion', async () => {
+    const ai = new NoneAi()
+    await assert.rejects(
+      () => ai.chat({ messages: [{ role: 'user', content: 'hi' }] }),
+      (err) => err instanceof AiError && /no AI vendor is selected/.test(err.message),
+    )
+  })
+
+  it('fails the same way when streamed', async () => {
+    const ai = new NoneAi()
+    await assert.rejects(
+      () => collect(ai.stream({ messages: [{ role: 'user', content: 'hi' }] })),
+      (err) => err instanceof AiError,
+    )
+  })
+})
+
+describe('OpenRouterAi', () => {
+  const env = { OPENROUTER_API_KEY: 'sk-or-key' }
+  const model = 'anthropic/claude-opus-5'
+
+  it('throws at construction when the key is absent, naming the command', () => {
+    assert.throws(
+      () => new OpenRouterAi({}, model),
+      (err) => err instanceof AiError && /wrangler secret put OPENROUTER_API_KEY/.test(err.message),
+    )
+  })
+
+  it('throws at construction when no model is declared', () => {
+    assert.throws(
+      () => new OpenRouterAi(env, undefined),
+      (err) => err instanceof AiError && err.kind === 'model_unavailable',
+    )
+  })
+
+  it('sends the declared model, and a per-call model wins over it', async () => {
+    const sent = []
+    const fakeFetch = async (_url, init) => {
+      sent.push(JSON.parse(init.body))
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        async json() {
+          return {
+            model: 'anthropic/claude-opus-5',
+            choices: [{ message: { content: 'hello' }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 3, completion_tokens: 2 },
+          }
+        },
+      }
+    }
+    const ai = new OpenRouterAi(env, model, fakeFetch)
+    await ai.chat({ messages: [{ role: 'user', content: 'hi' }] })
+    await ai.chat({ messages: [{ role: 'user', content: 'hi' }], model: 'openai/gpt-5' })
+    assert.equal(sent[0].model, model)
+    assert.equal(sent[1].model, 'openai/gpt-5')
+  })
+
+  it('lowers a top-level system prompt to a leading system message', async () => {
+    let sent
+    const fakeFetch = async (_url, init) => {
+      sent = JSON.parse(init.body)
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        async json() {
+          return { choices: [{ message: { content: '' }, finish_reason: 'stop' }] }
+        },
+      }
+    }
+    const ai = new OpenRouterAi(env, model, fakeFetch)
+    await ai.chat({ system: 'Be terse.', messages: [{ role: 'user', content: 'hi' }] })
+    assert.deepEqual(sent.messages[0], { role: 'system', content: 'Be terse.' })
+    assert.equal(sent.messages[1].role, 'user')
+  })
+
+  it('reports the model that served the call, not the one requested', async () => {
+    const fakeFetch = async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      async json() {
+        return {
+          model: 'anthropic/claude-opus-5-20260101',
+          choices: [{ message: { content: 'x' }, finish_reason: 'stop' }],
+        }
+      },
+    })
+    const ai = new OpenRouterAi(env, model, fakeFetch)
+    const res = await ai.chat({ messages: [{ role: 'user', content: 'hi' }] })
+    assert.equal(res.model, 'anthropic/claude-opus-5-20260101')
+  })
+
+  it('returns tool calls with a tool_calls stop reason', async () => {
+    const fakeFetch = async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      async json() {
+        return {
+          choices: [
+            {
+              message: {
+                content: null,
+                tool_calls: [
+                  { id: 'call_1', function: { name: 'lookup', arguments: '{"q":"x"}' } },
+                ],
+              },
+              finish_reason: 'tool_calls',
+            },
+          ],
+        }
+      },
+    })
+    const ai = new OpenRouterAi(env, model, fakeFetch)
+    const res = await ai.chat({ messages: [{ role: 'user', content: 'hi' }] })
+    assert.equal(res.stopReason, 'tool_calls')
+    assert.deepEqual(res.toolCalls, [{ id: 'call_1', name: 'lookup', arguments: '{"q":"x"}' }])
+    assert.equal(res.text, '')
+  })
+
+  it('maps 429 to rate_limited and carries retry-after', async () => {
+    const fakeFetch = async () => ({
+      ok: false,
+      status: 429,
+      headers: { get: (h) => (h === 'retry-after' ? '12' : null) },
+      async text() {
+        return JSON.stringify({ error: { message: 'slow down' } })
+      },
+    })
+    const ai = new OpenRouterAi(env, model, fakeFetch)
+    await assert.rejects(
+      () => ai.chat({ messages: [] }),
+      (err) => err.kind === 'rate_limited' && err.retryAfterSeconds === 12,
+    )
+  })
+
+  it('maps a context overflow onto its own kind, so the remedy is programmable', async () => {
+    const fakeFetch = async () => ({
+      ok: false,
+      status: 400,
+      headers: { get: () => null },
+      async text() {
+        return JSON.stringify({
+          error: { message: 'This model’s maximum context length is 200000 tokens' },
+        })
+      },
+    })
+    const ai = new OpenRouterAi(env, model, fakeFetch)
+    await assert.rejects(
+      () => ai.chat({ messages: [] }),
+      (err) => err.kind === 'context_length_exceeded',
+    )
+  })
+
+  it('leaves an unrecognized failure as rejected rather than guessing a kind', async () => {
+    const fakeFetch = async () => ({
+      ok: false,
+      status: 400,
+      headers: { get: () => null },
+      async text() {
+        return JSON.stringify({ error: { message: 'tool schema is invalid' } })
+      },
+    })
+    const ai = new OpenRouterAi(env, model, fakeFetch)
+    await assert.rejects(
+      () => ai.chat({ messages: [] }),
+      (err) => err.kind === 'rejected',
+    )
+  })
+
+  it('streams text chunks and ends with done', async () => {
+    const fakeFetch = async () =>
+      sseResponse([
+        ': OPENROUTER PROCESSING\n',
+        'data: {"choices":[{"delta":{"content":"Hel"}}]}\n',
+        'data: {"choices":[{"delta":{"content":"lo"},"finish_reason":"stop"}]}\n',
+        'data: {"usage":{"prompt_tokens":4,"completion_tokens":2},"choices":[]}\n',
+        'data: [DONE]\n',
+      ])
+    const ai = new OpenRouterAi(env, model, fakeFetch)
+    const events = await collect(ai.stream({ messages: [] }))
+    assert.deepEqual(events, [
+      { type: 'text', text: 'Hel' },
+      { type: 'text', text: 'lo' },
+      { type: 'done', stopReason: 'stop', usage: { inputTokens: 4, outputTokens: 2 } },
+    ])
+  })
+
+  /**
+   * The bug this parser exists to not have: an SSE event split across two
+   * network chunks. Splitting each chunk independently drops it, and only
+   * under load — which is when it is hardest to see.
+   */
+  it('reassembles an event split across chunk boundaries', async () => {
+    const fakeFetch = async () =>
+      sseResponse([
+        'data: {"choices":[{"delta":{"content"',
+        ':"split"}}]}\ndata: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n',
+        'data: [DONE]\n',
+      ])
+    const ai = new OpenRouterAi(env, model, fakeFetch)
+    const events = await collect(ai.stream({ messages: [] }))
+    assert.deepEqual(events[0], { type: 'text', text: 'split' })
+  })
+
+  /**
+   * Tool arguments stream as partial JSON fragments. A consumer can do nothing
+   * with a fragment but buffer it, so the adapter buffers once and emits each
+   * call whole.
+   */
+  it('accumulates streamed tool-call fragments and emits each call once, whole', async () => {
+    const fakeFetch = async () =>
+      sseResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"lookup","arguments":"{\\"q\\":"}}]}}]}\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"x\\"}"}}]}}]}\n',
+        'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n',
+        'data: [DONE]\n',
+      ])
+    const ai = new OpenRouterAi(env, model, fakeFetch)
+    const events = await collect(ai.stream({ messages: [] }))
+    assert.deepEqual(events, [
+      { type: 'tool_call', call: { id: 'call_1', name: 'lookup', arguments: '{"q":"x"}' } },
+      { type: 'done', stopReason: 'tool_calls', usage: { inputTokens: 0, outputTokens: 0 } },
+    ])
   })
 })

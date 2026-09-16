@@ -23,7 +23,7 @@ numbering is unchanged._
 | --- | --- |
 | Repo `AleksaZCodes/fiducial` (public, MIT) | ✅ https://github.com/AleksaZCodes/fiducial |
 | `MISSION.md`, `STACK.md`, `LICENSE`, `IP-POLICY.md` | ✅ |
-| `crates/fiducial` v0.1.0 → crates.io | ❌ **not on crates.io** — recorded as published, verified absent 2026-09-16 |
+| `crates/fiducial` v0.1.0 → crates.io | ❌ **not on crates.io** — recorded as published, verified absent 2026-09-16. **Resolved 2026-09-16:** never published, not published-then-removed — all fifteen names return "does not exist" and a yanked crate still resolves. This row recorded an intention. See `docs/specs/2026-09-16-the-rust-crates-release-in-lockstep.md` |
 | `@fiducial/fiducial` v0.1.0 → js registry (`@fiducial` org created) | ✅ published |
 | Design spec → `docs/specs/2026-09-06-fiducial-design.md` | ✅ |
 
@@ -383,6 +383,59 @@ built because no product has one yet.
 | `fid capability list --all` — `database`/`storage` now show `selectable: none, d1` / `none, r2` | ✅ |
 | **Deliberately not done, and said so in `ROADMAP.md`, `SHIPPED.md` and the spec**: Workers-as-`deploy` (needs its own design — `deploy` is pipeline-shaped, not a runtime trait), Access, Turnstile, Queues, Workers AI (no contract exists for any of the four, and designing one against zero consumers is the mistake *capability taxonomy, made real* already corrected once), a Rust-side D1/R2 client (would need Cloudflare's HTTP/S3 API over an API token, not a binding — no Tauri product needs it), a working `signedUrl` | ✅ |
 | Clippy (0 warnings), fmt, full Rust suite (all workspace crates) and the new JS test file all green | ✅ |
+
+**Phase 36 — the release actually reaches the registries ✅ (2026-09-16)**
+
+> Implements the roadmap item **Rust release versioning**, in the half that was
+> never a versioning problem: there was no publish path at all. Spec:
+> `docs/specs/2026-09-16-the-rust-crates-release-in-lockstep.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **The precondition was met before any publish logic was written**, as the roadmap demanded: all fifteen names return `crate … does not exist`. Nobody holds them, and a yanked crate still resolves — so "never published", not "published then removed". The Phase 0 row above recorded an intention | ✅ |
+| **Two failures found by `cargo publish --dry-run`, which had never been run** — neither visible in any workflow log, because neither got as far as a log | ✅ |
+| **Not one crate in this workspace could be published.** The eleven internal `[workspace.dependencies]` entries declared `path` and no `version`, which `cargo publish` refuses: a published crate has no path to resolve. The one-crate loop and the dead `if:` gate were symptoms sitting on top of this | ✅ |
+| **`fiducial-cli` could not be packaged** — `build.rs` read `MISSION.md` two directories up, and `cargo package` cannot reach outside a package directory. A symlink inside the crate fixes it without a second copy of the principles, verified present by `cargo package --list` | ✅ |
+| **All fifteen now package, verify and order by dependency** under `cargo publish --dry-run`, for the first time | ✅ |
+| **The gate was deleted, not repaired.** `if: steps.changesets.outputs.published == 'true'` reported skipped on two consecutive runs that did publish. The step asks crates.io what exists and publishes only what does not, so it needs no gate — and gating a registry check on a claim *about* the registry is the second declaration this platform exists to delete | ✅ |
+| **The `for crate in fiducial` loop is gone**, and nothing replaced it with fifteen names. `cargo publish` has ordered multi-package publishing since Rust 1.90; `scripts/publish-crates.sh` names only the missing crates and lets cargo order them | ✅ |
+| `scripts/verify-published.sh` — asks npm, crates.io and `git ls-remote --tags origin` whether what the repository declares is actually there. Run by `release.yml` with `if: always()`, because the step it checks has lied twice | ✅ |
+| **Tags are pushed and verified against the remote**, never the runner's clone — the clone is the thing that reported "Created git tags" while the remote stayed empty | ✅ |
+| **Lockstep decided and recorded**, per the roadmap's "decide this explicitly — expensive to reverse". They are one artifact with one story; fifteen independent changelogs would record the same commits fifteen times. Revisit when a crate first needs a version the others do not, which is a visible event | ✅ |
+| **The one duplication cargo forces is gated.** `version = "0.1.0"` on each internal dependency cannot inherit from `[workspace.package]`, so `internal_dependencies_pin_the_workspace_version` names every line still carrying the old version after a bump — before a fifteen-crate publish discovers it partway through and cannot be undone | ✅ |
+| `RELEASE_PAT` read with a fallback to `GITHUB_TOKEN`, so the file is correct before the secret exists and starts working the moment it does. Creating it is the one step only the account owner can take | 🟡 |
+| **Deliberately not done, and said so**: a Rust version-bump mechanism (the roadmap's third question — answerable against something real now that a publish path exists), the Zenodo DOI (needs a tag, then a GitHub release, then the webhook; this supplies and verifies the first link), and `WIRE_VERSION`, which is deliberately not SemVer | ✅ |
+
+**Phase 35 — the AI contract, targeting a gateway ✅ (2026-09-16)**
+
+> Implements the roadmap item **AI**, and closes **Cloudflare adapter set**
+> with it — that item had reduced to "Access and Workers AI", and both turned
+> out to name contracts rather than Cloudflare adapters. Scoped 2026-09-15 as
+> the highest-design-risk item of its round, shipped the next day once the
+> founder's gateway correction dissolved the risk. Spec:
+> `docs/specs/2026-09-16-the-ai-contract-targets-a-gateway.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **New `ai` contract** — `chat` and `stream`, with messages, a top-level system prompt, tool definitions, tool calls, tool results, stop reasons and usage. Rust trait + `NoneAi` in `fiducial-adapters`, TS interface + `None*` in `@fiducial/adapters` | ✅ |
+| **The contract targets a gateway, not model vendors** — and the spec carries the evidence: `system` top-level vs. a message role, content blocks vs. a parts array, substantially different streaming shapes, and three parameters that changed shape inside a year. Intersecting those by hand yields a contract too thin for agentic work; supersetting them picks a vendor without admitting it | ✅ |
+| `OpenRouterAi` — the first implementation. Secret-reached (`env.OPENROUTER_API_KEY`), the boundary `turnstile` established, so it works from any runtime with `fetch` | ✅ |
+| **`[ai] model` is a declaration, derived into the factory as a literal** — `ai: new OpenRouterAi(env, "anthropic/claude-opus-5")`. This is what makes the gateway decision pay: switching model vendor is a one-line change in a declaration and no adapter change at all | ✅ |
+| **No default model, deliberately.** Any default is a vendor choice made for the product, and it would age into a retired model id *silently* — a gateway reports an unknown model at the first call, not at deploy. `ai = "openrouter"` with no `[ai] model` fails `fid derive`, naming the key | ✅ |
+| **A per-call `request.model` still wins over the declaration** — an agent that classifies with a small model and answers with a large one is a normal agent, and forcing it to build a second adapter would make the declaration a lie rather than a default | ✅ |
+| **`NoneAi` fails rather than succeeding silently**, joining `NoneAuth`. Two of them is enough to state the rule: *does the caller read a result?* A no-op send is indistinguishable from a real one at the call site; a session and a completion **are** the result, so fabricating one moves the failure away from the config that caused it | ✅ |
+| **A found bug, in the gate rather than the feature:** `fid derive --check` hashed outputs against `fiducial.lock` and re-derived only `fid-schema`, so changing a declaration and forgetting to re-run derive left a byte-identical file and a **passing check**. `database = "none"` → `"d1"` shipped a Worker still constructing `NoneDatabase`. `fid-adapters` is now re-derived and compared — the generalization its own doc comment said to make "when a second one needs it" | ✅ |
+| `render_adapters_factory` split out of `run_fid_adapters` so derive and check share one definition of what the factory should say, rather than two | ✅ |
+| **A second found bug, in `fid dash`:** a blockquote carrying one marker counted as a roadmap item. ROADMAP.md opens with "Every ⬜ item below now carries a …", and the moment nothing was 🟡 to outrank it, `fid dash --section roadmap` answered "what is next" with a sentence about the file's format — in the command AGENTS.md sends every agent to for exactly that answer | ✅ |
+| **Streamed tool calls are emitted whole, not as fragments** — gateways stream tool arguments as partial JSON, which a consumer can do nothing with but buffer. The adapter buffers once so every consumer does not | ✅ |
+| **A hand-written SSE parser, and the two bugs it exists to not have**: an event straddling a chunk boundary and several events in one chunk. Both fail only under load; both have a direct test | ✅ |
+| `futures-core` — the `Stream` trait alone, no executor and no combinators — so the Rust contract can name a stream without every consumer inheriting an async runtime from it. `NoneAi`'s one-item stream is six hand-written lines rather than a combinator dependency | ✅ |
+| `ADAPTER_SLOTS` absorbed the eighth contract as one table row, plus the first `vendor_extra_args` arm — the only vendor that needs a constructor argument after `env` | ✅ |
+| **Rust gets the contract, not the vendor**, and says which of the two reasons applies: not structural — an HTTPS POST is reachable from Rust — simply no consumer, since every AI call in the product shapes this platform scaffolds happens in a Worker or a server route | ✅ |
+| 4 new Rust unit tests, 15 new TypeScript tests, 6 new end-to-end CLI tests, and `openrouter` added to the vendor matrix the generated factory is compiled under by real `tsc` | ✅ |
+| Prose block re-read against `pub static CONTRACTS` before acceptance, and **amended rather than accepted**: "every contract ships with `none` — a real, working no-op" was no longer accurate for the two that fail. That is the gate working as designed | ✅ |
+| Docs captures regenerated; `fid context --check`, `fid docs --check` green | ✅ |
+| **Deliberately not done, and said so**: embeddings and a vector store (a real second use with its own shape, landing when it has a consumer), direct-vendor adapters (`anthropic`/`openai` stay `candidates`), a Rust `openrouter` client, an `ai` capability directory, and any agent loop, retry policy or prompt templating — the contract is the vendor boundary, and what to do with a `tool_calls` stop reason is the product's decision | ✅ |
 
 **Phase 34 — the open-source bootstrap, for Fiducial itself ✅ (2026-09-16)**
 

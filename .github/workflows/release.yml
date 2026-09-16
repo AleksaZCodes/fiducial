@@ -63,40 +63,69 @@ jobs:
           title: "chore: version packages"
           commit: "chore: version packages"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # RELEASE_PAT when it exists, GITHUB_TOKEN otherwise.
+          #
+          # GitHub does not run workflows on a pull request authored by
+          # GITHUB_TOKEN without a human pressing approve, so runs on
+          # `changeset-release/main` have sat in `action_required` since
+          # 2026-09-15. That was harmless until the branch ruleset began
+          # requiring status checks, at which point the Release PR became
+          # permanently unmergeable and had to be approved by hand every time.
+          #
+          # A PAT makes the PR authored by a real account, so its CI runs
+          # unattended. The fallback means this file is correct before the
+          # secret exists and starts working the moment it does — no second
+          # change to remember, and no step that fails today for a secret
+          # nobody has created yet.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      # ── Push the tags changesets created ───────────────────────────────────
+      # `changeset publish` prints "Creating git tags… Created git tags." and
+      # creates them in the runner's clone. On 2026-09-16 it printed exactly
+      # that while `git ls-remote --tags origin` stayed empty afterwards —
+      # nothing had ever pushed them. The chain to a Zenodo DOI starts at a
+      # tag, so its first link was not merely missing: it appeared to succeed
+      # and dropped its output.
+      #
+      # Runs even when the publish step failed, because a tag for a package
+      # that did publish is still owed. `--no-verify` is not used and no tag is
+      # forced: an existing remote tag must never be moved.
+      - name: Push release tags
+        if: always() && steps.changesets.outputs.published == 'true'
+        run: git push origin --tags
+
       # ── Publish Rust crates ────────────────────────────────────────────────
-      # Only runs when the Release PR is merged (i.e. when changesets/action
-      # actually published — detected by the `published` output being truthy).
+      # No `if:` gate. It used to read
       #
-      # `cargo publish` errors when the version already exists on crates.io, so
-      # each crate is skipped when its current version is already published.
-      # Without that guard a JS-only release fails here, because the Rust crate
-      # version is unchanged and cannot be pushed twice.
+      #   if: steps.changesets.outputs.published == 'true'
       #
-      # crates.io rejects requests without a User-Agent (403), which would make
-      # a naive check report "not published" for everything and then fail on the
-      # publish itself — so the header is required, not decorative.
+      # and on two consecutive runs that *did* publish to npm, this step
+      # reported **skipped** — so the fifteen crates were unreachable even
+      # before the one-crate loop was considered.
+      #
+      # The gate is not repaired, it is deleted, because the step does not need
+      # one: it asks crates.io what exists and publishes only what does not.
+      # The registry is the source of truth about the registry, and a workflow
+      # output is a claim about it. That is the same finding as "a publish step
+      # exiting 0 is not evidence anything was published", applied one step
+      # earlier.
       - name: Publish crates to crates.io
-        if: steps.changesets.outputs.published == 'true'
-        run: |
-          set -euo pipefail
-          ua="fiducial-release (https://github.com/${{ github.repository }})"
-          for crate in fiducial; do
-            version=$(cargo metadata --no-deps --format-version 1 \
-              | jq -r --arg c "$crate" '.packages[] | select(.name == $c) | .version')
-            if [ -z "$version" ]; then
-              echo "could not resolve a version for $crate" >&2
-              exit 1
-            fi
-            code=$(curl -sS -H "User-Agent: $ua" -o /dev/null -w '%{http_code}' \
-              "https://crates.io/api/v1/crates/$crate/$version")
-            case "$code" in
-              200) echo "$crate $version already on crates.io — skipping" ;;
-              404) echo "publishing $crate $version"; cargo publish --package "$crate" ;;
-              *)   echo "crates.io returned $code checking $crate $version" >&2; exit 1 ;;
-            esac
-          done
+        run: scripts/publish-crates.sh
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      # ── Verify, against the registries and the remote ──────────────────────
+      # The step that exists because every step above it has lied at least
+      # once: `changeset publish` reported "Successfully published" for a
+      # package that stayed at its old version, and reported created tags that
+      # were never pushed. Exit codes are claims; this asks.
+      #
+      # Ungated for the same reason the step above it is, and `always()` so it
+      # still reports when something upstream failed — what did land is the
+      # thing you need to know at that point. Gating this on
+      # `steps.changesets.outputs.published` would be checking the claim with
+      # the claim.
+      - name: Verify what actually reached the registries
+        if: always()
+        run: scripts/verify-published.sh

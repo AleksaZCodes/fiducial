@@ -1,7 +1,7 @@
 {
   "name": "@fiducial/adapters",
   "version": "0.2.0",
-  "description": "Cross-platform adapter contracts for Fiducial — database, storage, email, diagnostics, bot protection, queue, auth.",
+  "description": "Cross-platform adapter contracts for Fiducial — database, storage, email, diagnostics, bot protection, queue, auth, AI.",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
   "repository": {
@@ -51,6 +51,10 @@
     "./newsletter": {
       "import": "./dist/newsletter.js",
       "types": "./dist/newsletter.d.ts"
+    },
+    "./ai": {
+      "import": "./dist/ai.js",
+      "types": "./dist/ai.d.ts"
     }
   },
   "files": ["dist", "README.md"],

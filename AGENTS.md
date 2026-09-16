@@ -312,8 +312,15 @@ The capabilities this platform ships:
 <!-- fid:end capabilities -->
 
 **Adapters name contracts, not vendors.** A product picks a vendor per contract
-in `[adapters]`, and every contract ships with `none` — a real, working no-op,
-not a placeholder, which is what makes it cost nothing to wire in on day one.
+in `[adapters]`, and every contract ships with `none` — a real, working
+implementation, not a placeholder, which is what makes it cost nothing to wire
+in on day one.
+
+`auth` and `ai` are the two whose `none` **fails rather than succeeding
+silently**, and the rule behind that is whether the caller reads a result: a
+no-op send is indistinguishable from a real one at the call site, but a
+fabricated session or completion surfaces far away from the config that caused
+it. See `NoneAi`'s doc comment in `crates/fiducial-adapters/src/ai.rs`.
 
 A name under **Planned** cannot be selected and fails with a message saying so,
 because a selectable name with nothing behind it is a promise the platform does
@@ -330,6 +337,7 @@ not keep. This table is generated from the registry that enforces that rule:
 | `errors` | Error tracking and diagnostics | `none` | `sentry`, `workers-analytics` |
 | `botProtection` | Bot / abuse challenge verification | `none`, `turnstile` | `recaptcha`, `hcaptcha` |
 | `queue` | Asynchronous job/message queue (producer side) | `none`, `cloudflare-queues` | `sqs` |
+| `ai` | Language-model calls: chat, streaming, tool use | `none`, `openrouter` | `workers-ai`, `anthropic`, `openai` |
 | `auth` | Users and authentication: sign-up, sign-in, sessions | `none`, `supabase` | `clerk`, `auth.js` |
 <!-- fid:end adapters -->
 

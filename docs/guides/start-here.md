@@ -199,6 +199,7 @@ Capabilities
   errors         not selected
   botProtection  not selected
   queue          not selected
+  ai             not selected
   auth           not selected
 ```
 

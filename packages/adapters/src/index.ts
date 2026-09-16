@@ -38,6 +38,20 @@ export {
 export type { Queue } from "./queue.js";
 export { CloudflareQueue, NoneQueue, QueueError } from "./queue.js";
 
+export type {
+  Ai,
+  AiErrorKind,
+  ChatRequest,
+  ChatResponse,
+  StopReason,
+  StreamEvent,
+  ToolCall,
+  ToolChoice,
+  ToolDefinition,
+  Usage,
+} from "./ai.js";
+export { AiError, NoneAi, OpenRouterAi } from "./ai.js";
+
 // `Auth` is not part of `AdapterSet` — see its own doc comment in auth.ts for
 // why: every other contract here is env-scoped, and a real Auth
 // implementation is request-scoped (it needs a session store bound to the
@@ -67,6 +81,7 @@ import type { Diagnostics } from "./diagnostics.js";
 import type { BotProtection } from "./bot-protection.js";
 import type { Queue } from "./queue.js";
 import type { Newsletter } from "./newsletter.js";
+import type { Ai } from "./ai.js";
 import { NoneDatabase } from "./database.js";
 import { NoneStorage } from "./storage.js";
 import { NoneEmail } from "./email.js";
@@ -74,6 +89,7 @@ import { NoneDiagnostics } from "./diagnostics.js";
 import { NoneBotProtection } from "./bot-protection.js";
 import { NoneQueue } from "./queue.js";
 import { NoneNewsletter } from "./newsletter.js";
+import { NoneAi } from "./ai.js";
 
 /**
  * The full adapter set — one of these per product, built from `[adapters]`
@@ -95,6 +111,7 @@ export interface AdapterSet {
   botProtection: BotProtection;
   queue: Queue;
   newsletter: Newsletter;
+  ai: Ai;
 }
 
 /**
@@ -113,5 +130,6 @@ export function createNoneAdapters(): AdapterSet {
     botProtection: new NoneBotProtection(),
     queue: new NoneQueue(),
     newsletter: new NoneNewsletter(),
+    ai: new NoneAi(),
   };
 }
