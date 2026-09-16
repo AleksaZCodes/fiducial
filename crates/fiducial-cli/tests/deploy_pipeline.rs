@@ -255,10 +255,7 @@ fn a_non_cloudflare_deploy_vendor_is_refused_by_name() {
 #[test]
 fn selecting_email_resend_emits_resend_api_key_secret() {
     let tmp = tempfile::tempdir().unwrap();
-    let root = product_with_deploy(
-        tmp.path(),
-        "deploy = \"cloudflare\"\nemail = \"resend\"",
-    );
+    let root = product_with_deploy(tmp.path(), "deploy = \"cloudflare\"\nemail = \"resend\"");
     assert!(run(&root, &["derive"]).status.success());
 
     let w = wrangler(&root);

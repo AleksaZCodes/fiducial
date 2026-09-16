@@ -250,7 +250,10 @@ fn selecting_resend_newsletter_derives_the_real_class() {
     assert!(run(&root, &["derive"]).status.success());
     let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
     assert!(factory.contains("ResendNewsletter"), "{factory}");
-    assert!(factory.contains("@fiducial/adapters/newsletter"), "{factory}");
+    assert!(
+        factory.contains("@fiducial/adapters/newsletter"),
+        "{factory}"
+    );
 }
 
 #[test]

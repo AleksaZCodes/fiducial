@@ -67,7 +67,9 @@ pub use bot_protection::{BotProtection, BotProtectionError, NoneBotProtection, V
 pub use database::{Database, DatabaseError, NoneDatabase};
 pub use diagnostics::{Diagnostics, DiagnosticsError, NoneDiagnostics};
 pub use email::{Email, EmailError, NoneEmail};
-pub use newsletter::{Newsletter, NewsletterError, NoneNewsletter, Subscription, SubscriberAttributes};
+pub use newsletter::{
+    Newsletter, NewsletterError, NoneNewsletter, SubscriberAttributes, Subscription,
+};
 pub use queue::{NoneQueue, Queue, QueueError};
 pub use storage::{NoneStorage, Storage, StorageError};
 

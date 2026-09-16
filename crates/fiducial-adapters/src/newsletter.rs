@@ -56,10 +56,7 @@ pub trait Newsletter: Send + Sync {
 
     /// Mark `email` as unsubscribed. Does not delete the record — the opt-out
     /// entry serves as a suppression list entry.
-    fn unsubscribe<'a>(
-        &'a self,
-        email: &'a str,
-    ) -> BoxFuture<'a, Result<(), NewsletterError>>;
+    fn unsubscribe<'a>(&'a self, email: &'a str) -> BoxFuture<'a, Result<(), NewsletterError>>;
 
     /// Return the current subscription record, or `None` if the address has
     /// never been on the list.
@@ -92,10 +89,7 @@ impl Newsletter for NoneNewsletter {
         })))
     }
 
-    fn unsubscribe<'a>(
-        &'a self,
-        _email: &'a str,
-    ) -> BoxFuture<'a, Result<(), NewsletterError>> {
+    fn unsubscribe<'a>(&'a self, _email: &'a str) -> BoxFuture<'a, Result<(), NewsletterError>> {
         Box::pin(std::future::ready(Ok(())))
     }
 
@@ -129,10 +123,7 @@ mod tests {
             first_name: Some("Alice".into()),
             last_name: None,
         };
-        let sub = nl()
-            .subscribe("a@example.com", Some(&attrs))
-            .await
-            .unwrap();
+        let sub = nl().subscribe("a@example.com", Some(&attrs)).await.unwrap();
         assert!(sub.subscribed);
     }
 
