@@ -1289,10 +1289,11 @@ Three things have to be decided, and only the first is mechanical:
    enforcement, which makes the third the most consistent with the platform
    — and the most work.
 
-**Four failures observed on real releases, 2026-09-16.** Recorded because
+**Five failures observed on real releases, 2026-09-16.** Recorded because
 none of them is visible until you run the thing — the first three when
 `@fiducial/adapters@0.2.0` and `@fiducial/identity@0.2.0` were published, the
-fourth when `0.3.0` was not:
+fourth when `0.3.0` was not, and the fifth when it was and the check said
+otherwise:
 
 1. **The crates.io step is gated on a condition that did not fire.** It runs
    `if: steps.changesets.outputs.published == 'true'`. On two consecutive runs
@@ -1361,6 +1362,33 @@ fourth when `0.3.0` was not:
    dropped run is re-derived by the next one. Every step re-derives what to do
    from the registries, which is what makes repetition safe — so the worst case
    becomes latency, not a version nothing has.
+
+5. **The verification failed a release that worked.** The run recovering
+   `@fiducial/adapters@0.3.0` published it correctly, pushed its tag, and was
+   then marked red by its own verify step. The timings say why:
+
+   | Event | Time |
+   |---|---|
+   | `changeset publish` reported it | 16:29:58Z |
+   | verify asked npm | 16:30:10Z — **404**, run red |
+   | npm began serving 0.3.0 | 16:31:34Z |
+
+   Nothing was wrong. The question was asked twelve seconds after the write,
+   and registries are read-after-write eventual.
+
+   This is the inverse of failure 2 and the more corrosive one. A publish that
+   lies costs a version; **a check that lies costs the check**, because a red
+   build for a release that worked is the same colour as a real failure and
+   there is no way to tell them apart without reading the log. A gate that
+   cries wolf is one people learn to wave through — the same reason
+   `fid docs --accept` is a separate command from `--check`.
+
+   ✅ **Fixed 2026-09-16.** A 404 is retried until a shared deadline
+   (`VERIFY_SETTLE_SECS`, default 120s). Shared rather than per-package, so the
+   first absent thing absorbs the wait and a run costs that window once however
+   much is genuinely missing. Only 404 is retried: a 403 from a missing
+   User-Agent already looked exactly like "not published" once, and sitting on
+   it for two minutes would have made that harder to find.
 
 **Not this item:** `WIRE_VERSION` is deliberately not SemVer and its
 mechanism is already stricter. Leave it alone.
