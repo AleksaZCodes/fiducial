@@ -132,10 +132,20 @@ product actually needs.
 <!-- fid:describes crates/fiducial-cli/src/adapter.rs#pub static CONTRACTS -->
 
 Vendors sit behind **adapter contracts**, chosen per product in `[adapters]`.
-Every contract ships with `none` — a real, working no-op, not a placeholder,
-which is what makes it cost nothing to wire in from the first commit. A name
-under *Planned* cannot be selected and fails with a message saying so: a
-selectable name with nothing behind it is a promise the platform does not keep.
+Every contract ships with `none` — a real, working implementation, not a
+placeholder, which is what makes it cost nothing to wire in from the first
+commit. A name under *Planned* cannot be selected and fails with a message
+saying so: a selectable name with nothing behind it is a promise the platform
+does not keep.
+
+Two of those `none`s **fail rather than succeed silently**: `auth` and `ai`.
+The difference is whether the caller reads a result. A no-op send or enqueue is
+indistinguishable from the real thing at the call site — the caller wanted an
+effect elsewhere. A session and a completion *are* the result, so returning a
+fabricated one turns "no vendor selected" into a logged-in stranger or a blank
+answer in the UI, and both get debugged as bugs somewhere else. They still cost
+nothing to wire in: constructing them is free, and nothing fails until
+something actually asks.
 
 <!-- fid:end-describes -->
 
@@ -150,6 +160,7 @@ selectable name with nothing behind it is a promise the platform does not keep.
 | `errors` | Error tracking and diagnostics | `none` | `sentry`, `workers-analytics` |
 | `botProtection` | Bot / abuse challenge verification | `none`, `turnstile` | `recaptcha`, `hcaptcha` |
 | `queue` | Asynchronous job/message queue (producer side) | `none`, `cloudflare-queues` | `sqs` |
+| `ai` | Language-model calls: chat, streaming, tool use | `none`, `openrouter` | `workers-ai`, `anthropic`, `openai` |
 | `auth` | Users and authentication: sign-up, sign-in, sessions | `none`, `supabase` | `clerk`, `auth.js` |
 <!-- fid:end adapters -->
 

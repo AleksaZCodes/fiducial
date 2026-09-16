@@ -384,6 +384,37 @@ built because no product has one yet.
 | **Deliberately not done, and said so in `ROADMAP.md`, `SHIPPED.md` and the spec**: Workers-as-`deploy` (needs its own design — `deploy` is pipeline-shaped, not a runtime trait), Access, Turnstile, Queues, Workers AI (no contract exists for any of the four, and designing one against zero consumers is the mistake *capability taxonomy, made real* already corrected once), a Rust-side D1/R2 client (would need Cloudflare's HTTP/S3 API over an API token, not a binding — no Tauri product needs it), a working `signedUrl` | ✅ |
 | Clippy (0 warnings), fmt, full Rust suite (all workspace crates) and the new JS test file all green | ✅ |
 
+**Phase 35 — the AI contract, targeting a gateway ✅ (2026-09-16)**
+
+> Implements the roadmap item **AI**, and closes **Cloudflare adapter set**
+> with it — that item had reduced to "Access and Workers AI", and both turned
+> out to name contracts rather than Cloudflare adapters. Scoped 2026-09-15 as
+> the highest-design-risk item of its round, shipped the next day once the
+> founder's gateway correction dissolved the risk. Spec:
+> `docs/specs/2026-09-16-the-ai-contract-targets-a-gateway.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **New `ai` contract** — `chat` and `stream`, with messages, a top-level system prompt, tool definitions, tool calls, tool results, stop reasons and usage. Rust trait + `NoneAi` in `fiducial-adapters`, TS interface + `None*` in `@fiducial/adapters` | ✅ |
+| **The contract targets a gateway, not model vendors** — and the spec carries the evidence: `system` top-level vs. a message role, content blocks vs. a parts array, substantially different streaming shapes, and three parameters that changed shape inside a year. Intersecting those by hand yields a contract too thin for agentic work; supersetting them picks a vendor without admitting it | ✅ |
+| `OpenRouterAi` — the first implementation. Secret-reached (`env.OPENROUTER_API_KEY`), the boundary `turnstile` established, so it works from any runtime with `fetch` | ✅ |
+| **`[ai] model` is a declaration, derived into the factory as a literal** — `ai: new OpenRouterAi(env, "anthropic/claude-opus-5")`. This is what makes the gateway decision pay: switching model vendor is a one-line change in a declaration and no adapter change at all | ✅ |
+| **No default model, deliberately.** Any default is a vendor choice made for the product, and it would age into a retired model id *silently* — a gateway reports an unknown model at the first call, not at deploy. `ai = "openrouter"` with no `[ai] model` fails `fid derive`, naming the key | ✅ |
+| **A per-call `request.model` still wins over the declaration** — an agent that classifies with a small model and answers with a large one is a normal agent, and forcing it to build a second adapter would make the declaration a lie rather than a default | ✅ |
+| **`NoneAi` fails rather than succeeding silently**, joining `NoneAuth`. Two of them is enough to state the rule: *does the caller read a result?* A no-op send is indistinguishable from a real one at the call site; a session and a completion **are** the result, so fabricating one moves the failure away from the config that caused it | ✅ |
+| **A found bug, in the gate rather than the feature:** `fid derive --check` hashed outputs against `fiducial.lock` and re-derived only `fid-schema`, so changing a declaration and forgetting to re-run derive left a byte-identical file and a **passing check**. `database = "none"` → `"d1"` shipped a Worker still constructing `NoneDatabase`. `fid-adapters` is now re-derived and compared — the generalization its own doc comment said to make "when a second one needs it" | ✅ |
+| `render_adapters_factory` split out of `run_fid_adapters` so derive and check share one definition of what the factory should say, rather than two | ✅ |
+| **A second found bug, in `fid dash`:** a blockquote carrying one marker counted as a roadmap item. ROADMAP.md opens with "Every ⬜ item below now carries a …", and the moment nothing was 🟡 to outrank it, `fid dash --section roadmap` answered "what is next" with a sentence about the file's format — in the command AGENTS.md sends every agent to for exactly that answer | ✅ |
+| **Streamed tool calls are emitted whole, not as fragments** — gateways stream tool arguments as partial JSON, which a consumer can do nothing with but buffer. The adapter buffers once so every consumer does not | ✅ |
+| **A hand-written SSE parser, and the two bugs it exists to not have**: an event straddling a chunk boundary and several events in one chunk. Both fail only under load; both have a direct test | ✅ |
+| `futures-core` — the `Stream` trait alone, no executor and no combinators — so the Rust contract can name a stream without every consumer inheriting an async runtime from it. `NoneAi`'s one-item stream is six hand-written lines rather than a combinator dependency | ✅ |
+| `ADAPTER_SLOTS` absorbed the eighth contract as one table row, plus the first `vendor_extra_args` arm — the only vendor that needs a constructor argument after `env` | ✅ |
+| **Rust gets the contract, not the vendor**, and says which of the two reasons applies: not structural — an HTTPS POST is reachable from Rust — simply no consumer, since every AI call in the product shapes this platform scaffolds happens in a Worker or a server route | ✅ |
+| 4 new Rust unit tests, 15 new TypeScript tests, 6 new end-to-end CLI tests, and `openrouter` added to the vendor matrix the generated factory is compiled under by real `tsc` | ✅ |
+| Prose block re-read against `pub static CONTRACTS` before acceptance, and **amended rather than accepted**: "every contract ships with `none` — a real, working no-op" was no longer accurate for the two that fail. That is the gate working as designed | ✅ |
+| Docs captures regenerated; `fid context --check`, `fid docs --check` green | ✅ |
+| **Deliberately not done, and said so**: embeddings and a vector store (a real second use with its own shape, landing when it has a consumer), direct-vendor adapters (`anthropic`/`openai` stay `candidates`), a Rust `openrouter` client, an `ai` capability directory, and any agent loop, retry policy or prompt templating — the contract is the vendor boundary, and what to do with a `tool_calls` stop reason is the product's decision | ✅ |
+
 **Phase 34 — the open-source bootstrap, for Fiducial itself ✅ (2026-09-16)**
 
 > Implements the roadmap item **Open-source bootstrap**, in part — the files

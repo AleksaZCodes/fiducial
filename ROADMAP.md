@@ -203,7 +203,7 @@ full mapping.
 **Vendor implementations** — `d1` and `r2` shipped as the first two; Supabase,
 Neon/Postgres, S3, Resend, Sentry remain — under *Cloudflare adapter set*.
 
-### Cloudflare adapter set — *terminal, product-critical* 🟡
+### Cloudflare adapter set — *terminal, product-critical* ✅
 
 D1, R2, Workers, Access, Turnstile, Queues, Workers AI. The first real adapters,
 and the proof that the adapter contract is vendor-neutral rather than a
@@ -232,6 +232,16 @@ rather than Access. Workers AI folds into the **AI** item below, reframed as
 one candidate implementation of a vendor-neutral contract rather than the
 contract's namesake. What remains under this item is therefore nothing
 Cloudflare-specific; it closes when those two do.
+
+**Closed 2026-09-16**, when the second of those two shipped. Neither closed
+as a Cloudflare adapter, and that is the outcome this item was the proof of:
+`auth` shipped Supabase first, and `ai` shipped a gateway with `workers-ai`
+listed as a candidate behind the same contract any other vendor would
+implement. Five of the original seven pieces are Cloudflare vendors behind
+neutral contracts; the two that were Cloudflare *products* in the original
+framing turned out to name contracts instead. That is the item's thesis —
+the adapter contract is vendor-neutral rather than a Cloudflare-shaped hole
+— demonstrated by the two pieces that refused to stay in it.
 
 **Depends on:** cross-platform adapter architecture above.
 
@@ -437,13 +447,14 @@ belong to **Legal & compliance** below — building them here means building
 them twice, which is the precise reason that item is sequenced after i18n
 and brand.
 
-### AI — *terminal, product-critical* ⬜
+### AI — *terminal, product-critical* ✅
 
 "Some way to run AI on the edge or connect to an internet API" — named
 correcting an earlier framing of this as "Workers AI": the founder was
 explicit that Workers AI specifically might not be the right vendor, and
 the actual need is thinking about **AI apps**, vendor-neutral. Scoped
-2026-09-15, not yet built:
+2026-09-15, shipped 2026-09-16:
+`docs/specs/2026-09-16-the-ai-contract-targets-a-gateway.md`.
 
 - **Conversational/agentic first.** Streaming chat completion, tool calls,
   system prompts — shaped like the Anthropic/OpenAI messages API. This is
@@ -480,12 +491,28 @@ the actual need is thinking about **AI apps**, vendor-neutral. Scoped
   whether a direct-vendor adapter is ever worth having as an escape hatch for
   someone who does not want a gateway in the path.
 
-**Why it is not built yet:** highest design risk of everything discussed in
-this round — model APIs vary more across vendors than storage or database
-APIs do (chat completion vs. embeddings vs. image generation are genuinely
-different shapes), so a first attempt is the likeliest of all these items to
-need a redesign. No product has a concrete AI feature yet to generalize the
-contract from.
+**Both answered, 2026-09-16.** `model` is a **declaration** — `[ai] model`,
+derived into the generated factory as a literal, with a per-call override
+still available. That is what makes the gateway decision pay: switching
+from Claude to GPT is a one-line change in a declaration and no adapter
+change at all, which it would not be if the model were scattered across
+route handlers. And **no direct-vendor adapter**: `anthropic` and `openai`
+sit in `candidates`, which is this platform's word for intended and not
+selectable. Adding one later adds an implementation rather than redesigning
+the contract, which is the property that made deferring it cheap.
+
+**The design risk was real and the gateway decision is what retired it.**
+This was called the likeliest item of its round to need a redesign, because
+model APIs vary more across vendors than storage or database APIs do. That
+is still true — the contract simply stopped being the place that absorbs
+the variance.
+
+**Fixed a gate that was blind while building it.** `fid derive --check`
+hashed outputs against `fiducial.lock` and re-derived only `fid-schema`, so
+changing a declaration and forgetting to re-run derive left a byte-identical
+file and a passing check. `[adapters] database = "none"` → `"d1"` shipped a
+Worker still constructing `NoneDatabase`, and nothing failed. `fid-adapters`
+is now re-derived and compared too.
 
 ### Supabase, fully — *terminal, product-critical* ⬜
 

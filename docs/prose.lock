@@ -10,6 +10,6 @@
 "AGENTS.md::.github/cla-exempt.txt" = "a99c1bb4f2f5e47fadf34621c5f7cdd34e91778f44c6a5a57588543b8705e0b7"
 "AGENTS.md::crates/fiducial-cli/src/capability/manifest.rs#pub fn derive" = "ed0814d474d23d3f6e2bff0fd8e200206eae76719b0c3a1f6287eed8b8631095"
 "AGENTS.md::rust-toolchain.toml" = "55e68d5e0504383adf20de2c53ea374b14966b0e27eeb742236eed406d797edc"
-"README.md::crates/fiducial-cli/src/adapter.rs#pub static CONTRACTS" = "4c706ce3e41b947d9542d307578e99133547e10829bd5d73a95d721a9d564360"
+"README.md::crates/fiducial-cli/src/adapter.rs#pub static CONTRACTS" = "9501761a879bae332db093cb03fdc03e39a1dda754d36dcc5ed9770458b9c8cc"
 "README.md::crates/fiducial-cli/src/capability/manifest.rs#pub fn derive" = "ed0814d474d23d3f6e2bff0fd8e200206eae76719b0c3a1f6287eed8b8631095"
 "README.md::crates/fiducial-cli/src/commands/derive.rs#fn run_pipeline_command" = "bdcb4847090b10c6f3db8e83d2605ef3aa7ff2665a8ff95cb794393d7fc442c8"
