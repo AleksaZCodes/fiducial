@@ -196,9 +196,14 @@ export class ResendNewsletter implements Newsletter {
       if (existing) {
         // If the contact is currently unsubscribed, re-subscribe it.
         if (!existing.subscribed) {
-          return this._setUnsubscribed(email, false);
+          const resubscribed = await this.setUnsubscribed(email, false);
+          // `null` means it vanished between the read and the write. Fall
+          // through to the error path rather than claiming a subscription
+          // that does not exist.
+          if (resubscribed) return resubscribed;
+        } else {
+          return existing;
         }
-        return existing;
       }
       // If status returns null after a conflict, something unexpected happened;
       // fall through to the error path below.
@@ -214,8 +219,22 @@ export class ResendNewsletter implements Newsletter {
     return { id: data.id, email, subscribed: true };
   }
 
+  /**
+   * Suppress an address.
+   *
+   * **A contact Resend does not have is success, not an error.** The caller
+   * asked for "this person is not subscribed," and that state already holds;
+   * throwing would turn a correctly-handled unsubscribe link into an error
+   * page. Suppression is the one operation here that must never fail loudly —
+   * it is the request a product is obliged to honour, and a caller that sees
+   * an exception has no safe way to distinguish "already gone" from "not
+   * applied."
+   *
+   * Every other failure — auth, rate limit, a 5xx — still throws, because
+   * those genuinely did not apply the change.
+   */
   async unsubscribe(email: string): Promise<void> {
-    await this._setUnsubscribed(email, true);
+    await this.setUnsubscribed(email, true);
   }
 
   async status(email: string): Promise<Subscription | null> {
@@ -247,11 +266,19 @@ export class ResendNewsletter implements Newsletter {
     };
   }
 
-  /** PATCH the contact's `unsubscribed` flag. Returns the updated record. */
-  private async _setUnsubscribed(
+  /**
+   * PATCH the contact's `unsubscribed` flag.
+   *
+   * Returns the updated record, or `null` when Resend has no such contact.
+   * The 404 is returned rather than thrown because the two callers want
+   * opposite things from it: `unsubscribe` treats a missing contact as the
+   * desired end state, and `subscribe`'s re-subscribe path treats it as the
+   * race it is. Deciding that here would be wrong for one of them.
+   */
+  private async setUnsubscribed(
     email: string,
     unsubscribed: boolean,
-  ): Promise<Subscription> {
+  ): Promise<Subscription | null> {
     const url = `${RESEND_CONTACTS_BASE}/${this.audienceId}/contacts/${encodeURIComponent(email)}`;
     let res: Response;
     try {
@@ -268,6 +295,8 @@ export class ResendNewsletter implements Newsletter {
         `ResendNewsletter update request failed: ${String(err)}`,
       );
     }
+
+    if (res.status === 404) return null;
 
     if (!res.ok) {
       throw new NewsletterError(

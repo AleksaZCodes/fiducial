@@ -937,6 +937,32 @@ describe('@fiducial/adapters', () => {
       assert.equal(capturedBody.unsubscribed, true)
     })
 
+    it('unsubscribe treats a contact Resend does not have as success', async () => {
+      // The desired end state — "not subscribed" — already holds. Throwing
+      // here would turn a correctly-handled unsubscribe link into an error
+      // page, on the one request a product is obliged to honour.
+      const fakeFetch = async () => ({ ok: false, status: 404 })
+      const nl = new ResendNewsletter(
+        { RESEND_API_KEY: 're_key', RESEND_AUDIENCE_ID: 'aud-1' },
+        fakeFetch,
+      )
+      await nl.unsubscribe('nobody@example.com')
+    })
+
+    it('unsubscribe still throws when the change genuinely did not apply', async () => {
+      // The counterpart to the test above: tolerating 404 must not become
+      // tolerating everything. A 500 means the suppression was not recorded.
+      const fakeFetch = async () => ({ ok: false, status: 500 })
+      const nl = new ResendNewsletter(
+        { RESEND_API_KEY: 're_key', RESEND_AUDIENCE_ID: 'aud-1' },
+        fakeFetch,
+      )
+      await assert.rejects(
+        () => nl.unsubscribe('a@example.com'),
+        (err) => err instanceof NewsletterError && /HTTP 500/.test(err.message),
+      )
+    })
+
     it('status returns a Subscription when the contact is found', async () => {
       const fakeFetch = async () => ({
         ok: true,
