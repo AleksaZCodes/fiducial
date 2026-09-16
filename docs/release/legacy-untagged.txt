@@ -1,26 +1,17 @@
-# Published versions that have no git tag, and never will have one created by
-# the release workflow — they were published before anything pushed tags.
+# Published versions that had no git tag, because they were published before
+# anything pushed tags.
 #
 # `changeset publish` printed "Creating git tags… Created git tags." on every
-# release while nothing pushed them, so these twelve versions are on npm with
-# no tag on origin. `release.yml` pushes tags from now on, but a fix cannot
-# retroactively create what was dropped.
+# release while nothing pushed them, so twelve versions sat on npm with no tag
+# on origin. `release.yml` pushes tags from now on, but a fix cannot
+# retroactively create what was dropped — `scripts/backfill-tags.sh --push`
+# did that on 2026-09-16, at the commits that introduced each version.
 #
 # `verify-published.sh` skips a tag named here — and FAILS if one named here
-# actually exists, so the file cannot outlive its purpose. Run
-# `scripts/backfill-tags.sh --push` with credentials that may push tags, then
-# delete every line below; the gate will tell you if you miss one.
+# actually exists, so the file cannot outlive its purpose. The list below is
+# empty and every version the repository declares is now tagged on origin, so
+# the gate runs against the remote and nothing is exempt from it.
 #
-# This is debt, written down. An empty list is the goal.
-@fiducial/adapters@0.2.0
-@fiducial/board-schema@0.5.0
-@fiducial/cli@0.2.0
-@fiducial/fiducial@0.1.0
-@fiducial/headless@0.3.0
-@fiducial/i18n@0.2.0
-@fiducial/identity@0.2.0
-@fiducial/realtime@0.1.0
-@fiducial/tokens@0.2.0
-@fiducial/transport-web@0.2.0
-@fiducial/viewer3d-react@0.2.0
-@fiducial/wasm-bridge@0.1.0
+# This was debt, written down. The empty list is the point: it is kept rather
+# than deleted so the next person to find a tag missing knows this already
+# happened once, and how it was repaid.
