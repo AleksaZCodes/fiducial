@@ -602,6 +602,413 @@ fn run_fid_i18n(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+// ── Built-in fid-legal executor ──────────────────────────────────────────────
+
+/// Generate `legal.*` message-catalog keys for every declared locale.
+///
+/// `[legal]` and `[brand]` in `fiducial.toml` are the declarations; `[i18n]`
+/// provides the locale list and the messages directory. The executor writes one
+/// JSON patch per locale into the messages directory, adding or overwriting
+/// `legal.*` keys. It never removes unrelated keys — it is additive.
+///
+/// The generated keys are jurisdiction-aware: EU products get GDPR boilerplate
+/// (DPO contact, lawful bases, data-subject rights); US-CA gets CCPA; others
+/// get a minimal generic policy. Cookie categories drive the consent banner
+/// entries.
+///
+/// This runs *before* `fid-i18n`, which then types all keys including the new
+/// `legal.*` ones into `src/generated/messages.ts`.
+fn run_fid_legal(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    let config = Config::load(&working_dir.join(crate::config::CONFIG_FILE))
+        .context("fid-legal needs [legal] in fiducial.toml")?;
+
+    let legal = &config.legal;
+    if legal.is_empty() {
+        bail!(
+            "fid-legal: [legal] is not declared in fiducial.toml.\n\
+             Add [legal] with at least `jurisdiction` \
+             (the `legal` capability seeds a placeholder — `fid add legal`)."
+        );
+    }
+    legal.validate()?;
+
+    let brand = &config.brand;
+    if brand.is_empty() {
+        bail!(
+            "fid-legal: [brand] must be declared before [legal] — legal text names \
+             your legal_name, domain, and contact_email."
+        );
+    }
+
+    if config.i18n.is_empty() {
+        bail!(
+            "fid-legal: [i18n] must be declared before [legal] — legal text is \
+             localized by construction."
+        );
+    }
+
+    let dir_name = config.i18n.messages_dir();
+    let dir = working_dir.join(dir_name);
+    if !dir.is_dir() {
+        std::fs::create_dir_all(&dir)
+            .with_context(|| format!("creating messages directory `{dir_name}/`"))?;
+    }
+
+    let locales = config.i18n.locales.clone();
+    if locales.is_empty() {
+        bail!(
+            "fid-legal: [i18n] declares no locales. Add at least one locale to \
+             `[i18n] locales`."
+        );
+    }
+
+    let dpo_contact = legal.dpo_contact(&brand.contact_email).to_string();
+    let categories = legal.effective_cookie_categories();
+
+    for locale in &locales {
+        let catalog_path = dir.join(format!("{locale}.json"));
+
+        // Load existing catalog if present; otherwise start fresh.
+        let mut catalog: serde_json::Map<String, serde_json::Value> = if catalog_path.exists() {
+            let raw = std::fs::read_to_string(&catalog_path)
+                .with_context(|| format!("reading {dir_name}/{locale}.json"))?;
+            serde_json::from_str(&raw)
+                .with_context(|| format!("parsing {dir_name}/{locale}.json as JSON"))?
+        } else {
+            serde_json::Map::new()
+        };
+
+        // Inject legal.* keys — always overwrite so they stay current.
+        let keys = legal_keys(legal, &brand.legal_name, &brand.domain, &dpo_contact, &categories);
+        for (k, v) in keys {
+            catalog.insert(k, serde_json::Value::String(v));
+        }
+
+        let content = serde_json::to_string_pretty(&serde_json::Value::Object(catalog))
+            .context("serializing message catalog")?;
+        std::fs::write(&catalog_path, content + "\n")
+            .with_context(|| format!("writing {dir_name}/{locale}.json"))?;
+    }
+
+    // fid-legal has no static outputs — it patches locale files in place.
+    // Only report when the pipeline has explicit outputs (unusual config).
+    if !pipeline.outputs.is_empty() {
+        eprintln!(
+            "fid-legal: pipeline declares {} output(s) but fid-legal writes locale \
+             files directly — those output paths are unused",
+            pipeline.outputs.len()
+        );
+    }
+
+    Ok(())
+}
+
+/// Build the `legal.*` key map for a given jurisdiction.
+///
+/// Returns a flat `Vec<(key, value)>` that callers merge into a message catalog.
+/// The values are English text — in production these would be translated; here
+/// they serve as a well-formed starting point that passes `fid-i18n`'s
+/// placeholder checks.
+fn legal_keys(
+    legal: &crate::config::Legal,
+    legal_name: &str,
+    domain: &str,
+    dpo_contact: &str,
+    cookie_categories: &[&str],
+) -> Vec<(String, String)> {
+    let jurisdiction = legal.jurisdiction.as_str();
+    let retention = legal.retention_description();
+    let mut keys: Vec<(String, String)> = Vec::new();
+
+    // ── Privacy policy ────────────────────────────────────────────────────────
+    keys.push(("legal.privacy.title".into(), "Privacy Policy".into()));
+    keys.push(("legal.privacy.intro".into(), format!(
+        "{legal_name} operates {domain}. This page describes how we collect, use, and \
+         protect your personal data."
+    )));
+    keys.push(("legal.privacy.contact".into(), format!(
+        "For privacy enquiries contact {dpo_contact}."
+    )));
+    keys.push(("legal.privacy.retention".into(), format!(
+        "We retain your personal data for {retention}."
+    )));
+    keys.push(("legal.privacy.data_categories".into(),
+        "We collect: account information (name, email), usage data (pages visited, \
+         features used), and technical data (IP address, browser type, device). \
+         We do not collect payment card data directly — payments are handled by our \
+         payment processor.".into()));
+    keys.push(("legal.privacy.third_parties".into(),
+        "We share data with: our hosting provider (infrastructure), analytics provider \
+         (usage insights, when consent is given), and payment processor (billing). \
+         We do not sell your data.".into()));
+    keys.push(("legal.privacy.security".into(),
+        "We use industry-standard encryption in transit (TLS) and at rest. \
+         Access to personal data is restricted to personnel who need it to \
+         operate the service.".into()));
+
+    match jurisdiction {
+        "EU" | "EEA" => {
+            keys.push(("legal.privacy.lawful_basis".into(),
+                "We process your data on the following lawful bases: contract performance \
+                 (to provide the service you signed up for), legitimate interests \
+                 (fraud prevention, security, product improvement), and consent \
+                 (marketing emails and non-essential cookies — you may withdraw at any time).".into()));
+            keys.push(("legal.privacy.rights".into(),
+                "Under GDPR you have the right to: access your data (Art. 15), \
+                 rectify inaccurate data (Art. 16), erase your data (Art. 17), \
+                 restrict processing (Art. 18), port your data (Art. 20), and \
+                 object to processing based on legitimate interests (Art. 21). \
+                 Exercise these rights by contacting us. You may also lodge a complaint \
+                 with your national supervisory authority.".into()));
+            keys.push(("legal.privacy.dpo_contact".into(), format!(
+                "Data Protection Officer: {dpo_contact}"
+            )));
+            keys.push(("legal.privacy.international_transfers".into(),
+                "When we transfer personal data outside the EEA, we use Standard \
+                 Contractual Clauses (SCCs) approved by the European Commission, \
+                 or rely on an adequacy decision. Contact us for a copy of the \
+                 applicable transfer mechanism.".into()));
+            // Consent section for opt-in forms
+            keys.push(("legal.privacy.consent.marketing".into(),
+                "I agree to receive marketing emails from {legal_name}. \
+                 I can unsubscribe at any time.".replace("{legal_name}", legal_name)));
+            keys.push(("legal.privacy.consent.analytics".into(),
+                "I consent to the use of analytics cookies to help improve the service.".into()));
+            keys.push(("legal.privacy.dsar.title".into(), "Data Subject Access Request".into()));
+            keys.push(("legal.privacy.dsar.intro".into(), format!(
+                "To exercise your GDPR rights, email {dpo_contact} with the subject \
+                 \"DSAR — [your name]\". We will respond within 30 days. We may ask \
+                 you to verify your identity before processing your request."
+            )));
+        }
+        "US-CA" => {
+            keys.push(("legal.privacy.ccpa_rights".into(),
+                "Under CCPA/CPRA, California residents have the right to: know what \
+                 personal information we collect and how we use it, delete their personal \
+                 information, opt out of the sale or sharing of personal information, \
+                 correct inaccurate personal information, and not be discriminated against \
+                 for exercising these rights.".into()));
+            keys.push(("legal.privacy.do_not_sell".into(),
+                "We do not sell your personal information. We do not share your personal \
+                 information with third parties for cross-context behavioral advertising.".into()));
+            keys.push(("legal.privacy.consent.marketing".into(),
+                "I agree to receive marketing emails. I can unsubscribe at any time.".into()));
+        }
+        "RS" => {
+            keys.push(("legal.privacy.dpo_contact".into(), format!(
+                "Data Protection Officer: {dpo_contact}"
+            )));
+            keys.push(("legal.privacy.rights".into(),
+                "Under the Law on Personal Data Protection (ZZPL) you have the right to \
+                 access, correct, delete, restrict, and port your data. You have 15 days \
+                 to respond to a DSAR. You may lodge a complaint with the Commissioner for \
+                 Information of Public Importance and Personal Data Protection.".into()));
+            keys.push(("legal.privacy.dsar.title".into(), "Data Subject Access Request".into()));
+            keys.push(("legal.privacy.dsar.intro".into(), format!(
+                "To exercise your rights, email {dpo_contact}. We will respond within \
+                 15 days. We may ask you to verify your identity."
+            )));
+            keys.push(("legal.privacy.consent.marketing".into(),
+                "Slažem se da primam marketinške mejlove. Mogu da se odjavim u svakom trenutku.".into()));
+        }
+        _ => {
+            keys.push(("legal.privacy.generic_notice".into(),
+                "We use your data only to operate this service and do not share it with \
+                 third parties except as required by law.".into()));
+            keys.push(("legal.privacy.consent.marketing".into(),
+                "I agree to receive marketing emails. I can unsubscribe at any time.".into()));
+        }
+    }
+
+    // ── Terms of service ─────────────────────────────────────────────────────
+    keys.push(("legal.terms.title".into(), "Terms of Service".into()));
+    keys.push(("legal.terms.intro".into(), format!(
+        "By using {domain} you agree to these terms. {legal_name} may update them at \
+         any time; continued use after notice of a change constitutes acceptance."
+    )));
+    keys.push(("legal.terms.governing_law".into(), governing_law_text(jurisdiction)));
+    keys.push(("legal.terms.limitation_of_liability".into(), format!(
+        "To the extent permitted by law, {legal_name}'s liability is limited to \
+         the amount you paid in the 12 months preceding the claim."
+    )));
+    keys.push(("legal.terms.termination".into(), format!(
+        "{legal_name} may suspend or terminate your access for violation of these terms, \
+         non-payment, or as required by law, with reasonable notice where possible."
+    )));
+    keys.push(("legal.terms.ip".into(), format!(
+        "All intellectual property in the service is owned by or licensed to {legal_name}. \
+         Your data remains yours."
+    )));
+
+    // EU Consumer Rights: 14-day right of withdrawal for digital services.
+    if legal.charges_users && matches!(jurisdiction, "EU" | "EEA") {
+        keys.push(("legal.terms.withdrawal_right".into(),
+            "If you are a consumer in the EU/EEA, you have the right to withdraw from \
+             this contract within 14 days of purchase without giving any reason \
+             (the cooling-off period). To exercise this right, contact us within 14 days. \
+             By requesting that we begin providing the service immediately, you acknowledge \
+             that you may lose the right of withdrawal once the service has been fully \
+             performed.".into()));
+        keys.push(("legal.terms.refund_policy".into(),
+            "Refunds for unused subscription periods are issued pro-rata within 14 days \
+             of a cancellation request, unless the service has already been fully performed \
+             with your prior consent.".into()));
+    } else if legal.charges_users {
+        keys.push(("legal.terms.refund_policy".into(),
+            "Refunds are evaluated case by case. Contact us within 30 days of purchase \
+             if you are unsatisfied.".into()));
+    }
+
+    // ── Cookie consent banner ─────────────────────────────────────────────────
+    // These keys are for the consent banner UI, separate from the Cookie Notice page.
+    keys.push(("legal.cookie_banner.title".into(), "We use cookies".into()));
+    keys.push(("legal.cookie_banner.body".into(), format!(
+        "{domain} uses cookies to operate the service and, with your consent, \
+         to analyse how it is used."
+    )));
+    keys.push(("legal.cookie_banner.accept_all".into(), "Accept all".into()));
+    keys.push(("legal.cookie_banner.reject_non_essential".into(), "Reject non-essential".into()));
+    keys.push(("legal.cookie_banner.manage".into(), "Manage preferences".into()));
+    keys.push(("legal.cookie_banner.learn_more".into(), "Learn more".into()));
+
+    // ── Cookie notice (page) ──────────────────────────────────────────────────
+    keys.push(("legal.cookie.title".into(), "Cookie Notice".into()));
+    keys.push(("legal.cookie.intro".into(), format!(
+        "{domain} uses cookies and similar technologies as described below. \
+         You can change your preferences at any time using the button at the \
+         bottom of the page."
+    )));
+    for cat in cookie_categories {
+        let (label, description) = match *cat {
+            "necessary"   => (
+                "Strictly Necessary",
+                "Required for the site to function. Cannot be disabled. Examples: \
+                 session cookies, CSRF tokens, load-balancer affinity.",
+            ),
+            "analytics"   => (
+                "Performance & Analytics",
+                "Help us understand how visitors use the site so we can improve it. \
+                 No personal data is sold. Examples: page views, feature usage counts.",
+            ),
+            "marketing"   => (
+                "Marketing & Advertising",
+                "Used to deliver ads relevant to your interests on other sites. \
+                 Can be disabled without affecting core site functionality.",
+            ),
+            "preferences" => (
+                "Preferences & Personalisation",
+                "Remember your settings and personalise your experience. \
+                 Examples: language preference, theme, dashboard layout.",
+            ),
+            other => (other, ""),
+        };
+        keys.push((format!("legal.cookie.categories.{cat}.label"), label.to_string()));
+        keys.push((format!("legal.cookie.categories.{cat}.description"), description.to_string()));
+    }
+
+    // ── Imprint (EU only) ─────────────────────────────────────────────────────
+    if matches!(jurisdiction, "EU" | "EEA" | "DE" | "AT" | "CH") {
+        keys.push(("legal.imprint.title".into(), "Imprint".into()));
+        keys.push(("legal.imprint.entity".into(), format!(
+            "{legal_name}, reachable at {dpo_contact}"
+        )));
+        keys.push(("legal.imprint.responsible".into(), format!(
+            "Responsible for content under § 18 Abs. 2 MStV: {legal_name}"
+        )));
+    }
+
+    // ── Data Processing Agreement (optional, B2B) ─────────────────────────────
+    if legal.generate_dpa {
+        keys.push(("legal.dpa.title".into(), "Data Processing Agreement".into()));
+        keys.push(("legal.dpa.intro".into(), format!(
+            "This Data Processing Agreement (\"DPA\") forms part of the agreement between \
+             you (\"Controller\") and {legal_name} (\"Processor\") and governs the processing \
+             of personal data by {legal_name} on your behalf."
+        )));
+        keys.push(("legal.dpa.subject".into(), format!(
+            "Subject matter: {legal_name} processes personal data to provide the {domain} \
+             service as described in the main agreement."
+        )));
+        keys.push(("legal.dpa.duration".into(), format!(
+            "Duration: this DPA remains in force for the duration of the main agreement \
+             and for {retention} thereafter for legitimate business purposes.", retention = retention
+        )));
+        keys.push(("legal.dpa.processor_obligations".into(),
+            "Processor obligations: process data only on Controller instructions; \
+             implement appropriate technical and organisational security measures; \
+             assist Controller in responding to data subject requests; \
+             notify Controller of any personal data breach without undue delay; \
+             delete or return all personal data on termination.".into()));
+        keys.push(("legal.dpa.subprocessors".into(), format!(
+            "Sub-processors: {legal_name} uses sub-processors for hosting, analytics, \
+             and email delivery. A current list is available on request. {legal_name} \
+             will notify Controller before engaging new sub-processors."
+        )));
+        keys.push(("legal.dpa.governing_law".into(), governing_law_text(jurisdiction)));
+        keys.push(("legal.dpa.sign_intro".into(), format!(
+            "To countersign this DPA, email {dpo_contact} with the subject \
+             \"DPA — [your company name]\"."
+        )));
+    }
+
+    // ── Acceptable Use Policy (optional) ─────────────────────────────────────
+    if legal.generate_aup {
+        keys.push(("legal.aup.title".into(), "Acceptable Use Policy".into()));
+        keys.push(("legal.aup.intro".into(), format!(
+            "This Acceptable Use Policy (\"AUP\") sets out what is and is not permitted \
+             when using {domain}. Violation may result in account suspension or termination."
+        )));
+        keys.push(("legal.aup.prohibited.illegal".into(),
+            "Any activity that violates applicable laws or regulations.".into()));
+        keys.push(("legal.aup.prohibited.harm".into(),
+            "Harassing, threatening, or harming any person.".into()));
+        keys.push(("legal.aup.prohibited.spam".into(),
+            "Sending unsolicited bulk messages or operating a spamming service.".into()));
+        keys.push(("legal.aup.prohibited.malware".into(),
+            "Distributing malware, ransomware, or other malicious software.".into()));
+        keys.push(("legal.aup.prohibited.abuse".into(),
+            "Attempting to gain unauthorised access to any system or account.".into()));
+        keys.push(("legal.aup.prohibited.scraping".into(),
+            "Automated scraping or crawling of the service without written permission.".into()));
+        keys.push(("legal.aup.prohibited.ip_violation".into(),
+            "Infringing any intellectual property right of a third party.".into()));
+        keys.push(("legal.aup.enforcement".into(), format!(
+            "{legal_name} reserves the right to investigate and, where appropriate, \
+             suspend or terminate accounts in violation of this policy. \
+             Report abuse to {dpo_contact}."
+        )));
+    }
+
+    // ── Accessibility statement ───────────────────────────────────────────────
+    keys.push(("legal.a11y.title".into(), "Accessibility Statement".into()));
+    keys.push(("legal.a11y.intro".into(), format!(
+        "{legal_name} is committed to making {domain} accessible to everyone, \
+         in accordance with applicable accessibility standards."
+    )));
+    keys.push(("legal.a11y.standard".into(),
+        "We aim to meet WCAG 2.1 Level AA. Some areas of the site may not yet \
+         fully conform; we are actively working to improve them.".into()));
+    keys.push(("legal.a11y.contact".into(), format!(
+        "If you encounter an accessibility barrier, please contact {dpo_contact}. \
+         We will respond within 5 business days."
+    )));
+    keys.push(("legal.a11y.enforcement".into(),
+        "If you are not satisfied with our response, you may contact the relevant \
+         national enforcement body for accessibility regulations.".into()));
+
+    keys
+}
+
+fn governing_law_text(jurisdiction: &str) -> String {
+    match jurisdiction {
+        "EU" | "EEA" => "These terms are governed by the laws of the European Union member \
+                         state where we are established.".into(),
+        "US-CA"      => "These terms are governed by the laws of the State of California, USA.".into(),
+        "RS"         => "These terms are governed by the laws of the Republic of Serbia.".into(),
+        other        => format!("These terms are governed by the laws of {other}."),
+    }
+}
+
 // ── Built-in fid-brand executor ───────────────────────────────────────────────
 
 /// One declaration in, a handful of static artifacts out.
@@ -1621,10 +2028,11 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             "fid-identity" => return run_fid_identity(pipeline, working_dir),
             "fid-adapters" => return run_fid_adapters(pipeline, working_dir),
             "fid-schema" => return run_fid_schema(pipeline, working_dir),
+            "fid-legal" => return run_fid_legal(pipeline, working_dir),
             other => bail!(
                 "unknown executor `{other}` \
                  (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n, fid-brand, \
-                 fid-adapters, fid-deploy, fid-identity, fid-schema)"
+                 fid-adapters, fid-deploy, fid-identity, fid-schema, fid-legal)"
             ),
         };
 

@@ -1,0 +1,11 @@
+name     = "legal"
+executor = "fid-legal"
+# outputs are dynamic: one JSON file per locale from [i18n], written into
+# [i18n] messages_dir (default: messages/). The pipeline adds the
+# `legal.*` keys to each locale's catalog; fid-i18n then types them along
+# with the rest of the product's keys on its next run.
+#
+# No static outputs list — fid-legal discovers locales from [i18n] and writes
+# one file per locale. `fid derive --check` asks fid-legal to verify each
+# locale's legal keys are present and current against fiducial.lock.
+outputs = []

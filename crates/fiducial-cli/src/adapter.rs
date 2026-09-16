@@ -237,7 +237,8 @@ mod tests {
     /// "not yet", a typo is a "no".
     #[test]
     fn a_planned_vendor_reads_differently_from_a_typo() {
-        let planned = problem("database", "supabase").expect("not implemented yet");
+        // s3 is a storage candidate (planned but not yet implemented).
+        let planned = problem("storage", "s3").expect("s3 is a candidate, not yet implemented");
         assert!(planned.contains("nothing implements yet"), "{planned}");
 
         let typo = problem("database", "supabse").expect("unknown");

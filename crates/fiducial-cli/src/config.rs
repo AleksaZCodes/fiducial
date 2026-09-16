@@ -43,6 +43,9 @@ pub struct Config {
     /// `[freshness]` — gates other than `fid derive --check`.
     #[serde(default, skip_serializing_if = "Freshness::is_empty")]
     pub freshness: Freshness,
+    /// `[legal]` — jurisdiction and contact details for generated legal pages.
+    #[serde(default, skip_serializing_if = "Legal::is_empty")]
+    pub legal: Legal,
 }
 
 /// `[ai]` — what an AI gateway needs that nothing can derive.
@@ -787,5 +790,132 @@ mod brand_tests {
         brand.primary_color = "blue".into();
         let err = brand.validate().unwrap_err();
         assert!(format!("{err:#}").contains("primary_color"));
+    }
+}
+
+// ── Legal ─────────────────────────────────────────────────────────────────────
+
+/// `[legal]` — jurisdiction and contact details for generated legal pages.
+///
+/// Legal text is long-form localized copy, so it flows through the i18n
+/// machinery rather than beside it. The `legal` capability derives
+/// message-catalog keys for privacy, terms, cookie, imprint, and
+/// accessibility pages from this block and the `[brand]` declaration.
+///
+/// `[brand]` must be declared — `legal_name`, `domain`, and `contact_email`
+/// are facts the legal text names. `[i18n]` must be declared — legal text
+/// is localized by construction. `fid add legal` checks both dependencies.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct Legal {
+    /// IETF jurisdiction tag, e.g. `"EU"`, `"US-CA"`, `"RS"`.
+    ///
+    /// Drives which cookie categories, which consent banner, which regulatory
+    /// body is named in the privacy policy, and which pages are generated.
+    /// Required.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub jurisdiction: String,
+
+    /// The data-protection officer's email, when required by jurisdiction.
+    ///
+    /// EU/GDPR products name a DPO contact in their privacy policy.
+    /// Optional — defaults to `[brand] contact_email` when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dpo_email: Option<String>,
+
+    /// Cookie categories this product uses.
+    ///
+    /// `["necessary"]` is the minimum. GDPR products that add analytics,
+    /// marketing, or preferences must declare them here — the consent banner
+    /// is derived from this list. Order is preserved in the generated banner.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cookie_categories: Vec<String>,
+
+    /// Whether the product charges end users (not just businesses).
+    ///
+    /// When `true` and jurisdiction is EU/EEA, generates the 14-day right of
+    /// withdrawal notice required by the EU Consumer Rights Directive for
+    /// digital services, plus a refund/cancellation policy section.
+    /// Default: `false`.
+    #[serde(default)]
+    pub charges_users: bool,
+
+    /// How long user data is retained before deletion, in days.
+    ///
+    /// GDPR requires stating your retention period. Common values:
+    /// `730` (2 years), `1095` (3 years), `365` (1 year).
+    /// When set, the privacy policy names this period explicitly.
+    /// Optional — omitting it produces a vaguer "as long as necessary" clause.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data_retention_days: Option<u32>,
+
+    /// Generates a Data Processing Agreement (DPA) for B2B use.
+    ///
+    /// When `true`, the legal pipeline produces a `legal.dpa.*` key set
+    /// containing a standard GDPR Article 28-compliant DPA template that
+    /// business customers can countersign. Required when you process data on
+    /// behalf of customers (SaaS B2B).
+    /// Default: `false`.
+    #[serde(default)]
+    pub generate_dpa: bool,
+
+    /// Generates an Acceptable Use Policy.
+    ///
+    /// When `true`, the legal pipeline produces `legal.aup.*` keys listing
+    /// the categories of prohibited use. Every commercial product should
+    /// have one — it is the legal basis for account termination.
+    /// Default: `false`.
+    #[serde(default)]
+    pub generate_aup: bool,
+}
+
+impl Legal {
+    /// True when no `[legal]` block has been declared.
+    pub fn is_empty(&self) -> bool {
+        self.jurisdiction.is_empty()
+            && self.dpo_email.is_none()
+            && self.cookie_categories.is_empty()
+            && !self.charges_users
+            && self.data_retention_days.is_none()
+            && !self.generate_dpa
+            && !self.generate_aup
+    }
+
+    /// Every required fact is present.
+    pub fn validate(&self) -> Result<()> {
+        if self.jurisdiction.trim().is_empty() {
+            bail!(
+                "[legal] jurisdiction is required. \
+                 Set it to an IETF jurisdiction tag, e.g. `jurisdiction = \"EU\"`"
+            );
+        }
+        Ok(())
+    }
+
+    /// The DPO email to use in generated text.
+    ///
+    /// Falls back to `brand.contact_email` when not explicitly declared;
+    /// callers supply `brand_contact` for that fallback.
+    pub fn dpo_contact<'a>(&'a self, brand_contact: &'a str) -> &'a str {
+        self.dpo_email.as_deref().unwrap_or(brand_contact)
+    }
+
+    /// The effective cookie categories, defaulting to `["necessary"]`.
+    pub fn effective_cookie_categories(&self) -> Vec<&str> {
+        if self.cookie_categories.is_empty() {
+            vec!["necessary"]
+        } else {
+            self.cookie_categories.iter().map(|s| s.as_str()).collect()
+        }
+    }
+
+    /// Human-readable retention period for use in generated text.
+    pub fn retention_description(&self) -> String {
+        match self.data_retention_days {
+            None => "as long as necessary to provide the service".into(),
+            Some(365) => "up to 1 year".into(),
+            Some(730) => "up to 2 years".into(),
+            Some(1095) => "up to 3 years".into(),
+            Some(d) => format!("up to {} days", d),
+        }
     }
 }

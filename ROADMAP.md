@@ -573,11 +573,13 @@ is a worked precedent for the same contract.
 nearly free if the direct-connection route is taken. If they do, say so
 rather than shipping three near-identical classes.
 
-### Legal & compliance — *terminal* ⬜
+### Legal & compliance — *terminal* ✅
 
-Depends on **i18n** (legal text is long-form localized copy) and **brand** (it is
-copy about a declared entity). A genuine dependency, not a preference: built
-earlier, it gets built twice.
+`fid add legal` installs the `legal` capability. `fid-legal` derives `legal.*`
+message-catalog keys for every declared locale from `[legal]` + `[brand]`
+declarations: privacy policy (jurisdiction-aware: GDPR, CCPA, Serbian DPA),
+terms of service, cookie notice, imprint (EU), and accessibility statement.
+Keys flow through `fid-i18n` so missing translations fail the build.
 
 ### `fid capability extract` — *terminal* ⬜
 

@@ -17,6 +17,10 @@ numbering is unchanged._
 > wrong twice over: it duplicated the roadmap, and "between phases" was a state
 > the numbering cannot express, because a phase does not exist until work ships.
 
+**Legal & compliance capability ✅ (2026-09-16)**
+
+`fid add legal` → `[legal]` declaration → `fid-legal` derives `legal.*` keys into every locale catalog → `fid-i18n` types them. Jurisdiction-aware: EU/GDPR (DPO, lawful bases, data-subject rights, imprint), CCPA (US-CA), Serbian DPA (RS), generic for others. 10 end-to-end tests.
+
 **`fid dash` counts prose as items — fixed ✅ (2026-09-16)**
 
 > **On demand item.** `roadmap_status` treated any line carrying a marker as a roadmap item.

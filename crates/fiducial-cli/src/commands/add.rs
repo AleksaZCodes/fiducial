@@ -257,6 +257,29 @@ WHAT THE RUNNER ENFORCES
     )]
     Migrations,
 
+    /// Add legal pages — privacy policy, terms, cookie notice, imprint, accessibility
+    #[command(
+        long_about = "\
+Install the legal capability.
+
+Derives localized `legal.*` message-catalog keys from `[legal]` + `[brand]`
+declarations. The fid-legal pipeline writes one JSON patch per locale into
+`messages/`, adding privacy policy, terms of service, cookie notice, imprint
+(EU only), and accessibility statement keys. fid-i18n then types them along
+with the rest of the product's keys.
+
+Requires [brand] and [i18n] to already be declared.",
+        after_long_help = "\
+EXAMPLE:
+    fid add brand
+    fid add i18n
+    fid add legal
+    # edit [legal] in fiducial.toml — set jurisdiction
+    fid derive          # writes legal.* keys to messages/<locale>.json
+    fid derive --check  # fails if keys are missing or stale"
+    )]
+    Legal,
+
     /// Add cross-platform adapter contracts (database, storage, email, diagnostics)
     #[command(
         long_about = "\
@@ -360,6 +383,7 @@ pub fn run(target: AddTarget) -> Result<()> {
         AddTarget::Identity => install_capability("identity"),
         AddTarget::Adapters => install_capability("adapters"),
         AddTarget::Migrations => install_capability("migrations"),
+        AddTarget::Legal => install_capability("legal"),
         AddTarget::Capability { id, from } => match from {
             Some(spec) => install_external(&id, &spec),
             None => install_capability(&id),

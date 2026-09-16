@@ -1,0 +1,17 @@
+description = "Jurisdiction-aware legal pages derived from [legal] + [brand] declarations"
+
+# The legal capability seeds [legal] with sensible defaults.
+# Replace jurisdiction with your actual tag before deriving.
+# [brand] and [i18n] must already be declared.
+#
+# Fields:
+#   jurisdiction        — IETF tag: EU, US-CA, RS, or any other tag for generic
+#   dpo_email           — optional, defaults to [brand] contact_email
+#   cookie_categories   — ["necessary"] minimum; add "analytics", "marketing", "preferences"
+#   charges_users       — set true if you sell to consumers (unlocks EU withdrawal right)
+#   data_retention_days — how long you keep user data (365, 730, 1095, or any number)
+#   generate_dpa        — set true for B2B (generates Data Processing Agreement keys)
+#   generate_aup        — set true for SaaS (generates Acceptable Use Policy keys)
+[[declarations.config]]
+block = "legal"
+seed = { jurisdiction = "EU", cookie_categories = ["necessary"], charges_users = false, generate_dpa = false, generate_aup = false }
