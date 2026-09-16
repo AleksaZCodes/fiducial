@@ -234,8 +234,11 @@ fn render_capabilities() -> String {
         {
             parts.push("seeds a `fiducial.toml` block".to_string());
         }
+        if !cap.guard_rules.is_empty() {
+            parts.push("guard rules".to_string());
+        }
         if parts.is_empty() {
-            parts.push("a skill and guard rules".to_string());
+            parts.push("a skill".to_string());
         }
         s.push_str(&format!(
             "| `{}` | {} | `fid add capability {}` |\n",
