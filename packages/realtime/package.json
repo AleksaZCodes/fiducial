@@ -1,7 +1,7 @@
 {
   "name": "@fiducial/realtime",
   "version": "0.1.0",
-  "description": "Supabase Realtime typed wrappers — Broadcast, Presence, and Postgres Changes",
+  "description": "Typed Broadcast and Presence over Cloudflare Durable Objects — WebSocket hibernation, zero Supabase dependency",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
   "repository": {
@@ -11,10 +11,11 @@
   "homepage": "https://github.com/AleksaZCodes/fiducial",
   "keywords": [
     "realtime",
-    "supabase",
+    "cloudflare",
+    "durable-objects",
     "broadcast",
     "presence",
-    "postgres-changes",
+    "websocket",
     "fiducial"
   ],
   "type": "module",
@@ -22,6 +23,14 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./durable-object": {
+      "import": "./dist/durable-object.js",
+      "types": "./dist/durable-object.d.ts"
+    },
+    "./client": {
+      "import": "./dist/durable-object-client.js",
+      "types": "./dist/durable-object-client.d.ts"
     }
   },
   "files": [
@@ -39,13 +48,5 @@
   },
   "devDependencies": {
     "typescript": "catalog:"
-  },
-  "peerDependencies": {
-    "@supabase/supabase-js": ">=2"
-  },
-  "peerDependenciesMeta": {
-    "@supabase/supabase-js": {
-      "optional": true
-    }
   }
 }
