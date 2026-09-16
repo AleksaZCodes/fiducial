@@ -31,6 +31,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # changesets needs full history for changelog
+          # The same token the action uses, so the tags and release it pushes
+          # are attributed to a real account and trigger other workflows. A
+          # push made with GITHUB_TOKEN does not trigger workflows, which is
+          # half of why the Release PR's checks sat in `action_required`.
+          token: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
 
       - uses: pnpm/action-setup@v4
         # version read from packageManager field in package.json — do not set here
@@ -53,47 +58,41 @@ jobs:
       # changesets/action either:
       #   a) opens/updates a "Release PR" when changesets are pending, or
       #   b) publishes when merging a Release PR (no pending changesets).
-      - name: Create Release PR or Publish
-        id: changesets # referenced by the crates.io step below — without this
-        # id, `steps.changesets.outputs.published` is always empty and that step
-        # silently never runs.
-        uses: changesets/action@v1
-        with:
-          publish: pnpm release
-          title: "chore: version packages"
-          commit: "chore: version packages"
-        env:
-          # RELEASE_PAT when it exists, GITHUB_TOKEN otherwise.
-          #
-          # GitHub does not run workflows on a pull request authored by
-          # GITHUB_TOKEN without a human pressing approve, so runs on
-          # `changeset-release/main` have sat in `action_required` since
-          # 2026-09-15. That was harmless until the branch ruleset began
-          # requiring status checks, at which point the Release PR became
-          # permanently unmergeable and had to be approved by hand every time.
-          #
-          # A PAT makes the PR authored by a real account, so its CI runs
-          # unattended. The fallback means this file is correct before the
-          # secret exists and starts working the moment it does — no second
-          # change to remember, and no step that fails today for a secret
-          # nobody has created yet.
-          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      # ── Push the tags changesets created ───────────────────────────────────
-      # `changeset publish` prints "Creating git tags… Created git tags." and
-      # creates them in the runner's clone. On 2026-09-16 it printed exactly
-      # that while `git ls-remote --tags origin` stayed empty afterwards —
-      # nothing had ever pushed them. The chain to a Zenodo DOI starts at a
-      # tag, so its first link was not merely missing: it appeared to succeed
-      # and dropped its output.
       #
-      # Runs even when the publish step failed, because a tag for a package
-      # that did publish is still owed. `--no-verify` is not used and no tag is
-      # forced: an existing remote tag must never be moved.
-      - name: Push release tags
-        if: always() && steps.changesets.outputs.published == 'true'
-        run: git push origin --tags
+      # **Pinned to v2, and that pin is the root-cause fix.** v1 detects what
+      # it published by parsing the CLI's stdout for `New tag:` lines, and
+      # `@changesets/cli` 3.x prints a spinner-based "Successfully published:"
+      # block instead. In the action's source `pushTags()` and
+      # `setOutput("published")` sit inside the **same branch**, so one failed
+      # parse produced two symptoms that looked unrelated and were debugged as
+      # two bugs on 2026-09-16:
+      #
+      #   - the crates.io step, gated on `published`, reported skipped on runs
+      #     that had just published to npm;
+      #   - `Creating git tags… Created git tags.` printed while
+      #     `git ls-remote --tags origin` stayed empty.
+      #
+      # v2.0.0 dropped v1 compatibility and reworked exactly this path. It also
+      # renames every input (`publish` → `publish-script`, `title` →
+      # `pr-title`, `commit` → `commit-message`) and **no longer reads a token
+      # from the GITHUB_TOKEN environment variable** — it must go to the
+      # `github-token` input, or the PAT above is silently ignored and the
+      # Release PR is bot-authored again.
+      #
+      # `push-git-tags` and `create-github-releases` both default to true, so
+      # this step pushes the tags itself (no separate step needed) and creates
+      # the GitHub release — which is the object a Zenodo webhook archives to
+      # mint a DOI. Two links of that chain, from one pin.
+      - name: Create Release PR or Publish
+        id: changesets # referenced by the verify step below
+        uses: changesets/action@v2.1.2
+        with:
+          github-token: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
+          publish-script: pnpm release
+          pr-title: "chore: version packages"
+          commit-message: "chore: version packages"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       # ── Publish Rust crates ────────────────────────────────────────────────
       # No `if:` gate. It used to read

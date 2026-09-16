@@ -1368,6 +1368,18 @@ reason the publish must be verified against the registry.
 `scripts/verify-published.sh tags` reads `git ls-remote --tags origin` — never
 the runner's own clone, which is the thing that lied.
 
+**Root cause, found in PR #43 and adopted here.** The `published` output and
+the tag push are **one** bug, not two: `changesets/action@v1` detects what it
+published by parsing stdout for `New tag:` lines, `@changesets/cli` 3.x prints
+a different block, and `pushTags()` sits inside the same failed branch. Pinned
+to `changesets/action@v2.1.2`, which reworked that path — and whose
+`create-github-releases` default produces the GitHub release Zenodo archives.
+So the DOI chain gains two links from one pin.
+
+This was rediscovered rather than read: #43 was open from 08:02 that morning
+and a later session rebuilt the same fix worse. `AGENTS.md` now opens with
+"read the open pull requests" because of it.
+
 **First real publish, 2026-09-16 — five of fifteen, and the limit is
 documented policy.** `fiducial`, `fiducial-adapters`, `fiducial-core`,
 `fiducial-geometry` and `fiducial-model` are on crates.io. The sixth took a
