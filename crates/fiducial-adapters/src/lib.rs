@@ -20,6 +20,7 @@
 //! | `Queue`          | `queue`           |
 //! | `Newsletter`     | `newsletter`      |
 //! | `Auth`           | `auth`            |
+//! | `Ai`             | `ai`              |
 //! | (n/a)            | `deploy`          |
 //!
 //! `deploy` is a build-time/pipeline concern, not a runtime call — no trait.
@@ -52,6 +53,7 @@
 
 use std::{future::Future, pin::Pin};
 
+pub mod ai;
 pub mod auth;
 pub mod bot_protection;
 pub mod database;
@@ -62,6 +64,10 @@ pub mod newsletter;
 pub mod queue;
 pub mod storage;
 
+pub use ai::{
+    Ai, AiError, ChatRequest, ChatResponse, Message as AiMessage, NoneAi, Role, StopReason,
+    StreamEvent, ToolCall, ToolChoice, ToolDefinition, Usage,
+};
 pub use auth::{Auth, AuthError, AuthSession, AuthUser, NoneAuth};
 pub use bot_protection::{BotProtection, BotProtectionError, NoneBotProtection, VerifyOutcome};
 pub use database::{Database, DatabaseError, NoneDatabase};
@@ -78,3 +84,10 @@ pub use storage::{NoneStorage, Storage, StorageError};
 /// Defined once here so each module imports it from `crate` rather than
 /// writing `Pin<Box<dyn Future<...>>>` in every method signature.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+
+/// Object-safe async stream type, for contracts that yield rather than return.
+///
+/// Only [`Ai::stream`](ai::Ai::stream) uses it today. Declared beside
+/// [`BoxFuture`] because it is the same decision for the same reason: keeping
+/// the trait object-safe without a macro.
+pub type BoxStream<'a, T> = Pin<Box<dyn futures_core::Stream<Item = T> + Send + 'a>>;

@@ -59,6 +59,13 @@ thiserror  = { version = "2" }
 walkdir    = { version = "2" }
 tempfile   = { version = "3" }
 tokio      = { version = "1" }
+# `Stream` for the `Ai` contract's `stream()` method. futures-core is the
+# trait definition alone — no executor, no combinators — so the contract can
+# name a stream without every consumer inheriting an async runtime.
+futures-core = { version = "0.3" }
+# Combinators, dev-only: the contracts depend on `futures-core` alone so no
+# consumer inherits a runtime, but the tests that drive a stream need `next()`.
+futures-util = { version = "0.3", default-features = false }
 rayon      = { version = "1" }
 serialport = { version = "4", default-features = false }
 diffy      = { version = "0.4" }

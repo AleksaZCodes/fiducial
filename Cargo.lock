@@ -407,6 +407,8 @@ version = "0.1.0"
 name = "fiducial-adapters"
 version = "0.1.0"
 dependencies = [
+ "futures-core",
+ "futures-util",
  "thiserror",
  "tokio",
 ]
