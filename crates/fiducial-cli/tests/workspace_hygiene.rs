@@ -703,3 +703,85 @@ fn a_phase_built_from_the_roadmap_names_its_item() {
         missing.join("\n")
     );
 }
+
+/// The release scripts invoke no tool the repository does not declare.
+///
+/// `jq` is preinstalled on GitHub's ubuntu runners and on no machine by
+/// guarantee, so three scripts under `scripts/` used it for years while CI
+/// stayed green. The gap surfaced the one place it must not: a maintainer
+/// running `backfill-tags.sh` by hand to repair a release got
+/// `jq: command not found` after it had printed nothing.
+///
+/// They read JSON through `scripts/lib/json.sh` (`node -e`) now, and Node *is*
+/// declared — `.nvmrc`, `engines`, `packageManager`. This keeps the next
+/// convenient one-liner from quietly reintroducing the same class of gap.
+///
+/// It checks invocations, not prose: `scripts/lib/json.sh` explains at length
+/// why jq is gone, and a naive substring search would fail on its own rationale.
+#[test]
+fn release_scripts_invoke_no_undeclared_tool() {
+    // Tools CI installs but a clone is not guaranteed to have. `curl`, `git`,
+    // `sed` and `node` are not here: the first three are POSIX-ubiquitous and
+    // the fourth this repository pins.
+    const UNDECLARED: &[&str] = &["jq", "yq", "http", "xmllint"];
+
+    let scripts_dir = workspace_root().join("scripts");
+    let mut offences: Vec<String> = Vec::new();
+
+    let mut files: Vec<PathBuf> = Vec::new();
+    let mut stack = vec![scripts_dir.clone()];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).expect("scripts/ is readable") {
+            let path = entry.expect("readable entry").path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|e| e == "sh") {
+                files.push(path);
+            }
+        }
+    }
+    files.sort();
+    assert!(
+        files.len() >= 4,
+        "expected the release scripts, found {} — has scripts/ moved?",
+        files.len()
+    );
+
+    for path in &files {
+        let text = std::fs::read_to_string(path).expect("script is readable");
+        for (n, line) in text.lines().enumerate() {
+            // A comment is where the reasoning lives, and reasoning names the
+            // tool it rejects. Only what the shell would run counts.
+            let code = match line.split_once('#') {
+                Some((before, _)) if !before.trim().is_empty() => before,
+                Some(_) => continue,
+                None => line,
+            };
+            for tool in UNDECLARED {
+                // Word-bounded: `jqueue=1` is not an invocation of `jq`.
+                let invoked = code
+                    .split(|c: char| !c.is_alphanumeric() && c != '_' && c != '-')
+                    .any(|word| word == *tool);
+                if invoked {
+                    offences.push(format!(
+                        "  {}:{}  invokes `{tool}`\n      {}",
+                        path.strip_prefix(workspace_root())
+                            .unwrap_or(path)
+                            .display(),
+                        n + 1,
+                        code.trim()
+                    ));
+                }
+            }
+        }
+    }
+
+    assert!(
+        offences.is_empty(),
+        "release scripts may only invoke tools this repository declares.\n\
+         These are present on GitHub's runners and not on a fresh clone:\n\n{}\n\n\
+         Read JSON through `scripts/lib/json.sh` instead — it uses `node -e`,\n\
+         and Node is pinned by `.nvmrc`, `engines` and `packageManager`.\n",
+        offences.join("\n")
+    );
+}

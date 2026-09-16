@@ -1396,12 +1396,30 @@ ten re-runs.
 **Twelve published versions have no tag, and the workflow cannot create them.**
 Tag pushing is fixed going forward, but it cannot retroactively create what was
 dropped. `scripts/backfill-tags.sh --push` creates them at the commits that made
-each version — it needs credentials that may push tags, which the agent session
-does not have (a bare HTTP 403 on `refs/tags/*`, branches push fine).
+each version — it needs credentials that may push tags.
 `docs/release/legacy-untagged.txt` records the twelve so the gate is honest
 rather than permanently red, and **fails if a listed tag turns out to exist** —
 so the exemption cannot outlive its purpose. An empty file is the goal, and it
 is the last thing standing between here and the DOI chain's first link.
+
+✅ **Backfilled 2026-09-16.** All twelve tags are on `origin` at the commits
+that introduced each version, `legacy-untagged.txt` is empty, and
+`scripts/verify-published.sh tags` passes on the remote rather than on an
+exemption. The earlier note that an agent session cannot do this recorded the
+wrong cause: the 403 was the environment that session happened to run in, not a
+property of agent sessions, and the script pushed on the first attempt from a
+maintainer's machine.
+
+It did not run there at first, though — it died on `jq: command not found`
+after printing nothing. `jq` is preinstalled on GitHub's ubuntu runners and on
+no machine by guarantee, so three release scripts carried a prerequisite that
+only CI happened to satisfy. They now read JSON through `scripts/lib/json.sh`
+(`node -e`), which this repository already requires everywhere. **A dependency
+the runner image donates is not a dependency anyone declared** — and the one
+place it surfaces is the one place it must not, a maintainer running the
+recovery script by hand. `release_scripts_invoke_no_undeclared_tool` in
+`workspace_hygiene.rs` holds it: it reads what the shell would run, ignoring
+comments, so the next convenient one-liner cannot reintroduce the gap.
 
 **Sequencing.** Blocked on Rust release versioning above, and on
 `CITATION.cff`, which shipped 2026-09-16. Zenodo reads `CITATION.cff` when

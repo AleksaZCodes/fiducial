@@ -31,6 +31,8 @@ set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo"
 
+. "$repo/scripts/lib/json.sh"
+
 # crates.io rejects requests without a User-Agent with 403, which would make a
 # naive check report "not published" for every crate. The header is required,
 # not decorative.
@@ -64,15 +66,12 @@ committed() {
 # believed and already wrong.
 verify_npm() {
   echo "── npm ──"
-  local pkg name version code
+  local pkg name version private code
   while IFS= read -r pkg; do
     json=$(committed "$pkg") || continue
     [ -z "$json" ] && continue
-    if [ "$(jq -r '.private // false' <<<"$json")" = "true" ]; then
-      continue
-    fi
-    name=$(jq -r '.name' <<<"$json")
-    version=$(jq -r '.version' <<<"$json")
+    IFS=$'\t' read -r name version private < <(json_package_fields <<<"$json")
+    [ "$private" = "true" ] && continue
     code=$(curl -sS -o /dev/null -w '%{http_code}' \
       "https://registry.npmjs.org/${name//\//%2f}/$version")
     case "$code" in
@@ -99,8 +98,7 @@ verify_crates() {
       *)   printf '  ? %s %s — crates.io returned %s\n' "$name" "$version" "$code"
            missing+=("crates:$name@$version (HTTP $code)") ;;
     esac
-  done < <(cargo metadata --no-deps --format-version 1 \
-    | jq -r '.packages[] | select(.publish != []) | [.name, .version] | @tsv' | sort)
+  done < <(cargo_publishable_crates)
 }
 
 # ── git tags ──────────────────────────────────────────────────────────────────
@@ -108,7 +106,7 @@ verify_crates() {
 # for, not evidence against it.
 verify_tags() {
   echo "── git tags (remote) ──"
-  local remote_tags name version tag legacy
+  local remote_tags name version private tag legacy
   remote_tags=$(git ls-remote --tags origin | sed 's#.*refs/tags/##' | sed 's/\^{}$//' | sort -u)
   # Versions published before anything pushed tags. See the file's own header.
   legacy=$(grep -vE '^\s*(#|$)' "$LEGACY_FILE" 2>/dev/null || true)
@@ -116,11 +114,8 @@ verify_tags() {
   while IFS= read -r pkg; do
     json=$(committed "$pkg") || continue
     [ -z "$json" ] && continue
-    if [ "$(jq -r '.private // false' <<<"$json")" = "true" ]; then
-      continue
-    fi
-    name=$(jq -r '.name' <<<"$json")
-    version=$(jq -r '.version' <<<"$json")
+    IFS=$'\t' read -r name version private < <(json_package_fields <<<"$json")
+    [ "$private" = "true" ] && continue
     tag="$name@$version"
     if grep -qxF "$tag" <<<"$remote_tags"; then
       # A tag on the legacy list that now exists means the list is stale, and a
