@@ -10,7 +10,40 @@ name: Release
 on:
   push:
     branches: [main]
+  # Convergence, and the reason the release is no longer merge-triggered only.
+  #
+  # Every step below re-derives what to do from the registries rather than from
+  # the previous run's state, so running again is always safe and never a
+  # no-op-by-accident. That makes a periodic run the cheapest possible recovery
+  # for anything a push-triggered run missed.
+  schedule:
+    - cron: "0 */6 * * *"
+  # For draining a backlog now rather than in six hours.
+  workflow_dispatch:
 
+# One release at a time: `changeset publish` and `cargo publish` must not race
+# each other, so runs serialize on a single group.
+#
+# `cancel-in-progress: false` protects the run that is **executing**. It does
+# not protect a run that is **queued** — GitHub keeps at most one pending run
+# per group, so a newly queued run evicts the one already waiting, and an
+# evicted run never creates a job at all.
+#
+# On 2026-09-16 that cost a publish. The run for PR #45 (the Release PR merge,
+# whose only job was publishing `@fiducial/adapters@0.3.0`) was cancelled one
+# second after an unrelated merge queued behind it, while a third run sat in
+# `publish-crates.sh`'s hour-long rate-limit sleep holding the group. Zero
+# steps ran. The `if: always()` verify step never fired either — `always()`
+# covers a *failed* run, not one cancelled before it starts.
+#
+# Two changes make that survivable, and neither is a wider concurrency group
+# (which would just let the publishes race):
+#
+#   1. `publish-crates.sh` no longer sleeps by default, so the critical
+#      section is minutes rather than hours and eviction is rare.
+#   2. The `schedule:` above means eviction is no longer **lossy**. A run that
+#      is dropped is re-derived by the next one, so the worst case is latency,
+#      not a version that main declares and no registry has.
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false

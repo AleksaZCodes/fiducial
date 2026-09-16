@@ -29,23 +29,41 @@
 #   Requests): You have published too many new crates in a short period of
 #   time. Please try again after Wed, 16 Sep 2026 14:38:58 GMT
 #
-# So this waits until the time the server named and goes round again. Each pass
-# re-asks crates.io what is missing, which makes the loop converge whatever
-# happened in the previous pass — a partial publish is just a shorter next one.
+# Each pass re-asks crates.io what is missing, which makes this converge
+# whatever happened in the previous pass — a partial publish is just a shorter
+# next one. That property is the whole design, and it is what lets the default
+# be **do not wait**.
 #
-# The wait is bounded by `PUBLISH_MAX_WAIT_SECS` (default two hours) so a
-# pathological case cannot burn a six-hour runner. Reaching the cap fails,
-# because a publish that did not finish is not a publish that succeeded.
+# ## Why it no longer sleeps by default
 #
-# Note this path costs an hour and a half *once*. After the first release every
-# crate exists, so every later run publishes new versions into the burst of 30
-# and never sleeps at all. That is why the wait lives here rather than being
-# engineered away: it is a real condition, rarely hit, and the honest handling
-# is to wait exactly as long as the server asked.
+# It used to wait out the 429 in place, up to `PUBLISH_MAX_WAIT_SECS` (two
+# hours). That is the honest thing for a script and the wrong thing for this
+# script, because of where it runs: inside `release.yml`, whose `concurrency`
+# group admits **one pending run**. A release job that sleeps for an hour holds
+# that group, and the next merge to main evicts whatever was queued behind it.
+#
+# That is not theoretical. On 2026-09-16 the run for PR #45 — the Release PR
+# merge, the run whose only job was publishing `@fiducial/adapters@0.3.0` —
+# was cancelled one second after an unrelated merge queued behind it. It never
+# created a job, so not one step ran, and `verify-published.sh` with
+# `if: always()` never fired either: `always()` covers a failed run, not a run
+# cancelled before it starts. main declared 0.3.0 while npm had 0.2.0 and
+# nothing said so.
+#
+# So the wait is out of the critical section. A rate-limited pass now publishes
+# what the bucket allowed, names what is left, and **exits 0** — the release
+# job finishes in minutes and releases the group. What is left gets published
+# by the next run, and `release.yml` is on a schedule precisely so a next run
+# always comes. `verify-published.sh` remains the thing that says whether the
+# registry agrees with the repository; this script's exit code never claimed to.
+#
+# `--wait` restores the old behaviour for a human draining the backlog by hand,
+# where holding nothing up is the point.
 #
 # Usage:
 #
-#   scripts/publish-crates.sh              # publish what is missing
+#   scripts/publish-crates.sh              # publish what the bucket allows
+#   scripts/publish-crates.sh --wait       # sit out the 429s until done
 #   scripts/publish-crates.sh --dry-run    # say what would be published
 #
 # `--dry-run` runs cargo's own `--dry-run`, so it still packages and verifies
@@ -58,12 +76,15 @@ cd "$repo"
 . "$repo/scripts/lib/json.sh"
 
 dry_run=""
-if [ "${1:-}" = "--dry-run" ]; then
-  dry_run="--dry-run"
-elif [ -n "${1:-}" ]; then
-  echo "unknown argument '$1' — the only option is --dry-run" >&2
-  exit 2
-fi
+wait_out_limit=""
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) dry_run="--dry-run" ;;
+    --wait)    wait_out_limit=1 ;;
+    *) echo "unknown argument '$arg' — the options are --dry-run and --wait" >&2
+       exit 2 ;;
+  esac
+done
 
 # crates.io rejects requests without a User-Agent with 403, which would make a
 # naive check report "not published" for every crate and then fail on the
@@ -137,6 +158,25 @@ while :; do
   if [ -z "$retry_at" ]; then
     echo "✗ publish failed, and not for a rate limit — see the error above" >&2
     exit 1
+  fi
+
+  # Rate limited. Without `--wait` this is where the script stops — see the
+  # header: sleeping here holds `release.yml`'s concurrency group and gets the
+  # next queued release cancelled, which costs a publish. Converging over
+  # several short runs costs only time.
+  if [ -z "$wait_out_limit" ]; then
+    echo
+    echo "⏳ rate limited by crates.io; it asked to retry after $retry_at"
+    echo "   Not waiting — this holds the release workflow's concurrency group,"
+    echo "   and a held group gets the next queued release cancelled."
+    echo "   The remaining crate(s) publish on the next run; release.yml runs on"
+    echo "   a schedule so one always comes. To drain it now, by hand:"
+    echo
+    echo "       scripts/publish-crates.sh --wait"
+    echo
+    echo "✦ published what the rate limit allowed; verify-published.sh reports"
+    echo "  what the registry is still missing"
+    exit 0
   fi
 
   now=$(date -u +%s)

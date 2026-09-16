@@ -785,3 +785,51 @@ fn release_scripts_invoke_no_undeclared_tool() {
         offences.join("\n")
     );
 }
+
+/// The release workflow can recover from a run that never happened.
+///
+/// `release.yml` serializes on one concurrency group, and GitHub keeps at most
+/// one *pending* run per group — so a newly queued run evicts the one already
+/// waiting, which never creates a job at all. On 2026-09-16 that silently cost
+/// the publish of `@fiducial/adapters@0.3.0`: main declared it, npm did not
+/// have it, and the `if: always()` verify step never ran, because `always()`
+/// covers a failed run and not one cancelled before it starts.
+///
+/// The fix is not a wider concurrency group — that would let two publishes
+/// race. It is that **something always comes back**: every step re-derives what
+/// to do from the registries, so a scheduled run repairs whatever a dropped run
+/// missed, and eviction costs latency instead of a version nothing has.
+///
+/// This holds the `schedule:` trigger in place. Delete it and the failure above
+/// is silently reintroduced, with nothing to notice it — which is exactly how
+/// it happened the first time.
+#[test]
+fn the_release_workflow_runs_on_a_schedule_not_only_on_merges() {
+    let path = workspace_root().join(".github/workflows/release.yml");
+    let text = std::fs::read_to_string(&path).expect("release.yml is readable");
+
+    // Only what the workflow declares, not what its comments discuss: the
+    // rationale below `concurrency:` names every one of these words.
+    let declared: String = text
+        .lines()
+        .filter(|line| !line.trim_start().starts_with('#'))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        declared.contains("schedule:") && declared.contains("cron:"),
+        "`.github/workflows/release.yml` must declare a `schedule:` trigger.\n\n\
+         It serializes on one concurrency group, and GitHub evicts a queued run\n\
+         when another queues behind it — an evicted run creates no job, so the\n\
+         `if: always()` verify step cannot report it either. A periodic run is\n\
+         what makes that eviction cost latency rather than a lost publish.\n"
+    );
+
+    // The verify step is the other half: convergence is only useful if
+    // something still says when the registry disagrees with the repository.
+    assert!(
+        declared.contains("verify-published.sh"),
+        "`release.yml` must still run `scripts/verify-published.sh` — a release\n\
+         that re-derives its work needs something that reports the result.\n"
+    );
+}

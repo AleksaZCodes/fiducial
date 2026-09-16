@@ -1289,9 +1289,11 @@ Three things have to be decided, and only the first is mechanical:
    enforcement, which makes the third the most consistent with the platform
    — and the most work.
 
-**Three failures observed on a real release, 2026-09-16**, when
-`@fiducial/adapters@0.2.0` and `@fiducial/identity@0.2.0` were published.
-Recorded because none of them is visible until you run the thing:
+**Five failures observed on real releases, 2026-09-16.** Recorded because
+none of them is visible until you run the thing — the first three when
+`@fiducial/adapters@0.2.0` and `@fiducial/identity@0.2.0` were published, the
+fourth when `0.3.0` was not, and the fifth when it was and the check said
+otherwise:
 
 1. **The crates.io step is gated on a condition that did not fire.** It runs
    `if: steps.changesets.outputs.published == 'true'`. On two consecutive runs
@@ -1328,10 +1330,65 @@ Recorded because none of them is visible until you run the thing:
    a PAT for `changesets/action` instead of `GITHUB_TOKEN`, so the PR is
    authored by a human account and CI runs unattended.
 
-   🟡 **Wired 2026-09-16, waiting on the secret.** The workflow reads
-   `${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}`, so nothing changes
-   until the secret exists and it starts working the moment it does. Creating
-   it is the one step here that only the account owner can take.
+   ✅ **Fixed 2026-09-16.** `RELEASE_PAT` exists and the workflow reads
+   `${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}`, so the Release PR is
+   authored by a real account and its checks run unattended.
+
+4. **A queued release run was cancelled, and nothing noticed.** The run for
+   PR #45 — the Release PR merge, whose only job was publishing
+   `@fiducial/adapters@0.3.0` — was cancelled **one second** after an
+   unrelated merge queued behind it. It never created a job, so not one step
+   ran. `changeset version` had already landed the bump on main, so the
+   repository declared 0.3.0 while npm served 0.2.0 and no tag existed.
+
+   The cause is `concurrency`, and it is a detail of GitHub rather than of
+   this repository: `cancel-in-progress: false` protects the run that is
+   **executing** and says nothing about one that is **queued**. GitHub keeps at
+   most one pending run per group, so a newly queued run evicts the waiting
+   one. The window was wide because a third run was sitting in
+   `publish-crates.sh`'s hour-long rate-limit sleep, holding the group.
+
+   **The verification step could not catch this, which is the part worth
+   keeping.** `verify-published.sh` runs `if: always()` — and `always()` covers
+   a *failed* run, not a run cancelled before it starts. A gate that lives
+   inside the thing it checks cannot report on the case where the thing never
+   ran. That is the same shape as "a publish step exiting 0 is not evidence
+   anything was published", one level further out.
+
+   ✅ **Fixed 2026-09-16, by making eviction cheap rather than impossible.**
+   Widening the concurrency group would only let two publishes race. Instead:
+   `publish-crates.sh` no longer sleeps by default, so the critical section is
+   minutes rather than hours; and `release.yml` runs on a **schedule**, so a
+   dropped run is re-derived by the next one. Every step re-derives what to do
+   from the registries, which is what makes repetition safe — so the worst case
+   becomes latency, not a version nothing has.
+
+5. **The verification failed a release that worked.** The run recovering
+   `@fiducial/adapters@0.3.0` published it correctly, pushed its tag, and was
+   then marked red by its own verify step. The timings say why:
+
+   | Event | Time |
+   |---|---|
+   | `changeset publish` reported it | 16:29:58Z |
+   | verify asked npm | 16:30:10Z — **404**, run red |
+   | npm began serving 0.3.0 | 16:31:34Z |
+
+   Nothing was wrong. The question was asked twelve seconds after the write,
+   and registries are read-after-write eventual.
+
+   This is the inverse of failure 2 and the more corrosive one. A publish that
+   lies costs a version; **a check that lies costs the check**, because a red
+   build for a release that worked is the same colour as a real failure and
+   there is no way to tell them apart without reading the log. A gate that
+   cries wolf is one people learn to wave through — the same reason
+   `fid docs --accept` is a separate command from `--check`.
+
+   ✅ **Fixed 2026-09-16.** A 404 is retried until a shared deadline
+   (`VERIFY_SETTLE_SECS`, default 120s). Shared rather than per-package, so the
+   first absent thing absorbs the wait and a run costs that window once however
+   much is genuinely missing. Only 404 is retried: a 403 from a missing
+   User-Agent already looked exactly like "not published" once, and sitting on
+   it for two minutes would have made that harder to find.
 
 **Not this item:** `WIRE_VERSION` is deliberately not SemVer and its
 mechanism is already stricter. Leave it alone.

@@ -26,6 +26,27 @@
 #
 # Exits non-zero naming every package or tag that is missing. Read-only: it
 # publishes nothing and pushes nothing.
+#
+# ## Why it waits for a 404 before believing it
+#
+# Registries are read-after-write eventual. On 2026-09-16 this step ran twelve
+# seconds after `changeset publish` reported `@fiducial/adapters@0.3.0`, got a
+# 404, and failed the release — while npm began serving that exact version
+# ninety-six seconds after the publish. The publish was fine; the question was
+# asked too early.
+#
+# A red build for a release that worked is worse than no check at all, because
+# it is the same colour as a real failure and there is no way to tell them
+# apart without reading the log. A gate that cries wolf is one people learn to
+# wave through, which is the failure mode this repository already names about
+# its prose gate.
+#
+# So a 404 is retried until a **shared deadline** (`VERIFY_SETTLE_SECS`,
+# default 120). Shared, not per-package: the first missing thing absorbs the
+# wait and everything after it fails fast, so a run costs that window once —
+# plus the 10-second poll it is in when the deadline passes — no matter how
+# much is genuinely absent. Set it to 0 for an immediate answer when you know
+# nothing was just published.
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -39,6 +60,31 @@ cd "$repo"
 ua="fiducial-release (https://github.com/AleksaZCodes/fiducial)"
 
 LEGACY_FILE="docs/release/legacy-untagged.txt"
+
+# One deadline for the whole run, fixed before any request goes out.
+settle_secs=${VERIFY_SETTLE_SECS:-120}
+settle_until=$(( $(date -u +%s) + settle_secs ))
+
+# The HTTP status for a URL, retrying a 404 until the shared deadline.
+#
+# Only 404 is retried. A 200 is an answer, and anything else is an unknown
+# state this script must report rather than sit on — a 403 from a missing
+# User-Agent used to look exactly like "not published", and waiting two minutes
+# to say so would have made that harder to find, not easier.
+status_once() {
+  curl -sS "$@" -o /dev/null -w '%{http_code}'
+}
+
+status_settled() {
+  local code
+  while :; do
+    code=$(status_once "$@")
+    [ "$code" = "404" ] || break
+    [ "$(date -u +%s)" -ge "$settle_until" ] && break
+    sleep 10
+  done
+  printf '%s' "$code"
+}
 
 section="${1:-all}"
 missing=()
@@ -72,8 +118,7 @@ verify_npm() {
     [ -z "$json" ] && continue
     IFS=$'\t' read -r name version private < <(json_package_fields <<<"$json")
     [ "$private" = "true" ] && continue
-    code=$(curl -sS -o /dev/null -w '%{http_code}' \
-      "https://registry.npmjs.org/${name//\//%2f}/$version")
+    code=$(status_settled "https://registry.npmjs.org/${name//\//%2f}/$version")
     case "$code" in
       200) printf '  ✓ %s@%s\n' "$name" "$version" ;;
       404) printf '  ✗ %s@%s — not on npm\n' "$name" "$version"
@@ -89,7 +134,7 @@ verify_crates() {
   echo "── crates.io ──"
   local name version code
   while IFS=$'\t' read -r name version; do
-    code=$(curl -sS -H "User-Agent: $ua" -o /dev/null -w '%{http_code}' \
+    code=$(status_settled -H "User-Agent: $ua" \
       "https://crates.io/api/v1/crates/$name/$version")
     case "$code" in
       200) printf '  ✓ %s %s\n' "$name" "$version" ;;
