@@ -154,6 +154,48 @@ abstraction is a product-level hook that returns a typed channel, not an
 `PresenceAdapter`, `PostgresChangesAdapter`) are already defined for this
 purpose — they take any channel implementation, not just Supabase.
 
+## Local relay — LAN, offline, bare metal
+
+When Cloudflare is not reachable (LAN-only, air-gapped, embedded devices,
+tests), use the relay instead of the DO. It speaks the same frame protocol,
+so `connectChannel()` works against either without any code change.
+
+```ts
+// server (Node ≥ 20, Bun, or any machine with TCP/IP)
+import { createRelay } from "@fiducial/realtime/relay";
+
+const relay = createRelay({ port: 8787 });
+// → ws://0.0.0.0:8787?channel=room-42
+```
+
+Or run as a standalone process (no code needed):
+
+```sh
+PORT=8787 npx @fiducial/realtime   # runs the realtime-relay bin
+```
+
+```ts
+// client (browser, Node, Electron, React Native — anything with WebSocket)
+import { connectChannel } from "@fiducial/realtime/client";
+
+const ch = connectChannel("ws://192.168.1.10:8787?channel=room-42");
+```
+
+The relay multiplexes many channels over one port (vs. the DO which is one
+instance per channel). Presence state lives in process memory and is lost on
+restart — reconnecting clients receive a `presence:sync` frame with the
+current snapshot, same as with the DO.
+
+**Relay vs. DO — when to pick which**
+
+| | Durable Object | Local relay |
+|---|---|---|
+| Deployment | Cloudflare Workers | Anywhere Node/Bun runs |
+| Internet required | Yes | No — LAN or loopback |
+| CPU billing | Hibernation (idle = free) | Always-on process |
+| Scale | CF global edge | Single machine |
+| Best for | Production web apps | Dev, desktop apps, IoT, LAN games |
+
 ## No capability block in fiducial.toml
 
 `realtime` has no `[realtime]` config block and no pipeline. There is nothing
@@ -162,12 +204,8 @@ generated code. Install the package, wire up a channel, and use it.
 
 ## Key constraints
 
-- **One channel per logical context.** Channels share a WebSocket; opening many
-  channels for the same entity wastes connections.
-- **Subscribe before calling `channel.subscribe()`.** Handlers registered after
-  the channel is live may miss events. The `boardChannel` factory above returns
-  the channel before it subscribes — call `.subscribe()` on the channel object
-  after attaching all handlers.
-- **Postgres Changes are Supabase/Postgres only.** The contract does not abstract
-  over the database vendor — it is a CDC stream from a live Postgres instance.
-  SQLite (D1) does not support it.
+- **One channel per logical context.** Opening many channels for the same
+  entity wastes connections.
+- **Postgres Changes are Supabase/Postgres only.** The contract does not
+  abstract over the database vendor — it is a CDC stream from a live Postgres
+  instance. SQLite (D1) does not support it.

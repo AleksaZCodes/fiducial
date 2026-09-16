@@ -31,7 +31,14 @@
     "./client": {
       "import": "./dist/durable-object-client.js",
       "types": "./dist/durable-object-client.d.ts"
+    },
+    "./relay": {
+      "import": "./dist/relay.js",
+      "types": "./dist/relay.d.ts"
     }
+  },
+  "bin": {
+    "realtime-relay": "./dist/relay-bin.js"
   },
   "files": [
     "dist",
@@ -46,7 +53,11 @@
     "lint": "echo 'no linter configured yet'",
     "test": "node --test src/realtime.test.js"
   },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
   "devDependencies": {
+    "@types/ws": "^8.5.13",
     "typescript": "catalog:"
   }
 }
