@@ -809,6 +809,19 @@ fn run_fid_deploy(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         secrets.push("SUPABASE_URL");
         secrets.push("SUPABASE_ANON_KEY");
     }
+    // database = "supabase" | "neon" | "postgres" all use a direct Postgres
+    // connection string. SUPABASE_URL is already declared above when auth is
+    // also supabase, so dedup below handles the overlap.
+    let db_vendor = config.adapters.get("database").map(|s| s.as_ref());
+    if matches!(db_vendor, Some("supabase") | Some("neon") | Some("postgres")) {
+        secrets.push("DATABASE_URL");
+    }
+    if config.adapters.get("storage") == Some("supabase-storage") {
+        secrets.push("SUPABASE_URL");
+        secrets.push("SUPABASE_SERVICE_ROLE_KEY");
+        // SUPABASE_STORAGE_BUCKET is optional (defaults to "assets") so it
+        // is not listed here — document it in the generated comment instead.
+    }
     // Deduplicate while preserving first-occurrence order.
     let mut seen = std::collections::HashSet::new();
     secrets.retain(|s| seen.insert(*s));
@@ -1553,6 +1566,17 @@ fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
     // derive still writes a file so the build stays green.
     let real = match (contract, vendor) {
         ("database", "d1") => Some(("D1Database", "@fiducial/adapters/database")),
+        ("database", "supabase") | ("database", "neon") | ("database", "postgres") => {
+            let class = match vendor {
+                "supabase" => "SupabaseDatabase",
+                "neon" => "NeonDatabase",
+                _ => "PostgresDatabase",
+            };
+            Some((class, "@fiducial/adapters/database"))
+        }
+        ("storage", "supabase-storage") => {
+            Some(("SupabaseStorage", "@fiducial/adapters/storage"))
+        }
         ("storage", "r2") => Some(("R2Storage", "@fiducial/adapters/storage")),
         ("email", "resend") => Some(("ResendEmail", "@fiducial/adapters/email")),
         ("botProtection", "turnstile") => Some(("Turnstile", "@fiducial/adapters/bot-protection")),

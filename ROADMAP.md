@@ -514,21 +514,28 @@ file and a passing check. `[adapters] database = "none"` → `"d1"` shipped a
 Worker still constructing `NoneDatabase`, and nothing failed. `fid-adapters`
 is now re-derived and compared too.
 
-### Supabase, fully — *terminal, product-critical* ⬜
+### Supabase, fully — *terminal, product-critical* ✅
+
+**Shipped 2026-09-16.** `database = "supabase"` (direct Postgres via `postgres.js`
+interface, satisfying `batch` atomicity via transactions), `storage = "supabase-storage"`
+(REST API — `put`/`get`/`delete`/`list`/`signedUrl` all implemented), `neon` and
+`postgres` as free aliases for the same Postgres adapter. Spec:
+`docs/specs/2026-09-16-supabase-database-and-storage.md`.
 
 **Requested directly:** *"I also need supabase to be fully supported,
 including database, storage, auth and all those nice things."*
 
-**What already exists**, so this is smaller than it looks:
+**Everything shipped** (body table — not separate items, status recorded here for reference):
 
 | Piece | State |
 |---|---|
-| `auth = "supabase"` | ✅ shipped — `SupabaseAuth`, full flows, cookie **and** bearer sessions |
-| Postgres SQL dialect + RLS policy generation | ✅ shipped for identity grants — `docs/specs/2026-09-15-postgres-dialect-and-rls.md` |
-| `scripts/verify-postgres.sh` | ✅ applies the derivation to a real PostgreSQL server in CI |
-| `@fiducial/realtime` + the `realtime` capability | ✅ Broadcast, Presence, Postgres Changes |
-| `database = "supabase"` | ⬜ listed in `candidates`, nothing behind it |
-| `storage = "supabase-storage"` | ⬜ listed in `candidates`, nothing behind it |
+| `auth = "supabase"` | shipped — `SupabaseAuth`, full flows, cookie and bearer sessions |
+| Postgres SQL dialect + RLS policy generation | shipped for identity grants — `docs/specs/2026-09-15-postgres-dialect-and-rls.md` |
+| `scripts/verify-postgres.sh` | applies the derivation to a real PostgreSQL server in CI |
+| `@fiducial/realtime` + the `realtime` capability | Broadcast, Presence, Postgres Changes |
+| `database = "supabase"` | direct Postgres, `SupabaseDatabase` — satisfies `batch` atomicity |
+| `database = "neon"` / `"postgres"` | aliases for `SupabaseDatabase` — swap is a `DATABASE_URL` change |
+| `storage = "supabase-storage"` | `SupabaseStorage` via REST API, including `signedUrl` |
 
 So the remaining work is **two adapters**, and the hard parts of both —
 Postgres dialect, RLS, a verified migration path — were already built for
@@ -1189,8 +1196,8 @@ what `fid derive --check` is. That part is done.
 
 | Thing | Portable? |
 |---|---|
-| `AGENTS.md` | ✅ every agent reads it |
-| The `fid` CLI | ✅ any agent can run it |
+| `AGENTS.md` | yes — every agent reads it |
+| The `fid` CLI | yes — any agent can run it |
 | `commands/*.md` (`/fiducial:harvest`, `/fiducial:platform`) | ❌ Claude Code packaging |
 | `.claude-plugin/plugin.json` | ❌ Claude Code only |
 | `PreToolUse` guard **wiring** | ❌ — though `fid guard-check` itself is a CLI any agent can call |

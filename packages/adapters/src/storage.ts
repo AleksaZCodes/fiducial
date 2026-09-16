@@ -179,3 +179,192 @@ export class R2Storage implements Storage {
     );
   }
 }
+
+// ── Supabase Storage ──────────────────────────────────────────────────────────
+
+/**
+ * SupabaseStorage — Supabase's object storage, reached over HTTPS using the
+ * Supabase REST API and a service-role key.
+ *
+ * **Secret convention.** Reads `env.SUPABASE_URL` and
+ * `env.SUPABASE_SERVICE_ROLE_KEY`. The service-role key bypasses Row Level
+ * Security, which is correct for server-side storage operations — a product
+ * that serves signed URLs does not want row-level constraints on `put`.
+ *
+ * **Bucket convention.** Reads `env.SUPABASE_STORAGE_BUCKET` (default:
+ * `"assets"`). Declare the bucket in Supabase's dashboard or via a migration;
+ * this adapter does not create it.
+ *
+ * **Reachability.** Any HTTPS-capable runtime: Worker, Tauri backend, Node.js,
+ * edge functions. Unlike `R2Storage` there is no binding; every call is an
+ * authenticated HTTPS request to `${SUPABASE_URL}/storage/v1/object/…`.
+ *
+ * **`signedUrl` is implemented**, because Supabase Storage provides a REST
+ * endpoint for it — unlike R2 which requires SigV4 signing.
+ *
+ * **`list` paginates internally.** Supabase's `list` endpoint returns at most
+ * 100 objects by default; this adapter pages until exhausted.
+ *
+ * **Why not `@supabase/storage-js`?** The SDK is fine, but it adds a JS
+ * dependency that this adapter would be the only consumer of in the adapters
+ * package, and all it does is wrap the same REST calls this class makes
+ * directly. Adding it is the right call when a second consumer needs it or
+ * the REST surface grows complex enough to justify it.
+ */
+export class SupabaseStorage implements Storage {
+  private readonly url: string;
+  private readonly key: string;
+  private readonly bucket: string;
+
+  constructor(env: {
+    SUPABASE_URL?: string;
+    SUPABASE_SERVICE_ROLE_KEY?: string;
+    SUPABASE_STORAGE_BUCKET?: string;
+  }) {
+    if (!env?.SUPABASE_URL) {
+      throw new StorageError(
+        "SupabaseStorage: missing SUPABASE_URL — set it with `wrangler secret put SUPABASE_URL`",
+      );
+    }
+    if (!env?.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new StorageError(
+        "SupabaseStorage: missing SUPABASE_SERVICE_ROLE_KEY — set it with " +
+          "`wrangler secret put SUPABASE_SERVICE_ROLE_KEY`",
+      );
+    }
+    this.url = env.SUPABASE_URL.replace(/\/$/, "");
+    this.key = env.SUPABASE_SERVICE_ROLE_KEY;
+    this.bucket = env.SUPABASE_STORAGE_BUCKET ?? "assets";
+  }
+
+  private objectUrl(key: string): string {
+    return `${this.url}/storage/v1/object/${encodeURIComponent(this.bucket)}/${key}`;
+  }
+
+  private headers(extra?: Record<string, string>): Record<string, string> {
+    return {
+      Authorization: `Bearer ${this.key}`,
+      apikey: this.key,
+      ...extra,
+    };
+  }
+
+  async put(key: string, bytes: Uint8Array, contentType?: string): Promise<void> {
+    try {
+      const res = await fetch(this.objectUrl(key), {
+        method: "POST",
+        headers: this.headers({
+          "Content-Type": contentType ?? "application/octet-stream",
+          "x-upsert": "true",
+        }),
+        body: bytes as unknown as BodyInit,
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new StorageError(`SupabaseStorage put failed (${res.status}): ${body}`, key);
+      }
+    } catch (err) {
+      if (err instanceof StorageError) throw err;
+      throw new StorageError(`SupabaseStorage put failed: ${String(err)}`, key);
+    }
+  }
+
+  async get(key: string): Promise<Uint8Array | null> {
+    try {
+      const res = await fetch(this.objectUrl(key), {
+        headers: this.headers(),
+      });
+      if (res.status === 404) return null;
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new StorageError(`SupabaseStorage get failed (${res.status}): ${body}`, key);
+      }
+      return new Uint8Array(await res.arrayBuffer());
+    } catch (err) {
+      if (err instanceof StorageError) throw err;
+      throw new StorageError(`SupabaseStorage get failed: ${String(err)}`, key);
+    }
+  }
+
+  async delete(key: string): Promise<void> {
+    try {
+      const res = await fetch(
+        `${this.url}/storage/v1/object/${encodeURIComponent(this.bucket)}`,
+        {
+          method: "DELETE",
+          headers: this.headers({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ prefixes: [key] }),
+        },
+      );
+      // 200 and 400 ("not found") are both success for our contract
+      if (!res.ok && res.status !== 400) {
+        const body = await res.text().catch(() => "");
+        throw new StorageError(`SupabaseStorage delete failed (${res.status}): ${body}`, key);
+      }
+    } catch (err) {
+      if (err instanceof StorageError) throw err;
+      throw new StorageError(`SupabaseStorage delete failed: ${String(err)}`, key);
+    }
+  }
+
+  async list(prefix: string): Promise<string[]> {
+    const keys: string[] = [];
+    let offset = 0;
+    const limit = 100;
+
+    try {
+      while (true) {
+        const res = await fetch(
+          `${this.url}/storage/v1/object/list/${encodeURIComponent(this.bucket)}`,
+          {
+            method: "POST",
+            headers: this.headers({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ prefix, limit, offset }),
+          },
+        );
+        if (!res.ok) {
+          const body = await res.text().catch(() => "");
+          throw new StorageError(`SupabaseStorage list failed (${res.status}): ${body}`);
+        }
+        const page = (await res.json()) as Array<{ name: string }>;
+        keys.push(...page.map((o) => o.name));
+        if (page.length < limit) break;
+        offset += limit;
+      }
+    } catch (err) {
+      if (err instanceof StorageError) throw err;
+      throw new StorageError(`SupabaseStorage list failed: ${String(err)}`);
+    }
+
+    return keys;
+  }
+
+  async signedUrl(key: string, ttlSeconds: number): Promise<string> {
+    try {
+      const res = await fetch(
+        `${this.url}/storage/v1/object/sign/${encodeURIComponent(this.bucket)}/${key}`,
+        {
+          method: "POST",
+          headers: this.headers({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ expiresIn: ttlSeconds }),
+        },
+      );
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new StorageError(
+          `SupabaseStorage signedUrl failed (${res.status}): ${body}`,
+          key,
+        );
+      }
+      const data = (await res.json()) as { signedURL?: string };
+      const signed = data.signedURL;
+      if (!signed) {
+        throw new StorageError("SupabaseStorage signedUrl: no signedURL in response", key);
+      }
+      return signed;
+    } catch (err) {
+      if (err instanceof StorageError) throw err;
+      throw new StorageError(`SupabaseStorage signedUrl failed: ${String(err)}`, key);
+    }
+  }
+}

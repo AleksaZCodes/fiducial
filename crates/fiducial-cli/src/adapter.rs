@@ -67,14 +67,14 @@ pub static CONTRACTS: &[Contract] = &[
     Contract {
         name: "database",
         description: "Relational storage: queries, migrations, transactions",
-        implementations: &[NONE, "d1"],
-        candidates: &["supabase", "neon", "postgres"],
+        implementations: &[NONE, "d1", "supabase", "neon", "postgres"],
+        candidates: &[],
     },
     Contract {
         name: "storage",
         description: "Object storage: put, get, signed URLs",
-        implementations: &[NONE, "r2"],
-        candidates: &["s3", "supabase-storage"],
+        implementations: &[NONE, "r2", "supabase-storage"],
+        candidates: &["s3"],
     },
     Contract {
         name: "deploy",

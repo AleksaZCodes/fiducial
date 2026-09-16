@@ -36,6 +36,27 @@ numbering is unchanged._
 
 ---
 
+**Supabase — database and storage adapters ✅ (2026-09-16)**
+
+> Implements the roadmap item **Supabase, fully** — the final two adapters,
+> completing the request for full Supabase support alongside the already-shipped
+> auth, realtime, Postgres dialect and RLS. Spec:
+> `docs/specs/2026-09-16-supabase-database-and-storage.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| **`SupabaseDatabase`** — direct Postgres via a `PostgresClient` interface (`unsafe`/`begin`/`end`). `batch` is a real `BEGIN`/`COMMIT` transaction, satisfying the contract's atomicity guarantee | shipped |
+| **`NeonDatabase` and `PostgresDatabase`** — exported aliases for `SupabaseDatabase`. A migration between the three is a `DATABASE_URL` change, not a code change | shipped |
+| **`SupabaseStorage`** — Supabase Storage REST API. All five methods: `put` (upsert), `get`, `delete`, `list` (paginated), `signedUrl` (fully implemented, unlike R2) | shipped |
+| **Decision on record:** direct Postgres rather than PostgREST — PostgREST has no transaction spanning multiple requests, so `batch` atomicity would be silently broken. One entry, doc'd in spec §2 | shipped |
+| **Decision on record:** `SupabaseDatabase` takes a `PostgresClient` interface rather than a driver dependency — `@fiducial/adapters` stays free of native deps; the caller wires the driver | shipped |
+| `database`: `supabase`, `neon`, `postgres` moved from `candidates` to `implementations` in `adapter::CONTRACTS`; `storage`: `supabase-storage` moved from `candidates` to `implementations` | shipped |
+| 5 new Rust integration tests (`selecting_supabase_database_derives_the_real_class`, `_neon_`, `_postgres_`, `selecting_supabase_storage_derives_the_real_class`, `doctor_accepts_supabase_as_implemented`); `doctor_still_rejects_an_unimplemented_candidate` updated to use `s3` (still a candidate) | shipped |
+| `DATABASE_URL` added to wrangler secrets for Postgres vendors; `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` added for `supabase-storage` | shipped |
+| TypeScript build and 105 existing tests all green | shipped |
+
+---
+
 **Phase 0 — complete ✅ (2026-09-06)**
 
 | Deliverable | Status |

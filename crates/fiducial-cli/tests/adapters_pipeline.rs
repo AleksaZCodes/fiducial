@@ -267,9 +267,10 @@ fn derive_writes_none_newsletter_for_default_selection() {
 
 #[test]
 fn doctor_still_rejects_an_unimplemented_candidate() {
+    // `supabase` is now implemented; use `s3` which is still a candidate.
     let tmp = tempfile::tempdir().unwrap();
     let root = product_with_adapters(tmp.path());
-    set_adapter(&root, "database", "supabase");
+    set_adapter(&root, "storage", "s3");
 
     let out = run(&root, &["doctor"]);
     assert!(!out.status.success(), "{}", text(&out));
@@ -277,6 +278,69 @@ fn doctor_still_rejects_an_unimplemented_candidate() {
         text(&out).contains("nothing implements yet"),
         "{}",
         text(&out)
+    );
+}
+
+// ── Supabase: database and storage ───────────────────────────────────────────
+
+#[test]
+fn selecting_supabase_database_derives_the_real_class() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "database", "supabase");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("SupabaseDatabase"), "{factory}");
+    assert!(factory.contains("@fiducial/adapters/database"), "{factory}");
+}
+
+#[test]
+fn selecting_neon_database_derives_the_real_class() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "database", "neon");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("NeonDatabase"), "{factory}");
+    assert!(factory.contains("@fiducial/adapters/database"), "{factory}");
+}
+
+#[test]
+fn selecting_postgres_database_derives_the_real_class() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "database", "postgres");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("PostgresDatabase"), "{factory}");
+    assert!(factory.contains("@fiducial/adapters/database"), "{factory}");
+}
+
+#[test]
+fn selecting_supabase_storage_derives_the_real_class() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "storage", "supabase-storage");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("SupabaseStorage"), "{factory}");
+    assert!(factory.contains("@fiducial/adapters/storage"), "{factory}");
+}
+
+#[test]
+fn doctor_accepts_supabase_as_an_implemented_database_vendor() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "database", "supabase");
+
+    // derive must succeed — supabase is now in implementations, not candidates
+    assert!(
+        run(&root, &["derive"]).status.success(),
+        "derive should succeed for database = supabase"
     );
 }
 
