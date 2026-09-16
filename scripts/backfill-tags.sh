@@ -18,9 +18,11 @@
 #   scripts/backfill-tags.sh            # show what would be created
 #   scripts/backfill-tags.sh --push     # create and push them
 #
-# Afterwards `docs/release/legacy-untagged.txt` should be emptied — and
-# `verify-published.sh` fails if it still names a tag that now exists, so the
-# file cannot quietly outlive its purpose.
+# `--push` also clears the tag names out of `docs/release/legacy-untagged.txt`,
+# because leaving that to a human is leaving it undone: `verify-published.sh`
+# FAILS on a listed tag that now exists, so the bookkeeping is not optional —
+# it is the difference between a green build and a red one. The file's
+# explanatory header is kept; only the names go.
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -68,4 +70,25 @@ if [ ${#created[@]} -eq 0 ]; then
 fi
 
 git push origin "${created[@]/#/refs/tags/}"
-echo "✦ pushed ${#created[@]} tag(s); verify with: scripts/verify-published.sh tags"
+echo "✦ pushed ${#created[@]} tag(s)"
+
+# Drop the names we just created from the legacy list, keeping its header.
+legacy="docs/release/legacy-untagged.txt"
+if [ -f "$legacy" ]; then
+  tmp=$(mktemp)
+  while IFS= read -r line; do
+    case "$line" in
+      ''|\#*) echo "$line" ;;
+      *) printf '%s\n' "${created[@]}" | grep -qxF "$line" || echo "$line" ;;
+    esac
+  done < "$legacy" > "$tmp"
+  mv "$tmp" "$legacy"
+  left=$(grep -cvE '^\s*(#|$)' "$legacy" || true)
+  echo "✦ $legacy now lists $left untagged version(s)"
+  echo
+  echo "Commit that change — the list is part of the repository:"
+  echo "    git add $legacy && git commit -m 'chore: the legacy tags exist now'"
+fi
+
+echo
+echo "Verify with: scripts/verify-published.sh tags"
