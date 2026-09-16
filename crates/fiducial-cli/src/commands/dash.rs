@@ -368,6 +368,17 @@ fn git_view(root: &Path) -> GitView {
 /// marker is not a roadmap item and is ignored — which is what keeps prose from
 /// being counted.
 fn roadmap_status(line: &str) -> Option<&'static str> {
+    // A blockquote is commentary *about* the roadmap, not an item in it. The
+    // multi-marker guard below already caught the legend; it did not catch a
+    // sentence carrying one marker, and this file opens with
+    // "Every ⬜ item below now carries a …" — counted as a to-do item, and
+    // reported as `next` the moment nothing was in progress to outrank it.
+    // `fid dash` is what AGENTS.md points every agent at to learn what comes
+    // next, so it pointed them at a sentence about the format.
+    if line.trim_start().starts_with('>') {
+        return None;
+    }
+
     let done = line.contains("- [x]") || line.contains("- [X]") || line.contains('✅');
     let in_progress = line.contains('🟡') || line.contains('🚧');
     let todo = line.contains("- [ ]") || line.contains('⬜') || line.contains('⏸');

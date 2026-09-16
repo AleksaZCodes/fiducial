@@ -677,6 +677,31 @@ fn a_legend_line_is_not_counted_as_roadmap_progress() {
     assert_eq!(d["roadmap"]["todo"], 0);
 }
 
+/// A blockquote is commentary about the roadmap, not an item in it.
+///
+/// The legend guard above only catches a line carrying *several* markers.
+/// Fiducial's own ROADMAP.md opens with "Every ⬜ item below now carries a
+/// …" — one marker, so it counted as a to-do, and it surfaced as `next` the
+/// moment no item was in progress to outrank it. `fid dash --section roadmap`
+/// is what AGENTS.md sends every agent to for what comes next, so it answered
+/// that question with a sentence about the file's format.
+#[test]
+fn a_blockquote_about_the_roadmap_is_not_an_item_in_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    write(
+        &root,
+        "ROADMAP.md",
+        "# Roadmap\n\n\
+         > Every ⬜ item below carries a \"Where it lands\" paragraph.\n\n\
+         ### Real item ⬜\n",
+    );
+
+    let d = dash(&root);
+    assert_eq!(d["roadmap"]["todo"], 1, "only the heading is an item");
+    assert_eq!(d["roadmap"]["next"], "Real item");
+}
+
 #[test]
 fn two_markers_meaning_the_same_thing_are_still_one_item() {
     let tmp = tempfile::tempdir().unwrap();
