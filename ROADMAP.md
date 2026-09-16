@@ -594,7 +594,7 @@ step 3 delivers.
 | **Small tools** | Backlinks, browser-compat banners |
 | **Framework currency** | Capability templates must track current majors — Next.js 16, SvelteKit, Tauri. Pinned versions in a scaffold rot silently and a product starts a major behind — see below |
 | **Agent portability** | Skills and guard wiring are Claude-Code-only; author once, generate per vendor — see below |
-| **Rust release versioning** | Changesets drives npm; the fifteen crates move in lockstep at 0.1.0 with nothing driving a bump — and only *one* of them is published at all. See below |
+| **Rust release versioning** | Changesets drives npm; the fifteen crates move in lockstep at 0.1.0 with nothing driving a bump — and **none of them is on crates.io at all**. See below |
 | **Tagged releases + Zenodo DOI** | No release exists, so there is nothing to archive or cite. Opt-in for child repos too — see below |
 | **Claude chat plugin** | The making philosophy, as a skill for claude.ai — see below |
 | ~~**`fid dash` freshness detection**~~ ✅ | Shipped 2026-09-15. Dash equated "gated" with "a workflow runs `fid derive --check`" and reported this repository as ungated while nine gates ran on every commit. `[freshness] gates` declares the others — which command gates an artifact is a judgment, not something to pattern-match — and a gate declared but run by nothing is now reported too |
@@ -1185,18 +1185,41 @@ version answers a different question than a package version. That mechanism is
 already stricter than SemVer and should stay as it is.
 
 **Where it lands, and a correction to the paragraph above.** The statement
-"`release.yml` publishes to crates.io" is true of *one* crate. The actual
+"`release.yml` publishes to crates.io" is not true of any crate. The actual
 loop is:
 
 ```yaml
 for crate in fiducial; do
 ```
 
-So fourteen of the fifteen workspace members have **never been published at
-all** — `fiducial-core`, `-identity`, `-protocol`, `-ota` and the rest exist
-only in this repository. That is a larger gap than "nothing drives a bump,"
-and it changes what this item is: not adding a version-decision mechanism to
-a working publish path, but building the publish path.
+— so it was only ever going to publish one of fifteen. **And that one is not
+there either.** Checked against the registry on 2026-09-16:
+`https://crates.io/api/v1/crates/fiducial` returns **404 — "crate `fiducial`
+does not exist"**, as do `fiducial-core`, `fiducial-cli` and
+`fiducial-adapters`, and a crates.io search for "fiducial" returns only
+unrelated crates.
+
+**`SHIPPED.md` Phase 0 recorded `crates/fiducial` v0.1.0 as published.** The
+registry disagrees. That row is now marked ❌ with the verification date, but
+*why* it disagrees is unresolved and is the first thing to establish: either
+the publish never succeeded and the row recorded an intention, or it
+succeeded and the crate was later removed. A yanked crate still resolves —
+a 404 means absent, not yanked — which makes "never published" the more
+likely of the two. **Do not assume; check the crates.io account before
+writing any publish logic**, because "this name is taken by someone else" and
+"this name is free" need different first steps.
+
+So this item is not adding a version-decision mechanism to a working publish
+path. It is building the publish path, and the guard in `release.yml` that
+skips a crate whose version already exists has **never once taken its publish
+branch** — it is untested code on the only path that matters.
+
+**Also unpublished, and probably unintentional:** `@fiducial/identity` is
+absent from npm while every other workspace package is there
+(`@fiducial/fiducial`, `adapters`, `headless`, `tokens`, `i18n`, `realtime`).
+Its `package.json` carries no `private: true`, so nothing declares the
+exclusion — which makes it a gap rather than a decision. Decide which it is
+and make the answer explicit, in `private` or in a publish.
 
 Three things have to be decided, and only the first is mechanical:
 

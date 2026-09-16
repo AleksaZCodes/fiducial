@@ -23,7 +23,7 @@ numbering is unchanged._
 | --- | --- |
 | Repo `AleksaZCodes/fiducial` (public, MIT) | ✅ https://github.com/AleksaZCodes/fiducial |
 | `MISSION.md`, `STACK.md`, `LICENSE`, `IP-POLICY.md` | ✅ |
-| `crates/fiducial` v0.1.0 → crates.io | ✅ published |
+| `crates/fiducial` v0.1.0 → crates.io | ❌ **not on crates.io** — recorded as published, verified absent 2026-09-16 |
 | `@fiducial/fiducial` v0.1.0 → js registry (`@fiducial` org created) | ✅ published |
 | Design spec → `docs/specs/2026-09-06-fiducial-design.md` | ✅ |
 
