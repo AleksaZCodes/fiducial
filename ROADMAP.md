@@ -1214,12 +1214,10 @@ path. It is building the publish path, and the guard in `release.yml` that
 skips a crate whose version already exists has **never once taken its publish
 branch** — it is untested code on the only path that matters.
 
-**Also unpublished, and probably unintentional:** `@fiducial/identity` is
-absent from npm while every other workspace package is there
-(`@fiducial/fiducial`, `adapters`, `headless`, `tokens`, `i18n`, `realtime`).
-Its `package.json` carries no `private: true`, so nothing declares the
-exclusion — which makes it a gap rather than a decision. Decide which it is
-and make the answer explicit, in `private` or in a publish.
+**Resolved 2026-09-16:** `@fiducial/identity` was absent from npm while every
+other workspace package was present. Not a misconfiguration — it was sitting
+in a Release PR that had never been merged, for the `action_required` reason
+in point 3 above. Published at `0.2.0` alongside `@fiducial/adapters@0.2.0`.
 
 Three things have to be decided, and only the first is mechanical:
 
@@ -1242,6 +1240,36 @@ Three things have to be decided, and only the first is mechanical:
    enforcement, which makes the third the most consistent with the platform
    — and the most work.
 
+**Three failures observed on a real release, 2026-09-16**, when
+`@fiducial/adapters@0.2.0` and `@fiducial/identity@0.2.0` were published.
+Recorded because none of them is visible until you run the thing:
+
+1. **The crates.io step is gated on a condition that did not fire.** It runs
+   `if: steps.changesets.outputs.published == 'true'`. On two consecutive runs
+   that *did* publish to npm, the step reported **skipped**. So even if the
+   loop named all fifteen crates and they existed, this step would still not
+   run. Fix the gate before fixing the loop — the loop is the visible half of
+   the bug and the smaller one.
+
+2. **`changeset publish` reported success for a package it did not publish.**
+   The log read `Successfully published: @fiducial/adapters@0.2.0,
+   @fiducial/identity@0.2.0` — printed 1ms apart, after a `(1/2)` progress
+   line. Only `identity` reached the registry; `adapters` still showed
+   `0.1.0` with an unchanged `time.modified`. Re-running the workflow
+   published it correctly. **A publish step that exits 0 is not evidence
+   anything was published** — whatever this item builds should verify against
+   the registry afterwards rather than trusting the exit code, which is the
+   same "a green build is not evidence of consistency" finding the Phase 18
+   audit already produced once.
+
+3. **CI on the Release PR sits in `action_required`.** Runs on
+   `changeset-release/main` have needed manual approval since 2026-09-15 —
+   GitHub gates workflow runs on bot-authored PRs. Harmless until the branch
+   ruleset began requiring status checks, at which point the Release PR became
+   permanently unmergeable and had to be approved by hand. The durable fix is
+   a PAT for `changesets/action` instead of `GITHUB_TOKEN`, so the PR is
+   authored by a human account and CI runs unattended.
+
 **Not this item:** `WIRE_VERSION` is deliberately not SemVer and its
 mechanism is already stricter. Leave it alone.
 
@@ -1262,6 +1290,16 @@ changesets action opens and merges a Release PR, and nothing creates a git
 tag or a GitHub release from it. Zenodo archives **GitHub releases**, so the
 chain is: version decision → tag → GitHub release → Zenodo webhook → DOI.
 Every link before the last one is missing.
+
+**The tagging failure is a mechanism, not an absence.** `changeset publish`
+printed `Creating git tags… Created git tags.` during the 2026-09-16 release,
+and `git ls-remote --tags origin` was **empty afterwards**. The tags are
+created in the runner's clone and never pushed. So the chain's first link is
+not merely missing — it appears to succeed and silently drops its output,
+which is the hardest shape of bug to notice from a green workflow.
+
+Whatever creates the tag must be verified against the **remote**, for the same
+reason the publish must be verified against the registry.
 
 **Sequencing.** Blocked on Rust release versioning above, and on
 `CITATION.cff`, which shipped 2026-09-16. Zenodo reads `CITATION.cff` when
