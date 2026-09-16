@@ -1,0 +1,21 @@
+# Everyone who holds copyright in this repository.
+#
+# Why this file exists: `docs/specs/2026-09-14-disclosure-authorship-and-citation.md`
+# names an explicit contributor record as one of three things that make
+# authorship "unambiguous and permanent," and notes it "becomes load-bearing
+# the moment there is more than one contributor." Today there is one. Writing
+# it down now costs nothing and means the record was never reconstructed from
+# a commit log afterwards.
+#
+# This is NOT the list of who may skip the CLA sign-off. That is
+# `.github/cla-exempt.txt`, and it is deliberately a different file answering
+# a different question: this one records who owns copyright, that one records
+# who does not need to sign an agreement with themselves. An automation
+# identity belongs in that file and must never appear in this one — a bot
+# holds no copyright.
+#
+# Outside contributors are added here when their first contribution merges,
+# which by IP-POLICY.md rule 3 cannot happen before they have agreed to
+# CLA.md.
+
+Aleksa Zdravković <aleksazdravkovic@proton.me>  https://orcid.org/0009-0004-1535-1839

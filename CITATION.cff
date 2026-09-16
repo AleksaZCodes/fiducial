@@ -1,0 +1,45 @@
+# Machine-readable citation metadata.
+#
+# GitHub renders a "Cite this repository" button from this file and offers
+# BibTeX and APA from it. Zenodo reads it when minting a DOI for a tagged
+# release, which is why the author identity here is an ORCID rather than an
+# email address: `docs/specs/2026-09-14-disclosure-authorship-and-citation.md`
+# states the goal as "authorship unambiguous and permanent," and an ORCID
+# survives the loss of an email account, a domain, or an institution.
+#
+# `version` and `date-released` are deliberately ABSENT. Both are facts about
+# a release, and no release exists yet. Declaring `version: 0.1.0` here would
+# be a second copy of `[product] version` in fiducial.toml — the duplication
+# this repository gates everywhere else — and a `date-released` for a release
+# that was never tagged is simply false. The tagged-release + Zenodo DOI work
+# is what earns those two keys, and it should DERIVE them rather than
+# hand-write them.
+
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: Fiducial
+abstract: >-
+  A platform for single-operator product development in which every fact is
+  declared once and every artifact derived from it, across electronics,
+  firmware, protocol, web and mechanical domains — with machine-checked
+  guarantees that a derived artifact which has drifted from its declaration
+  cannot reach the main branch.
+type: software
+
+authors:
+  - family-names: Zdravković
+    given-names: Aleksa
+    orcid: "https://orcid.org/0009-0004-1535-1839"
+
+repository-code: "https://github.com/AleksaZCodes/fiducial"
+url: "https://github.com/AleksaZCodes/fiducial"
+license: MIT
+
+keywords:
+  - single-source-of-truth
+  - code-generation
+  - build-systems
+  - electronic-design-automation
+  - embedded-systems
+  - developer-tools
+  - reproducibility

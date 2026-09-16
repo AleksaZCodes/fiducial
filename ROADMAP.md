@@ -514,9 +514,9 @@ Not ranked by value. Ranked by **what accrues while we wait.**
 
 | Item | Why it cannot queue |
 |---|---|
-| **`CLA.md`** | The repository is public and can accept pull requests. One contribution from a stranger permanently constrains re-licensing — you would need their permission to ever dual-license. Zero contributions today is the best moment, and it is one small file. |
-| `CITATION.cff`, `CONTRIBUTING.md`, `SECURITY.md` | Small, expected of a public project, and prerequisites for being cited correctly |
-| Zenodo DOI on a tagged release | Needed before the paper; Fiducial is its own first customer for the research tooling |
+| ~~**`CLA.md`**~~ ✅ | Shipped 2026-09-16 (written earlier). The repository is public and can accept pull requests. One contribution from a stranger permanently constrains re-licensing — you would need their permission to ever dual-license. Zero contributions was the best moment, and it stayed zero. |
+| ~~`CITATION.cff`, `CONTRIBUTING.md`, `SECURITY.md`~~ ✅ | Shipped 2026-09-16, with `CODE_OF_CONDUCT.md` and `AUTHORS`. Small, expected of a public project, and prerequisites for being cited correctly |
+| Zenodo DOI on a tagged release ⬜ | Needed before the paper; Fiducial is its own first customer for the research tooling. **Now the only thing left in this section**, and blocked on Rust release versioning below — there is still no tag to archive |
 
 ## i18n — *localized by construction*
 
@@ -761,7 +761,20 @@ boundaries stated.
 
 **Meta-requirement, stated explicitly:** everything built for Fiducial must be
 available *to* the tools Fiducial builds. Fiducial is the first consumer of its
-own open-source bootstrap — it currently lacks every file in that list.
+own open-source bootstrap.
+
+**Status, 2026-09-16:** Fiducial now has every file in that list except the
+release + Zenodo DOI wiring — `LICENSE`, `CITATION.cff`, `CLA.md`,
+`CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, and `AUTHORS`, with
+the authorship and trademark boundaries stated in `IP-POLICY.md`. It had none
+of them on 2026-09-14 when
+`docs/specs/2026-09-14-disclosure-authorship-and-citation.md` was written.
+
+That is the files existing *by hand*, which is the weaker half. **The command
+or skill that turns any repository into one — the actual item — is still
+unbuilt**, and Fiducial having the files is what it should now be generalized
+from rather than designed against nothing. The second-use rule applies to the
+platform's own bootstrap the same way it applies to everything else.
 
 ---
 

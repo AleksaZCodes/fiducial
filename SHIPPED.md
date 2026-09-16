@@ -384,6 +384,28 @@ built because no product has one yet.
 | **Deliberately not done, and said so in `ROADMAP.md`, `SHIPPED.md` and the spec**: Workers-as-`deploy` (needs its own design — `deploy` is pipeline-shaped, not a runtime trait), Access, Turnstile, Queues, Workers AI (no contract exists for any of the four, and designing one against zero consumers is the mistake *capability taxonomy, made real* already corrected once), a Rust-side D1/R2 client (would need Cloudflare's HTTP/S3 API over an API token, not a binding — no Tauri product needs it), a working `signedUrl` | ✅ |
 | Clippy (0 warnings), fmt, full Rust suite (all workspace crates) and the new JS test file all green | ✅ |
 
+**Phase 34 — the open-source bootstrap, for Fiducial itself ✅ (2026-09-16)**
+
+> Clears the roadmap's **Out of band — risk, not priority** section down to
+> its last item. Ordered by what accrued while waiting rather than by value,
+> per that section's own rule. The actions are the ones
+> `docs/specs/2026-09-14-disclosure-authorship-and-citation.md` listed and
+> numbered two days earlier.
+
+| Deliverable | Status |
+| --- | --- |
+| `CITATION.cff` — machine-readable citation metadata; GitHub renders a "Cite this repository" button from it and Zenodo reads it when minting a DOI. Author identified by **ORCID**, which survives the loss of an email account, a domain or an institution — the spec's stated goal of authorship "unambiguous and permanent" | ✅ |
+| **`CITATION.cff` deliberately omits `version` and `date-released`** — both are facts about a release, and no release exists. `version: 0.1.0` would be a second copy of `[product] version` in `fiducial.toml`, the exact duplication this repository gates everywhere else, and a `date-released` for a release never tagged is simply false. The DOI work should *derive* them | ✅ |
+| `CONTRIBUTING.md` — points at `AGENTS.md`, `MISSION.md`, the PR template and the issue templates rather than restating any of them, and tabulates only the rules a test actually enforces, naming the test for each | ✅ |
+| `SECURITY.md` — GitHub private vulnerability reporting as the primary channel with email as fallback, an honest one-maintainer response commitment (7 days to acknowledge, 30 to assess), and an explicit in-scope/out-of-scope table | ✅ |
+| **`SECURITY.md` states that `botProtection = "none"` failing open is specified behaviour, not a vulnerability** — `docs/specs/2026-09-15-turnstile-and-queues.md` documented it loudly as a real security default, and a scope table that did not say so would generate reports against a decision already recorded | ✅ |
+| `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1, with the canonical URL named as governing if this copy ever drifts from it | ✅ |
+| `AUTHORS` — the contributor record the citation spec named as the third leg of permanent authorship | ✅ |
+| **`AUTHORS` is explicitly not `.github/cla-exempt.txt`, and says so** — they answer different questions (who holds copyright vs. who need not sign an agreement with themselves), and the automation identities that belong in the second must never appear in the first, because a bot holds no copyright | ✅ |
+| `ROADMAP.md` corrected where it claimed Fiducial "currently lacks every file in that list" — true when written on 2026-09-14, false now | ✅ |
+| **The *item* is not done and the roadmap now says which half shipped**: these are the files existing by hand. The command or skill that turns any repository into a properly published open-source project is still unbuilt, and Fiducial having the files is what it should be generalized *from* — the second-use rule, applied to the platform's own bootstrap | ✅ |
+| `CITATION.cff` validated as parsing YAML with every CFF-required key present | ✅ |
+
 **Phase 33 — Resend, and the newsletter contract ✅ (2026-09-16)**
 
 > Implements the roadmap item **Newsletter and transactional email**,
