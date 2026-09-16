@@ -386,8 +386,10 @@ built because no product has one yet.
 
 **Phase 34 — the open-source bootstrap, for Fiducial itself ✅ (2026-09-16)**
 
+> Implements the roadmap item **Open-source bootstrap**, in part — the files
+> themselves, not yet the command that produces them for any repository.
 > Clears the roadmap's **Out of band — risk, not priority** section down to
-> its last item. Ordered by what accrued while waiting rather than by value,
+> its last item, ordered by what accrued while waiting rather than by value,
 > per that section's own rule. The actions are the ones
 > `docs/specs/2026-09-14-disclosure-authorship-and-citation.md` listed and
 > numbered two days earlier.
