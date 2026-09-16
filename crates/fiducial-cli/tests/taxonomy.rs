@@ -142,7 +142,8 @@ fn the_no_op_is_a_real_selection() {
 fn a_vendor_nothing_implements_is_refused_and_distinguished_from_a_typo() {
     let tmp = tempfile::tempdir().unwrap();
     let root = scaffold(tmp.path());
-    set_adapters(&root, "database = \"supabase\"\n");
+    // s3 is still a planned (candidate) storage vendor — nothing implements it.
+    set_adapters(&root, "storage = \"s3\"\n");
 
     let out = run(&root, &["doctor"]);
     assert!(!out.status.success(), "an unbacked vendor must fail doctor");
@@ -155,7 +156,7 @@ fn a_vendor_nothing_implements_is_refused_and_distinguished_from_a_typo() {
 
     let tmp2 = tempfile::tempdir().unwrap();
     let root2 = scaffold(tmp2.path());
-    set_adapters(&root2, "database = \"supabse\"\n");
+    set_adapters(&root2, "storage = \"s3x\"\n");
     let out = run(&root2, &["doctor"]);
     assert!(!out.status.success());
     assert!(
@@ -218,12 +219,13 @@ fn contracts_are_discoverable_and_honest_about_what_works() {
     let t = text(&out);
     assert!(t.contains("ADAPTER CONTRACTS"), "{t}");
     assert!(t.contains("selectable: none"), "{t}");
-    // d1 and r2 shipped as the first real vendors (Cloudflare adapter set) —
-    // selectable now, no longer merely planned.
+    // d1 shipped with the Cloudflare adapter set; supabase, neon, postgres
+    // followed — all selectable now, database has no planned vendors.
     assert!(
-        t.contains("selectable: none, d1") && t.contains("planned: supabase"),
-        "d1 moved from planned to selectable:\n{t}"
+        t.contains("selectable: none, d1, supabase, neon, postgres"),
+        "database should list all implementations:\n{t}"
     );
+    // r2 and supabase-storage are implemented; s3 is still planned.
     assert!(
         t.contains("selectable: none, r2") && t.contains("planned: s3"),
         "r2 moved from planned to selectable:\n{t}"
