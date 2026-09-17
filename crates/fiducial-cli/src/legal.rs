@@ -29,7 +29,13 @@ fn pages_for_jurisdiction(jurisdiction: &str) -> &'static [&'static str] {
 
 /// Substitute `{legal_name}`, `{domain}`, `{jurisdiction}`, and `{email}` in a
 /// template string.
-fn substitute(template: &str, legal_name: &str, domain: &str, jurisdiction: &str, email: &str) -> String {
+fn substitute(
+    template: &str,
+    legal_name: &str,
+    domain: &str,
+    jurisdiction: &str,
+    email: &str,
+) -> String {
     template
         .replace("{legal_name}", legal_name)
         .replace("{domain}", domain)
@@ -77,9 +83,10 @@ fn page_content(page: &str, _jurisdiction: &str, categories: &[&str]) -> (&'stat
                  **Contact:** {{email}}"
             ),
         ),
-        "cookies" => (
-            "Cookie Policy",
-            format!(
+        "cookies" => {
+            (
+                "Cookie Policy",
+                format!(
                 "{{legal_name}} uses cookies and similar technologies on {{domain}} to provide \
                  and improve our services.\n\n\
                  **Categories in use:** {cookie_list}.\n\n\
@@ -105,7 +112,8 @@ fn page_content(page: &str, _jurisdiction: &str, categories: &[&str]) -> (&'stat
                      such as remembering your preferences.\n\n"
                 } else { "" },
             ),
-        ),
+            )
+        }
         "imprint" => (
             "Imprint",
             "Imprint (Impressum) — required disclosure under {{jurisdiction}} law.\n\n\
@@ -177,12 +185,18 @@ pub fn render_legal_ts(
     out.push_str("// │      the human review must follow.                                  │\n");
     if legal.jurisdiction == "EU" || legal.jurisdiction == "UK" {
         out.push_str("// │  [ ] Appoint a Data Protection Officer if required (Art. 37 GDPR). │\n");
-        out.push_str("// │  [ ] Register with the supervisory authority if required.           │\n");
-        out.push_str("// │  [ ] Complete a DPIA for high-risk processing activities.           │\n");
+        out.push_str(
+            "// │  [ ] Register with the supervisory authority if required.           │\n",
+        );
+        out.push_str(
+            "// │  [ ] Complete a DPIA for high-risk processing activities.           │\n",
+        );
     }
     if legal.jurisdiction == "US" {
         out.push_str("// │  [ ] Check state-specific requirements (CCPA, CPRA, VCDPA, etc.).  │\n");
-        out.push_str("// │  [ ] Add a \"Do Not Sell or Share My Personal Information\" link     │\n");
+        out.push_str(
+            "// │  [ ] Add a \"Do Not Sell or Share My Personal Information\" link     │\n",
+        );
         out.push_str("// │      if subject to CCPA/CPRA.                                      │\n");
     }
     out.push_str("// └─────────────────────────────────────────────────────────────────────┘\n");
@@ -207,11 +221,10 @@ pub fn render_legal_ts(
     // copy should override the generated catalog through the i18n pipeline.
     for locale in locales {
         let const_name = locale.replace('-', "_");
-        out.push_str(&format!(
-            "export const {const_name}: LegalCatalog = {{\n"
-        ));
+        out.push_str(&format!("export const {const_name}: LegalCatalog = {{\n"));
         for page in pages {
-            let (title_template, body_template) = page_content(page, &legal.jurisdiction, &categories);
+            let (title_template, body_template) =
+                page_content(page, &legal.jurisdiction, &categories);
             let title = substitute(
                 title_template,
                 &brand.legal_name,

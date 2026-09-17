@@ -750,11 +750,7 @@ impl Legal {
 
     /// The effective cookie categories — `"necessary"` is always included.
     pub fn effective_categories(&self) -> Vec<&str> {
-        let mut cats: Vec<&str> = self
-            .cookie_categories
-            .iter()
-            .map(|s| s.as_str())
-            .collect();
+        let mut cats: Vec<&str> = self.cookie_categories.iter().map(|s| s.as_str()).collect();
         if !cats.contains(&"necessary") {
             cats.insert(0, "necessary");
         }

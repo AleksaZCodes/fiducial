@@ -439,8 +439,7 @@ fn cmd_extract(id: &str, from: Option<&str>) -> Result<()> {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("creating directory for {dest_rel}"))?;
         }
-        std::fs::write(&dest_abs, &file.content)
-            .with_context(|| format!("writing {dest_rel}"))?;
+        std::fs::write(&dest_abs, &file.content).with_context(|| format!("writing {dest_rel}"))?;
         println!(
             "  staged   {src:<42}  →  {dest}",
             src = file.rel_path,
@@ -503,7 +502,8 @@ fn cmd_extract(id: &str, from: Option<&str>) -> Result<()> {
         );
         let manifest_path = out_dir.join("capability.toml");
         std::fs::create_dir_all(&out_dir).context("creating capability staging directory")?;
-        std::fs::write(&manifest_path, &manifest_content).context("writing capability.toml stub")?;
+        std::fs::write(&manifest_path, &manifest_content)
+            .context("writing capability.toml stub")?;
         println!("  wrote    (stub)  →  capabilities/{id}/capability.toml");
     }
 
@@ -515,7 +515,7 @@ fn cmd_extract(id: &str, from: Option<&str>) -> Result<()> {
     for file in &files {
         for (lineno, line) in file.content.lines().enumerate() {
             let lineno = lineno + 1; // 1-based
-            // Hardcoded product name.
+                                     // Hardcoded product name.
             if line.contains(product_name.as_str()) {
                 issues.push(Issue {
                     file: file.rel_path.clone(),
@@ -528,7 +528,8 @@ fn cmd_extract(id: &str, from: Option<&str>) -> Result<()> {
             // Absolute paths anywhere on the line (heuristic: token starting with /).
             for token in line.split_whitespace() {
                 // Strip surrounding quotes/brackets for the check.
-                let trimmed = token.trim_matches(|c| matches!(c, '"' | '\'' | '(' | ')' | '[' | ']' | ',' | ';'));
+                let trimmed = token
+                    .trim_matches(|c| matches!(c, '"' | '\'' | '(' | ')' | '[' | ']' | ',' | ';'));
                 if trimmed.starts_with('/') && trimmed.len() > 1 {
                     issues.push(Issue {
                         file: file.rel_path.clone(),
@@ -572,11 +573,15 @@ fn cmd_extract(id: &str, from: Option<&str>) -> Result<()> {
         println!("    1. Review and fix the issues above");
         println!("    2. Add capabilities/{id}/capability.toml with description and declarations");
         println!("    3. Run: fid capability check --capability {id}");
-        println!("    4. Install in another product: fid add capability {id} --from ./capabilities/{id}");
+        println!(
+            "    4. Install in another product: fid add capability {id} --from ./capabilities/{id}"
+        );
     } else {
         println!("    1. Add capabilities/{id}/capability.toml with description and declarations");
         println!("    2. Run: fid capability check --capability {id}");
-        println!("    3. Install in another product: fid add capability {id} --from ./capabilities/{id}");
+        println!(
+            "    3. Install in another product: fid add capability {id} --from ./capabilities/{id}"
+        );
     }
 
     Ok(())
@@ -612,7 +617,10 @@ fn collect_dir_inner(dir: &Path, root: &Path, out: &mut Vec<StagedFile>) -> Resu
             .to_string_lossy()
             .replace('\\', "/");
         match std::fs::read_to_string(&path) {
-            Ok(content) => out.push(StagedFile { rel_path: rel, content }),
+            Ok(content) => out.push(StagedFile {
+                rel_path: rel,
+                content,
+            }),
             Err(e) => eprintln!("  warn  {}: {} (skipped — not UTF-8 text)", rel, e),
         }
     }
@@ -714,9 +722,8 @@ mod tests {
 
     /// Helper: write a minimal product root with fiducial.toml and fiducial.lock.
     fn make_product_root(dir: &std::path::Path, product_name: &str) {
-        let config = format!(
-            "[product]\nname = \"{product_name}\"\n\n[capabilities]\nenabled = []\n"
-        );
+        let config =
+            format!("[product]\nname = \"{product_name}\"\n\n[capabilities]\nenabled = []\n");
         fs::write(dir.join("fiducial.toml"), config).unwrap();
         let lock = "version = 1\n";
         fs::write(dir.join("fiducial.lock"), lock).unwrap();
@@ -745,7 +752,12 @@ mod tests {
         assert!(result.is_ok(), "extract failed: {result:?}");
 
         // Staged file must exist.
-        let staged = root.join("capabilities").join("realtime").join("src").join("realtime").join("index.ts");
+        let staged = root
+            .join("capabilities")
+            .join("realtime")
+            .join("src")
+            .join("realtime")
+            .join("index.ts");
         assert!(staged.exists(), "staged file missing");
         assert_eq!(
             fs::read_to_string(&staged).unwrap(),
@@ -759,7 +771,10 @@ mod tests {
         assert!(skill_content.contains("# Skill: realtime"));
 
         // capability.toml stub must be written.
-        let manifest = root.join("capabilities").join("realtime").join("capability.toml");
+        let manifest = root
+            .join("capabilities")
+            .join("realtime")
+            .join("capability.toml");
         assert!(manifest.exists(), "capability.toml stub missing");
     }
 
@@ -783,10 +798,11 @@ mod tests {
         // We test the issue-detection logic directly via the file content.
         let product_name = "acme";
         let content = fs::read_to_string(src.join("realtime.toml")).unwrap();
-        let found = content
-            .lines()
-            .any(|line| line.contains(product_name));
-        assert!(found, "hardcoded product name should be detected in file content");
+        let found = content.lines().any(|line| line.contains(product_name));
+        assert!(
+            found,
+            "hardcoded product name should be detected in file content"
+        );
     }
 
     /// When --from points to a non-existent directory, extract must fail.
@@ -803,7 +819,10 @@ mod tests {
 
         assert!(result.is_err(), "should fail for missing source dir");
         let msg = format!("{}", result.unwrap_err());
-        assert!(msg.contains("no/such/dir"), "error should mention the path: {msg}");
+        assert!(
+            msg.contains("no/such/dir"),
+            "error should mention the path: {msg}"
+        );
     }
 
     /// Without --from and with no lock entry, extract must fail with a clear message.
