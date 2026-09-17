@@ -269,6 +269,10 @@ legal page content for every declared locale.
 Depends on `brand` (for entity name, domain, contact) and `i18n` (for the locale
 set). Install both before running `fid derive`.
 
+Legal copy is rendered per language: English and Serbian templates ship, and a
+locale with no templates is emitted under a loud UNTRANSLATED banner rather than
+silently served as English.
+
 Seeds jurisdiction = \"EU\" and data_protection_email = \"privacy@example.com\" —
 replace the email before deriving for real.
 

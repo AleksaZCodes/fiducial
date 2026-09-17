@@ -703,7 +703,8 @@ fn is_hex_color(s: &str) -> bool {
 /// restated here: they are declared once in their own blocks.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Legal {
-    /// `EU` | `US` | `UK` | `other`. Affects which pages are generated.
+    /// `EU` | `US` | `UK` | `RS` | `other`. Affects which pages are generated
+    /// and which compliance checklist items appear.
     #[serde(default)]
     pub jurisdiction: String,
     /// Email address for data protection enquiries. Appears in every page.
@@ -723,10 +724,10 @@ impl Legal {
     /// Every fact the legal pipeline needs is present and well-formed.
     pub fn validate(&self) -> anyhow::Result<()> {
         match self.jurisdiction.as_str() {
-            "EU" | "US" | "UK" | "other" => {}
+            "EU" | "US" | "UK" | "RS" | "other" => {}
             other => anyhow::bail!(
                 "[legal] jurisdiction = \"{other}\" is not a known jurisdiction.\n\
-                 Known: EU, US, UK, other."
+                 Known: EU, US, UK, RS, other."
             ),
         }
         if self.data_protection_email.trim().is_empty() {
