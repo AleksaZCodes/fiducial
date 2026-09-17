@@ -368,14 +368,27 @@ fn git_view(root: &Path) -> GitView {
 /// marker is not a roadmap item and is ignored — which is what keeps prose from
 /// being counted.
 fn roadmap_status(line: &str) -> Option<&'static str> {
-    // A blockquote is commentary *about* the roadmap, not an item in it. The
-    // multi-marker guard below already caught the legend; it did not catch a
-    // sentence carrying one marker, and this file opens with
-    // "Every ⬜ item below now carries a …" — counted as a to-do item, and
-    // reported as `next` the moment nothing was in progress to outrank it.
-    // `fid dash` is what AGENTS.md points every agent at to learn what comes
-    // next, so it pointed them at a sentence about the format.
+    // A blockquote is commentary *about* the roadmap, not an item in it.
     if line.trim_start().starts_with('>') {
+        return None;
+    }
+
+    // Only count markers on lines that can declare an item: headings, table
+    // rows, or GitHub task-list bullets. A marker in plain prose (e.g.
+    // "Every ⬜ item below…" or "✅ **Fixed …**" mid-paragraph) is not an
+    // item, and counting it produces a silently-wrong progress number.
+    //
+    // The three shapes that are items:
+    //   - `### Heading ✅`          — starts with one or more `#`
+    //   - `| cell | ⬜ |`           — contains `|` (table row)
+    //   - `- [ ] task` / `- [x]`   — GitHub task-list syntax
+    let trimmed = line.trim_start();
+    let is_item_line = trimmed.starts_with('#')
+        || trimmed.contains('|')
+        || trimmed.starts_with("- [ ]")
+        || trimmed.starts_with("- [x]")
+        || trimmed.starts_with("- [X]");
+    if !is_item_line {
         return None;
     }
 

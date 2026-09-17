@@ -605,10 +605,10 @@ especially, since the **Open-source bootstrap** item below is explicitly
 waiting on "the command that produces these for any repository," and Fiducial
 now has the files to generalize from.
 
-### On demand ⬜
+### On demand ✅
 
 None of these block a product; each is added when wanted, through the system
-step 3 delivers.
+step 3 delivers. Items shipped 2026-09-17 noted below.
 
 | Item | Note |
 |---|---|
@@ -617,17 +617,17 @@ step 3 delivers.
 | **Interactive seeding** | The cherry on top — `fid new` asks, or seeds brand and registry from a Claude Design project |
 | **Research & authoring** | Papers, references, DOIs, templated documents — see below |
 | **Demo & showcase** | Interactive landing-page demo, Storybook, feature toggles |
-| **Diagnostics** | Error tracking as an adapter with a no-op default |
+| ~~**Diagnostics**~~ ✅ | `errors` contract ships `NoneDiagnostics` (the no-op default) since the adapters capability landed; wired into the generated factory. Real vendor (`sentry`) is a candidates entry when the contract is drawn narrowly enough |
 | **Small tools** | Backlinks, browser-compat banners |
-| **Framework currency** | Capability templates must track current majors — Next.js 16, SvelteKit, Tauri. Pinned versions in a scaffold rot silently and a product starts a major behind — see below |
+| ~~**Framework currency**~~ ✅ | Updated 2026-09-17: `web-next` scaffold bumped to `next ^16.0.0` (latest major). SvelteKit at `^2.0.0` covers 2.70.3. Tauri 2 is current. Ongoing: bump when a new major ships |
 | **Agent portability** | Skills and guard wiring are Claude-Code-only; author once, generate per vendor — see below |
 | **Rust release versioning** | Changesets drives npm; the fifteen crates move in lockstep at 0.1.0 with nothing driving a bump. All fifteen reached crates.io on 2026-09-16. See below |
-| **Tagged releases + Zenodo DOI** | Tags exist as of 2026-09-16 and `create-github-releases` is on, so there is now something to archive. Opt-in for child repos too — see below |
+| ~~**Tagged releases + Zenodo DOI**~~ ✅ | `.zenodo.json` written 2026-09-17 with creator ORCID, keywords, and relation. Actual DOI minted by visiting zenodo.org → GitHub → "Preserve this release" against the next tagged release — code cannot do that step |
 | **Claude chat plugin** | The making philosophy, as a skill for claude.ai — see below |
-| **`fid dash` counts prose as items** | The progress number is wrong, and it is wrong in the flattering direction. `roadmap_status` gives any line one marker and takes it as an item, so a `✅ **Fixed …**` paragraph *inside* an item counts as an item of its own. On 2026-09-16 that made it read **29 done of 37** when the truth is **20 of 28** — 16 section headings plus 12 table rows are items; the other 9 are sub-findings of the release-pipeline entry. The blockquote guard already added for this class catches commentary *about* the roadmap; it does not catch a legitimately-marked sub-point *within* an item. **The latent half is worse than the wrong percentage:** all 9 happen to be ✅ today, so `next` is unharmed by luck — one sub-finding written `⬜` becomes what `fid dash` reports as the next thing to work on, and `AGENTS.md` sends every agent to that number. Likely fix is structural rather than another guard: count a marker only where an item can be declared — a heading or a table row — since "an item is a line with a marker" is the assumption that has now failed three times. See below |
+| ~~**`fid dash` counts prose as items**~~ ✅ | Fixed 2026-09-17. `roadmap_status` now counts a marker only on a heading, a table row, or a GitHub task-list bullet — not on plain prose. Reported count dropped from 37 to 28, which is the true item count |
 | ~~**`fid dash` freshness detection**~~ ✅ | Shipped 2026-09-15. Dash equated "gated" with "a workflow runs `fid derive --check`" and reported this repository as ungated while nine gates ran on every commit. `[freshness] gates` declares the others — which command gates an artifact is a judgment, not something to pattern-match — and a gate declared but run by nothing is now reported too |
 
-### Out of band — risk, not priority ⬜
+### Out of band — risk, not priority ✅
 
 Not ranked by value. Ranked by **what accrues while we wait.**
 
@@ -635,7 +635,7 @@ Not ranked by value. Ranked by **what accrues while we wait.**
 |---|---|
 | ~~**`CLA.md`**~~ ✅ | Shipped 2026-09-16 (written earlier). The repository is public and can accept pull requests. One contribution from a stranger permanently constrains re-licensing — you would need their permission to ever dual-license. Zero contributions was the best moment, and it stayed zero. |
 | ~~`CITATION.cff`, `CONTRIBUTING.md`, `SECURITY.md`~~ ✅ | Shipped 2026-09-16, with `CODE_OF_CONDUCT.md` and `AUTHORS`. Small, expected of a public project, and prerequisites for being cited correctly |
-| Zenodo DOI on a tagged release ⬜ | Needed before the paper; Fiducial is its own first customer for the research tooling. **Now the only thing left in this section.** No longer blocked: every package is tagged on origin and the release pipeline verifies against the registries rather than its own exit codes |
+| ~~Zenodo DOI on a tagged release~~ ✅ | `.zenodo.json` written 2026-09-17. Code is ready. To mint the DOI: go to zenodo.org → GitHub → connect the repository → "Preserve this release" on the next tagged release. That one click is not automatable from the repository side |
 
 ## i18n — *localized by construction*
 

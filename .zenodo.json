@@ -1,0 +1,29 @@
+{
+  "title": "Fiducial",
+  "description": "A platform for single-operator product development in which every fact is declared once and every artifact derived from it, across electronics, firmware, protocol, web and mechanical domains — with machine-checked guarantees that a derived artifact which has drifted from its declaration cannot reach the main branch.",
+  "upload_type": "software",
+  "license": "MIT",
+  "creators": [
+    {
+      "name": "Zdravković, Aleksa",
+      "orcid": "0009-0004-1535-1839"
+    }
+  ],
+  "keywords": [
+    "single-source-of-truth",
+    "code-generation",
+    "build-systems",
+    "electronic-design-automation",
+    "embedded-systems",
+    "developer-tools",
+    "reproducibility"
+  ],
+  "related_identifiers": [
+    {
+      "scheme": "url",
+      "identifier": "https://github.com/AleksaZCodes/fiducial",
+      "relation": "isSupplementTo"
+    }
+  ],
+  "notes": "version and date are set by Zenodo from the tagged GitHub release. Do not add them here — they are facts about a release, not about the repository."
+}
