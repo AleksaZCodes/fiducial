@@ -49,39 +49,37 @@ fn page_content(page: &str, _jurisdiction: &str, categories: &[&str]) -> (&'stat
     match page {
         "privacy" => (
             "Privacy Policy",
-            format!(
-                "This Privacy Policy describes how {{legal_name}} (\"we\", \"us\", or \"our\") \
-                 collects, uses, and discloses information about you when you use our services \
-                 at {{domain}}.\n\n\
-                 **Data controller:** {{legal_name}}, reachable at {{email}}.\n\n\
-                 **Jurisdiction:** {{jurisdiction}}.\n\n\
-                 **What we collect:** We collect information you provide directly to us, \
-                 information we collect automatically when you use our services, and information \
-                 from third parties.\n\n\
-                 **How we use it:** To provide, maintain, and improve our services; to send you \
-                 technical notices; to respond to your comments and questions; and to comply with \
-                 legal obligations.\n\n\
-                 **Your rights:** Depending on your jurisdiction, you may have the right to \
-                 access, correct, delete, or port your personal data. Contact us at {{email}} \
-                 to exercise these rights.\n\n\
-                 **Contact:** {{email}}"
-            ),
+            "This Privacy Policy describes how {legal_name} (\"we\", \"us\", or \"our\") \
+             collects, uses, and discloses information about you when you use our services \
+             at {domain}.\n\n\
+             **Data controller:** {legal_name}, reachable at {email}.\n\n\
+             **Jurisdiction:** {jurisdiction}.\n\n\
+             **What we collect:** We collect information you provide directly to us, \
+             information we collect automatically when you use our services, and information \
+             from third parties.\n\n\
+             **How we use it:** To provide, maintain, and improve our services; to send you \
+             technical notices; to respond to your comments and questions; and to comply with \
+             legal obligations.\n\n\
+             **Your rights:** Depending on your jurisdiction, you may have the right to \
+             access, correct, delete, or port your personal data. Contact us at {email} \
+             to exercise these rights.\n\n\
+             **Contact:** {email}"
+                .to_string(),
         ),
         "terms" => (
             "Terms of Service",
-            format!(
-                "These Terms of Service govern your use of the services provided by \
-                 {{legal_name}} at {{domain}}. By accessing or using our services, you agree \
-                 to be bound by these terms.\n\n\
-                 **Jurisdiction:** These terms are governed by the laws of {{jurisdiction}}.\n\n\
-                 **Use of services:** You may use our services only as permitted by these terms \
-                 and applicable law. You may not use our services to violate any law or \
-                 regulation.\n\n\
-                 **Limitation of liability:** To the extent permitted by law, {{legal_name}} \
-                 shall not be liable for any indirect, incidental, special, consequential, or \
-                 punitive damages.\n\n\
-                 **Contact:** {{email}}"
-            ),
+            "These Terms of Service govern your use of the services provided by \
+             {legal_name} at {domain}. By accessing or using our services, you agree \
+             to be bound by these terms.\n\n\
+             **Jurisdiction:** These terms are governed by the laws of {jurisdiction}.\n\n\
+             **Use of services:** You may use our services only as permitted by these terms \
+             and applicable law. You may not use our services to violate any law or \
+             regulation.\n\n\
+             **Limitation of liability:** To the extent permitted by law, {legal_name} \
+             shall not be liable for any indirect, incidental, special, consequential, or \
+             punitive damages.\n\n\
+             **Contact:** {email}"
+                .to_string(),
         ),
         "cookies" => {
             (

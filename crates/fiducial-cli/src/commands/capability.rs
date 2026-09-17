@@ -451,14 +451,14 @@ fn cmd_extract(id: &str, from: Option<&str>) -> Result<()> {
             || file.rel_path.ends_with("/SKILL.md")
             || std::path::Path::new(&file.rel_path)
                 .file_name()
-                .map_or(false, |n| n == "SKILL.md")
+                .is_some_and(|n| n == "SKILL.md")
         {
             has_skill = true;
         }
         if file.rel_path == "capability.toml"
             || std::path::Path::new(&file.rel_path)
                 .file_name()
-                .map_or(false, |n| n == "capability.toml")
+                .is_some_and(|n| n == "capability.toml")
         {
             has_manifest = true;
         }
