@@ -527,8 +527,8 @@ including database, storage, auth and all those nice things."*
 | Postgres SQL dialect + RLS policy generation | ✅ shipped for identity grants — `docs/specs/2026-09-15-postgres-dialect-and-rls.md` |
 | `scripts/verify-postgres.sh` | ✅ applies the derivation to a real PostgreSQL server in CI |
 | `@fiducial/realtime` + the `realtime` capability | ✅ Broadcast, Presence, Postgres Changes |
-| `database = "supabase"` | ⬜ listed in `candidates`, nothing behind it |
-| `storage = "supabase-storage"` | ⬜ listed in `candidates`, nothing behind it |
+| `database = "supabase"` | ✅ `SupabaseDatabase` — direct Postgres via `postgres.js`, `SUPABASE_DB_URL`, transactional `batch` |
+| `storage = "supabase-storage"` | ✅ `SupabaseStorage` — `@supabase/supabase-js` service-role, `SUPABASE_STORAGE_BUCKET`, signed URLs |
 
 So the remaining work is **two adapters**, and the hard parts of both —
 Postgres dialect, RLS, a verified migration path — were already built for
