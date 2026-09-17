@@ -142,7 +142,7 @@ fn the_no_op_is_a_real_selection() {
 fn a_vendor_nothing_implements_is_refused_and_distinguished_from_a_typo() {
     let tmp = tempfile::tempdir().unwrap();
     let root = scaffold(tmp.path());
-    set_adapters(&root, "database = \"supabase\"\n");
+    set_adapters(&root, "database = \"neon\"\n");
 
     let out = run(&root, &["doctor"]);
     assert!(!out.status.success(), "an unbacked vendor must fail doctor");
@@ -218,15 +218,15 @@ fn contracts_are_discoverable_and_honest_about_what_works() {
     let t = text(&out);
     assert!(t.contains("ADAPTER CONTRACTS"), "{t}");
     assert!(t.contains("selectable: none"), "{t}");
-    // d1 and r2 shipped as the first real vendors (Cloudflare adapter set) —
-    // selectable now, no longer merely planned.
+    // d1 and r2 shipped as the first real vendors (Cloudflare adapter set);
+    // supabase and supabase-storage ship now — all four are selectable.
     assert!(
-        t.contains("selectable: none, d1") && t.contains("planned: supabase"),
-        "d1 moved from planned to selectable:\n{t}"
+        t.contains("selectable: none, d1, supabase") && t.contains("planned: neon"),
+        "database: d1 and supabase selectable, neon still planned:\n{t}"
     );
     assert!(
-        t.contains("selectable: none, r2") && t.contains("planned: s3"),
-        "r2 moved from planned to selectable:\n{t}"
+        t.contains("selectable: none, r2, supabase-storage") && t.contains("planned: s3"),
+        "storage: r2 and supabase-storage selectable, s3 still planned:\n{t}"
     );
     // turnstile and cloudflare-queues followed the same seam.
     assert!(

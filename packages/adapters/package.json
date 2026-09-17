@@ -66,7 +66,8 @@
     "test:generated": "node --test src/generated-factory.test.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.116.0"
+    "@supabase/supabase-js": "^2.116.0",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "typescript": "catalog:"

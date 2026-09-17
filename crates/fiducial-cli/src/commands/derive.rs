@@ -809,6 +809,13 @@ fn run_fid_deploy(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         secrets.push("SUPABASE_URL");
         secrets.push("SUPABASE_ANON_KEY");
     }
+    if config.adapters.get("database") == Some("supabase") {
+        secrets.push("SUPABASE_DB_URL");
+    }
+    if config.adapters.get("storage") == Some("supabase-storage") {
+        secrets.push("SUPABASE_URL");
+        secrets.push("SUPABASE_SERVICE_ROLE_KEY");
+    }
     // Deduplicate while preserving first-occurrence order.
     let mut seen = std::collections::HashSet::new();
     secrets.retain(|s| seen.insert(*s));
@@ -1560,6 +1567,8 @@ fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
         ("newsletter", "resend") => Some(("ResendNewsletter", "@fiducial/adapters/newsletter")),
         ("ai", "openrouter") => Some(("OpenRouterAi", "@fiducial/adapters/ai")),
         ("auth", "supabase") => Some(("SupabaseAuth", "@fiducial/adapters/auth")),
+        ("database", "supabase") => Some(("SupabaseDatabase", "@fiducial/adapters/database")),
+        ("storage", "supabase-storage") => Some(("SupabaseStorage", "@fiducial/adapters/storage")),
         _ => None,
     };
 

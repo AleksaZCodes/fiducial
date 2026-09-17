@@ -269,7 +269,7 @@ fn derive_writes_none_newsletter_for_default_selection() {
 fn doctor_still_rejects_an_unimplemented_candidate() {
     let tmp = tempfile::tempdir().unwrap();
     let root = product_with_adapters(tmp.path());
-    set_adapter(&root, "database", "supabase");
+    set_adapter(&root, "database", "neon");
 
     let out = run(&root, &["doctor"]);
     assert!(!out.status.success(), "{}", text(&out));

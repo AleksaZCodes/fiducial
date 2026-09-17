@@ -514,7 +514,7 @@ file and a passing check. `[adapters] database = "none"` → `"d1"` shipped a
 Worker still constructing `NoneDatabase`, and nothing failed. `fid-adapters`
 is now re-derived and compared too.
 
-### Supabase, fully — *terminal, product-critical* ⬜
+### Supabase, fully — *terminal, product-critical* ✅
 
 **Requested directly:** *"I also need supabase to be fully supported,
 including database, storage, auth and all those nice things."*
