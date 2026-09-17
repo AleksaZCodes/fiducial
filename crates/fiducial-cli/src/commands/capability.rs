@@ -719,6 +719,11 @@ fn cmd_new(name: &str) -> Result<()> {
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::Mutex;
+
+    // Tests that temporarily change the process-wide cwd must hold this lock
+    // so they do not race with each other's TempDir cleanup.
+    static CWD_LOCK: Mutex<()> = Mutex::new(());
 
     /// Helper: write a minimal product root with fiducial.toml and fiducial.lock.
     fn make_product_root(dir: &std::path::Path, product_name: &str) {
@@ -744,6 +749,7 @@ mod tests {
         fs::write(src.join("index.ts"), "export const RT = true;\n").unwrap();
 
         // Run extraction (changes cwd temporarily).
+        let _guard = CWD_LOCK.lock().unwrap();
         let orig = env::current_dir().unwrap();
         env::set_current_dir(root).unwrap();
         let result = cmd_extract("realtime", Some("src/realtime"));
@@ -812,6 +818,7 @@ mod tests {
         let root = tmp.path();
         make_product_root(root, "my-product");
 
+        let _guard = CWD_LOCK.lock().unwrap();
         let orig = env::current_dir().unwrap();
         env::set_current_dir(root).unwrap();
         let result = cmd_extract("realtime", Some("no/such/dir"));
@@ -832,6 +839,7 @@ mod tests {
         let root = tmp.path();
         make_product_root(root, "my-product");
 
+        let _guard = CWD_LOCK.lock().unwrap();
         let orig = env::current_dir().unwrap();
         env::set_current_dir(root).unwrap();
         let result = cmd_extract("unknown-cap", None);
