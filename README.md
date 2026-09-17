@@ -121,6 +121,7 @@ product actually needs.
 | `firmware-stm32` | 9 template file(s); guard rules | `fid add capability firmware-stm32` |
 | `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
+| `legal` | declares `legal`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability legal` |
 | `migrations` | declares `migrations`; 1 pipeline(s) | `fid add capability migrations` |
 | `realtime` | a skill | `fid add capability realtime` |
 | `tauri` | 5 template file(s); guard rules | `fid add capability tauri` |
@@ -152,8 +153,8 @@ something actually asks.
 <!-- fid:begin adapters -->
 | Contract | For | Selectable today | Planned |
 |---|---|---|---|
-| `database` | Relational storage: queries, migrations, transactions | `none`, `d1` | `supabase`, `neon`, `postgres` |
-| `storage` | Object storage: put, get, signed URLs | `none`, `r2` | `s3`, `supabase-storage` |
+| `database` | Relational storage: queries, migrations, transactions | `none`, `d1`, `supabase` | `neon`, `postgres` |
+| `storage` | Object storage: put, get, signed URLs | `none`, `r2`, `supabase-storage` | `s3` |
 | `deploy` | Where the product ships and how a release is promoted | `none`, `cloudflare` | `vercel`, `fly` |
 | `email` | Transactional email: send, template, verify a domain | `none`, `resend` | `ses`, `cloudflare-email` |
 | `newsletter` | Subscriber list management: subscribe, unsubscribe, status | `none`, `resend` | — |
@@ -246,9 +247,9 @@ what the declaration implies.
 
 Executors are `shell` and `cargo-test` — which need no platform change at all —
 plus the in-process ones (`fid-validate`, `fid-mesh`, `fid-i18n`, `fid-brand`,
-`fid-deploy`, `fid-identity`, `fid-adapters`, `fid-schema`). Reach for `shell`
-first; a new in-process executor is warranted only when the work is genuinely a
-Rust library call rather than a tool invocation.
+`fid-deploy`, `fid-identity`, `fid-adapters`, `fid-schema`, `fid-legal`). Reach
+for `shell` first; a new in-process executor is warranted only when the work is
+genuinely a Rust library call rather than a tool invocation.
 
 <!-- fid:end-describes -->
 

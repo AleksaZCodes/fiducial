@@ -257,6 +257,32 @@ WHAT THE RUNNER ENFORCES
     )]
     Migrations,
 
+    /// Add localized legal pages — privacy, terms, cookies, and more
+    #[command(
+        long_about = "\
+Make this product's legal pages a declaration instead of hand-written files.
+
+Installs `[legal]` in fiducial.toml (jurisdiction, data protection email, cookie
+categories) and a `fid-legal` pipeline that derives a typed TypeScript catalog of
+legal page content for every declared locale.
+
+Depends on `brand` (for entity name, domain, contact) and `i18n` (for the locale
+set). Install both before running `fid derive`.
+
+Seeds jurisdiction = \"EU\" and data_protection_email = \"privacy@example.com\" —
+replace the email before deriving for real.
+
+GDPR compliance is a legal state, not a code state. The generated file carries a
+checklist comment naming every decision a human must still make.",
+        after_long_help = "\
+EXAMPLE:
+    fid add legal
+    # edit [legal] in fiducial.toml — replace data_protection_email
+    fid derive          # writes src/generated/legal.ts
+    fid derive --check  # fails if it is missing or stale"
+    )]
+    Legal,
+
     /// Add cross-platform adapter contracts (database, storage, email, diagnostics)
     #[command(
         long_about = "\
@@ -358,6 +384,7 @@ pub fn run(target: AddTarget) -> Result<()> {
         AddTarget::Brand => install_capability("brand"),
         AddTarget::Deploy => install_capability("deploy"),
         AddTarget::Identity => install_capability("identity"),
+        AddTarget::Legal => install_capability("legal"),
         AddTarget::Adapters => install_capability("adapters"),
         AddTarget::Migrations => install_capability("migrations"),
         AddTarget::Capability { id, from } => match from {

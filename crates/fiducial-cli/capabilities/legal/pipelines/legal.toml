@@ -1,0 +1,16 @@
+name     = "legal"
+executor = "fid-legal"
+outputs  = ["src/generated/legal.ts"]
+
+# `[legal]` in fiducial.toml is the declaration. The output is a TypeScript
+# file exporting typed legal page content for every locale declared in `[i18n]`.
+#
+# `fid-legal` reads `[legal]`, `[brand]`, and `[i18n]` — all three must be
+# configured before this pipeline can run.
+#
+# `fid derive --check` fails when the output is missing or stale against
+# `fiducial.lock`, the same as every other pipeline's outputs.
+#
+# GDPR compliance is a legal state, not a code state. The generated file carries
+# a checklist comment naming every decision a human must still make — read it
+# after the first `fid derive`.

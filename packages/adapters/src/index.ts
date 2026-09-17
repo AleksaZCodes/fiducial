@@ -14,10 +14,10 @@
  */
 
 export type { Database, Row, SqlValue, WriteResult } from "./database.js";
-export { D1Database, DatabaseError, MapRow, NoneDatabase } from "./database.js";
+export { D1Database, DatabaseError, MapRow, NoneDatabase, SupabaseDatabase } from "./database.js";
 
 export type { Storage } from "./storage.js";
-export { NoneStorage, R2Storage, StorageError } from "./storage.js";
+export { NoneStorage, R2Storage, StorageError, SupabaseStorage } from "./storage.js";
 
 export type { Email, Message } from "./email.js";
 export { EmailError, NoneEmail, ResendEmail } from "./email.js";

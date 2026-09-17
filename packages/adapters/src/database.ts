@@ -11,6 +11,8 @@
  * `D1Database` for what that would take.
  */
 
+import postgres, { type Sql } from "postgres";
+
 /** A SQL parameter value — the intersection across all target vendors. */
 export type SqlValue = null | boolean | number | string | Uint8Array;
 
@@ -209,6 +211,102 @@ export class D1Database implements Database {
       return results.map((r) => ({ rowsAffected: r.meta.changes ?? 0 }));
     } catch (err) {
       throw new DatabaseError(`D1 batch failed: ${String(err)}`);
+    }
+  }
+}
+
+// ── Supabase (Postgres) ─────────────────────────────────────────────────────
+
+/**
+ * SupabaseDatabase — direct Postgres connection to a Supabase project,
+ * using `postgres.js` and a connection string.
+ *
+ * **Why direct Postgres, not the Supabase JS client's REST API.** The
+ * `Database` contract requires raw SQL — `execute`, `query`, `queryOne`,
+ * `batch` — and `supabase-js` exposes PostgREST, not SQL. More importantly,
+ * `batch` promises atomicity, and PostgREST has no cross-request transaction.
+ * A direct Postgres connection satisfies both with `BEGIN`/`COMMIT`.
+ *
+ * **Credentials:** `SUPABASE_DB_URL` — the full Postgres connection string
+ * from Project Settings → Database → Connection string (URI tab) in the
+ * Supabase dashboard. It looks like
+ * `postgresql://postgres:password@db.PROJECT.supabase.co:5432/postgres`.
+ * Set it with `wrangler secret put SUPABASE_DB_URL`. This is distinct from
+ * `SUPABASE_ANON_KEY` (which `auth = "supabase"` uses for the REST API):
+ * a product using both holds two credentials to the same Supabase project,
+ * one for each channel.
+ *
+ * **`neon` and `postgres` fall out of this adapter for free.** All three
+ * vendors speak the Postgres wire protocol; the only difference is the
+ * connection string env var (`NEON_DB_URL`, `DATABASE_URL`). When those
+ * vendors are promoted from candidates, they will be thin aliases of this
+ * class reading different env vars.
+ *
+ * **Cloudflare Workers:** `postgres.js` supports Workers TCP sockets via
+ * Cloudflare's `connect()` API. SSL (`ssl: "require"`) is mandatory for
+ * Supabase; Cloudflare Workers enforce TLS on outbound TCP.
+ */
+export class SupabaseDatabase implements Database {
+  private readonly sql: Sql;
+
+  constructor(env: { SUPABASE_DB_URL?: string }) {
+    if (!env.SUPABASE_DB_URL) {
+      throw new DatabaseError(
+        "SupabaseDatabase: SUPABASE_DB_URL is not set — set it to the Postgres " +
+          "connection string from Project Settings → Database → Connection string " +
+          "in the Supabase dashboard, using `wrangler secret put SUPABASE_DB_URL`",
+      );
+    }
+    this.sql = postgres(env.SUPABASE_DB_URL, { ssl: "require", max: 1 });
+  }
+
+  async execute(sql: string, params: SqlValue[]): Promise<WriteResult> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await this.sql.unsafe(sql, params as any[]);
+      return { rowsAffected: result.count };
+    } catch (err) {
+      throw new DatabaseError(`SupabaseDatabase execute failed: ${String(err)}`);
+    }
+  }
+
+  async query(sql: string, params: SqlValue[]): Promise<Row[]> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows = await this.sql.unsafe(sql, params as any[]);
+      return rows.map((r) => new MapRow(r as Record<string, SqlValue>));
+    } catch (err) {
+      throw new DatabaseError(`SupabaseDatabase query failed: ${String(err)}`);
+    }
+  }
+
+  async queryOne(sql: string, params: SqlValue[]): Promise<Row | null> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows = await this.sql.unsafe(sql, params as any[]);
+      return rows.length > 0
+        ? new MapRow(rows[0] as Record<string, SqlValue>)
+        : null;
+    } catch (err) {
+      throw new DatabaseError(`SupabaseDatabase queryOne failed: ${String(err)}`);
+    }
+  }
+
+  async batch(
+    statements: Array<{ sql: string; params: SqlValue[] }>,
+  ): Promise<WriteResult[]> {
+    try {
+      const results: WriteResult[] = [];
+      await this.sql.begin(async (tx) => {
+        for (const stmt of statements) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const result = await tx.unsafe(stmt.sql, stmt.params as any[]);
+          results.push({ rowsAffected: result.count });
+        }
+      });
+      return results;
+    } catch (err) {
+      throw new DatabaseError(`SupabaseDatabase batch failed: ${String(err)}`);
     }
   }
 }

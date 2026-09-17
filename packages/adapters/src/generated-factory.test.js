@@ -62,8 +62,8 @@ const tsc = join(repoRoot, 'node_modules/.bin/tsc')
  * covered.
  */
 const REAL_VENDORS = {
-  database: 'd1',
-  storage: 'r2',
+  database: 'supabase',
+  storage: 'supabase-storage',
   deploy: 'cloudflare',
   email: 'resend',
   botProtection: 'turnstile',
@@ -74,6 +74,13 @@ const REAL_VENDORS = {
   // `errors` has no real vendor yet — `none` is a real implementation, so it
   // belongs in the typechecked set rather than omitted.
   errors: 'none',
+}
+
+// The Cloudflare-native pair: D1 for database, R2 for storage.
+const CLOUDFLARE_VENDORS = {
+  ...REAL_VENDORS,
+  database: 'd1',
+  storage: 'r2',
 }
 
 /** Scaffold a product, select `vendors`, derive, and return its root. */
@@ -152,10 +159,12 @@ function typecheck(root) {
 describe('the generated adapter factory compiles', () => {
   let allNone
   let allReal
+  let allCloudflare
 
   before(() => {
     allNone = productWith(Object.fromEntries(Object.keys(REAL_VENDORS).map((c) => [c, 'none'])))
     allReal = productWith(REAL_VENDORS)
+    allCloudflare = productWith(CLOUDFLARE_VENDORS)
   })
 
   it('with every contract set to none', () => {
@@ -163,9 +172,14 @@ describe('the generated adapter factory compiles', () => {
     assert.equal(errors, '', `tsc rejected the all-none factory:\n${errors}`)
   })
 
-  it('with every contract set to a real vendor', () => {
+  it('with every contract set to a real vendor (supabase database + storage)', () => {
     const errors = typecheck(allReal)
     assert.equal(errors, '', `tsc rejected the all-real-vendor factory:\n${errors}`)
+  })
+
+  it('with cloudflare-native vendors (d1 + r2)', () => {
+    const errors = typecheck(allCloudflare)
+    assert.equal(errors, '', `tsc rejected the cloudflare-vendor factory:\n${errors}`)
   })
 
   it('constructs every contract, so the typecheck actually covered them', () => {

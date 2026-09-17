@@ -67,14 +67,14 @@ pub static CONTRACTS: &[Contract] = &[
     Contract {
         name: "database",
         description: "Relational storage: queries, migrations, transactions",
-        implementations: &[NONE, "d1"],
-        candidates: &["supabase", "neon", "postgres"],
+        implementations: &[NONE, "d1", "supabase"],
+        candidates: &["neon", "postgres"],
     },
     Contract {
         name: "storage",
         description: "Object storage: put, get, signed URLs",
-        implementations: &[NONE, "r2"],
-        candidates: &["s3", "supabase-storage"],
+        implementations: &[NONE, "r2", "supabase-storage"],
+        candidates: &["s3"],
     },
     Contract {
         name: "deploy",
@@ -237,7 +237,7 @@ mod tests {
     /// "not yet", a typo is a "no".
     #[test]
     fn a_planned_vendor_reads_differently_from_a_typo() {
-        let planned = problem("database", "supabase").expect("not implemented yet");
+        let planned = problem("database", "neon").expect("not implemented yet");
         assert!(planned.contains("nothing implements yet"), "{planned}");
 
         let typo = problem("database", "supabse").expect("unknown");

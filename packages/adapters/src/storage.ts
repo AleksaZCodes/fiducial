@@ -5,6 +5,11 @@
  * and Supabase Storage. Vendor-specific features stay on the vendor type.
  */
 
+import {
+  createClient as createSupabaseClient,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
+
 export class StorageError extends Error {
   constructor(
     message: string,
@@ -177,5 +182,141 @@ export class R2Storage implements Storage {
         "which the Workers binding does not carry. See the class doc comment.",
       key,
     );
+  }
+}
+
+// ── Supabase Storage ──────────────────────────────────────────────────────────
+
+/**
+ * Supabase Storage — Supabase's managed object storage, reached over HTTPS
+ * using the Supabase JS client with a service-role key.
+ *
+ * **Credentials:** `SUPABASE_URL` (your project URL) and
+ * `SUPABASE_SERVICE_ROLE_KEY` (service-role key, bypasses RLS for
+ * server-side writes). Set both with `wrangler secret put`.
+ *
+ * **Bucket:** reads `SUPABASE_STORAGE_BUCKET` from env, defaulting to
+ * `"assets"`. Create the bucket in the Supabase dashboard before use.
+ *
+ * **`list` traverses sub-folders.** `prefix` is treated as a path prefix:
+ * files whose full path starts with `prefix` are returned via breadth-first
+ * traversal. A trailing `/` in `prefix` is stripped before dispatch.
+ *
+ * **`signedUrl` is fully implemented.** Supabase Storage's native
+ * `createSignedUrl` endpoint is used; `ttlSeconds` is passed as-is.
+ */
+export class SupabaseStorage implements Storage {
+  private readonly client: SupabaseClient;
+  private readonly bucket: string;
+
+  constructor(env: {
+    SUPABASE_URL?: string;
+    SUPABASE_SERVICE_ROLE_KEY?: string;
+    SUPABASE_STORAGE_BUCKET?: string;
+  }) {
+    if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new StorageError(
+        "SupabaseStorage: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required — " +
+          "set both with `wrangler secret put`",
+      );
+    }
+    this.client = createSupabaseClient(
+      env.SUPABASE_URL,
+      env.SUPABASE_SERVICE_ROLE_KEY,
+      { auth: { persistSession: false, autoRefreshToken: false } },
+    );
+    this.bucket = env.SUPABASE_STORAGE_BUCKET ?? "assets";
+  }
+
+  async put(
+    key: string,
+    bytes: Uint8Array,
+    contentType?: string,
+  ): Promise<void> {
+    const { error } = await this.client.storage.from(this.bucket).upload(key, bytes, {
+      contentType: contentType ?? "application/octet-stream",
+      upsert: true,
+    });
+    if (error) {
+      throw new StorageError(`SupabaseStorage put failed: ${error.message}`, key);
+    }
+  }
+
+  async get(key: string): Promise<Uint8Array | null> {
+    const { data, error } = await this.client.storage
+      .from(this.bucket)
+      .download(key);
+    if (error) {
+      if (
+        error.message.includes("Not Found") ||
+        error.message.includes("does not exist") ||
+        error.message.includes("Object not found")
+      ) {
+        return null;
+      }
+      throw new StorageError(`SupabaseStorage get failed: ${error.message}`, key);
+    }
+    return new Uint8Array(await data.arrayBuffer());
+  }
+
+  async delete(key: string): Promise<void> {
+    const { error } = await this.client.storage.from(this.bucket).remove([key]);
+    if (error) {
+      throw new StorageError(`SupabaseStorage delete failed: ${error.message}`, key);
+    }
+  }
+
+  async list(prefix: string): Promise<string[]> {
+    // Normalise: strip trailing slash, treat "" as root.
+    const folder = prefix.replace(/\/$/, "");
+    return this._listFolder(folder, folder ? `${folder}/` : "");
+  }
+
+  private async _listFolder(path: string, keyPrefix: string): Promise<string[]> {
+    const keys: string[] = [];
+    const limit = 1000;
+    let offset = 0;
+
+    for (;;) {
+      const { data, error } = await this.client.storage
+        .from(this.bucket)
+        .list(path || undefined, { limit, offset });
+
+      if (error) {
+        throw new StorageError(`SupabaseStorage list failed: ${error.message}`);
+      }
+      if (!data || data.length === 0) break;
+
+      for (const item of data) {
+        const fullKey = `${keyPrefix}${item.name}`;
+        if (item.id !== null) {
+          // Real file.
+          keys.push(fullKey);
+        } else {
+          // Implicit folder — recurse.
+          const sub = path ? `${path}/${item.name}` : item.name;
+          const subKeys = await this._listFolder(sub, `${fullKey}/`);
+          keys.push(...subKeys);
+        }
+      }
+
+      offset += data.length;
+      if (data.length < limit) break;
+    }
+
+    return keys;
+  }
+
+  async signedUrl(key: string, ttlSeconds: number): Promise<string> {
+    const { data, error } = await this.client.storage
+      .from(this.bucket)
+      .createSignedUrl(key, ttlSeconds);
+    if (error) {
+      throw new StorageError(
+        `SupabaseStorage signedUrl failed: ${error.message}`,
+        key,
+      );
+    }
+    return data.signedUrl;
   }
 }

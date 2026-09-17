@@ -809,6 +809,13 @@ fn run_fid_deploy(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         secrets.push("SUPABASE_URL");
         secrets.push("SUPABASE_ANON_KEY");
     }
+    if config.adapters.get("database") == Some("supabase") {
+        secrets.push("SUPABASE_DB_URL");
+    }
+    if config.adapters.get("storage") == Some("supabase-storage") {
+        secrets.push("SUPABASE_URL");
+        secrets.push("SUPABASE_SERVICE_ROLE_KEY");
+    }
     // Deduplicate while preserving first-occurrence order.
     let mut seen = std::collections::HashSet::new();
     secrets.retain(|s| seen.insert(*s));
@@ -1560,6 +1567,8 @@ fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
         ("newsletter", "resend") => Some(("ResendNewsletter", "@fiducial/adapters/newsletter")),
         ("ai", "openrouter") => Some(("OpenRouterAi", "@fiducial/adapters/ai")),
         ("auth", "supabase") => Some(("SupabaseAuth", "@fiducial/adapters/auth")),
+        ("database", "supabase") => Some(("SupabaseDatabase", "@fiducial/adapters/database")),
+        ("storage", "supabase-storage") => Some(("SupabaseStorage", "@fiducial/adapters/storage")),
         _ => None,
     };
 
@@ -1567,6 +1576,70 @@ fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
         Some((class, path)) => (class.to_string(), path.to_string()),
         None => (none_class.0.to_string(), none_class.1.to_string()),
     }
+}
+
+// ── Built-in fid-legal executor ───────────────────────────────────────────────
+
+/// Derive localized legal page content from `[legal]`, `[brand]`, and `[i18n]`.
+///
+/// `[legal]` declares the jurisdiction, data protection email, and cookie
+/// categories. `[brand]` provides the entity name and domain. `[i18n]` provides
+/// the locale list. All three must be configured before this pipeline can run.
+///
+/// Output: a single TypeScript file `src/generated/legal.ts` (or wherever
+/// `pipelines/legal.toml` points) with:
+/// - `LegalPage` type union
+/// - `LegalCatalog` type (`Record<LegalPage, { title, body }>`)
+/// - One constant per locale and a `legalCatalogs` map keyed by locale string
+///
+/// The generated file starts with a GDPR checklist comment naming every
+/// decision a human must still make — read it after the first `fid derive`.
+fn run_fid_legal(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    let config = Config::load(&working_dir.join(crate::config::CONFIG_FILE))
+        .context("fid-legal needs [legal], [brand], and [i18n] in fiducial.toml")?;
+    let legal = &config.legal;
+
+    if legal.is_empty() {
+        bail!(
+            "fid-legal: [legal] is not declared in fiducial.toml.\n\
+             Add [legal] with jurisdiction, data_protection_email, and cookie_categories \
+             (the `legal` capability seeds a placeholder — `fid add legal`)."
+        );
+    }
+    legal.validate()?;
+
+    if config.i18n.is_empty() {
+        bail!(
+            "fid-legal: [i18n] is not configured in fiducial.toml.\n\
+             The legal pipeline generates localized content for every declared locale.\n\
+             Add [i18n] with locales and default (the `i18n` capability — `fid add i18n`)."
+        );
+    }
+    let default_locale = config.i18n.default_locale()?.to_string();
+    let locales = config.i18n.locales.clone();
+
+    if config.brand.is_empty() {
+        bail!(
+            "fid-legal: [brand] is not configured in fiducial.toml.\n\
+             The legal pipeline reads the entity name, domain, and contact from [brand].\n\
+             Add [brand] with legal_name, trading_name, domain and contact_email \
+             (the `brand` capability — `fid add brand`)."
+        );
+    }
+    config.brand.validate()?;
+
+    let rendered = crate::legal::render_legal_ts(legal, &config.brand, &locales, &default_locale)?;
+
+    for out in &pipeline.outputs {
+        let abs = working_dir.join(out);
+        if let Some(parent) = abs.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("creating parent for `{out}`"))?;
+        }
+        std::fs::write(&abs, &rendered).with_context(|| format!("writing {out}"))?;
+    }
+
+    Ok(())
 }
 
 // ── Command execution ─────────────────────────────────────────────────────────
@@ -1597,10 +1670,11 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             "fid-identity" => return run_fid_identity(pipeline, working_dir),
             "fid-adapters" => return run_fid_adapters(pipeline, working_dir),
             "fid-schema" => return run_fid_schema(pipeline, working_dir),
+            "fid-legal" => return run_fid_legal(pipeline, working_dir),
             other => bail!(
                 "unknown executor `{other}` \
                  (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n, fid-brand, \
-                 fid-adapters, fid-deploy, fid-identity, fid-schema)"
+                 fid-adapters, fid-deploy, fid-identity, fid-schema, fid-legal)"
             ),
         };
 
