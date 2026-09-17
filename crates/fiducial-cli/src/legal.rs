@@ -38,7 +38,7 @@ fn substitute(template: &str, legal_name: &str, domain: &str, jurisdiction: &str
 }
 
 /// Title and body template for each page, before substitution.
-fn page_content(page: &str, jurisdiction: &str, categories: &[&str]) -> (&'static str, String) {
+fn page_content(page: &str, _jurisdiction: &str, categories: &[&str]) -> (&'static str, String) {
     let cookie_list = categories.join(", ");
     match page {
         "privacy" => (

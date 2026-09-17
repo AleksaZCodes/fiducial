@@ -566,7 +566,7 @@ is a worked precedent for the same contract.
 nearly free if the direct-connection route is taken. If they do, say so
 rather than shipping three near-identical classes.
 
-### Legal & compliance — *terminal* ⬜
+### Legal & compliance — *terminal* ✅
 
 Depends on **i18n** (legal text is long-form localized copy) and **brand** (it is
 copy about a declared entity). A genuine dependency, not a preference: built
