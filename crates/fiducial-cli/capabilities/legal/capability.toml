@@ -1,0 +1,11 @@
+description = "Localized legal pages derived from jurisdiction, entity, and cookie declarations"
+
+# A declaration with no file of its own: a `fiducial.toml` block, seeded with
+# placeholder text so `is_empty` is false and the pipeline this capability
+# also installs does not fail on the very next `fid derive`. Replace
+# `data_protection_email` before deriving for real — the jurisdiction and
+# cookie_categories are valid as seeded (EU + necessary-only is the safest
+# starting point).
+[[declarations.config]]
+block = "legal"
+seed = { jurisdiction = "EU", data_protection_email = "privacy@example.com", cookie_categories = ["necessary"] }

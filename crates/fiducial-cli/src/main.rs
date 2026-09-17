@@ -9,6 +9,7 @@ mod config;
 mod context;
 mod guard;
 mod i18n;
+mod legal;
 mod lock;
 mod migration;
 mod pipeline;

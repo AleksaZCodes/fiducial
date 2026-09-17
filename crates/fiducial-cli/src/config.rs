@@ -43,6 +43,12 @@ pub struct Config {
     /// `[freshness]` — gates other than `fid derive --check`.
     #[serde(default, skip_serializing_if = "Freshness::is_empty")]
     pub freshness: Freshness,
+    /// `[legal]` — jurisdiction and cookie declarations for the legal pipeline.
+    ///
+    /// Skipped when the product declares no legal facts, so a product that has
+    /// not added the `legal` capability carries no empty `[legal]` block.
+    #[serde(default, skip_serializing_if = "Legal::is_empty")]
+    pub legal: Legal,
 }
 
 /// `[ai]` — what an AI gateway needs that nothing can derive.
@@ -683,6 +689,77 @@ fn is_hex_color(s: &str) -> bool {
         return false;
     };
     digits.len() == 6 && digits.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+/// `[legal]` — what the legal pipeline needs that `[brand]` cannot imply.
+///
+/// Jurisdiction affects which pages are generated and which clauses are
+/// included. Cookie categories name every tracking purpose the product
+/// declares. `"necessary"` is always included regardless of what the product
+/// lists — it is not a choice.
+///
+/// The `legal` pipeline depends on both `[brand]` (for the entity name, domain,
+/// and contact) and `[i18n]` (for the locale set). Neither dependency is
+/// restated here: they are declared once in their own blocks.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct Legal {
+    /// `EU` | `US` | `UK` | `other`. Affects which pages are generated.
+    #[serde(default)]
+    pub jurisdiction: String,
+    /// Email address for data protection enquiries. Appears in every page.
+    #[serde(default)]
+    pub data_protection_email: String,
+    /// Tracking purposes declared. `"necessary"` is always present.
+    #[serde(default)]
+    pub cookie_categories: Vec<String>,
+}
+
+impl Legal {
+    /// True when the product declares no legal facts at all.
+    pub fn is_empty(&self) -> bool {
+        self.jurisdiction.is_empty()
+    }
+
+    /// Every fact the legal pipeline needs is present and well-formed.
+    pub fn validate(&self) -> anyhow::Result<()> {
+        match self.jurisdiction.as_str() {
+            "EU" | "US" | "UK" | "other" => {}
+            other => anyhow::bail!(
+                "[legal] jurisdiction = \"{other}\" is not a known jurisdiction.\n\
+                 Known: EU, US, UK, other."
+            ),
+        }
+        if self.data_protection_email.trim().is_empty() {
+            anyhow::bail!(
+                "[legal] data_protection_email is missing.\n\
+                 It appears in every generated legal page — add a real address."
+            );
+        }
+        let known = ["necessary", "analytics", "marketing", "functional"];
+        for cat in &self.cookie_categories {
+            if !known.contains(&cat.as_str()) {
+                anyhow::bail!(
+                    "[legal] cookie_categories contains \"{cat}\", which is not a \
+                     known category.\n\
+                     Known: necessary, analytics, marketing, functional."
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// The effective cookie categories — `"necessary"` is always included.
+    pub fn effective_categories(&self) -> Vec<&str> {
+        let mut cats: Vec<&str> = self
+            .cookie_categories
+            .iter()
+            .map(|s| s.as_str())
+            .collect();
+        if !cats.contains(&"necessary") {
+            cats.insert(0, "necessary");
+        }
+        cats
+    }
 }
 
 /// Guard configuration — what `fid guard-check` enforces in this product.
