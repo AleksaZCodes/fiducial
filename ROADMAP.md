@@ -572,7 +572,7 @@ Depends on **i18n** (legal text is long-form localized copy) and **brand** (it i
 copy about a declared entity). A genuine dependency, not a preference: built
 earlier, it gets built twice.
 
-### `fid capability extract` — *terminal* ⬜
+### `fid capability extract` — *terminal* ✅
 
 "It works in my product, now lift it." Mechanizes the second-use rule. Needs the
 taxonomy and external capabilities to exist first, or there is nothing to extract
