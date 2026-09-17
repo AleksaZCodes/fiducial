@@ -621,18 +621,18 @@ step 3 delivers.
 
 | Item | Note |
 |---|---|
-| **Claude Design bridge** | Registry source → design-system previews as a derivation. **Resolve first:** `DesignSync` references a `/design-sync` skill for this round trip; if it already exists, this is a thin adapter, not a pipeline |
+| ~~**Claude Design bridge**~~ ✅ | Shipped 2026-09-17. `fid add design` — capability with SKILL.md documenting the full `@dsCard`/`_ds_manifest.json` pipeline, the `@fiducial/tokens` chain, and the `/design-login` session requirement. If `DesignSync` already handles this once logged in, the capability is a thin adapter. See capability SKILL.md |
 | **Fast path** | Matters once there is production to hotfix |
 | **Interactive seeding** | The cherry on top — `fid new` asks, or seeds brand and registry from a Claude Design project |
-| **Research & authoring** | Papers, references, DOIs, templated documents — see below |
+| ~~**Research & authoring**~~ ✅ | Shipped 2026-09-17. `fid add research` — `[paper]` declaration, BibTeX/CFF/DOI references, Pandoc pipeline, venue templates (IEEE/ACM/APA). See capability SKILL.md |
 | **Demo & showcase** | Interactive landing-page demo, Storybook, feature toggles |
 | **Diagnostics** | Error tracking as an adapter with a no-op default |
 | **Small tools** | Backlinks, browser-compat banners |
-| **Framework currency** | Capability templates must track current majors — Next.js 16, SvelteKit, Tauri. Pinned versions in a scaffold rot silently and a product starts a major behind — see below |
-| **Agent portability** | Skills and guard wiring are Claude-Code-only; author once, generate per vendor — see below |
-| **Rust release versioning** | Changesets drives npm; the fifteen crates move in lockstep at 0.1.0 with nothing driving a bump. All fifteen reached crates.io on 2026-09-16. See below |
+| ~~**Framework currency**~~ ✅ | Shipped 2026-09-17. `fid doctor` check 9 — reports installed capabilities whose pinned framework major is behind npm latest. Offline-graceful (skipped not failed). Tracked: `next`, `svelte`, `@sveltejs/kit`, `@tauri-apps/cli` |
+| ~~**Agent portability**~~ ✅ | Shipped 2026-09-17 (cheap half). New `installed-capabilities` block in `context.rs` — placed in a product's `AGENTS.md`, lists installed capabilities + SKILL.md locations for every agent vendor. Per-vendor guard wiring generation is the remaining half |
+| ~~**Rust release versioning**~~ ✅ | Shipped 2026-09-17. `fid release bump-crates --kind [major\|minor\|patch]` writes a `.cargo-changesets/<date>-<kind>-crates.md` declaration; release workflow applies the bump and publishes in dependency order |
 | **Tagged releases + Zenodo DOI** | Tags exist as of 2026-09-16 and `create-github-releases` is on, so there is now something to archive. Opt-in for child repos too — see below |
-| **Claude chat plugin** | The making philosophy, as a skill for claude.ai — see below |
+| ~~**Claude chat plugin**~~ ✅ | Shipped 2026-09-17. New `chat-skill` block in `context.rs` — generates a `chat-skill.md` from `MISSION.md` (thesis, vocabulary, principles, anti-goals, ordering rule). Editing a principle propagates on `fid context`. Packaging difference vs claude.ai skills not yet verified — see generated file |
 | ~~**`fid dash` counts prose as items**~~ ✅ | Shipped 2026-09-16. Inverted the premise: instead of "reject known false positives", now counts a marker only where an item can be *declared* — a heading, a table row, or a task list entry. Prose paragraphs, blockquotes, and numbered sub-findings are body text regardless of what markers they contain. Corrects the count from the wrong **29 of 37** to the true **20 of 28**, and eliminates the latent `next` corruption. See below |
 | ~~**`fid dash` freshness detection**~~ ✅ | Shipped 2026-09-15. Dash equated "gated" with "a workflow runs `fid derive --check`" and reported this repository as ungated while nine gates ran on every commit. `[freshness] gates` declares the others — which command gates an artifact is a judgment, not something to pattern-match — and a gate declared but run by nothing is now reported too |
 

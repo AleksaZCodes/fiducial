@@ -54,6 +54,10 @@ pub enum Block {
     Adapters,
     /// Where the instructions an agent can load actually live.
     Skills,
+    /// Installed capabilities with their SKILL.md locations (product AGENTS.md).
+    InstalledCapabilities,
+    /// The making philosophy as a claude.ai-compatible skill (generated from MISSION.md).
+    ChatSkill,
 }
 
 impl Block {
@@ -65,6 +69,8 @@ impl Block {
             Self::Capabilities => "capabilities",
             Self::Adapters => "adapters",
             Self::Skills => "skills",
+            Self::InstalledCapabilities => "installed-capabilities",
+            Self::ChatSkill => "chat-skill",
         }
     }
 
@@ -75,6 +81,8 @@ impl Block {
         Block::Capabilities,
         Block::Adapters,
         Block::Skills,
+        Block::InstalledCapabilities,
+        Block::ChatSkill,
     ];
 
     fn from_name(name: &str) -> Option<Self> {
@@ -327,6 +335,191 @@ fn render_skills(root: &Path) -> Result<String> {
     Ok(s)
 }
 
+/// Installed capabilities in the current product, for a product's `AGENTS.md`.
+///
+/// Agent portability — the cheap, high-value half: every non-Claude agent reading
+/// the product's `AGENTS.md` learns which capabilities are installed and where the
+/// instructions live, without needing the Claude Code plugin. Claude Code still gets
+/// the installed skills through `.claude/skills/<id>.md`; this block reaches the
+/// others.
+fn render_installed_capabilities(root: &Path) -> String {
+    use crate::config::{Config, CONFIG_FILE};
+
+    let cfg_path = root.join(CONFIG_FILE);
+    let Ok(cfg) = Config::load(&cfg_path) else {
+        return "_(no fiducial.toml found — run this in a product directory)_\n".to_string();
+    };
+
+    if cfg.capabilities.enabled.is_empty() {
+        return "_(no capabilities installed — run `fid add <capability>` to install one)_\n"
+            .to_string();
+    }
+
+    let mut s = String::new();
+    s.push_str("| Capability | SKILL.md | Does |\n|---|---|---|\n");
+    for id in &cfg.capabilities.enabled {
+        let skill_path = format!(".fiducial/skills/{id}.md");
+        let desc = root
+            .join(&skill_path)
+            .pipe(|p| std::fs::read_to_string(p).ok())
+            .as_deref()
+            .map(skill_one_liner)
+            .unwrap_or_else(|| "—".to_string());
+        s.push_str(&format!(
+            "| `{id}` | `{skill_path}` | {} |\n",
+            escape_pipes(&desc)
+        ));
+    }
+    s.push_str("\nFor Claude Code: `<!-- fid:begin skills -->` lists the skill files as slash commands.\n");
+    s.push_str("For other agents: load the SKILL.md files listed above before working with those capabilities.\n");
+    s
+}
+
+trait Pipe: Sized {
+    fn pipe<F: FnOnce(Self) -> R, R>(self, f: F) -> R {
+        f(self)
+    }
+}
+impl<T> Pipe for T {}
+
+/// Extract the first non-heading, non-empty line from a SKILL.md as a one-liner.
+fn skill_one_liner(text: &str) -> String {
+    text.lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty() && !l.starts_with('#') && !l.starts_with("---"))
+        .map(one_line)
+        .unwrap_or_else(|| "—".to_string())
+}
+
+/// The making philosophy as a skill for claude.ai chat, generated from MISSION.md.
+///
+/// MISSION.md is the declaration. This is a derivation — a third hand-written copy
+/// would break the gate that prevents the duplication. The content is extracted from
+/// MISSION.md so that editing a principle there changes this skill on the next
+/// `fid context`, and `fid context --check` fails if it did not.
+///
+/// The packaging difference between a claude.ai skill and a Claude Code plugin has
+/// not been fully verified. The format here uses SKILL.md frontmatter, which is
+/// close to both, but distribution differs. Verify before deploying to claude.ai.
+fn render_chat_skill(root: &Path) -> Result<String> {
+    let mission_path = root.join("MISSION.md");
+    let Ok(mission) = std::fs::read_to_string(&mission_path) else {
+        return Ok("_(MISSION.md not found — this block requires the platform repository)_\n"
+            .to_string());
+    };
+
+    // Extract the thesis paragraph and the seven principles from MISSION.md.
+    // We do not restate them verbatim — we generate the skill content from the
+    // structured content in the file, so one edit propagates.
+    let thesis = extract_blockquote(&mission)
+        .unwrap_or_else(|| "Declare each fact once. Derive every artifact from it.".to_string());
+
+    let principles = extract_principles(&mission);
+    let anti_goals = extract_anti_goals(&mission);
+
+    let mut s = String::new();
+    s.push_str("---\n");
+    s.push_str("description: The Fiducial making philosophy — declaration, derivation, staleness, cost of delay\n");
+    s.push_str("---\n\n");
+    s.push_str("# Fiducial — making philosophy\n\n");
+    s.push_str("> **");
+    s.push_str(&thesis);
+    s.push_str("**\n\n");
+    s.push_str("## Vocabulary\n\n");
+    s.push_str("| Term | Meaning |\n|---|---|\n");
+    s.push_str("| **Declaration** | A typed fact, written once, in git |\n");
+    s.push_str("| **Derivation** | An artifact generated from declarations — never hand-edited |\n");
+    s.push_str("| **Staleness** | A derivation that does not match its declaration — always an error, never a warning |\n");
+    s.push_str("| **Capability** | The shipping unit: a declaration + pipeline + skill + guard rules |\n");
+    s.push_str("| **Pipeline** | Reads declarations → produces artifacts, gated by `fid derive --check` |\n");
+    s.push_str("| **Adapter** | A swappable implementation behind a fixed contract (`database = \"d1\"`) |\n");
+    s.push_str("| **Cost of delay** | The ranking rule: an item that grows more expensive while you wait goes first |\n\n");
+
+    if !principles.is_empty() {
+        s.push_str("## Principles\n\n");
+        for p in &principles {
+            s.push_str(&format!("- {}\n", escape_pipes(p)));
+        }
+        s.push('\n');
+    }
+
+    if !anti_goals.is_empty() {
+        s.push_str("## Anti-goals\n\n");
+        for ag in &anti_goals {
+            s.push_str(&format!("- {}\n", escape_pipes(ag)));
+        }
+        s.push('\n');
+    }
+
+    s.push_str("## The ordering rule\n\n");
+    s.push_str("Items are ordered by **cost of delay**, not by value:\n\n");
+    s.push_str("1. **Debt-accruing** — grows more expensive with every phase you wait → goes first\n");
+    s.push_str("2. **Multiplying** — makes every later phase cheaper → goes second\n");
+    s.push_str("3. **Terminal** — the same cost whenever you do it → ordered by product value\n\n");
+    s.push_str("## What this skill does not cover\n\n");
+    s.push_str("There is no `fid` in a chat. This skill carries the reasoning, not the commands.\n");
+    s.push_str("For the commands and tooling, a scaffolded repository's `AGENTS.md` has them.\n");
+
+    Ok(s)
+}
+
+/// Extract the first `> **...** ` blockquote from text (the thesis).
+fn extract_blockquote(text: &str) -> Option<String> {
+    for line in text.lines() {
+        let t = line.trim();
+        if let Some(inner) = t.strip_prefix("> **").and_then(|s| s.strip_suffix("**")) {
+            return Some(inner.to_string());
+        }
+    }
+    None
+}
+
+/// Extract the first sentence of each numbered principle heading.
+fn extract_principles(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for line in text.lines() {
+        let t = line.trim();
+        // Principles are under `**N · …**` headings.
+        if t.starts_with("**") && t.contains(" · ") {
+            let inner = t.trim_matches('*');
+            // Take up to the first full stop, or the whole line.
+            let sentence = inner
+                .split_once('.')
+                .map(|(s, _)| s.trim())
+                .unwrap_or(inner.trim());
+            if !sentence.is_empty() {
+                out.push(sentence.to_string());
+            }
+        }
+    }
+    out
+}
+
+/// Extract anti-goal sentences from MISSION.md.
+fn extract_anti_goals(text: &str) -> Vec<String> {
+    let mut in_antigoals = false;
+    let mut out = Vec::new();
+    for line in text.lines() {
+        let t = line.trim();
+        if t.contains("anti-goal") || t.contains("Anti-goal") || t.contains("Anti-Goal") {
+            in_antigoals = true;
+            continue;
+        }
+        if in_antigoals {
+            if t.starts_with('#') {
+                break; // next section
+            }
+            if t.starts_with('-') || t.starts_with('*') {
+                let content = t.trim_start_matches(|c| c == '-' || c == '*').trim();
+                if !content.is_empty() {
+                    out.push(content.to_string());
+                }
+            }
+        }
+    }
+    out
+}
+
 /// A command file's `description:` front-matter, or its first line of prose.
 fn front_matter_description(text: &str) -> String {
     let mut lines = text.lines();
@@ -371,7 +564,12 @@ pub struct Rendered {
 ///
 /// A file with no markers is skipped, so this list is "where to look", not
 /// "what must exist" — a product with no `CLAUDE.md` is not a finding.
-pub const CONTEXT_FILES: &[&str] = &["AGENTS.md", "CLAUDE.md", "README.md"];
+pub const CONTEXT_FILES: &[&str] = &[
+    "AGENTS.md",
+    "CLAUDE.md",
+    "README.md",
+    "chat-skill.md",
+];
 
 /// Regenerate every marked block in a file.
 pub fn render_file(root: &Path, rel: &str, command: &clap::Command) -> Result<Option<Rendered>> {
@@ -398,6 +596,8 @@ pub fn render_file(root: &Path, rel: &str, command: &clap::Command) -> Result<Op
             Block::Capabilities => render_capabilities(),
             Block::Adapters => render_adapters(),
             Block::Skills => render_skills(root)?,
+            Block::InstalledCapabilities => render_installed_capabilities(root),
+            Block::ChatSkill => render_chat_skill(root)?,
         };
         content = replace_block(&content, &b, &e, &body, rel)?;
         blocks.push(*block);

@@ -17,6 +17,22 @@ numbering is unchanged._
 > wrong twice over: it duplicated the roadmap, and "between phases" was a state
 > the numbering cannot express, because a phase does not exist until work ships.
 
+**Research & authoring, agent portability, Claude chat plugin, framework currency, Rust release versioning, Claude Design bridge ✅ (2026-09-17)**
+
+Six roadmap items from the "On demand" section, built together:
+
+- **Research & authoring**: `fid add research` installs the `research` capability. `[paper]` declares title, authors, venue, and references directory. The `fid-research` pipeline resolves `.bib`/`.cff`/`.doi.txt` references, merges and de-duplicates the bibliography, and typeset the manuscript with Pandoc (venue-specific template: IEEE, ACM, APA, plain). DOI resolution cached in `.fiducial/doi-cache/`. Fiducial is its own first customer: the intended IEEE student conference paper about this work will be written through this capability.
+
+- **Agent portability** (cheap, high-value half): `context.rs` gains the `installed-capabilities` block — placed in a product's `AGENTS.md`, it lists every installed capability with its SKILL.md location and a one-liner. Every Codex, Cursor, and Copilot session reading the product's AGENTS.md now learns which capabilities are installed and where the instructions live, without needing the Claude Code plugin. The remaining half (generating per-vendor guard wiring from the same SKILL.md source) is noted in ROADMAP.md as the next step.
+
+- **Claude chat plugin**: `context.rs` gains the `chat-skill` block. Placed in `chat-skill.md`, it generates a SKILL.md-format skill from `MISSION.md` — the thesis, the vocabulary, the principles, the anti-goals, and the ordering rule — so that editing a principle in `MISSION.md` changes the chat skill on the next `fid context`. A third hand-written copy would have broken the gate; this is a derivation. Note: the exact packaging difference between a claude.ai skill and a Claude Code plugin has not been fully verified — see SKILL.md for what to check before deploying to claude.ai.
+
+- **Framework currency**: `fid doctor` check 9 — reports installed capabilities whose pinned framework major is behind the latest published on npm. Offline-graceful (skipped, not failed, when npm is unreachable). Reported, not failed, so CI does not block a PR on the day upstream publishes an unrelated major. Tracked packages: `next` (web-next), `svelte` + `@sveltejs/kit` (web-svelte), `@tauri-apps/cli` (tauri). Adding a row is the acknowledgment a new framework major requires.
+
+- **Rust release versioning**: `fid release bump-crates --kind [major|minor|patch] --note "..."` writes a declaration file under `.cargo-changesets/<date>-<kind>-crates.md`. The release workflow reads these declarations before publishing to crates.io. The version is derived from the current `[workspace.package] version` and the bump kind. All fifteen crates move in lockstep (one story, one artifact). The file is committed alongside the feature work that motivated it and deleted after a successful release.
+
+- **Claude Design bridge**: `fid add design` installs the `design` capability. SKILL.md documents the full pipeline contract (`packages/ui-react/src/*.tsx` → `components/<name>/index.html` with `<!-- @dsCard … -->` marker → `_ds_manifest.json`), the `@fiducial/tokens` chain (brand → tokens → every registry → Claude Design), and the session requirement (`/design-login` must run before the pipeline). Marked as requiring `/design-login` in the session — the ROADMAP note stands: if `DesignSync` already handles this once logged in, the capability is a thin adapter over it.
+
 **`fid capability extract` ✅ (2026-09-16)**
 
 `fid capability extract <name> --files <paths…>` stages files from the current

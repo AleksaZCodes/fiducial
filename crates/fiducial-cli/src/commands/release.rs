@@ -93,6 +93,46 @@ Both are bugs.  Use `fid release protocol --bump` to change the wire version
 correctly — it updates the constant declaration and the matrix in one step.")]
     Check,
 
+    /// Declare a version bump for all Rust workspace crates
+    ///
+    /// Writes a declaration file under `.cargo-changesets/` that `release.yml`
+    /// reads before publishing.  The actual version is applied in the release
+    /// workflow — this command only records the *intent*, the same way
+    /// `.changeset/*.md` files record intent for npm packages.
+    ///
+    /// **Done when:** a merge whose `fid release bump-crates` declaration exists
+    /// publishes exactly the new version to crates.io, and a merge with no
+    /// declaration publishes nothing.
+    #[command(long_about = "\
+Declare a version bump for all Rust workspace crates.
+
+All fifteen crates move in lockstep (same version, one story — see ROADMAP
+\"Rust release versioning\" for the rationale). This command writes one
+declaration file under .cargo-changesets/ that the release workflow reads.
+
+Usage:
+  fid release bump-crates --kind minor --note \"Add research capability\"
+
+The bump kind follows semver:
+  --kind major   0.1.0 → 1.0.0  (breaking API change)
+  --kind minor   0.1.0 → 0.2.0  (new capability, backwards-compatible)
+  --kind patch   0.1.0 → 0.1.1  (bug fix)
+
+The declaration is committed alongside the feature work that motivated it.
+The release workflow applies the version bump and publishes in dependency order.
+
+WIRE_VERSION is not SemVer and is managed separately by
+`fid release protocol --bump`.  Do not use this command for protocol bumps.")]
+    BumpCrates {
+        /// Bump kind: `major`, `minor`, or `patch`
+        #[arg(long, value_name = "KIND")]
+        kind: CrateBumpKind,
+
+        /// Short note describing what motivated the bump (recorded in the declaration)
+        #[arg(long, value_name = "TEXT")]
+        note: Option<String>,
+    },
+
     /// Bump the wire protocol version and update the compatibility matrix
     #[command(long_about = "\
 Bump the wire protocol version and update `docs/compat/matrix.toml`.
@@ -130,12 +170,33 @@ pub enum BumpKind {
     Compatible,
 }
 
+#[derive(Debug, Clone, clap::ValueEnum)]
+pub enum CrateBumpKind {
+    /// Breaking API change: 0.1.0 → 1.0.0
+    Major,
+    /// New capability, backwards-compatible: 0.1.0 → 0.2.0
+    Minor,
+    /// Bug fix: 0.1.0 → 0.1.1
+    Patch,
+}
+
+impl CrateBumpKind {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Major => "major",
+            Self::Minor => "minor",
+            Self::Patch => "patch",
+        }
+    }
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 pub fn run(action: ReleaseAction) -> Result<()> {
     match action {
         ReleaseAction::Status => status(),
         ReleaseAction::Check => check(),
+        ReleaseAction::BumpCrates { kind, note } => bump_crates(kind, note),
         ReleaseAction::Protocol { bump, note } => bump_protocol(bump, note),
     }
 }
@@ -173,6 +234,105 @@ fn status() -> Result<()> {
 
     println!();
     Ok(())
+}
+
+// ── bump_crates ───────────────────────────────────────────────────────────────
+
+/// The directory where crate bump declarations are stored, relative to workspace root.
+const CARGO_CHANGESETS_DIR: &str = ".cargo-changesets";
+
+fn bump_crates(kind: CrateBumpKind, note: Option<String>) -> Result<()> {
+    let root = workspace_root();
+    let dir = root.join(CARGO_CHANGESETS_DIR);
+    fs::create_dir_all(&dir)
+        .with_context(|| format!("creating {CARGO_CHANGESETS_DIR}/"))?;
+
+    // Read the current workspace version so we can show what the bump will do.
+    let workspace_toml = root.join("Cargo.toml");
+    let current_version = read_workspace_version(&workspace_toml).unwrap_or_else(|| "0.1.0".to_string());
+
+    let today = today_iso8601();
+    let kind_str = kind.as_str();
+
+    // Derive the next version for display purposes.
+    let next_version = apply_bump(&current_version, &kind);
+
+    let note_text = note.clone().unwrap_or_else(|| format!("{kind_str} bump of all Rust workspace crates"));
+
+    // File name: <date>-<kind>-crates.md — unambiguous and sorts chronologically.
+    let file_name = format!("{today}-{kind_str}-crates.md");
+    let file_path = dir.join(&file_name);
+
+    if file_path.exists() {
+        anyhow::bail!(
+            "{CARGO_CHANGESETS_DIR}/{file_name} already exists. \
+             If you intended a second bump for today, rename the existing file first."
+        );
+    }
+
+    let content = format!(
+        "# Crate version bump: {kind_str}\n\
+         \n\
+         kind: {kind_str}\n\
+         date: {today}\n\
+         note: {note_text}\n\
+         \n\
+         This file declares a {kind_str} version bump for all Rust workspace crates.\n\
+         Current version: {current_version}\n\
+         Next version:    {next_version}\n\
+         \n\
+         Applied by the release workflow (`release.yml`) before publishing to crates.io.\n\
+         Delete this file only after the release has published successfully.\n"
+    );
+
+    fs::write(&file_path, content)
+        .with_context(|| format!("writing {}", file_path.display()))?;
+
+    println!("✦ fid release bump-crates — {kind_str}");
+    println!();
+    println!("  Declaration written: {CARGO_CHANGESETS_DIR}/{file_name}");
+    println!();
+    println!("  Current version:  {current_version}");
+    println!("  Next version:     {next_version}  ({kind_str})");
+    println!();
+    println!("  Note: {note_text}");
+    println!();
+    println!("  ─── NEXT STEPS ──────────────────────────────────────────────");
+    println!("  1. Commit the declaration file alongside your feature work.");
+    println!("  2. When the PR merges, the release workflow applies the bump");
+    println!("     and publishes all fifteen crates in dependency order.");
+    println!("  3. The declaration file is deleted after a successful publish.");
+    println!("  ────────────────────────────────────────────────────────────");
+    Ok(())
+}
+
+fn read_workspace_version(cargo_toml: &std::path::Path) -> Option<String> {
+    let raw = fs::read_to_string(cargo_toml).ok()?;
+    let value: toml::Value = toml::from_str(&raw).ok()?;
+    value
+        .get("workspace")?
+        .get("package")?
+        .get("version")?
+        .as_str()
+        .map(str::to_owned)
+}
+
+fn apply_bump(version: &str, kind: &CrateBumpKind) -> String {
+    let parts: Vec<u64> = version
+        .split('.')
+        .filter_map(|p| p.parse().ok())
+        .collect();
+    let (major, minor, patch) = match parts.as_slice() {
+        &[ma, mi, pa, ..] => (ma, mi, pa),
+        &[ma, mi] => (ma, mi, 0),
+        &[ma] => (ma, 0, 0),
+        _ => return version.to_string(),
+    };
+    match kind {
+        CrateBumpKind::Major => format!("{}.0.0", major + 1),
+        CrateBumpKind::Minor => format!("{major}.{}.0", minor + 1),
+        CrateBumpKind::Patch => format!("{major}.{minor}.{}", patch + 1),
+    }
 }
 
 // ── check ─────────────────────────────────────────────────────────────────────
