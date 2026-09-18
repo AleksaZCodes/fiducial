@@ -108,6 +108,35 @@ disclaiming.
 
 ## Tools — use these before writing library code
 
+### Do not script what a tool already does
+
+Editing a file by piping it through a Python or Node heredoc is slower and less
+safe than the harness's own file tools, and the difference is not stylistic:
+
+**A scripted replacement fails silently.** `s.replace(old, new)` against a
+pattern that is not there returns the string unchanged and writes it back, and
+the script reports success. The edit simply did not happen, and you find out two
+build cycles later — or not at all. `Edit` validates the match, refuses an
+ambiguous one, and errors loudly when the text is not found. That is the whole
+reason to prefer it.
+
+| Doing | Use | Not |
+|---|---|---|
+| changing a file's contents | `Edit` | `python3 - <<'PY'`, `node -e` |
+| writing a new file | `Write` | `cat > f <<'EOF'` for anything structured |
+| reading a file | `Read` | `cat`, `sed -n` |
+| finding text across files | `Grep` | `grep -r` piped through three filters |
+| finding files by name | `Glob` | `find` with `-name` and `-not -path` |
+
+`Read` before `Edit` is required, and that is a feature: it is what makes the
+match exact rather than hopeful.
+
+Shell is still the right tool for what shell is for — running the build, the
+tests, `git`, `fid`, `gh`, a one-off `wc -l`, a pipeline whose whole output you
+want to read. Reach for a scripting language when the task is genuinely a
+program: parsing JSON to answer a question, arithmetic over a data file,
+generating a fixture. Not to perform an edit.
+
 ### context7 (live documentation)
 
 Before writing code against any named library — Embassy, wasm-bindgen, wasm-pack,
@@ -276,6 +305,7 @@ rule that matters most.
 | `fid harvest` | Survey an existing codebase for reusable logic, art, UI and principles |
 | `fid context` | Regenerate the derivable parts of AGENTS.md / CLAUDE.md |
 | `fid design` | Documentation freshness, including prose nothing can generate Is the published design gallery the system this product declares? |
+| `fid repo` | Make the remote enforce what `[guard]` already claims |
 | `fid docs` | — |
 | `fid doctor` | Check for drift: outdated deps, stale templates, un-applied migrations |
 <!-- fid:end commands -->
@@ -295,6 +325,7 @@ Four kinds, and the difference is not cosmetic — see
 | **Declaration** | a typed fact, written once, inert — a file, a `fiducial.toml` block, or a directory the product fills | `board/board.interface.json`, the `[i18n]` block, `migrations/` |
 | **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/eda.toml` |
 | **Adapter** | a swappable vendor behind a fixed contract, selected in `[adapters]` | `storage = "none"` |
+| **Tool** | an external command the capability's work needs on PATH — declared, never installed | `requires_tools = ["wrangler"]` |
 | **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
 
 <!-- fid:end-describes -->

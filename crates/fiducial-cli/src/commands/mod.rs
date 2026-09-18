@@ -11,4 +11,5 @@ pub mod graph;
 pub mod harvest;
 pub mod new;
 pub mod release;
+pub mod repo;
 pub mod upgrade;

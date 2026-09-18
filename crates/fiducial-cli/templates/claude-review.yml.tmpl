@@ -13,6 +13,16 @@ jobs:
   review:
     name: Opus review
     runs-on: ubuntu-latest
+    # Advisory, and it has to say so.
+    #
+    # A review is an opinion, not a gate. Without this line the job looks
+    # identical to a test suite — and the day `ANTHROPIC_API_KEY` is missing,
+    # rate-limited, or the model declines, a red review blocks a green branch.
+    #
+    # It is also the declaration `fid repo protect` derives from: a job marked
+    # advisory is not turned into a required status check. A review that can
+    # stop a merge is a review nobody asks for a second time.
+    continue-on-error: true
     permissions:
       contents: read
       pull-requests: write
