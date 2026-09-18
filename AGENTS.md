@@ -275,7 +275,8 @@ rule that matters most.
 | `fid dash` | The workbench — one read-only view of roadmap, decisions, CI, graph, freshness |
 | `fid harvest` | Survey an existing codebase for reusable logic, art, UI and principles |
 | `fid context` | Regenerate the derivable parts of AGENTS.md / CLAUDE.md |
-| `fid docs` | Documentation freshness, including prose nothing can generate |
+| `fid design` | Documentation freshness, including prose nothing can generate Is the published design gallery the system this product declares? |
+| `fid docs` | — |
 | `fid doctor` | Check for drift: outdated deps, stale templates, un-applied migrations |
 <!-- fid:end commands -->
 

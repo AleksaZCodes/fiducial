@@ -174,6 +174,16 @@ ring                 = "oklch(0.6 0 0)"
 doodle-ink           = "oklch(0.55 0 0)"        # annotation marks
 doodle-accent        = "oklch(0.32 0 0)"        # the one loud mark per viewport
 
+# Data-visualisation series, in the order a chart spends them. Declared here
+# because a deck that needs a sixth line is otherwise where a sixth colour gets
+# invented. Replace these first when you replace the palette: a neutral ramp is
+# a placeholder, and five greys is not a categorical scale.
+chart-1              = "oklch(0.87 0 0)"
+chart-2              = "oklch(0.556 0 0)"
+chart-3              = "oklch(0.439 0 0)"
+chart-4              = "oklch(0.371 0 0)"
+chart-5              = "oklch(0.269 0 0)"
+
 [dark]
 background           = "oklch(0.16 0 0)"
 foreground           = "oklch(0.97 0 0)"
@@ -195,6 +205,11 @@ input                = "oklch(1 0 0 / 16%)"
 ring                 = "oklch(0.56 0 0)"
 doodle-ink           = "oklch(0.62 0 0)"
 doodle-accent        = "oklch(0.87 0 0)"
+chart-1              = "oklch(0.87 0 0)"
+chart-2              = "oklch(0.72 0 0)"
+chart-3              = "oklch(0.6 0 0)"
+chart-4              = "oklch(0.47 0 0)"
+chart-5              = "oklch(0.36 0 0)"
 ```
 
 ### Measured pairs
@@ -302,6 +317,59 @@ Three arrows on one screen is a clip-art page, and the device stops meaning
 anything the moment it is decoration. Marks are `aria-hidden` — one that points
 at text is emphasis, not information, and the text has to carry the meaning
 alone. They stroke in `--doodle-ink`, never `--foreground`.
+
+---
+
+## 5a · Surfaces beyond the web page
+
+Claude Design, Docs and Slides became one interface in September 2026. A design
+system that only describes a web page is now an incomplete one: the same
+declaration has to govern a deck and a document, or those come out generically
+styled while the site is exactly on brand — which is the original problem
+wearing a different hat.
+
+This block is **declared and validated but not generated from**. There is no
+stylesheet for a slide. The consumer is the skill an agent reads; the pipeline's
+job is to refuse a surface that maps to a type step or a colour the declaration
+does not have, so the mapping cannot quietly point at nothing.
+
+```toml fid:surfaces
+[slides]
+title       = "display"   # the one line on a title slide
+heading     = "h2"        # a heading inside a content slide
+body        = "subhead"   # slide body copy is read from further away than page copy
+small       = "small"     # slide numbers, sources, footnotes
+canvas      = "1280x720"
+max_points  = 4           # "one idea per slide" is advice until it is a number
+chart_order = ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"]
+never = [
+  "a gradient title slide",
+  "an icon beside every bullet",
+  "a slide that is only a chart with no sentence saying what it shows",
+  "stock photography",
+]
+
+[document]
+title   = "h1"
+heading = "h2"
+body    = "body"
+small   = "small"
+never = [
+  "a cover page with a full-bleed image",
+  "a three-column layout for running prose",
+]
+```
+
+Notes worth keeping:
+
+- **Slide body is `subhead`, not `body`.** A slide is read from three metres
+  away and a page from forty centimetres. Using the same step for both is the
+  most common way a deck built from a web design system comes out unreadable.
+- **`chart_order` may only name declared colours.** A deck cannot introduce a
+  sixth series colour by inventing one, which is exactly what happens when a
+  chart needs one more line than the palette has.
+- The global **Not this** list below applies to every surface. `never` here is
+  what is *additionally* forbidden on that one.
 
 ---
 

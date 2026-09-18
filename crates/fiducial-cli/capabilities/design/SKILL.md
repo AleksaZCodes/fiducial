@@ -184,6 +184,87 @@ Assemble a landing page from these and it is consistent by construction. If a
 page needs a shape that is not here, add it to `design-system.md` first and
 then to `sections.tsx` — in that order.
 
+## Rule 5b · The design system governs decks and documents too
+
+Claude Design, Docs and Slides became one interface in September 2026. Claude
+now picks the surface from the task rather than the user picking the tool, which
+means the same request can come back as a page, a deck or a document — and a
+design system that only describes a web page governs one of the three.
+
+The failure this produces is specific and familiar: the website is exactly on
+brand and the pitch deck looks like every other pitch deck. That is the original
+problem wearing a different hat, and it is worse here, because a deck is the
+artifact that goes to people who have never seen the site.
+
+So `design-system.md` declares `fid:surfaces`, and `fid derive` validates it —
+a surface that maps to a type step or a colour the declaration does not have is
+an error, not a silent fallback.
+
+```toml
+[slides]
+title       = "display"
+body        = "subhead"        # not "body" — see below
+canvas      = "1280x720"
+max_points  = 4
+chart_order = ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"]
+never       = ["a gradient title slide", "an icon beside every bullet"]
+```
+
+Three things this gets right that a deck otherwise gets wrong:
+
+1. **Slide body is a larger step than page body.** A slide is read from three
+   metres away, a page from forty centimetres. Reusing one step for both is the
+   single most common way a deck built from a web design system comes out
+   unreadable — and it is invisible on the laptop it was built on.
+2. **`max_points` is a number.** "One idea per slide" is advice, and advice
+   loses to a bullet list that felt like it needed six items.
+3. **`chart_order` may only name declared colours.** A chart needing one more
+   series than the palette has is exactly where a sixth colour gets invented.
+   Declaring the order means the sixth series is a conversation, not an
+   accident.
+
+The global **Not this** list applies to every surface. `never` on a surface is
+what is *additionally* forbidden there.
+
+### Publishing the system to Claude Design
+
+The gallery is not only a page to look at. Uploaded to a claude.ai design-system
+project, it is what Claude Design builds *from*: it reads the components,
+checks its output against them, and corrects before you see it. The `@dsCard`
+marker on each preview's first line is what puts it in the Design System pane.
+
+```
+fid design           list the cards, check both failure modes
+fid design --check   the CI gate
+fid design --plan    the write set, for /design-sync to publish
+/design-sync         the upload itself
+```
+
+`fid design` does not upload — that needs a claude.ai authorization a CLI cannot
+hold, and a `push` that does not push is worse than no command. What it owns is
+the half that fails silently:
+
+- **The gallery is rebuilt separately from `fid derive`.** Run the derive and
+  skip the rebuild, and the published swatches describe a palette the product no
+  longer has. Nothing else catches this: the app builds fine either way.
+- **A preview with no card marker uploads and then is not there.** That reads
+  as a dropped file rather than a malformed one, so it gets debugged in the
+  wrong place.
+
+Uploading a new `tokens.css` also re-derives the project's adherence config —
+the rules that flag a raw hex or a raw `px` in generated output as "use a
+design-system token". Leave a stale `tokens.css` up there and that linter goes
+on enforcing token names the product has renamed.
+
+### Brand as a skill
+
+This capability installs `SKILL.md` into `.claude/skills/`, which is the same
+mechanism Claude uses to keep presentations and documents on brand — a brand
+skill activates automatically whenever a presentation, document or spreadsheet
+is created, without being asked for. That is why the declaration lives next to
+the skill rather than only in the repository's CSS: the CSS governs the app, and
+the skill governs everything else the product ever has to hand someone.
+
 ## Rule 6 · Write the negative constraints
 
 The most useful half of a design system is the half that says what the product

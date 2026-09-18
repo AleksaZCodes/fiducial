@@ -4,6 +4,7 @@ pub mod component;
 pub mod context;
 pub mod dash;
 pub mod derive;
+pub mod design;
 pub mod docs;
 pub mod doctor;
 pub mod graph;

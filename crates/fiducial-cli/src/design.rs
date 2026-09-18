@@ -165,6 +165,46 @@ struct ScaleBlock {
     steps: BTreeMap<String, ScaleStep>,
 }
 
+/// How one non-web surface spends the design system.
+///
+/// Claude Design, Docs and Slides became one interface in September 2026, which
+/// makes a design system that only describes a web page an incomplete one: the
+/// same declaration now has to govern a deck and a document, or those come out
+/// generically styled while the site is exactly on brand.
+///
+/// This block is **declared and validated here but not generated from**. There
+/// is no stylesheet for a slide — the consumer is the skill an agent reads, and
+/// the pipeline's job is to make sure the skill is not pointing at a type step
+/// that does not exist.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Surface {
+    /// Scale step for the biggest thing on the surface — a slide title, a
+    /// document title.
+    pub title: String,
+    /// Scale step for a heading within it.
+    pub heading: String,
+    /// Scale step for running text.
+    pub body: String,
+    /// Scale step for captions, footnotes, slide numbers.
+    #[serde(default)]
+    pub small: Option<String>,
+    /// Canvas, for a fixed-size surface. `"1280x720"`. Meaningless for a
+    /// document, which is why it is optional rather than defaulted.
+    #[serde(default)]
+    pub canvas: Option<String>,
+    /// Hard limit on ideas per unit — bullets on a slide, claims in a section.
+    /// Declared because "one idea per slide" is advice until it is a number.
+    #[serde(default)]
+    pub max_points: Option<u32>,
+    /// Colour token order for charts on this surface. Each must be a declared
+    /// colour, so a deck cannot introduce a sixth series colour by inventing one.
+    #[serde(default)]
+    pub chart_order: Vec<String>,
+    /// What this surface must not do, beyond the global list.
+    #[serde(default)]
+    pub never: Vec<String>,
+}
+
 /// Everything `design-system.md` declares that a machine can act on.
 #[derive(Debug, Clone)]
 pub struct DesignSystem {
@@ -175,6 +215,8 @@ pub struct DesignSystem {
     clamp: Option<Clamp>,
     shape: Shape,
     contrast: Vec<ContrastPair>,
+    /// Non-web surfaces: `slides`, `document`, whatever else a product adds.
+    surfaces: BTreeMap<String, Surface>,
     /// Step order as written, so the generated CSS reads like the document.
     step_order: Vec<String>,
 }
@@ -268,6 +310,13 @@ pub fn parse(md: &str) -> Result<DesignSystem> {
         Some(b) => toml::from_str(b).context("parsing the `fid:contrast` block")?,
         None => ContrastBlock::default(),
     };
+    // Optional: a product with no deck and no document needs no answer here.
+    // A product that has one and does not declare it gets the default deck,
+    // which is the thing this whole capability exists to prevent.
+    let surfaces: BTreeMap<String, Surface> = match blocks.get("surfaces") {
+        Some(b) => toml::from_str(b).context("parsing the `fid:surfaces` block")?,
+        None => BTreeMap::new(),
+    };
 
     for r in ["display", "body", "script", "mono"] {
         if !roles.contains_key(r) {
@@ -296,6 +345,34 @@ pub fn parse(md: &str) -> Result<DesignSystem> {
         }
     }
 
+    // A surface may only spend steps and colours the declaration already has.
+    // Without this the block is prose: an agent reads `title = "hero"`, finds
+    // nothing, and falls back to whatever it would have done anyway.
+    for (name, surf) in &surfaces {
+        for (field, step) in [
+            ("title", Some(&surf.title)),
+            ("heading", Some(&surf.heading)),
+            ("body", Some(&surf.body)),
+            ("small", surf.small.as_ref()),
+        ] {
+            let Some(step) = step else { continue };
+            if !scale.steps.contains_key(step) {
+                bail!(
+                    "surface `{name}` maps `{field}` to scale step `{step}`, \
+                     which the `fid:scale` block does not declare"
+                );
+            }
+        }
+        for c in &surf.chart_order {
+            if !color.light.contains_key(c) {
+                bail!(
+                    "surface `{name}` names chart colour `{c}`, which the \
+                     `fid:color` block does not declare"
+                );
+            }
+        }
+    }
+
     let mut step_order = declared_order(scale_body);
     // Anything the order scan missed (a step written as its own `[table]`)
     // still has to be emitted — appended rather than dropped.
@@ -314,6 +391,7 @@ pub fn parse(md: &str) -> Result<DesignSystem> {
         clamp: scale.clamp,
         shape,
         contrast: contrast.pairs,
+        surfaces,
         step_order,
     })
 }
@@ -732,6 +810,60 @@ impl DesignSystem {
         }
         s.push_str("}\n");
 
+        // ── surfaces, resolved to real numbers ───────────────────────────────
+        //
+        // A slide has no stylesheet, so this is a comment — but it is a comment
+        // in the one file that is always open when something is being styled,
+        // and it carries resolved sizes rather than step names. An agent
+        // building a deck should not have to hold the scale in its head to find
+        // out that slide body is 1.1875rem.
+        if !self.surfaces.is_empty() {
+            s.push_str(
+                "\n/* Surfaces beyond the web page. Claude Design, Docs and Slides are one\n\
+                 \x20  interface, so the declaration governs a deck and a document too. There is\n\
+                 \x20  no stylesheet for a slide; these are the mappings, resolved.\n\
+                 *\n",
+            );
+            for (name, surf) in &self.surfaces {
+                s.push_str(&format!(" *   [{name}]"));
+                if let Some(c) = &surf.canvas {
+                    s.push_str(&format!("  canvas {c}"));
+                }
+                if let Some(m) = surf.max_points {
+                    s.push_str(&format!("  max {m} points"));
+                }
+                s.push('\n');
+                for (role, step) in [
+                    ("title", Some(&surf.title)),
+                    ("heading", Some(&surf.heading)),
+                    ("body", Some(&surf.body)),
+                    ("small", surf.small.as_ref()),
+                ] {
+                    let Some(step) = step else { continue };
+                    // Unwrap-free: `parse` already refused a step the scale
+                    // does not declare, so a miss here would be a bug in that
+                    // check rather than a bad declaration.
+                    match self.steps.get(step) {
+                        Some(st) => s.push_str(&format!(
+                            " *     {role:<8} {step} — {} / {}\n",
+                            st.size, st.leading
+                        )),
+                        None => s.push_str(&format!(" *     {role:<8} {step}\n")),
+                    }
+                }
+                if !surf.chart_order.is_empty() {
+                    s.push_str(&format!(
+                        " *     charts   {}\n",
+                        surf.chart_order.join(", ")
+                    ));
+                }
+                for n in &surf.never {
+                    s.push_str(&format!(" *     never    {n}\n"));
+                }
+            }
+            s.push_str(" */\n");
+        }
+
         // ── the measured pairs, as a record ──────────────────────────────────
         let measured = self.measure();
         if !measured.is_empty() {
@@ -819,6 +951,23 @@ pairs = [
   { fg = "foreground", bg = "background", min = 4.5 },
   { fg = "primary", bg = "background", min = 4.5, theme = "light" },
 ]
+```
+
+```toml fid:surfaces
+[slides]
+title = "display"
+heading = "display"
+body = "body"
+canvas = "1280x720"
+max_points = 4
+chart_order = ["primary"]
+never = ["a gradient title slide"]
+
+[document]
+title = "display"
+heading = "display"
+body = "body"
+small = "eyebrow"
 ```
 "##;
 
@@ -1102,6 +1251,52 @@ pairs = [
                 !SLOP.contains(&fam.as_str()),
                 "shipped `{role}` is {}",
                 r.family
+            );
+        }
+    }
+
+    #[test]
+    fn surfaces_are_parsed_and_optional() {
+        let s = sys();
+        assert_eq!(s.surfaces.len(), 2);
+        assert_eq!(s.surfaces["slides"].canvas.as_deref(), Some("1280x720"));
+        assert_eq!(s.surfaces["slides"].max_points, Some(4));
+        // A product with no deck declares no block, and that is not an error.
+        let doc = DOC.replace("fid:surfaces", "surfaces-were-here");
+        assert!(parse(&doc).unwrap().surfaces.is_empty());
+    }
+
+    #[test]
+    fn a_surface_may_not_spend_a_step_the_scale_does_not_have() {
+        // Otherwise the block is prose: an agent reads `title = "hero"`, finds
+        // nothing, and falls back to exactly what it would have done anyway.
+        let doc = DOC.replace(
+            r#"[slides]
+title = "display""#,
+            r#"[slides]
+title = "hero""#,
+        );
+        let err = parse(&doc).unwrap_err().to_string();
+        assert!(err.contains("does not declare"), "{err}");
+        assert!(err.contains("hero"), "{err}");
+    }
+
+    #[test]
+    fn a_surface_may_not_invent_a_chart_colour() {
+        let doc = DOC.replace(r#"chart_order = ["primary"]"#, r#"chart_order = ["teal"]"#);
+        let err = parse(&doc).unwrap_err().to_string();
+        assert!(err.contains("chart colour `teal`"), "{err}");
+    }
+
+    #[test]
+    fn the_shipped_default_declares_both_surfaces() {
+        // Design, Docs and Slides are one interface. A declaration that only
+        // describes a web page leaves two thirds of the output to the default.
+        let s = parse(SHIPPED).unwrap();
+        for surface in ["slides", "document"] {
+            assert!(
+                s.surfaces.contains_key(surface),
+                "the shipped design-system.md declares no `{surface}` surface"
             );
         }
     }
