@@ -125,6 +125,7 @@ $ fid doctor
   ✓ all template files unmodified
   ✓ no pending codemod migrations
   ✓ no hardcoded user-visible strings found
+  ✓ tooling: 1 command(s) present
 
   ⚠ fiducial.toml: upstream template updated (installed: X.Y.Z, current: X.Y.Z) — run `fid upgrade`
 

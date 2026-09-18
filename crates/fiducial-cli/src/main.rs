@@ -59,6 +59,45 @@ pub struct Cli {
     command: Commands,
 }
 
+/// Repository configuration on the host, as opposed to in the working tree.
+#[derive(Subcommand)]
+enum RepoCmd {
+    /// Protect the default branch with what this product already declares
+    #[command(long_about = "\
+`no-direct-main-push` is a local hook. It fires on `git push` from a machine
+that has the hook installed — and on no other machine, and on nothing a token
+or a CI job does. A product declaring it believes main is protected while
+GitHub happily accepts a push to it.
+
+That is the same failure this platform refuses to shrug at one layer in: a
+guard rule listed with no implementation is a finding, because a product
+listing it believes it is guarded and is not. The remote is the other half of
+that sentence.
+
+Nothing applied here is a preference. Required checks come from the job names
+in .github/workflows/ — a list kept by hand goes stale on the next renamed job,
+and a required check nothing produces blocks every PR forever. Pull requests,
+force pushes and deletions come from the guard rule itself.
+
+Needs `gh`, logged in, with admin on the repository.
+
+EXAMPLES
+  fid repo protect            show what would be applied, change nothing
+  fid repo protect --apply    write it to GitHub")]
+    Protect {
+        /// Write the policy to GitHub instead of printing it
+        #[arg(long)]
+        apply: bool,
+        /// Do not require this job, by name. Repeatable.
+        ///
+        /// The escape hatch for a job a workflow cannot describe. Prefer
+        /// `continue-on-error: true` on the job itself — that is a declaration
+        /// the repository keeps, and this is a flag someone has to remember.
+        #[arg(long = "except", value_name = "JOB")]
+        except: Vec<String>,
+    },
+}
+
 #[derive(Subcommand)]
 enum Commands {
     /// Scaffold a new product repository
@@ -517,6 +556,10 @@ EXAMPLES
         plan: bool,
     },
 
+    /// Make the remote enforce what `[guard]` already claims
+    #[command(subcommand)]
+    Repo(RepoCmd),
+
     Docs {
         /// Fail instead of reporting, for CI
         #[arg(long)]
@@ -606,6 +649,7 @@ fn main() -> Result<()> {
         } => commands::harvest::run(&path, name, into, json),
         Commands::Context { check } => commands::context::run(check),
         Commands::Design { check, plan } => commands::design::run(check, plan),
+        Commands::Repo(RepoCmd::Protect { apply, except }) => commands::repo::run(apply, &except),
         Commands::Docs { check, accept } => commands::docs::run(check, accept),
         Commands::Doctor => commands::doctor::run(),
         Commands::GuardCheck => guard::check_from_stdin(),

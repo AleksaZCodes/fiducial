@@ -140,6 +140,15 @@ pub struct Capability {
     pub declarations: Vec<Declaration>,
     pub pipelines: Vec<FileEntry>,
     pub requires_adapters: Vec<String>,
+    /// External commands this capability's workflow needs on PATH.
+    ///
+    /// A capability can install every file it owns and still not work: `deploy`
+    /// derives a `wrangler.toml` that only `wrangler` can act on, and a product
+    /// installing `fid` in CI from a GitHub remote needs `gh`. That is as much
+    /// a dependency as an adapter contract — and it is the kind that announces
+    /// itself as a command-not-found halfway through a release rather than at
+    /// the moment the capability is installed.
+    pub requires_tools: Vec<String>,
     pub guard_rules: Vec<String>,
     pub templates: Vec<FileEntry>,
     pub skill_md: String,
@@ -156,6 +165,8 @@ struct Manifest {
     guard_rules: Vec<String>,
     #[serde(default)]
     requires_adapters: Vec<String>,
+    #[serde(default)]
+    requires_tools: Vec<String>,
     #[serde(default)]
     declarations: ManifestDeclarations,
 }
@@ -273,6 +284,7 @@ pub fn derive(id: &str, files: &BTreeMap<String, String>, source: Source) -> Res
         declarations,
         pipelines,
         requires_adapters: manifest.requires_adapters,
+        requires_tools: manifest.requires_tools,
         guard_rules: manifest.guard_rules,
         templates,
         skill_md,

@@ -10,7 +10,7 @@
 //!   6. Pending codemod migrations — run `fid upgrade`.
 
 use anyhow::{Context, Result};
-use std::{env, path::Path};
+use std::{collections::BTreeMap, env, path::Path};
 
 use crate::{
     adapter,
@@ -58,6 +58,16 @@ pub fn run() -> Result<()> {
     // ── 8. Hardcoded user-visible strings ─────────────────────────────────
     if let Some(cfg) = &cfg {
         check_hardcoded_strings(&root, cfg, &mut reports, &mut ok);
+    }
+
+    // ── 9. External tools the installed capabilities need ─────────────────
+    if let Some(cfg) = &cfg {
+        check_tools(cfg, &mut reports, &mut ok);
+    }
+
+    // ── 10. Does the remote enforce what `[guard]` claims? ────────────────
+    if let Some(cfg) = &cfg {
+        check_branch_protection(&root, cfg, &mut reports, &mut ok);
     }
 
     // ── Report ────────────────────────────────────────────────────────────
@@ -203,6 +213,149 @@ fn check_hardcoded_strings(
 
 /// How many findings `fid doctor` lists before summarising.
 const MAX_HARDCODED_LISTED: usize = 10;
+
+/// Is every external command the installed capabilities need actually on PATH?
+///
+/// A capability can install every file it owns and still not work. `deploy`
+/// derives a `wrangler.toml` that only `wrangler` can act on; a product whose
+/// CI opens PRs needs `gh`. Those are dependencies, and until now they were the
+/// kind that announces itself as a command-not-found halfway through a release
+/// rather than at the moment the capability is installed.
+///
+/// Reported, not failed: a missing tool is a fact about this machine, and CI
+/// runners legitimately have a different set from a laptop. `fid doctor` says
+/// what is absent; it does not decide that absence is wrong.
+fn check_tools(cfg: &Config, reports: &mut Vec<String>, ok: &mut Vec<String>) {
+    // `git` is not capability-specific — `fid new` runs it, and every guard
+    // rule about pushing presumes it.
+    let mut needed: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    needed
+        .entry("git".to_string())
+        .or_default()
+        .push("the platform".into());
+
+    for id in &cfg.capabilities.enabled {
+        let Some(cap) = crate::capability::find(id) else {
+            continue;
+        };
+        for tool in &cap.requires_tools {
+            needed.entry(tool.clone()).or_default().push(id.clone());
+        }
+    }
+
+    let mut missing: Vec<String> = Vec::new();
+    for (tool, wanted_by) in &needed {
+        if which(tool).is_none() {
+            missing.push(format!("`{tool}` — needed by {}", wanted_by.join(", ")));
+        }
+    }
+
+    if missing.is_empty() {
+        ok.push(format!("tooling: {} command(s) present", needed.len()));
+    } else {
+        for m in missing {
+            reports.push(format!("not on PATH: {m}"));
+        }
+    }
+}
+
+/// Is `<tool>` on PATH?
+///
+/// Spelled out rather than shelling out to `which`/`where`: the answer differs
+/// per platform and a subprocess to answer "does this file exist" is a
+/// subprocess per tool per run.
+fn which(tool: &str) -> Option<std::path::PathBuf> {
+    let path = env::var_os("PATH")?;
+    env::split_paths(&path).find_map(|dir| {
+        let candidate = dir.join(tool);
+        candidate.is_file().then_some(candidate)
+    })
+}
+
+/// Does the remote enforce the guard rule this product declares?
+///
+/// `no-direct-main-push` is a local hook. It fires on `git push` from a machine
+/// that has the hook installed, and on no other machine, and on nothing CI or a
+/// token does. A product declaring it therefore believes main is protected while
+/// GitHub allows anyone to push to it.
+///
+/// This repository already treats a guard rule with no implementation as a
+/// finding rather than a shrug — "a product listing it believes it is guarded
+/// and is not". This is the same sentence one layer out, and it went unsaid
+/// until someone noticed the branch was open.
+///
+/// Reported, not failed: not every product has a GitHub remote, and protection
+/// needs admin rights `fid` cannot assume it has.
+fn check_branch_protection(
+    root: &Path,
+    cfg: &Config,
+    reports: &mut Vec<String>,
+    ok: &mut Vec<String>,
+) {
+    if !cfg.guard.rules.iter().any(|r| r == "no-direct-main-push") {
+        return;
+    }
+    let Some(slug) = github_slug(root) else {
+        return; // No GitHub remote — nothing to ask about.
+    };
+    if which("gh").is_none() {
+        reports.push(format!(
+            "`[guard] no-direct-main-push` is declared and `gh` is not on PATH, \
+             so whether {slug} actually protects main could not be checked"
+        ));
+        return;
+    }
+
+    let out = std::process::Command::new("gh")
+        .args([
+            "api",
+            &format!("repos/{slug}/branches/main/protection"),
+            "--silent",
+        ])
+        .output();
+
+    match out {
+        Ok(o) if o.status.success() => {
+            ok.push(format!("{slug}: main is protected on the remote"));
+        }
+        Ok(o) => {
+            let err = String::from_utf8_lossy(&o.stderr);
+            if err.contains("Branch not protected") {
+                reports.push(format!(
+                    "{slug}: `[guard] no-direct-main-push` is declared, but main is \
+                     NOT protected on the remote.\n      \
+                     The hook stops this machine; it stops nothing else.\n      \
+                     Fix it: fid repo protect --apply"
+                ));
+            } else {
+                // 403 without admin, no network, not logged in — all real, none
+                // of them evidence that the branch is open.
+                reports.push(format!(
+                    "{slug}: could not read branch protection ({})",
+                    err.lines().next().unwrap_or("unknown error").trim()
+                ));
+            }
+        }
+        Err(e) => reports.push(format!("{slug}: could not run `gh` ({e})")),
+    }
+}
+
+/// `owner/repo` for the `origin` remote, when it is a GitHub one.
+fn github_slug(root: &Path) -> Option<String> {
+    let out = std::process::Command::new("git")
+        .args(["remote", "get-url", "origin"])
+        .current_dir(root)
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let url = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    let rest = url
+        .strip_prefix("https://github.com/")
+        .or_else(|| url.strip_prefix("git@github.com:"))?;
+    Some(rest.trim_end_matches(".git").to_string())
+}
 
 fn check_config(root: &Path, ok: &mut Vec<String>, issues: &mut Vec<String>) -> Option<Config> {
     let path = root.join(CONFIG_FILE);

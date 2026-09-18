@@ -8,8 +8,8 @@
 
 [accepted]
 "AGENTS.md::.github/cla-exempt.txt" = "a99c1bb4f2f5e47fadf34621c5f7cdd34e91778f44c6a5a57588543b8705e0b7"
-"AGENTS.md::crates/fiducial-cli/src/capability/manifest.rs#pub fn derive" = "ed0814d474d23d3f6e2bff0fd8e200206eae76719b0c3a1f6287eed8b8631095"
+"AGENTS.md::crates/fiducial-cli/src/capability/manifest.rs#pub fn derive" = "1dff22f21377d2ecf1636aa899dd2d83a1950edbd8656e06f45453ef88bc91aa"
 "AGENTS.md::rust-toolchain.toml" = "55e68d5e0504383adf20de2c53ea374b14966b0e27eeb742236eed406d797edc"
 "README.md::crates/fiducial-cli/src/adapter.rs#pub static CONTRACTS" = "b4dd21ee61b1c446bd382b08e3036e425755e5a828bd4730c498553a80633558"
-"README.md::crates/fiducial-cli/src/capability/manifest.rs#pub fn derive" = "ed0814d474d23d3f6e2bff0fd8e200206eae76719b0c3a1f6287eed8b8631095"
+"README.md::crates/fiducial-cli/src/capability/manifest.rs#pub fn derive" = "1dff22f21377d2ecf1636aa899dd2d83a1950edbd8656e06f45453ef88bc91aa"
 "README.md::crates/fiducial-cli/src/commands/derive.rs#fn run_pipeline_command" = "8ced6bd253086503afbafe7c78982171e6e243eb26c5b5b1a1fc08e5c77108ac"

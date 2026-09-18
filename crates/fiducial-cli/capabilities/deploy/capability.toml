@@ -1,5 +1,12 @@
 description = "Cloudflare deploy config derived from [adapters] — wrangler.toml stops being hand-copied"
 
+# The derivation produces a `wrangler.toml`, and only `wrangler` can act on it.
+# Installing this capability without the CLI gives a product a correct,
+# complete, unusable artifact — and the gap announces itself as a
+# command-not-found at deploy time rather than at install time. `fid doctor`
+# reports it now.
+requires_tools = ["wrangler"]
+
 # `[deploy]` holds only what the Cloudflare account knows and nothing can
 # derive: a database id, a bucket name, a route. The bindings are generated
 # around it from `[adapters]`, because which bindings a Worker needs is
