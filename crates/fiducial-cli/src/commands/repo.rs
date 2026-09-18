@@ -202,7 +202,17 @@ fn workflow_job_names(root: &Path) -> Vec<String> {
             if indent == 4 {
                 if let Some(v) = t.strip_prefix("name:") {
                     let v = v.trim().trim_matches(['"', '\'']);
-                    if !v.is_empty() {
+                    // A name carrying a `${{ … }}` expression is a matrix job.
+                    // GitHub reports one check per leg, under the *expanded*
+                    // name — `spine (x86_64-unknown-linux-gnu)` — and the
+                    // legs are not knowable from this file alone. Requiring
+                    // the literal template is requiring a check that never
+                    // reports, which is the exact failure this whole function
+                    // exists to avoid.
+                    //
+                    // So it is skipped, and the operator sees a shorter list
+                    // rather than an unmergeable branch.
+                    if !v.is_empty() && !v.contains("${{") {
                         current = Some(v.to_string());
                     }
                 }
@@ -359,6 +369,19 @@ mod tests {
             "name: CI\n\njobs:\n  lint:\n    name: lint\n    continue-on-error: true\n  test:\n    name: test\n    runs-on: ubuntu-latest\n",
         )]);
         assert_eq!(workflow_job_names(tmp.path()), vec!["test"]);
+    }
+
+    #[test]
+    fn a_matrix_job_name_is_not_required() {
+        // GitHub reports one check per matrix leg under the expanded name, so
+        // the literal template never reports and requiring it makes the branch
+        // permanently unmergeable. Found on this repository's own `spine` job
+        // while reading the dry run, one command before applying it.
+        let tmp = workflows(&[(
+            "ci.yml",
+            "name: CI\n\njobs:\n  spine:\n    name: spine (${{ matrix.target.triple }})\n    runs-on: ubuntu-latest\n  host:\n    name: Rust (host)\n    runs-on: ubuntu-latest\n",
+        )]);
+        assert_eq!(workflow_job_names(tmp.path()), vec!["Rust (host)"]);
     }
 
     #[test]
