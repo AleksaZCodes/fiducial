@@ -157,10 +157,38 @@
   .cham-b::before {
     content: "";
     position: absolute;
-    inset: var(--border-w);
+    /* Weighted bottom and right — this is the default, not a modifier.
+       A clip-path element cannot cast an outer box-shadow, so the edge is the
+       only surface elevation can live on. Pushing the fill further off the
+       bottom-right thickens exactly those edges, and the two corners between
+       grade from light to heavy, which is what a bevel under one light source
+       does.
+
+       It was briefly an opt-in called `.cham-lift`, which meant every surface
+       in the product kept the flat border and nobody saw it. A depth cue that
+       has to be remembered at each call site is a depth cue the product does
+       not have. */
+    inset: var(--border-w) var(--border-w-heavy) var(--border-w-heavy) var(--border-w);
     z-index: -1;
     background: var(--fill);
     --c: calc(var(--c-outer) - 0.5857864 * var(--border-w));
+  }
+
+  /* The heavy edge, relative to the light one. Declared here rather than in the
+     token block because it is a ratio, not a value someone picks per product —
+     3× is the point where the weight reads as depth rather than as a mistake. */
+  .cham,
+  .cham-sm,
+  .cham-xs,
+  .cham-b {
+    --border-w-heavy: calc(var(--border-w) * 3);
+  }
+
+  /* Flat, for the surface that genuinely is not raised: something inset into
+     the page, or a control inside another chamfered box where a second bevel
+     would read as two light sources. */
+  .cham-flat::before {
+    inset: var(--border-w);
   }
 
   /* All four corners cut. `--c-outer` is the only thing that differs between
@@ -228,31 +256,6 @@
 
   .cham-b::before {
     inset: 0 var(--border-w) var(--border-w) var(--border-w);
-  }
-
-  /* ── Depth ─────────────────────────────────────────────────────────────────
-     A weighted edge on the bottom and right, so a panel reads as sitting above
-     the page rather than printed on it.
-
-     This is the chamfer system's answer to elevation, and it has to be: a
-     `clip-path` element cannot cast an outer `box-shadow` — the clip removes
-     it. The only surface available is the edge itself.
-
-     It works by pushing the fill further off the bottom-right than the
-     top-left, which thickens exactly those two edges. The two corners in
-     between get a border that grades from light to heavy around the cut, which
-     is what a bevel under a single light source actually does — so it reads as
-     depth rather than as an error.
-
-     The corner correction still applies, against the *light* weight: the
-     top-left cut is the one whose diagonal has to match the thin edges, and it
-     is the one the eye checks against them. */
-  .cham-lift {
-    --border-w-heavy: calc(var(--border-w) * 3);
-  }
-
-  .cham-lift::before {
-    inset: var(--border-w) var(--border-w-heavy) var(--border-w-heavy) var(--border-w);
   }
 
   /* An outline control.
