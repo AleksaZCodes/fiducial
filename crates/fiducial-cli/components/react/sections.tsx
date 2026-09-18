@@ -170,7 +170,7 @@ export function Hero({
   return (
     <div className={cn("max-w-3xl", className)} {...props}>
       {status ? (
-        <span className="cham-xs type-small inline-flex items-center gap-2 px-3.5 py-2 text-muted-foreground">
+        <span className="shape-chip type-small inline-flex items-center gap-2 px-3.5 py-2 text-muted-foreground">
           {status}
         </span>
       ) : null}
@@ -227,7 +227,7 @@ export function StepList({ steps, className }: { steps: Step[]; className?: stri
   return (
     <ol className={cn("grid gap-4 sm:grid-cols-2", className)}>
       {steps.map((s) => (
-        <li key={s.n} className="cham p-6">
+        <li key={s.n} className="shape-panel p-6">
           <span className="type-mono text-primary">{s.n}</span>
           <h3 className="type-h3 mt-3">{s.title}</h3>
           <p className="type-small mt-2 max-w-[52ch] text-muted-foreground">{s.body}</p>
@@ -252,11 +252,11 @@ export interface StatusCardProps extends Omit<React.HTMLAttributes<HTMLDivElemen
 /** A card with an honest label in its corner. Flat: no shadow, no hover lift. */
 export function StatusCard({ title, status, children, className, ...props }: StatusCardProps) {
   return (
-    <div className={cn("cham p-6", className)} {...props}>
+    <div className={cn("shape-panel p-6", className)} {...props}>
       <div className="flex items-start justify-between gap-4">
         <h3 className="type-h3">{title}</h3>
         {status ? (
-          <span className="cham-xs type-small shrink-0 px-3 py-1.5 text-[0.7rem] font-medium uppercase tracking-wide text-muted-foreground">
+          <span className="shape-chip type-small shrink-0 px-3 py-1.5 text-[0.7rem] font-medium uppercase tracking-wide text-muted-foreground">
             {status}
           </span>
         ) : null}

@@ -102,8 +102,27 @@
 
      Callers set --edge and --fill; everything else follows.
 
-     Under the `round` corner strategy these classes are inert: --corner-* are
-     0 and the shape comes from --radius as usual. */
+     ── These are the OPT-IN, not the default ──────────────────────────────────
+
+     A component should say what it is — `.shape-panel`, `.shape-control`,
+     `.shape-chip` — and never how its corner is cut. Those classes are
+     GENERATED into tokens.css from the `strategy` in `design-system.md`, so a
+     product that declares `round` gets a real border and a real radius out of
+     every shipped component, and flipping one word re-renders all of them.
+
+     `.cham-*` here is the other thing: an explicit cut on one element, wanted
+     for its own sake. It works in any product, including one that is otherwise
+     entirely rounded, which is the point — the chamfer is an artistic addition
+     available anywhere, not the house style forced everywhere.
+
+     Reach for `.shape-*` when you mean "this is a card". Reach for `.cham`
+     when you mean "cut this one".
+
+     This comment used to claim these classes were inert under `round`. They
+     were not — nothing connected the strategy to them, and every shipped
+     component hardcoded `.cham`, so a product choosing `round` still got
+     clipped octagons. That is fixed by generating `.shape-*`; the note is kept
+     because a switch that silently does nothing is worth remembering. */
 
   .cham,
   .cham-sm,
