@@ -7,6 +7,7 @@ mod capability;
 mod commands;
 mod config;
 mod context;
+mod design;
 mod guard;
 mod i18n;
 mod legal;

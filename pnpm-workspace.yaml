@@ -1,5 +1,13 @@
 packages:
   - "packages/*"
+  # The two component registries are not under `packages/` because they are not
+  # libraries — they are the source `fid add component` copies into a product,
+  # embedded into the binary by `include_str!`, and so they have to live inside
+  # the crate that ships them. They carry a package.json anyway so the files
+  # that ship are the files that get typechecked. They used to be duplicated
+  # under `packages/`, and the copies had drifted.
+  - "crates/fiducial-cli/components/react"
+  - "crates/fiducial-cli/components/svelte"
 
 # ── Dependency catalog ──────────────────────────────────────────────────────
 # Principle 1, on the JavaScript side: a version used by two packages is

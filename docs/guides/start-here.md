@@ -147,16 +147,16 @@ $ fid dash
 
 Product
   name           demo-product
-  version        X.Y.Z
+  version        0.1.0
   root           /home/you/dev/demo-product
   spine          disabled
-  capabilities   i18n
+  capabilities   design, i18n
   guard rules    2
 
 Git
   branch         main
   head           no commits yet
-  working tree   13 file(s) with uncommitted changes
+  working tree   16 file(s) with uncommitted changes
   upstream       not tracking a remote branch
 
 Roadmap
@@ -174,6 +174,8 @@ CI
   (declared workflows, not live run status — dash makes no network calls)
 
 Graph
+  design (fid-design)
+    → apps/web/src/app/tokens.css
   i18n (fid-i18n)
     → src/generated/messages.ts
 
@@ -187,6 +189,7 @@ Localization
   no hardcoded user-visible strings found
 
 Capabilities
+  ✓ design-system.md                   declared (design)
   ✓ i18n                               declared (i18n)
   ✓ messages/en.json                   declared (i18n)
   ✓ messages/sr.json                   declared (i18n)

@@ -157,10 +157,50 @@ fn run_derive(
 /// Kept as a lookup here rather than a field on `Pipeline` because it is a
 /// question about *this product's config*, which a TOML file installed once
 /// cannot answer.
-fn outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<String> {
-    if pipeline.executor != "fid-identity" {
-        return Vec::new();
+pub(crate) fn outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<String> {
+    match pipeline.executor.as_str() {
+        "fid-identity" => identity_outputs_not_applicable(pipeline, root),
+        // The design capability is installed in every new product, because the
+        // alternative to having a design system is having the default one. But
+        // its output is a stylesheet, and a firmware-only product has nowhere
+        // to put it: deriving there would create an orphan `apps/web/` tree
+        // and then `--check` would demand it forever.
+        //
+        // So the output is not applicable until the app it belongs to exists.
+        // Add one — `fid add app next` — and it starts deriving with no further
+        // ceremony.
+        "fid-design" => pipeline
+            .outputs
+            .iter()
+            .filter(|o| !app_root_exists(root, o))
+            .cloned()
+            .collect(),
+        _ => Vec::new(),
     }
+}
+
+/// Is there a real app at the root the output lives under?
+///
+/// `apps/web/src/app/tokens.css` → is `apps/web` an app? Two segments, because
+/// that is the depth every `fid add app` target scaffolds at.
+///
+/// The test is a manifest, not a directory. The `design` capability installs
+/// its own `apps/web/src/app/marks.css`, so the *directory* exists from the
+/// moment the capability does — checking for it would mean this guard never
+/// fires and a firmware-only product carries a stylesheet it has no way to
+/// load. A `package.json` or `Cargo.toml` is what actually says "an app lives
+/// here".
+fn app_root_exists(root: &Path, output: &str) -> bool {
+    let mut parts = Path::new(output).components();
+    let (Some(a), Some(b)) = (parts.next(), parts.next()) else {
+        // Not an app-shaped path at all — assume the author meant it.
+        return true;
+    };
+    let app = root.join(a.as_os_str()).join(b.as_os_str());
+    app.join("package.json").is_file() || app.join("Cargo.toml").is_file()
+}
+
+fn identity_outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<String> {
     let Ok(config) = Config::load(&root.join(crate::config::CONFIG_FILE)) else {
         return Vec::new();
     };
@@ -1578,6 +1618,71 @@ fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
     }
 }
 
+// ── Built-in fid-design executor ──────────────────────────────────────────────
+
+/// Derive the theme stylesheet from `design-system.md`.
+///
+/// The declaration is `args[0]` (default `design-system.md`) and the single
+/// output is the generated token stylesheet. The product's own `globals.css`
+/// imports it and keeps everything that is not a token — the base layer, the
+/// marks layer, the commentary. A generator that owned the whole stylesheet
+/// would delete all of that on the next run.
+///
+/// The palette is measured before it is written: `fid:contrast` declares the
+/// pairs and their minimums, and a palette that misses one fails here. That is
+/// the difference between a design system that documents a rule and one that
+/// holds it.
+fn run_fid_design(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    let source = pipeline
+        .args
+        .first()
+        .map(String::as_str)
+        .unwrap_or("design-system.md");
+
+    let src_path = working_dir.join(source);
+    let md = std::fs::read_to_string(&src_path).with_context(|| {
+        format!(
+            "fid-design: cannot read `{source}`.\n  \
+             It is the declaration — install it with `fid add design`."
+        )
+    })?;
+
+    let system = crate::design::parse(&md)
+        .with_context(|| format!("fid-design: `{source}` does not parse"))?;
+
+    let pairs = system
+        .check_contrast()
+        .context("fid-design: the declared palette does not meet its own requirements")?;
+
+    let [out] = pipeline.outputs.as_slice() else {
+        bail!(
+            "fid-design: expected exactly one output (the token stylesheet), got {}",
+            pipeline.outputs.len()
+        );
+    };
+
+    // Declared, checked, but with nowhere to land yet. The palette above was
+    // still measured — the declaration is worth policing before there is an app
+    // to apply it to, which is the whole point of writing it first.
+    if !app_root_exists(working_dir, out) {
+        print!(" [{pairs} contrast pairs ok; no app yet — `{out}` not written]");
+        return Ok(());
+    }
+
+    let css = system.generate_css(source);
+    let abs = working_dir.join(out);
+    if let Some(parent) = abs.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("creating {}", parent.display()))?;
+    }
+    std::fs::write(&abs, css).with_context(|| format!("writing {}", abs.display()))?;
+
+    // Said out loud because a silent check is one nobody trusts: the whole
+    // point of measuring in the pipeline is that the number is real.
+    print!(" [{pairs} contrast pairs ok]");
+    Ok(())
+}
+
 // ── Built-in fid-legal executor ───────────────────────────────────────────────
 
 /// Derive localized legal page content from `[legal]`, `[brand]`, and `[i18n]`.
@@ -1671,10 +1776,11 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             "fid-adapters" => return run_fid_adapters(pipeline, working_dir),
             "fid-schema" => return run_fid_schema(pipeline, working_dir),
             "fid-legal" => return run_fid_legal(pipeline, working_dir),
+            "fid-design" => return run_fid_design(pipeline, working_dir),
             other => bail!(
                 "unknown executor `{other}` \
                  (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n, fid-brand, \
-                 fid-adapters, fid-deploy, fid-identity, fid-schema, fid-legal)"
+                 fid-adapters, fid-deploy, fid-identity, fid-schema, fid-legal, fid-design)"
             ),
         };
 

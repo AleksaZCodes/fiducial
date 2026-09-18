@@ -1,4 +1,6 @@
 $ fid graph
+pipeline: design (fid-design)
+  → artifact: apps/web/src/app/tokens.css
 pipeline: eda (fid-validate)
   → artifact: board/board.interface.json
 pipeline: enclosure (fid-mesh)

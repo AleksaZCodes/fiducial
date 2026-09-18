@@ -32,16 +32,25 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
+<!-- The click handler lives on <dialog> itself because that is what a click on
+     the ::backdrop targets — the backdrop is a pseudo-element and cannot carry
+     a listener of its own. `handleBackdropClick` then compares the pointer
+     against the dialog's own bounding rect, so a click on the content is
+     already excluded by geometry.
+
+     There used to be an inner `<div onclick={stopPropagation}>` doing that
+     exclusion a second time. It was redundant, and it put a click handler on a
+     non-interactive element with no role and no keyboard equivalent — which is
+     what `--fail-on-warnings` was reporting. Closing by keyboard is Escape,
+     which <dialog> handles natively. -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
 <dialog
   bind:this={dialog}
   class={["fid-dialog", className].filter(Boolean).join(" ")}
   onclose={handleClose}
   onclick={handleBackdropClick}
 >
-  <div onclick={(e) => e.stopPropagation()}>
-    {@render children?.()}
-  </div>
+  {@render children?.()}
 </dialog>
 
 <style>

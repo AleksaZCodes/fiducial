@@ -1,12 +1,12 @@
 {
   "name": "@fiducial/ui-react",
   "version": "0.1.0",
-  "description": "Fiducial component registry source \u2014 React. Use `fid add component <name>` to copy components into your product.",
+  "description": "Fiducial component registry source — React. Copied into products by `fid add component <name>`.",
   "license": "MIT",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./index.ts",
+  "types": "./index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
@@ -17,9 +17,7 @@
     "@base-ui-components/react": "^1.0.0-alpha.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "tailwind-merge": "^2.6.0",
-    "@fiducial/tokens": "workspace:*",
-    "@fiducial/headless": "workspace:*"
+    "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
     "@types/react": "catalog:",

@@ -49,6 +49,22 @@ pub fn run(name: &str, locales: Option<&str>, default_locale: Option<&str>) -> R
         .context("writing fiducial.lock")?;
     println!("  wrote  fiducial.lock");
 
+    // A design system from the first commit, for the same reason as i18n:
+    // the alternative to having one is not "no design", it is the default one —
+    // Inter, an indigo primary, `rounded-xl`, a gradient hero. Those are absent
+    // decisions, not neutral ones, and they are absent in the same direction in
+    // every product that never wrote anything down.
+    //
+    // `design-system.md` ships filled in rather than as a checklist, and its
+    // pipeline measures the palette's contrast pairs on the first derive. If
+    // the product has no web app yet the stylesheet is simply not written —
+    // see `outputs_not_applicable` — so this costs a firmware product nothing
+    // but the document, which is the part worth having early anyway.
+    {
+        let cap = capability::find("design").expect("the design capability is built in");
+        capability::install(cap, &dest, name)?;
+    }
+
     // Localized from the first commit, not as a later pass.
     //
     // Installing the capability here rather than reimplementing it keeps one
@@ -64,6 +80,12 @@ pub fn run(name: &str, locales: Option<&str>, default_locale: Option<&str>) -> R
         // `fid derive --check`, so a product whose generated messages have
         // never been produced fails its own pipeline on the first commit,
         // before anyone has changed anything.
+        println!();
+        super::derive::run_in(&dest, false, None)?;
+    } else {
+        // No i18n, but `design` still declares a pipeline — leave the scaffold
+        // derived either way, so a product never starts life failing its own
+        // `fid derive --check`.
         println!();
         super::derive::run_in(&dest, false, None)?;
     }

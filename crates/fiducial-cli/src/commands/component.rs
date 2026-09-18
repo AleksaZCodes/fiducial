@@ -43,6 +43,13 @@ pub fn run(name: &str, framework: &str) -> Result<()> {
         "  → apps/web/src/components/ui/{}",
         component_filename(name, framework)
     );
+    if name == "doodle" && framework == "react" {
+        println!(
+            "\n  Doodle marks are stroked in --doodle-ink and animated by the\n  \
+             marks layer. Both come from the `design` capability:\n    \
+             fid add design"
+        );
+    }
     if name == "dialog" && framework == "react" {
         println!(
             "\n  Dialog uses @base-ui-components/react for accessibility.\n  \
@@ -108,7 +115,7 @@ fn install_svelte(name: &str, root: &Path, lock: &mut Lock, version: &str) -> Re
 
 // ── Embedded component sources ────────────────────────────────────────────────
 
-const UTILS_TS: &str = include_str!("../../components/react/utils.ts");
+const UTILS_TS: &str = include_str!("../../components/react/lib/utils.ts");
 
 fn react_source(name: &str) -> Result<&'static str> {
     match name {
@@ -116,9 +123,17 @@ fn react_source(name: &str) -> Result<&'static str> {
         "card" => Ok(include_str!("../../components/react/card.tsx")),
         "badge" => Ok(include_str!("../../components/react/badge.tsx")),
         "dialog" => Ok(include_str!("../../components/react/dialog.tsx")),
+        // `doodle` is not a control — it is the annotation mark set (arrows,
+        // circles, underlines). It needs the `design` capability's marks layer
+        // for its draw animation; see the note printed after install.
+        "doodle" => Ok(include_str!("../../components/react/doodle.tsx")),
+        // Page shapes, not controls: the hero, the band, the numbered sequence.
+        // The page is where a design system stops being applied, so the page is
+        // a component too.
+        "sections" => Ok(include_str!("../../components/react/sections.tsx")),
         other => bail!(
             "unknown component `{other}`\n  \
-             Available: button, card, badge, dialog\n  \
+             Available: button, card, badge, dialog, doodle, sections\n  \
              Run `fid add component --help` for details."
         ),
     }
@@ -146,7 +161,7 @@ mod tests {
 
     #[test]
     fn react_source_returns_all_components() {
-        for name in ["button", "card", "badge", "dialog"] {
+        for name in ["button", "card", "badge", "dialog", "doodle", "sections"] {
             let tsx = react_source(name).unwrap_or_else(|e| panic!("{name}: {e}"));
             assert!(!tsx.is_empty(), "{name}.tsx is empty");
         }
@@ -155,7 +170,7 @@ mod tests {
     #[test]
     fn react_components_use_cn_utility() {
         // Verify shadcn convention: all components import cn() not fid-btn classes.
-        for name in ["button", "card", "badge", "dialog"] {
+        for name in ["button", "card", "badge", "dialog", "doodle", "sections"] {
             let tsx = react_source(name).unwrap();
             assert!(
                 tsx.contains("cn("),
@@ -164,6 +179,132 @@ mod tests {
             assert!(
                 !tsx.contains("fid-"),
                 "{name}.tsx must not contain legacy fid-* CSS class names"
+            );
+        }
+    }
+
+    #[test]
+    fn components_import_cn_through_the_alias_that_resolves_where_they_land() {
+        // The bug this guards: components are installed into
+        // `apps/web/src/components/ui/`, while `utils.ts` is installed into
+        // `apps/web/src/lib/`. A relative `../lib/utils` from the first is
+        // `src/components/lib/utils` — which does not exist. It shipped that
+        // way, and the second copy of these files (since deleted) typechecked
+        // green because it used a different spelling.
+        //
+        // `@/lib/utils` is the alias every scaffolded product maps to `src/*`,
+        // and it is the spelling shadcn itself uses.
+        for name in ["button", "card", "badge", "dialog", "doodle", "sections"] {
+            let tsx = react_source(name).unwrap();
+            if !tsx.contains("from \"@/lib/utils\"") {
+                assert!(
+                    !tsx.contains("lib/utils"),
+                    "{name}.tsx imports cn through a path that does not resolve \
+                     from apps/web/src/components/ui/ — use `@/lib/utils`"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn utils_lands_where_the_alias_points() {
+        // `@/lib/utils` resolves to `apps/web/src/lib/utils`, which is exactly
+        // where `install_react` writes UTILS_TS. If either moves, both move.
+        assert!(UTILS_TS.contains("export function cn"));
+    }
+
+    #[test]
+    fn doodle_exports_the_whole_mark_set() {
+        // The set is a vocabulary, not a grab bag: a page that can point but
+        // cannot circle ends up pointing at everything.
+        let tsx = react_source("doodle").unwrap();
+        for export in [
+            "export function Arrow",
+            "export function Circle",
+            "export function Underline",
+            "export function Bracket",
+            "export function Burst",
+            "export function Check",
+            "export function Cross",
+            "export function Note",
+        ] {
+            assert!(tsx.contains(export), "doodle.tsx is missing `{export}`");
+        }
+    }
+
+    #[test]
+    fn doodle_marks_are_decorative_and_renormalised() {
+        let tsx = react_source("doodle").unwrap();
+        // Marks carry no meaning of their own — the text they point at does.
+        assert!(
+            tsx.contains("aria-hidden"),
+            "doodle marks must default to aria-hidden"
+        );
+        // pathLength={1} is what lets one draw animation fit every path length.
+        assert!(
+            tsx.contains("pathLength={1}"),
+            "every mark path must be renormalised with pathLength={{1}}"
+        );
+        // Annotation ink, never text foreground.
+        assert!(
+            tsx.contains("var(--doodle-ink)"),
+            "marks must stroke in --doodle-ink"
+        );
+        assert!(
+            !tsx.contains("var(--foreground)"),
+            "a mark at full text contrast is a headline, not an annotation"
+        );
+    }
+
+    #[test]
+    fn sections_hold_the_page_level_negative_constraints() {
+        // These are the shapes the "not this" list rules out. A section
+        // component that offers one as a prop is a list that does not hold.
+        //
+        // Comments are stripped first: the file's own doc comment explains what
+        // is banned by naming it, and a test that cannot tell the rule from a
+        // violation of it is a test that forbids documentation.
+        let tsx = react_source("sections").unwrap();
+        let code: String = tsx
+            .lines()
+            .filter(|l| {
+                let t = l.trim_start();
+                !(t.starts_with("//") || t.starts_with("*") || t.starts_with("/*"))
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        for banned in ["gradient", "shadow-", "hover:scale", "carousel"] {
+            assert!(
+                !code.contains(banned),
+                "sections.tsx uses `{banned}`, which design-system.md rules out"
+            );
+        }
+
+        // `rounded-full` has exactly one carve-out, and it is written down in
+        // the declaration: a six-pixel status dot. A circle that small is a
+        // circle, not a pill. Anywhere else it is the shape the list forbids.
+        for line in code.lines().filter(|l| l.contains("rounded-full")) {
+            assert!(
+                line.contains("animate-ping") || line.contains("h-1.5 w-1.5"),
+                "rounded-full outside the status dot: {}",
+                line.trim()
+            );
+        }
+    }
+
+    #[test]
+    fn sections_read_named_type_steps_rather_than_sizes() {
+        // The point of shipping page shapes at all: a section that inlines
+        // `text-4xl` is a scale step that exists in one component and drifts.
+        let tsx = react_source("sections").unwrap();
+        assert!(tsx.contains("type-display"));
+        assert!(tsx.contains("type-h2"));
+        assert!(tsx.contains("type-small"));
+        for inline in ["text-4xl", "text-5xl", "text-6xl", "text-3xl"] {
+            assert!(
+                !tsx.contains(inline),
+                "sections.tsx inlines `{inline}` instead of using a named step"
             );
         }
     }

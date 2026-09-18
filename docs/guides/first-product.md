@@ -39,6 +39,17 @@ $ fid new demo-product
   wrote  .github/workflows/ci.yml
   wrote  .github/workflows/claude-review.yml
   wrote  fiducial.lock
+✦ fid add design — installing into demo-product
+  wrote  design-system.md
+  wrote  pipelines/design.toml
+  wrote  apps/web/src/app/marks.css
+  wrote  scripts/build-design-system.mjs
+  wrote  .fiducial/skills/design.md
+  wrote  .claude/skills/design.md
+  patched fiducial.toml
+  ✓ design installed
+  ✓ no guard rules — this capability adds none
+  ✓ instructions → .fiducial/skills/design.md (any agent; see AGENTS.md)
 ✦ fid add i18n — installing into demo-product
   wrote  messages/en.json
   wrote  messages/sr.json
@@ -50,6 +61,7 @@ $ fid new demo-product
   ✓ no guard rules — this capability adds none
   ✓ instructions → .fiducial/skills/i18n.md (any agent; see AGENTS.md)
 
+  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓
   ▶ i18n (fid-i18n) ✓
 
 ✦ fid derive complete — fiducial.lock updated
@@ -107,9 +119,9 @@ fid doctor
 $ fid doctor
 ✦ fid doctor — /home/you/dev/demo-product
 
-  ✓ fiducial.toml valid  (product: demo-product, vX.Y.Z)
+  ✓ fiducial.toml valid  (product: demo-product, v0.1.0)
   ✓ guard: 2 rule(s), all implemented
-  ✓ fiducial.lock valid  (14 template(s) tracked, 0 migration(s) applied)
+  ✓ fiducial.lock valid  (18 template(s) tracked, 0 migration(s) applied)
   ✓ all template files unmodified
   ✓ no pending codemod migrations
   ✓ no hardcoded user-visible strings found
@@ -233,6 +245,8 @@ fid graph
 
 ```text
 $ fid graph
+pipeline: design (fid-design)
+  → artifact: apps/web/src/app/tokens.css
 pipeline: eda (fid-validate)
   → artifact: board/board.interface.json
 pipeline: enclosure (fid-mesh)

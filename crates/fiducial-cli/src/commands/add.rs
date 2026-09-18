@@ -177,6 +177,35 @@ EXAMPLE:
     )]
     Brand,
 
+    /// Add design — four type roles, a corner strategy, and annotation marks
+    #[command(
+        long_about = "\
+Make this product's taste a declaration instead of a habit.
+
+An interface built without a design system is not neutral — it has a look, and
+the look is always the same one: Inter, an indigo primary, `rounded-xl`, and a
+gradient hero. Those are not bad decisions, they are absent ones. Silence in a
+design system is a decision to use the default.
+
+Installs `design-system.md` at the product root — the declaration, written
+before the UI and authoritative over it — plus the marks layer
+(`apps/web/src/app/marks.css`: named type steps, the chamfer system, the draw
+animation) and a script that generates the gallery from the app's own
+stylesheet, so the swatches cannot drift from the product.
+
+Ships filled in with real defaults rather than TODOs: four named families, a
+ten-step scale, and a corner strategy. Replace them — a default you kept on
+purpose is a decision, a default you never read is the problem.",
+        after_long_help = "\
+EXAMPLE:
+    fid add design
+    fid add component doodle          # the annotation marks
+    # edit design-system.md, then transcribe the tokens into globals.css
+    # and @import \"./marks.css\" after them
+    node scripts/build-design-system.mjs   # regenerate the gallery"
+    )]
+    Design,
+
     /// Add Cloudflare deploy config, derived from [adapters]
     #[command(
         long_about = "\
@@ -386,6 +415,7 @@ pub fn run(target: AddTarget) -> Result<()> {
         AddTarget::Eda => install_capability("eda"),
         AddTarget::I18n => install_capability("i18n"),
         AddTarget::Brand => install_capability("brand"),
+        AddTarget::Design => install_capability("design"),
         AddTarget::Deploy => install_capability("deploy"),
         AddTarget::Identity => install_capability("identity"),
         AddTarget::Legal => install_capability("legal"),

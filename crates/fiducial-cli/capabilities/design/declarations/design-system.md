@@ -1,0 +1,336 @@
+# {{name}} — Design System
+
+**This file is the input, not the record.** It is written before the UI and it
+is authoritative over it. When `globals.css` and this file disagree, this file
+is right and the stylesheet is a bug — and since `fid derive` generates the
+token stylesheet from the blocks below, they mostly cannot.
+
+---
+
+## 0 · How to write this file
+
+Read this section once, do what it says, then delete it.
+
+**Spend twenty minutes on prose before you generate a single screen.** Not
+because the prose is the deliverable, but because of the one rule the rest of
+this document exists to serve:
+
+> **Silence is a decision to use the default.**
+> Every constraint you do not write, something else writes for you — and what
+> it writes is Inter, an indigo primary, `rounded-xl`, a gradient hero, an
+> icon-and-label sidebar, and 64px of padding. Those are not bad decisions.
+> They are *absent* ones, and they are absent in the same direction every time.
+
+The method, in order:
+
+1. **Name the anti-references first.** What this product must not be mistaken
+   for is easier to answer than what it is, and it constrains more. "Not
+   startup-modern, not a dashboard, not an NGO brochure" rules out more bad
+   screens than any adjective rules in.
+2. **Then the adjectives** — three to six, of the kind you could disagree with.
+   "Clean" and "modern" are not decisions. "Slightly formal" is.
+3. **Then type, because it is the loudest.** Name exact families, never
+   categories: a category resolves to the default. Pick a display face and a
+   body face that are *different voices*, not different sizes.
+4. **Then colour, as hex plus a role.** Then measure the pairs — the pipeline
+   will make you.
+5. **Then shape**, as a strategy, not a number.
+6. **Then the negative constraints.** This is the half a default cannot fill in
+   and the half most people skip. Be specific and be unreasonable.
+7. **Test on one component before a page.** Ask for a single component in all
+   its states and check it against this file: exact value, exact corner, exact
+   step, no invented gradient, no invented shadow. Errors hide in composition;
+   a system only ever applied to a whole page has not been tested.
+
+**Everything below ships filled in with real defaults, not TODOs** — a system
+from the first commit beats a checklist nobody completes. But a default you
+kept on purpose is a decision and a default you never read is the problem this
+file exists to prevent. Go through it once.
+
+### How this file is read
+
+Prose is for people. The fenced ` ```toml fid:<section> ` blocks are what
+`fid derive` parses. Untagged fences — like an example in the prose — are
+ignored, so you can write code in here safely.
+
+```
+design-system.md              ← you edit this
+  ↓  fid derive                (pipeline: design — executor fid-design)
+apps/web/src/app/tokens.css   ← generated: never hand-edit
+  ↓  imported by globals.css, which is yours
+components                    ← read tokens and named steps, never literals
+```
+
+---
+
+## 1 · Personality
+
+> Three to six adjectives. They are the tiebreaker for every decision this
+> document does not cover, so make them the kind you could disagree with.
+
+`editorial` · `warm` · `considered` · `slightly formal`
+
+**Anti-references** — what this product is explicitly not:
+
+not corporate SaaS · not Stripe-lookalike · not startup-modern · not
+glassmorphism · not a dashboard
+
+**References** — what it is closer to:
+
+_(Name two or three real sites or objects — "Stripe Press", "A24", "a field
+manual", "a Swiss rail timetable". Specific enough to argue with.)_
+
+---
+
+## 2 · Type
+
+Four roles, not two. The pair that shadcn ships — sans plus mono — cannot
+express the thing that most separates a designed page from a generated one:
+**the display face is not the body face at a larger size.** If your headline
+and your paragraph are the same family, you have a document, not a design.
+
+The script role is the other half. It gives the page a voice beside itself —
+the hand in the margin. It belongs in `<Note>` and nowhere else: not a heading,
+not a button, not a paragraph.
+
+`display` is the slot you are expected to replace once you have a brand. The
+other three are the floor.
+
+> **Check `latin-ext` before you swap a family.** A face that cannot set `ž` is
+> not a candidate for a product that ships in more than one language.
+
+```toml fid:type
+display = { family = "Chakra Petch",   weights = [500, 600, 700], fallback = ["ui-sans-serif", "system-ui", "sans-serif"] }
+body    = { family = "Source Serif 4", weights = [400, 600],      fallback = ["ui-serif", "Georgia", "serif"] }
+script  = { family = "Caveat",         weights = [500, 600],      fallback = ["ui-serif", "cursive"] }
+mono    = { family = "JetBrains Mono", weights = [400, 500],      fallback = ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"] }
+```
+
+Loading the family yourself (next/font, `@font-face`)? Add `var = "--font-x"`
+to a role and it goes first in the stack, ahead of the family name — so the
+self-hosted file is used when it has loaded and the same family still resolves
+by name if it has not.
+
+### The scale
+
+Ten steps, one class each, and **nothing outside them**. An inline
+`text-[2.375rem] leading-[1.06]` is a scale step that exists on one page and
+nowhere else, and the next page invents a different one. Need an eleventh? Add
+it here.
+
+```toml fid:scale
+display = { role = "display", size = "3.75rem",   leading = "1.04", weight = "600", tracking = "-0.025em", wrap = "balance" }
+h1      = { role = "display", size = "2.75rem",   leading = "1.1",  weight = "600", tracking = "-0.02em",  wrap = "balance" }
+h2      = { role = "display", size = "2rem",      leading = "1.18", weight = "600", tracking = "-0.015em", wrap = "balance" }
+h3      = { role = "display", size = "1.25rem",   leading = "1.3",  weight = "600", tracking = "-0.01em" }
+subhead = { role = "body",    size = "1.1875rem", leading = "1.6",  weight = "400", wrap = "pretty" }
+body    = { role = "body",    size = "1rem",      leading = "1.65", weight = "400", wrap = "pretty" }
+small   = { role = "body",    size = "0.875rem",  leading = "1.6",  weight = "400", wrap = "pretty" }
+eyebrow = { role = "display", size = "0.75rem",   leading = "1",    weight = "600", tracking = "0.18em", uppercase = true }
+note    = { role = "script",  size = "1.25rem",   leading = "1.25", weight = "500" }
+mono    = { role = "mono",    size = "0.8125rem", leading = "1.5",  weight = "400" }
+
+# Display type is the one part of a scale that cannot be responsive by
+# accident: 3.75rem on a 375px screen is six lines, and in a language with
+# longer words it is eight.
+clamp = { below = "40rem", display = "2.5rem", h1 = "2rem", h2 = "1.625rem" }
+```
+
+Rules that go with it:
+
+- **No weight above 600** except in the hero. 700 exists for one element.
+- One `display` step per page, at most.
+- Body measure caps at **68 characters**. Wider is not a longer line, it is a
+  line nobody finishes.
+
+---
+
+## 3 · Colour
+
+Hex — or OKLCH, which `fid derive` annotates with the hex — plus **what the
+colour is for**. Not a description of the hue. "A warm red" is not a value and
+"brand orange" is not a role.
+
+```toml fid:color
+[light]
+background           = "oklch(1 0 0)"           # page ground
+foreground           = "oklch(0.205 0 0)"       # body text
+card                 = "oklch(1 0 0)"
+card-foreground      = "oklch(0.205 0 0)"
+popover              = "oklch(1 0 0)"
+popover-foreground   = "oklch(0.205 0 0)"
+primary              = "oklch(0.32 0 0)"        # primary actions, links
+primary-foreground   = "oklch(0.985 0 0)"
+secondary            = "oklch(0.97 0 0)"
+secondary-foreground = "oklch(0.205 0 0)"
+muted                = "oklch(0.97 0 0)"        # section bands, inset surfaces
+muted-foreground     = "oklch(0.47 0 0)"        # secondary text, captions
+accent               = "oklch(0.97 0 0)"
+accent-foreground    = "oklch(0.205 0 0)"
+destructive          = "oklch(0.577 0.245 27.325)"  # errors only
+border               = "oklch(0.922 0 0)"
+input                = "oklch(0.922 0 0)"
+ring                 = "oklch(0.6 0 0)"
+doodle-ink           = "oklch(0.55 0 0)"        # annotation marks
+doodle-accent        = "oklch(0.32 0 0)"        # the one loud mark per viewport
+
+[dark]
+background           = "oklch(0.16 0 0)"
+foreground           = "oklch(0.97 0 0)"
+card                 = "oklch(0.21 0 0)"
+card-foreground      = "oklch(0.97 0 0)"
+popover              = "oklch(0.21 0 0)"
+popover-foreground   = "oklch(0.97 0 0)"
+primary              = "oklch(0.87 0 0)"
+primary-foreground   = "oklch(0.21 0 0)"
+secondary            = "oklch(0.27 0 0)"
+secondary-foreground = "oklch(0.97 0 0)"
+muted                = "oklch(0.27 0 0)"
+muted-foreground     = "oklch(0.72 0 0)"
+accent               = "oklch(0.27 0 0)"
+accent-foreground    = "oklch(0.97 0 0)"
+destructive          = "oklch(0.704 0.191 22.216)"
+border               = "oklch(1 0 0 / 12%)"
+input                = "oklch(1 0 0 / 16%)"
+ring                 = "oklch(0.56 0 0)"
+doodle-ink           = "oklch(0.62 0 0)"
+doodle-accent        = "oklch(0.87 0 0)"
+```
+
+### Measured pairs
+
+These are not documentation. `fid derive` computes every one of them from the
+values above and **fails if any falls under its minimum** — which is what turns
+"do not eyeball it" from advice into a rule. If a pair fails, change the
+colour, not the minimum.
+
+A pair with no `theme` is measured in both. A slot a theme does not override
+falls back to light's.
+
+```toml fid:contrast
+pairs = [
+  { fg = "foreground",         bg = "background", min = 4.5, note = "body text — the one that must never fail" },
+  { fg = "muted-foreground",   bg = "background", min = 4.5, note = "secondary text; the pair that fails most often" },
+  { fg = "muted-foreground",   bg = "muted",      min = 4.5, note = "the same text on a section band" },
+  { fg = "primary",            bg = "background", min = 4.5, note = "primary used as a link colour" },
+  { fg = "primary-foreground", bg = "primary",    min = 4.5, note = "label on a primary button" },
+  { fg = "doodle-ink",         bg = "background", min = 3.0, note = "annotation is non-text; 3.0 is the graphics floor" },
+]
+```
+
+### Prohibitions
+
+_(State them. "No blues or purples anywhere" does real work; "warm palette"
+does not.)_
+
+- `--destructive` is for errors. Not for urgency, not for emphasis.
+- No colour is introduced at a call site. If it is not in the block above, it
+  does not exist.
+
+---
+
+## 4 · Shape and space
+
+Corners are a **strategy**, not a number. The shadcn slot set has one shape
+decision in it — `--radius` — which is why every product built on it has the
+same silhouette. One variable can say *how much*; it can never say *what kind*.
+
+Three sizes rather than one scalar, because under `chamfer` there is a hard
+geometric constraint a radius does not have: **a chamfer must stay under half
+the element's height**, or the two cuts on one edge meet and the box
+degenerates into a lozenge. A chip given the panel corner is not slightly
+wrong, it is a different shape.
+
+```toml fid:shape
+strategy      = "chamfer"   # round | chamfer | square
+panel         = "1.5rem"    # cards, dialogs, sections (taller than ~5rem)
+control       = "0.75rem"   # buttons, inputs, nav items (~2.25rem and up)
+chip          = "0.5rem"    # badges, pills, tags (~1.75rem and up)
+border        = "2px"       # structural edges
+hair          = "1px"       # rules and dividers
+doodle_stroke = "2.25px"    # mark weight — fixed, never scaled
+# radius = "0.625rem"       # only read under strategy = "round"
+```
+
+Under `chamfer` and `square`, `--radius` is forced to 0 and the corner comes
+from `.cham-*` in the marks layer. The `--radius-*` scale is still emitted, so
+a component copied in from any shadcn-shaped registry resolves.
+
+**Spacing** — base 4px. Scale: `4 8 12 16 24 32 48 64 96`. Nothing between.
+
+**Shadows** — one flat shadow or none. Never multi-layer, never coloured.
+_(Under `chamfer`, note that a `clip-path` element cannot cast an outer
+box-shadow at all: the clip cuts it off. Elevation has to be the edge.)_
+
+---
+
+## 5 · Components
+
+> Say how each one looks, in the terms above. Silence here is the gap a default
+> fills.
+
+- **Button** — flat, no gradient. `.cham-sm`, `type-small` at weight 500.
+  One primary action per view; everything else is `.cham-outline`.
+- **Input** — card fill, `--border-w` edge, focus ring in `--ring`. No inner
+  shadow.
+- **Card** — `.cham`, 2px edge, 1.4rem padding. No shadow, no hover lift. A
+  card that reacts to the pointer is a button.
+- **Chip / status pill** — `.cham-xs`, `type-small`, muted foreground. Says
+  what is actually true; never decorative.
+- **Nav** — text links at `type-small`, no icons. Sticky, frosted, `.cham-b`.
+- **Table** — zebra striping in `--muted`, `--hair-w` rules, no outer border.
+
+### Page shapes
+
+`fid add component sections` — `Section` `Band` `Eyebrow` `SectionHead` `Hero`
+`LiveDot` `StepList` `StatusCard` `CardGrid` `Feature` `FeatureList` `Cta`.
+
+Build pages out of these rather than out of divs. They read named type steps
+and tokens, they carry the rhythm and the measure, and none of them will let
+you pass a gradient. The icon grid is replaced by `Feature` — a rule and a real
+sentence, because an icon beside a four-word label is decoration standing in
+for a reason.
+
+### Annotation, with a budget
+
+`Arrow` · `Circle` · `Underline` · `Bracket` · `Burst` · `Check` · `Cross` ·
+`Note` — installed by `fid add component doodle`.
+
+> **At most two marks per viewport, one of them `tone="accent"`.**
+
+Three arrows on one screen is a clip-art page, and the device stops meaning
+anything the moment it is decoration. Marks are `aria-hidden` — one that points
+at text is emphasis, not information, and the text has to carry the meaning
+alone. They stroke in `--doodle-ink`, never `--foreground`.
+
+---
+
+## 6 · Not this
+
+> The half a default cannot fill in. Most people skip this section. It is the
+> one that does the most work.
+
+This product does not use:
+
+- full-bleed hero with centred text over a gradient
+- icon-grid feature sections
+- testimonial carousels, logo walls, "trusted by" strips
+- three-column link-list footers
+- pill / `rounded-full` anything
+- multi-layer or coloured shadows
+- an icon beside every navigation label
+- hover lifts, scale transforms, scroll-reveal fades on content
+- more than two annotation marks in one viewport
+
+Instead: editorial column, long measure, section bands separated by a rule,
+figures inline with the text that explains them, and annotation used sparingly
+enough that it still means something.
+
+---
+
+## 7 · Changelog
+
+> A visual decision that changed without a line here is one the next person
+> will change back.
+
+- _(date)_ · Scaffolded from the Fiducial `design` capability defaults.
