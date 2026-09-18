@@ -135,10 +135,11 @@ fn a_product_with_no_roadmap_or_decisions_still_renders() {
     assert_eq!(d["roadmap"]["done"], 0);
     assert!(d["decisions"]["source"].is_null(), "no decisions yet");
     assert_eq!(d["decisions"]["count"], 0);
-    // A scaffold ships the i18n pipeline — `fid new` creates a product that is
-    // already localized, so "no pipelines" is no longer a state a new product
-    // passes through. This test is about an absent roadmap, not about that.
-    assert_eq!(d["graph"]["pipelines"].as_array().unwrap().len(), 1);
+    // A scaffold ships the i18n and design pipelines — `fid new` creates a
+    // product that is already localized and already has a design system, so
+    // "no pipelines" is not a state a new product passes through. This test is
+    // about an absent roadmap, not about that.
+    assert_eq!(d["graph"]["pipelines"].as_array().unwrap().len(), 2);
 
     // And the text view says so rather than printing an empty heading.
     let out = run(&root, &["dash", "--section", "roadmap"]);

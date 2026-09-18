@@ -1,0 +1,226 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   The marks layer — shape, annotation, and surfaces.
+
+   Installed by the `design` capability. Import it from your global stylesheet,
+   after Tailwind and after the token block:
+
+     @import "tailwindcss";
+     @import "./tokens.css";   ·  derived by fid derive, pipeline: design
+     @import "./marks.css";    ·  this file — mechanism only
+
+   (Those are written with a middot rather than a CSS comment on purpose: a
+   nested comment closes the outer one, and the `@import` below it goes live.
+   This file importing itself is an infinite resolve, and the error names the
+   stylesheet that imported it rather than this line.)
+
+   Everything here reads tokens and declares none: no colour, no family and no
+   size is written in this file. That is the point — it is the mechanism, and
+   every value lives in `design-system.md`, which `fid derive` turns into
+   `tokens.css`.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+@layer components {
+  /* ── Named type steps live in tokens.css ──────────────────────────────────
+     They used to be written here by hand. They are now derived from the
+     `fid:scale` block in `design-system.md` by `fid derive`, because a scale
+     written in two places is a scale that drifts — and this file is the half
+     that cannot be derived, so it should not be carrying values at all.
+
+     Everything below is mechanism: it reads tokens and declares none. */
+
+  /* ── Annotation ────────────────────────────────────────────────────────────
+     The script role, and the only place it is allowed to appear. */
+
+  .doodle-note {
+    display: inline-block;
+    font-family: var(--type-script);
+    font-size: 1.25rem;
+    line-height: 1.25;
+    font-weight: 500;
+    /* The tilt is set inline by the <Note> component so it can vary per mark;
+       a single fixed angle across a page reads as a template, not a hand. */
+    transform-origin: center;
+  }
+
+  /* ── Hand-drawn marks ──────────────────────────────────────────────────────
+     Every path in the set carries pathLength="1", so one rule draws all of
+     them at the same rate regardless of their real geometry. */
+
+  .doodle path {
+    vector-effect: non-scaling-stroke;
+  }
+
+  .doodle-draw path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: doodle-draw 900ms cubic-bezier(0.32, 0.72, 0.3, 1) forwards;
+    animation-delay: var(--doodle-delay, 0ms);
+  }
+
+  @keyframes doodle-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  /* Where the browser supports scroll-driven animation, the mark draws as it
+     enters the viewport rather than on mount — which is what makes it read as
+     a reaction to the content rather than a page-load effect. No JavaScript,
+     no "use client", and a plain time-based draw everywhere else. */
+  @supports (animation-timeline: view()) {
+    .doodle-draw path {
+      animation-timeline: view();
+      animation-range: entry 10% cover 35%;
+      animation-fill-mode: both;
+      /* Scroll-driven animations are progressed by scroll position, so a
+         duration is meaningless here — but the per-path delay is too, which is
+         why the staggered marks collapse to a single synchronised stroke under
+         this branch. That is the correct trade: a stagger tied to scroll
+         position fights the reader's thumb. */
+      animation-delay: 0ms;
+    }
+  }
+
+  /* A mark is emphasis. Emphasis that moves when someone asked for no motion
+     is just motion. Draw it instantly and completely. */
+  @media (prefers-reduced-motion: reduce) {
+    .doodle-draw path {
+      animation: none;
+      stroke-dashoffset: 0;
+    }
+  }
+
+  /* ── Chamfer ───────────────────────────────────────────────────────────────
+     A chamfered box with a real border, which clip-path alone cannot do:
+     clipping cuts the stroke off along the diagonal and leaves the corners
+     bare. So the element's own background paints the edge and an inset
+     pseudo-element paints the fill.
+
+     `isolation: isolate` keeps the pseudo-element's z-index:-1 inside this
+     element's stacking context, so it sits above the edge but below the
+     content — including bare text nodes, which a `> *` rule would miss.
+
+     Callers set --edge and --fill; everything else follows.
+
+     Under the `round` corner strategy these classes are inert: --corner-* are
+     0 and the shape comes from --radius as usual. */
+
+  .cham,
+  .cham-sm,
+  .cham-xs,
+  .cham-b {
+    --edge: var(--border);
+    --fill: var(--card);
+    position: relative;
+    isolation: isolate;
+    background: var(--edge);
+  }
+
+  .cham::before,
+  .cham-sm::before,
+  .cham-xs::before,
+  .cham-b::before {
+    content: "";
+    position: absolute;
+    inset: var(--border-w);
+    z-index: -1;
+    background: var(--fill);
+  }
+
+  /* All four corners cut. `--c` is the only thing that differs between the
+     three sizes, so the polygon is written once and inherited. */
+  .cham,
+  .cham::before,
+  .cham-sm,
+  .cham-sm::before,
+  .cham-xs,
+  .cham-xs::before {
+    clip-path: polygon(
+      var(--c) 0,
+      calc(100% - var(--c)) 0,
+      100% var(--c),
+      100% calc(100% - var(--c)),
+      calc(100% - var(--c)) 100%,
+      var(--c) 100%,
+      0 calc(100% - var(--c)),
+      0 var(--c)
+    );
+  }
+
+  /* A chamfer must stay under half the element's height, or the two cuts on
+     one edge meet and the box degenerates into a lozenge. That constraint is
+     why there are three sizes and not one scalar:
+       .cham     panels and cards       — taller than ~5rem
+       .cham-sm  buttons, nav controls  — ~2.25rem and up
+       .cham-xs  chips and pills        — ~1.75rem and up */
+  .cham,
+  .cham::before {
+    --c: var(--corner-panel);
+  }
+  .cham-sm,
+  .cham-sm::before {
+    --c: var(--corner-control);
+  }
+  .cham-xs,
+  .cham-xs::before {
+    --c: var(--corner-chip);
+  }
+
+  /* Bottom corners only — the shape of a bar hanging from the top of the
+     viewport, rather than a panel floating near it. */
+  .cham-b,
+  .cham-b::before {
+    --c: var(--corner-panel);
+    clip-path: polygon(
+      0 0,
+      100% 0,
+      100% calc(100% - var(--c)),
+      calc(100% - var(--c)) 100%,
+      var(--c) 100%,
+      0 calc(100% - var(--c))
+    );
+  }
+
+  .cham-b::before {
+    inset: 0 var(--border-w) var(--border-w) var(--border-w);
+  }
+
+  /* An outline control.
+     `--fill: transparent` looks like the obvious way to get one and is a trap:
+     the element's own background is what paints the chamfered edge, so a
+     transparent fill reveals `--edge` across the whole box and the button comes
+     out as a solid border-coloured slab. The fill must be opaque, and on a
+     page-coloured surface that means --background.
+
+     On a tinted band, set --fill to that band's colour at the call site. */
+  .cham-outline {
+    --edge: var(--border);
+    --fill: var(--background);
+  }
+
+  .cham-outline:hover {
+    --fill: var(--muted);
+  }
+
+  /* ── Frosted surface ───────────────────────────────────────────────────────
+     The blur lives on the fill pseudo-element, since that is what carries the
+     translucent surface. Where backdrop-filter is unsupported the fill goes
+     opaque — legibility is not a progressive enhancement. */
+
+  .frosted {
+    --fill: var(--surface-veil, var(--card));
+  }
+
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .frosted::before {
+      -webkit-backdrop-filter: blur(14px) saturate(180%);
+      backdrop-filter: blur(14px) saturate(180%);
+    }
+  }
+
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .frosted {
+      --fill: var(--background);
+    }
+  }
+}

@@ -7,6 +7,7 @@ mod capability;
 mod commands;
 mod config;
 mod context;
+mod design;
 mod guard;
 mod i18n;
 mod legal;
@@ -487,6 +488,35 @@ EXAMPLES
   fid docs             report which blocks need re-reading
   fid docs --check     fail when one does (the CI gate)
   fid docs --accept    record that you have read them against their sources")]
+    /// Is the published design gallery the system this product declares?
+    #[command(long_about = "\
+Check the design gallery before it is published.
+
+This does not upload — the upload is `/design-sync`, which runs in an agent
+holding your claude.ai authorization. What this owns is the half that fails
+silently:
+
+  • The gallery is rebuilt by a `node` script, separately from `fid derive`.
+    Run the derive without the rebuild and the published swatches describe a
+    palette the product no longer has, while every other gate stays green.
+
+  • The Design System pane indexes each preview by its first-line
+    `<!-- @dsCard group=\"…\" -->` marker. A page without one uploads fine and
+    then is simply not there.
+
+EXAMPLES
+  fid design           list the cards and report both checks
+  fid design --check   fail when either is wrong (the CI gate)
+  fid design --plan    print the write set for /design-sync")]
+    Design {
+        /// Fail instead of reporting, for CI
+        #[arg(long)]
+        check: bool,
+        /// Print the `/design-sync` write set as JSON
+        #[arg(long, conflicts_with = "check")]
+        plan: bool,
+    },
+
     Docs {
         /// Fail instead of reporting, for CI
         #[arg(long)]
@@ -575,6 +605,7 @@ fn main() -> Result<()> {
             json,
         } => commands::harvest::run(&path, name, into, json),
         Commands::Context { check } => commands::context::run(check),
+        Commands::Design { check, plan } => commands::design::run(check, plan),
         Commands::Docs { check, accept } => commands::docs::run(check, accept),
         Commands::Doctor => commands::doctor::run(),
         Commands::GuardCheck => guard::check_from_stdin(),

@@ -35,6 +35,10 @@ export type ThemeVars = {
   '--chart-5': string
   // Layout
   '--radius': string
+  // Annotation ink — the hand-drawn marks are stroked in these, never in
+  // --foreground. A margin note at full text contrast is not a margin note.
+  '--doodle-ink': string
+  '--doodle-accent': string
   // Sidebar
   '--sidebar': string
   '--sidebar-foreground': string
@@ -71,6 +75,8 @@ export const lightTheme: ThemeVars = {
   '--chart-4':                     'oklch(0.371 0 0)',
   '--chart-5':                     'oklch(0.269 0 0)',
   '--radius':                      '0.625rem',
+  '--doodle-ink':                  'oklch(0.556 0 0)',
+  '--doodle-accent':               'oklch(0.205 0 0)',
   '--sidebar':                     'oklch(0.985 0 0)',
   '--sidebar-foreground':          'oklch(0.145 0 0)',
   '--sidebar-primary':             'oklch(0.205 0 0)',
@@ -106,6 +112,8 @@ export const darkTheme: ThemeVars = {
   '--chart-4':                     'oklch(0.371 0 0)',
   '--chart-5':                     'oklch(0.269 0 0)',
   '--radius':                      '0.625rem',
+  '--doodle-ink':                  'oklch(0.708 0 0)',
+  '--doodle-accent':               'oklch(0.922 0 0)',
   '--sidebar':                     'oklch(0.205 0 0)',
   '--sidebar-foreground':          'oklch(0.985 0 0)',
   '--sidebar-primary':             'oklch(0.488 0.243 264.376)',

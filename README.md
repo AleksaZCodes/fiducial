@@ -116,6 +116,7 @@ product actually needs.
 | `adapters` | declares `adapters`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability adapters` |
 | `brand` | declares `brand`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability brand` |
 | `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
+| `design` | declares `design-system.md`; 1 pipeline(s); 2 template file(s) | `fid add capability design` |
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
 | `firmware-rp2040` | 10 template file(s); guard rules | `fid add capability firmware-rp2040` |
 | `firmware-stm32` | 9 template file(s); guard rules | `fid add capability firmware-stm32` |
@@ -247,9 +248,16 @@ what the declaration implies.
 
 Executors are `shell` and `cargo-test` — which need no platform change at all —
 plus the in-process ones (`fid-validate`, `fid-mesh`, `fid-i18n`, `fid-brand`,
-`fid-deploy`, `fid-identity`, `fid-adapters`, `fid-schema`, `fid-legal`). Reach
-for `shell` first; a new in-process executor is warranted only when the work is
-genuinely a Rust library call rather than a tool invocation.
+`fid-deploy`, `fid-identity`, `fid-adapters`, `fid-schema`, `fid-legal`,
+`fid-design`). Reach for `shell` first; a new in-process executor is warranted
+only when the work is genuinely a Rust library call rather than a tool
+invocation.
+
+`fid-design` is the clearest case of that line: it parses a declaration, runs
+OKLCH-to-sRGB conversion and WCAG contrast arithmetic over the palette, and
+fails the derive when a declared pair misses its minimum. Shelling out would
+mean shipping a script and a language runtime to do arithmetic the binary
+already can.
 
 <!-- fid:end-describes -->
 
@@ -317,7 +325,7 @@ fiducial/
 │   ├── fiducial-sim             Numerical simulation — ODE integration that runs native (wi…
 │   ├── fiducial-tauri           Serial transport and device discovery for Fiducial Tauri apps.
 │   └── fiducial-wasm            WASM bindings for fiducial-core — browser, edge, and Cloudf…
-└── packages/             14 members
+└── packages/             12 members
     ├── adapters                 Cross-platform adapter contracts for Fiducial — database, s…
     ├── board-schema             TypeScript types for board.interface.json — mirrors the Rus…
     ├── cli                      fid — the Fiducial platform CLI
@@ -328,8 +336,6 @@ fiducial/
     ├── realtime                 Supabase Realtime typed wrappers — Broadcast, Presence, and…
     ├── tokens                   Design tokens for Fiducial — OKLCH theme vars, Tailwind v4…
     ├── transport-web            Web Serial, WebUSB, and BLE transports for Fiducial — same…
-    ├── ui-react                 Fiducial component registry source — React. Use `fid add co…
-    ├── ui-svelte                Fiducial component registry source — Svelte. Use `fid add c…
     ├── viewer3d-react           React component for rendering Fiducial board GLB files in a…
     └── wasm-bridge              Generated TypeScript types for the fiducial WASM boundary.
 ```

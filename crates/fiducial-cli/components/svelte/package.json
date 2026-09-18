@@ -1,21 +1,17 @@
 {
   "name": "@fiducial/ui-svelte",
   "version": "0.1.0",
-  "description": "Fiducial component registry source \u2014 Svelte. Use `fid add component <name>` to copy components into your product.",
+  "description": "Fiducial component registry source — Svelte. Copied into products by `fid add component <name>`.",
   "license": "MIT",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./index.ts",
+  "types": "./index.ts",
   "scripts": {
     "typecheck": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings --tsgo"
   },
   "peerDependencies": {
     "svelte": ">=5"
-  },
-  "dependencies": {
-    "@fiducial/tokens": "workspace:*",
-    "@fiducial/headless": "workspace:*"
   },
   "devDependencies": {
     "svelte": "catalog:",

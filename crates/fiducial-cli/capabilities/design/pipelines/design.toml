@@ -1,0 +1,26 @@
+name     = "design"
+executor = "fid-design"
+args     = ["design-system.md"]
+outputs  = ["apps/web/src/app/tokens.css"]
+
+# `design-system.md` is the declaration. The prose in it is for people; the
+# fenced ```toml fid:<section> blocks are what this pipeline reads. One file,
+# because a design system whose values live apart from their reasons is two
+# declarations that disagree the first time either moves.
+#
+# The output is the token stylesheet ONLY — colours, the four type roles, the
+# shape scale, the `@theme inline` mapping, and one class per named type step.
+# `globals.css` is product-owned and imports it. That split is deliberate: the
+# base layer and the commentary around it are prose too, and a generator that
+# owned the whole stylesheet would delete them on every run.
+#
+# The palette is measured before it is written. `fid:contrast` declares the
+# pairs and their minimums; a palette that misses one fails `fid derive`. "Do
+# not eyeball it" is advice until something measures.
+#
+# `fid derive --check` fails when the output is missing or stale against
+# `fiducial.lock`, the same as every other pipeline's outputs — which is what
+# finally makes the declaration and the stylesheet unable to disagree.
+#
+# A SvelteKit product points `outputs` at `apps/web/src/tokens.css` instead.
+# The declaration does not move, only where the derivation lands.

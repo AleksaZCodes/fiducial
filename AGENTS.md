@@ -85,7 +85,7 @@ fiducial/
 │   ├── fiducial-sim             Numerical simulation — ODE integration that runs native (wi…
 │   ├── fiducial-tauri           Serial transport and device discovery for Fiducial Tauri apps.
 │   └── fiducial-wasm            WASM bindings for fiducial-core — browser, edge, and Cloudf…
-└── packages/             14 members
+└── packages/             12 members
     ├── adapters                 Cross-platform adapter contracts for Fiducial — database, s…
     ├── board-schema             TypeScript types for board.interface.json — mirrors the Rus…
     ├── cli                      fid — the Fiducial platform CLI
@@ -96,8 +96,6 @@ fiducial/
     ├── realtime                 Supabase Realtime typed wrappers — Broadcast, Presence, and…
     ├── tokens                   Design tokens for Fiducial — OKLCH theme vars, Tailwind v4…
     ├── transport-web            Web Serial, WebUSB, and BLE transports for Fiducial — same…
-    ├── ui-react                 Fiducial component registry source — React. Use `fid add co…
-    ├── ui-svelte                Fiducial component registry source — Svelte. Use `fid add c…
     ├── viewer3d-react           React component for rendering Fiducial board GLB files in a…
     └── wasm-bridge              Generated TypeScript types for the fiducial WASM boundary.
 ```
@@ -277,7 +275,8 @@ rule that matters most.
 | `fid dash` | The workbench — one read-only view of roadmap, decisions, CI, graph, freshness |
 | `fid harvest` | Survey an existing codebase for reusable logic, art, UI and principles |
 | `fid context` | Regenerate the derivable parts of AGENTS.md / CLAUDE.md |
-| `fid docs` | Documentation freshness, including prose nothing can generate |
+| `fid design` | Documentation freshness, including prose nothing can generate Is the published design gallery the system this product declares? |
+| `fid docs` | — |
 | `fid doctor` | Check for drift: outdated deps, stale templates, un-applied migrations |
 <!-- fid:end commands -->
 
@@ -323,6 +322,7 @@ The capabilities this platform ships:
 | `adapters` | declares `adapters`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability adapters` |
 | `brand` | declares `brand`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability brand` |
 | `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
+| `design` | declares `design-system.md`; 1 pipeline(s); 2 template file(s) | `fid add capability design` |
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
 | `firmware-rp2040` | 10 template file(s); guard rules | `fid add capability firmware-rp2040` |
 | `firmware-stm32` | 9 template file(s); guard rules | `fid add capability firmware-stm32` |

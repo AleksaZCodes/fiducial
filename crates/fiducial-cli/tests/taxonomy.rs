@@ -74,12 +74,25 @@ fn installing_a_capability_declares_its_facts_and_wires_its_pipelines() {
     assert_eq!(board["present"], true);
 
     // i18n's block is a declaration, not a special case in `patch_config`.
+    // Found by capability rather than by being the first config-block in the
+    // list: a scaffold installs more than one capability now, and "the first
+    // block" was silently asserting install order.
     let block = decls
         .iter()
-        .find(|x| x["kind"] == "config-block")
+        .find(|x| x["capability"] == "i18n" && x["kind"] == "config-block")
         .expect("i18n declares a fiducial.toml block");
-    assert_eq!(block["capability"], "i18n");
     assert_eq!(block["present"], true);
+
+    // And `design-system.md` is a *file* declaration, not a block. The kind
+    // used to be guessed from whether the name contained a slash, which got
+    // every root-level declaration wrong.
+    let ds = decls
+        .iter()
+        .find(|x| x["name"] == "design-system.md")
+        .expect("design declares design-system.md");
+    assert_eq!(ds["kind"], "file");
+    assert_eq!(ds["capability"], "design");
+    assert_eq!(ds["present"], true);
 
     // Both of eda's pipelines are wired and runnable, which is the property
     // that distinguishes a pipeline from a file that was copied in.

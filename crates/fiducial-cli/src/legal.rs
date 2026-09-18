@@ -17,13 +17,54 @@ use crate::config::{Brand, Legal};
 /// Pages included per jurisdiction.
 ///
 /// EU and UK include `imprint` — a legal disclosure requirement in Germany and
-/// other EU/UK jurisdictions. US drops it (no equivalent requirement). `other`
-/// produces the minimal set every product needs.
+/// other EU/UK jurisdictions. US drops it (no equivalent requirement). RS
+/// (Serbia) has no Impressum equivalent, so it takes the minimal set plus an
+/// accessibility statement, which Serbian public-sector procurement commonly
+/// asks for. `other` produces the minimal set every product needs.
 fn pages_for_jurisdiction(jurisdiction: &str) -> &'static [&'static str] {
     match jurisdiction {
         "EU" | "UK" => &["privacy", "terms", "cookies", "imprint", "accessibility"],
         "US" => &["privacy", "terms", "cookies", "accessibility"],
+        "RS" => &["privacy", "terms", "cookies", "accessibility"],
         _ => &["privacy", "terms", "cookies"],
+    }
+}
+
+/// Languages this pipeline can render legal copy in.
+///
+/// A locale outside this list still gets a catalog entry — omitting one would
+/// break the `Record<Locale, …>` contract — but the entry is marked untranslated
+/// rather than silently served as English. See `render_legal_ts`.
+pub const TRANSLATED_LANGS: &[&str] = &["en", "sr"];
+
+/// `sr-Latn-RS` → `sr`. Legal copy varies by language, not by region.
+fn lang_of(locale: &str) -> &str {
+    locale.split(['-', '_']).next().unwrap_or(locale)
+}
+
+/// True when legal copy exists in this locale's language.
+pub fn is_translated(locale: &str) -> bool {
+    TRANSLATED_LANGS.contains(&lang_of(locale))
+}
+
+/// Human-readable jurisdiction name, per language.
+///
+/// The enum token is never interpolated into prose: "Jurisdiction: other" is
+/// not a sentence, and "governed by the laws of other" is worse. An undeclared
+/// jurisdiction renders as a bracketed placeholder so that it is visibly unfit
+/// to publish rather than plausibly wrong.
+fn jurisdiction_name(jurisdiction: &str, lang: &str) -> &'static str {
+    match (jurisdiction, lang) {
+        ("EU", "sr") => "Evropska unija",
+        ("EU", _) => "the European Union",
+        ("UK", "sr") => "Ujedinjeno Kraljevstvo",
+        ("UK", _) => "the United Kingdom",
+        ("US", "sr") => "Sjedinjene Američke Države",
+        ("US", _) => "the United States",
+        ("RS", "sr") => "Srbija",
+        ("RS", _) => "Serbia",
+        (_, "sr") => "[jurisdikcija nije navedena]",
+        _ => "[jurisdiction not declared]",
     }
 }
 
@@ -43,12 +84,23 @@ fn substitute(
         .replace("{email}", email)
 }
 
-/// Title and body template for each page, before substitution.
-fn page_content(page: &str, _jurisdiction: &str, categories: &[&str]) -> (&'static str, String) {
+/// Title and body template for each page, in the given language, before
+/// substitution.
+///
+/// Every arm returns owned strings so that translated and formatted variants
+/// can share one signature.
+fn page_content(page: &str, lang: &str, categories: &[&str]) -> (String, String) {
     let cookie_list = categories.join(", ");
+    match lang {
+        "sr" => page_content_sr(page, categories, &cookie_list),
+        _ => page_content_en(page, categories, &cookie_list),
+    }
+}
+
+fn page_content_en(page: &str, categories: &[&str], cookie_list: &str) -> (String, String) {
     match page {
         "privacy" => (
-            "Privacy Policy",
+            "Privacy Policy".to_string(),
             "This Privacy Policy describes how {legal_name} (\"we\", \"us\", or \"our\") \
              collects, uses, and discloses information about you when you use our services \
              at {domain}.\n\n\
@@ -67,7 +119,7 @@ fn page_content(page: &str, _jurisdiction: &str, categories: &[&str]) -> (&'stat
                 .to_string(),
         ),
         "terms" => (
-            "Terms of Service",
+            "Terms of Service".to_string(),
             "These Terms of Service govern your use of the services provided by \
              {legal_name} at {domain}. By accessing or using our services, you agree \
              to be bound by these terms.\n\n\
@@ -83,7 +135,7 @@ fn page_content(page: &str, _jurisdiction: &str, categories: &[&str]) -> (&'stat
         ),
         "cookies" => {
             (
-                "Cookie Policy",
+                "Cookie Policy".to_string(),
                 format!(
                 "{{legal_name}} uses cookies and similar technologies on {{domain}} to provide \
                  and improve our services.\n\n\
@@ -95,8 +147,7 @@ fn page_content(page: &str, _jurisdiction: &str, categories: &[&str]) -> (&'stat
                  {functional}\
                  **Managing cookies:** You can control cookies through your browser settings. \
                  Disabling non-necessary cookies may affect your experience.\n\n\
-                 **Contact:** {{{{email}}}}"
-            ,
+                 **Contact:** {{email}}",
                 analytics = if categories.contains(&"analytics") {
                     "**Analytics cookies** help us understand how visitors interact with our \
                      site. We use this data to improve performance and user experience.\n\n"
@@ -113,31 +164,131 @@ fn page_content(page: &str, _jurisdiction: &str, categories: &[&str]) -> (&'stat
             )
         }
         "imprint" => (
-            "Imprint",
-            "Imprint (Impressum) — required disclosure under {{jurisdiction}} law.\n\n\
+            "Imprint".to_string(),
+            "Imprint (Impressum) — required disclosure under {jurisdiction} law.\n\n\
              **Responsible for this website:**\n\
-             {{legal_name}}\n\
-             {{domain}}\n\n\
-             **Contact:** {{email}}\n\n\
+             {legal_name}\n\
+             {domain}\n\n\
+             **Contact:** {email}\n\n\
              **Dispute resolution:** The European Commission provides an online dispute \
              resolution platform: https://ec.europa.eu/consumers/odr — we are not obliged \
              to participate but are willing to engage in out-of-court dispute settlement."
                 .to_string(),
         ),
         "accessibility" => (
-            "Accessibility Statement",
-            "{{legal_name}} is committed to making {{domain}} accessible in accordance with \
+            "Accessibility Statement".to_string(),
+            "{legal_name} is committed to making {domain} accessible in accordance with \
              applicable law.\n\n\
              **Conformance status:** We aim for WCAG 2.1 Level AA conformance. Known \
              limitations are documented in our issue tracker and addressed on a rolling basis.\n\n\
-             **Feedback:** If you experience barriers, contact us at {{email}} and we will \
+             **Feedback:** If you experience barriers, contact us at {email} and we will \
              respond within five business days.\n\n\
-             **Enforcement procedure ({{jurisdiction}}):** If you are not satisfied with \
+             **Enforcement procedure ({jurisdiction}):** If you are not satisfied with \
              our response, you may contact the relevant national enforcement body for your \
              jurisdiction."
                 .to_string(),
         ),
-        _ => ("", String::new()),
+        _ => (String::new(), String::new()),
+    }
+}
+
+fn page_content_sr(page: &str, categories: &[&str], cookie_list: &str) -> (String, String) {
+    match page {
+        "privacy" => (
+            "Politika privatnosti".to_string(),
+            "Ova Politika privatnosti opisuje kako {legal_name} („mi“, „nas“ ili „naš“) \
+             prikuplja, koristi i saopštava podatke o vama kada koristite naše usluge \
+             na {domain}.\n\n\
+             **Rukovalac podacima:** {legal_name}, dostupan na {email}.\n\n\
+             **Jurisdikcija:** {jurisdiction}.\n\n\
+             **Šta prikupljamo:** Prikupljamo podatke koje nam dostavite neposredno, \
+             podatke koje prikupljamo automatski kada koristite naše usluge, kao i \
+             podatke od trećih lica.\n\n\
+             **Kako ih koristimo:** Da bismo pružali, održavali i unapređivali usluge; \
+             slali tehnička obaveštenja; odgovarali na vaša pitanja i primedbe; i \
+             ispunjavali zakonske obaveze.\n\n\
+             **Vaša prava:** U zavisnosti od jurisdikcije, možete imati pravo na pristup, \
+             ispravku, brisanje ili prenosivost svojih podataka o ličnosti. Obratite nam \
+             se na {email} radi ostvarivanja tih prava.\n\n\
+             **Kontakt:** {email}"
+                .to_string(),
+        ),
+        "terms" => (
+            "Uslovi korišćenja".to_string(),
+            "Ovi Uslovi korišćenja uređuju vaše korišćenje usluga koje pruža \
+             {legal_name} na {domain}. Pristupanjem uslugama ili njihovim korišćenjem \
+             prihvatate da budete obavezani ovim uslovima.\n\n\
+             **Merodavno pravo:** Na ove uslove primenjuje se pravo koje važi u \
+             {jurisdiction}.\n\n\
+             **Korišćenje usluga:** Usluge smete koristiti samo na način dozvoljen ovim \
+             uslovima i važećim propisima. Usluge ne smete koristiti radi kršenja bilo \
+             kog zakona ili propisa.\n\n\
+             **Ograničenje odgovornosti:** U meri u kojoj je to dozvoljeno zakonom, \
+             {legal_name} ne odgovara za posrednu, slučajnu, posebnu, posledičnu ili \
+             kaznenu štetu.\n\n\
+             **Kontakt:** {email}"
+                .to_string(),
+        ),
+        "cookies" => (
+            "Politika kolačića".to_string(),
+            format!(
+                "{{legal_name}} koristi kolačiće i slične tehnologije na {{domain}} radi \
+                 pružanja i unapređenja usluga.\n\n\
+                 **Kategorije u upotrebi:** {cookie_list}.\n\n\
+                 **Neophodni kolačići** potrebni su za rad sajta i ne mogu se isključiti.\n\n\
+                 {analytics}\
+                 {marketing}\
+                 {functional}\
+                 **Upravljanje kolačićima:** Kolačiće možete kontrolisati kroz podešavanja \
+                 pregledača. Isključivanje kolačića koji nisu neophodni može uticati na \
+                 vaše korisničko iskustvo.\n\n\
+                 **Kontakt:** {{email}}",
+                analytics = if categories.contains(&"analytics") {
+                    "**Analitički kolačići** pomažu nam da razumemo kako posetioci koriste \
+                     sajt. Te podatke koristimo za poboljšanje performansi i iskustva.\n\n"
+                } else {
+                    ""
+                },
+                marketing = if categories.contains(&"marketing") {
+                    "**Marketinški kolačići** koriste se za prikazivanje relevantnih oglasa \
+                     i praćenje uspešnosti kampanja.\n\n"
+                } else {
+                    ""
+                },
+                functional = if categories.contains(&"functional") {
+                    "**Funkcionalni kolačići** omogućavaju proširene funkcije i \
+                     personalizaciju, poput pamćenja vaših podešavanja.\n\n"
+                } else {
+                    ""
+                },
+            ),
+        ),
+        "imprint" => (
+            "Impresum".to_string(),
+            "Impresum — obavezno obaveštenje prema propisima koji važe u {jurisdiction}.\n\n\
+             **Odgovorni za ovaj sajt:**\n\
+             {legal_name}\n\
+             {domain}\n\n\
+             **Kontakt:** {email}\n\n\
+             **Rešavanje sporova:** Evropska komisija obezbeđuje platformu za onlajn \
+             rešavanje sporova: https://ec.europa.eu/consumers/odr — nismo obavezni da \
+             u njoj učestvujemo, ali smo spremni na vansudsko rešavanje sporova."
+                .to_string(),
+        ),
+        "accessibility" => (
+            "Izjava o pristupačnosti".to_string(),
+            "{legal_name} nastoji da {domain} učini pristupačnim u skladu sa važećim \
+             propisima.\n\n\
+             **Status usklađenosti:** Ciljamo usklađenost sa WCAG 2.1 nivo AA. Poznata \
+             ograničenja vodimo u sistemu za praćenje problema i otklanjamo ih \
+             kontinuirano.\n\n\
+             **Povratne informacije:** Ako naiđete na prepreke, obratite nam se na {email} \
+             i odgovorićemo u roku od pet radnih dana.\n\n\
+             **Postupak zaštite ({jurisdiction}):** Ako niste zadovoljni našim odgovorom, \
+             možete se obratiti nadležnom državnom organu za vašu jurisdikciju."
+                .to_string(),
+        ),
+        _ => (String::new(), String::new()),
     }
 }
 
@@ -214,27 +365,44 @@ pub fn render_legal_ts(
 
     out.push_str("export type LegalCatalog = Record<LegalPage, LegalPageContent>;\n\n");
 
-    // For each locale emit a constant. All locales share the same source text
-    // (the template language is English) — a product that needs translated legal
-    // copy should override the generated catalog through the i18n pipeline.
+    // One constant per locale, rendered in that locale's language. A locale whose
+    // language has no templates still gets an entry — omitting one would break the
+    // Record<Locale, …> contract downstream — but it is emitted in the default
+    // locale's language under a loud marker, never silently as English. Principle
+    // 1c: a missing translation is a missing artifact, not a fallback.
     for locale in locales {
         let const_name = locale.replace('-', "_");
+        let lang = lang_of(locale);
+        let translated = is_translated(locale);
+        if !translated {
+            out.push_str(&format!(
+                "// UNTRANSLATED — no legal templates exist for \"{lang}\".\n\
+                 // The text below is {fallback_lang}. It MUST NOT be published to a reader of\n\
+                 // \"{lang}\". Supply a translation before routing this locale's pages.\n",
+                fallback_lang = lang_of(default_locale),
+            ));
+        }
+        let render_lang = if translated {
+            lang
+        } else {
+            lang_of(default_locale)
+        };
         out.push_str(&format!("export const {const_name}: LegalCatalog = {{\n"));
         for page in pages {
-            let (title_template, body_template) =
-                page_content(page, &legal.jurisdiction, &categories);
+            let (title_template, body_template) = page_content(page, render_lang, &categories);
+            let jurisdiction = jurisdiction_name(&legal.jurisdiction, render_lang);
             let title = substitute(
-                title_template,
+                &title_template,
                 &brand.legal_name,
                 &brand.domain,
-                &legal.jurisdiction,
+                jurisdiction,
                 &legal.data_protection_email,
             );
             let body = substitute(
                 &body_template,
                 &brand.legal_name,
                 &brand.domain,
-                &legal.jurisdiction,
+                jurisdiction,
                 &legal.data_protection_email,
             );
             // Escape backticks and `${` for template literals.
@@ -356,5 +524,112 @@ mod tests {
             "dpo@acme.dev",
         );
         assert_eq!(result, "Hello Acme LLC at acme.dev (EU) — dpo@acme.dev");
+    }
+
+    // ── Serbian as a first-class locale ────────────────────────────────────
+
+    #[test]
+    fn serbian_renders_in_serbian_not_english() {
+        let legal = Legal {
+            jurisdiction: "RS".into(),
+            data_protection_email: "p@example.rs".into(),
+            cookie_categories: vec!["necessary".into()],
+        };
+        let ts = render_legal_ts(&legal, &test_brand(), &["sr".into(), "en".into()], "sr").unwrap();
+
+        // The Serbian catalog carries Serbian titles, the English one English.
+        assert!(ts.contains("Politika privatnosti"), "{ts}");
+        assert!(ts.contains("Uslovi korišćenja"), "{ts}");
+        assert!(ts.contains("Privacy Policy"), "{ts}");
+
+        // The regression this guards: sr and en must not be the same bytes.
+        let sr = ts.split("export const sr").nth(1).unwrap();
+        let sr_body = sr.split("export const").next().unwrap();
+        assert!(
+            !sr_body.contains("This Privacy Policy describes"),
+            "sr catalog must not contain the English template: {sr_body}"
+        );
+    }
+
+    #[test]
+    fn jurisdiction_renders_as_a_name_never_the_enum_token() {
+        let legal = Legal {
+            jurisdiction: "RS".into(),
+            data_protection_email: "p@example.rs".into(),
+            cookie_categories: vec!["necessary".into()],
+        };
+        let ts = render_legal_ts(&legal, &test_brand(), &["sr".into(), "en".into()], "sr").unwrap();
+        assert!(ts.contains("Srbija"), "{ts}");
+        assert!(ts.contains("Serbia"), "{ts}");
+        // "Jurisdiction: RS." is not a sentence a reader should ever see.
+        assert!(!ts.contains("**Jurisdiction:** RS"), "{ts}");
+        assert!(!ts.contains("**Jurisdikcija:** RS"), "{ts}");
+    }
+
+    #[test]
+    fn undeclared_jurisdiction_is_visibly_unfit_to_publish() {
+        let legal = Legal {
+            jurisdiction: "other".into(),
+            data_protection_email: "p@example.com".into(),
+            cookie_categories: vec!["necessary".into()],
+        };
+        let ts = render_legal_ts(&legal, &test_brand(), &["en".into()], "en").unwrap();
+        // Never the bare token: "governed by the laws of other" is worse than a gap.
+        assert!(!ts.contains("laws of other"), "{ts}");
+        assert!(ts.contains("[jurisdiction not declared]"), "{ts}");
+    }
+
+    #[test]
+    fn rs_includes_accessibility_but_not_imprint() {
+        let legal = Legal {
+            jurisdiction: "RS".into(),
+            data_protection_email: "p@example.rs".into(),
+            cookie_categories: vec!["necessary".into()],
+        };
+        let ts = render_legal_ts(&legal, &test_brand(), &["sr".into()], "sr").unwrap();
+        assert!(ts.contains("\"accessibility\""), "{ts}");
+        assert!(!ts.contains("\"imprint\""), "Serbia has no Impressum: {ts}");
+        assert!(ts.contains("Izjava o pristupačnosti"), "{ts}");
+    }
+
+    #[test]
+    fn an_untranslated_locale_is_marked_never_silently_english() {
+        let legal = Legal {
+            jurisdiction: "RS".into(),
+            data_protection_email: "p@example.rs".into(),
+            cookie_categories: vec!["necessary".into()],
+        };
+        // German has no templates.
+        let ts = render_legal_ts(&legal, &test_brand(), &["sr".into(), "de".into()], "sr").unwrap();
+        assert!(ts.contains("export const de"), "de must still exist: {ts}");
+        assert!(ts.contains("UNTRANSLATED"), "de must be marked: {ts}");
+        assert!(ts.contains("MUST NOT be published"), "{ts}");
+    }
+
+    #[test]
+    fn region_tagged_locales_resolve_to_their_language() {
+        assert_eq!(lang_of("sr-Latn-RS"), "sr");
+        assert_eq!(lang_of("en_US"), "en");
+        assert_eq!(lang_of("sr"), "sr");
+        assert!(is_translated("sr-Latn-RS"));
+        assert!(!is_translated("de-AT"));
+    }
+
+    #[test]
+    fn imprint_and_accessibility_have_no_stray_braces() {
+        // Regression: these two templates used `{{name}}` inside a plain
+        // .to_string(), where the doubled braces are literal, not escapes —
+        // so substitution left `{Acme LLC}` in the rendered page.
+        let legal = Legal {
+            jurisdiction: "EU".into(),
+            data_protection_email: "p@example.com".into(),
+            cookie_categories: vec!["necessary".into()],
+        };
+        let ts = render_legal_ts(&legal, &test_brand(), &["en".into()], "en").unwrap();
+        assert!(
+            !ts.contains("{Acme"),
+            "stray braces around substitution: {ts}"
+        );
+        assert!(!ts.contains("{{"), "unsubstituted doubled braces: {ts}");
     }
 }

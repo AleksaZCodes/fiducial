@@ -144,6 +144,12 @@ fn normalize(raw: &str, scratch: &Path, product: &Path) -> String {
                 }
             }
             // The platform version moves with every release.
+            //
+            // Only the platform version. A scaffolded product's own version is
+            // a fixed default (`0.1.0`) and stays literal — it churns when the
+            // scaffold changes, which is a thing a capture should show. While
+            // the two happened to be the same string this rule masked both, and
+            // the first platform bump made that visible rather than breaking it.
             if line.contains(env!("CARGO_PKG_VERSION")) {
                 return line.replace(env!("CARGO_PKG_VERSION"), "X.Y.Z");
             }

@@ -825,8 +825,21 @@ fn freshness_view(root: &Path, pipelines: &[pipeline::Pipeline]) -> Result<Fresh
     // An output a pipeline declares but the lock has never recorded has not
     // been derived yet. `fid derive --check` reports this too, but only for
     // outputs it is asked about; here it is a standing count.
+    //
+    // Except for outputs this product's configuration does not produce — an
+    // identity migration under `storage = "none"`, a stylesheet in a product
+    // with no web app. `fid derive` skips those, so counting them here would
+    // put a permanent problem on the dashboard of a correctly configured
+    // product, and a dashboard that is never clean is a dashboard nobody reads.
+    // The rule is shared with `derive` rather than restated: two answers to
+    // "does this product produce this artifact" is how the two commands start
+    // disagreeing about the same file.
     for p in pipelines {
+        let skip = super::derive::outputs_not_applicable(p, root);
         for out in &p.outputs {
+            if skip.contains(out) {
+                continue;
+            }
             if !lock.artifacts.contains_key(out.as_str()) {
                 view.artifacts_untracked += 1;
                 view.problems
@@ -899,11 +912,32 @@ fn taxonomy_view(root: &Path, config: &Config) -> TaxonomyView {
             InstalledCapability {
                 id: id.clone(),
                 declarations: match (record, builtin) {
-                    (Some(r), _) => r
-                        .declarations
-                        .iter()
-                        .map(|n| (n.clone(), n.contains('/')))
-                        .collect(),
+                    // The lock stores declaration *names* only, so the kind has
+                    // to come from the capability definition. It used to be
+                    // guessed with `n.contains('/')`, which called every
+                    // root-level file declaration a config block —
+                    // `design-system.md` is a file, and dash reported it as a
+                    // `fiducial.toml` block that did not exist.
+                    //
+                    // A third-party capability that is no longer resolvable has
+                    // no definition to consult, so the guess survives as a
+                    // fallback — widened to accept an extension, since that is
+                    // the other thing that makes a name a path.
+                    (Some(r), b) => {
+                        r.declarations
+                            .iter()
+                            .map(|n| {
+                                let known = b.and_then(|b| {
+                                    b.declarations.iter().find(|d| d.name() == n).map(|d| {
+                                        matches!(d, crate::capability::Declaration::File(_))
+                                    })
+                                });
+                                let is_file =
+                                    known.unwrap_or_else(|| n.contains('/') || n.contains('.'));
+                                (n.clone(), is_file)
+                            })
+                            .collect()
+                    }
                     (None, Some(b)) => b
                         .declarations
                         .iter()

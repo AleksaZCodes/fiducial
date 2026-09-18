@@ -1,4 +1,6 @@
 {
+  // See the note in ../react/tsconfig.json: the registry source directory is
+  // its own package so the files that ship are the files that get checked.
   "compilerOptions": {
     "target": "ES2020",
     "module": "ESNext",
@@ -11,5 +13,6 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src/**/*.ts", "src/**/*.svelte"]
+  "include": ["**/*.ts", "**/*.svelte"],
+  "exclude": ["node_modules"]
 }

@@ -12,6 +12,17 @@ $ fid new demo-product
   wrote  .github/workflows/ci.yml
   wrote  .github/workflows/claude-review.yml
   wrote  fiducial.lock
+✦ fid add design — installing into demo-product
+  wrote  design-system.md
+  wrote  pipelines/design.toml
+  wrote  apps/web/src/app/marks.css
+  wrote  scripts/build-design-system.mjs
+  wrote  .fiducial/skills/design.md
+  wrote  .claude/skills/design.md
+  patched fiducial.toml
+  ✓ design installed
+  ✓ no guard rules — this capability adds none
+  ✓ instructions → .fiducial/skills/design.md (any agent; see AGENTS.md)
 ✦ fid add i18n — installing into demo-product
   wrote  messages/en.json
   wrote  messages/sr.json
@@ -23,6 +34,7 @@ $ fid new demo-product
   ✓ no guard rules — this capability adds none
   ✓ instructions → .fiducial/skills/i18n.md (any agent; see AGENTS.md)
 
+  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓
   ▶ i18n (fid-i18n) ✓
 
 ✦ fid derive complete — fiducial.lock updated

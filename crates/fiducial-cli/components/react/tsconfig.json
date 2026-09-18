@@ -1,0 +1,27 @@
+{
+  // This directory is both the registry source and its own package, so the
+  // files that ship are the files that get typechecked — in place, with their
+  // own node_modules.
+  //
+  // It used to be typechecked from a second, byte-identical copy under
+  // `packages/ui-react/`, and the two had already drifted: the shipping copy
+  // imported `cn` from `../lib/utils`, which does not resolve from the
+  // `components/ui/` directory `fid add component` installs into, while the
+  // copy that was checked imported `./lib/utils` and passed. A typecheck that
+  // only ever ran against a file nobody ships is worse than none.
+  //
+  // `@/lib/utils` is the alias a product resolves through its own tsconfig; it
+  // is mapped here to the same file so both ends agree.
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "paths": { "@/*": ["./*"] }
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
+}

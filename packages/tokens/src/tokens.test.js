@@ -16,6 +16,13 @@ import {
   fontFamilies,
   leadings,
   radii,
+  fontRoles,
+  fontDefaults,
+  typeScale,
+  corners,
+  strokes,
+  doodle,
+  shapeDefaults,
 } from '../dist/index.js'
 import { generateThemeCss as generateThemeCssFromTailwind } from '../dist/tailwind.js'
 
@@ -68,12 +75,19 @@ describe('@fiducial/tokens', () => {
   // ── Themes ────────────────────────────────────────────────────────────────
 
   describe('themes', () => {
-    it('lightTheme has exactly 32 custom properties', () => {
-      assert.equal(Object.keys(lightTheme).length, 32)
+    // 30 shadcn-compatible slots + --radius + --doodle-ink + --doodle-accent.
+    // The count is here so a slot cannot be added by accident — if you are
+    // updating this number, you should be able to say what you added and why.
+    it('lightTheme has exactly 34 custom properties', () => {
+      assert.equal(Object.keys(lightTheme).length, 34)
     })
 
-    it('darkTheme has exactly 32 custom properties', () => {
-      assert.equal(Object.keys(darkTheme).length, 32)
+    it('darkTheme has exactly 34 custom properties', () => {
+      assert.equal(Object.keys(darkTheme).length, 34)
+    })
+
+    it('light and dark declare the same slots', () => {
+      assert.deepEqual(Object.keys(lightTheme).sort(), Object.keys(darkTheme).sort())
     })
 
     it('all values are non-empty strings', () => {
@@ -155,6 +169,68 @@ describe('@fiducial/tokens', () => {
 
     it('./tailwind re-exports generateThemeCss identically', () => {
       assert.equal(generateThemeCssFromTailwind(), generateThemeCss())
+    })
+
+    it(':root declares all four type roles as --type-*', () => {
+      const out = generateThemeCss()
+      for (const r of ['display', 'body', 'script', 'mono']) {
+        assert.ok(out.includes(`--type-${r}:`), `missing --type-${r}`)
+      }
+    })
+
+    it('@theme inline turns each role into a font-* utility', () => {
+      const out = generateThemeCss()
+      for (const r of ['display', 'body', 'script', 'mono']) {
+        const re = new RegExp(`--font-${r}:\\s+var\\(--type-${r}\\)`)
+        assert.match(out, re, `missing --font-${r}`)
+      }
+    })
+
+    it('the default sans is the body face, so unstyled text is already right', () => {
+      assert.match(generateThemeCss(), /--font-sans:\s+var\(--type-body\)/)
+    })
+
+    it('no --font-* var is defined in terms of itself', () => {
+      // `--font-display: var(--font-display)` would be a silent no-op and every
+      // heading would quietly fall back to the browser default.
+      for (const line of generateThemeCss().split('\n')) {
+        const m = line.match(/^\s*(--font-[a-z-]+):\s*var\((--font-[a-z-]+)\)/)
+        if (m) assert.notEqual(m[1], m[2], line.trim())
+      }
+    })
+
+    it('emits the corner scale and stroke weights', () => {
+      const out = generateThemeCss()
+      for (const v of ['--corner-panel:', '--corner-control:', '--corner-chip:',
+                       '--border-w:', '--hair-w:', '--doodle-stroke:']) {
+        assert.ok(out.includes(v), `missing ${v}`)
+      }
+    })
+
+    it('forces --radius to 0 under a non-round strategy', () => {
+      const out = generateThemeCss({ shape: { strategy: 'chamfer' } })
+      const root = out.slice(0, out.indexOf('.dark {'))
+      // Declared after the theme value, so the cascade lands on 0.
+      assert.ok(root.lastIndexOf('--radius: 0rem;') > root.indexOf('--radius:'))
+    })
+
+    it('leaves --radius alone under the round strategy', () => {
+      const out = generateThemeCss({ shape: { strategy: 'round' } })
+      const root = out.slice(0, out.indexOf('.dark {'))
+      assert.ok(!root.includes('--radius: 0rem;'))
+    })
+
+    it('still emits the radius scale under chamfer, for copied-in components', () => {
+      const out = generateThemeCss({ shape: { strategy: 'chamfer' } })
+      assert.match(out, /--radius-lg:\s+var\(--radius\)/)
+    })
+
+    it('a font override replaces only the role it names', () => {
+      const out = generateThemeCss({
+        fonts: { display: { family: 'Redaction', weights: [400], fallback: ['serif'], note: 'x' } },
+      })
+      assert.match(out, /--type-display:\s+"Redaction", serif;/)
+      assert.ok(out.includes(`"${fontDefaults.body.family}"`), 'body should be untouched')
     })
   })
 
@@ -310,5 +386,128 @@ describe('@fiducial/tokens', () => {
     })
 
     it('full is 9999px', () => assert.equal(radii.full, '9999px'))
+  })
+
+  // ── Type roles ────────────────────────────────────────────────────────────
+
+  describe('type roles', () => {
+    const ROLES = ['display', 'body', 'script', 'mono']
+
+    it('has exactly the four roles', () => {
+      assert.deepEqual(Object.keys(fontRoles).sort(), [...ROLES].sort())
+      assert.deepEqual(Object.keys(fontDefaults).sort(), [...ROLES].sort())
+    })
+
+    it('roles reference --type-*, not --font-* (Tailwind owns --font-*)', () => {
+      for (const r of ROLES) {
+        assert.equal(fontRoles[r], `var(--type-${r})`, `fontRoles.${r}`)
+      }
+    })
+
+    it('display and body are different families', () => {
+      // The entire reason there are four roles rather than two. If these ever
+      // collapse to one family the page is back to being one face at six sizes.
+      assert.notEqual(fontDefaults.display.family, fontDefaults.body.family)
+    })
+
+    it('no default family is on the slop list', () => {
+      // From the anti-slop rules: a default typeface nobody chose is the single
+      // most recognisable tell in generated UI.
+      const SLOP = ['inter', 'geist', 'roboto', 'open sans', 'poppins', 'montserrat', 'lato']
+      for (const r of ROLES) {
+        const fam = fontDefaults[r].family.toLowerCase()
+        assert.ok(!SLOP.includes(fam), `fontDefaults.${r} is ${fontDefaults[r].family}`)
+      }
+    })
+
+    it('every default names an exact family, weights, a fallback and a reason', () => {
+      for (const r of ROLES) {
+        const d = fontDefaults[r]
+        assert.equal(typeof d.family, 'string')
+        assert.ok(d.family.length > 0, `${r}.family`)
+        assert.ok(Array.isArray(d.weights) && d.weights.length > 0, `${r}.weights`)
+        assert.ok(Array.isArray(d.fallback) && d.fallback.length > 0, `${r}.fallback`)
+        // The note is not decoration: an undocumented face gets swapped for a
+        // slop default by the next person, who had no way to know why.
+        assert.ok(d.note.length > 40, `${r}.note is too thin to be a reason`)
+      }
+    })
+  })
+
+  // ── Type scale ────────────────────────────────────────────────────────────
+
+  describe('type scale', () => {
+    it('every step binds one of the four roles', () => {
+      for (const [name, step] of Object.entries(typeScale)) {
+        assert.ok(step.role in fontRoles, `typeScale.${name}.role = ${step.role}`)
+      }
+    })
+
+    it('every step is fully specified — silence in the scale means defaults', () => {
+      for (const [name, step] of Object.entries(typeScale)) {
+        for (const k of ['size', 'lineHeight', 'weight', 'letterSpacing']) {
+          assert.equal(typeof step[k], 'string', `typeScale.${name}.${k}`)
+          assert.ok(step[k].length > 0, `typeScale.${name}.${k} is empty`)
+        }
+      }
+    })
+
+    it('display steps descend: display > h1 > h2 > h3', () => {
+      const rem = s => parseFloat(s)
+      assert.ok(rem(typeScale.display.size) > rem(typeScale.h1.size))
+      assert.ok(rem(typeScale.h1.size) > rem(typeScale.h2.size))
+      assert.ok(rem(typeScale.h2.size) > rem(typeScale.h3.size))
+    })
+
+    it('the note step is the script role and nothing else is', () => {
+      const script = Object.entries(typeScale).filter(([, s]) => s.role === 'script')
+      assert.deepEqual(script.map(([n]) => n), ['note'])
+    })
+
+    it('body leading is loose enough to read', () => {
+      assert.ok(parseFloat(typeScale.body.lineHeight) >= 1.5)
+    })
+  })
+
+  // ── Shape ─────────────────────────────────────────────────────────────────
+
+  describe('shape', () => {
+    it('corner scale descends: panel > control > chip', () => {
+      // A chamfer must stay under half the element height; a chip given the
+      // panel corner degenerates into a lozenge.
+      const rem = s => parseFloat(s)
+      assert.ok(rem(shapeDefaults.panel) > rem(shapeDefaults.control))
+      assert.ok(rem(shapeDefaults.control) > rem(shapeDefaults.chip))
+    })
+
+    it('corners and strokes are var references', () => {
+      for (const [k, v] of Object.entries(corners)) assert.match(v, /^var\(--corner-/, k)
+      for (const [k, v] of Object.entries(strokes)) assert.match(v, /^var\(--/, k)
+      for (const [k, v] of Object.entries(doodle)) assert.match(v, /^var\(--doodle-/, k)
+    })
+
+    it('the shipped strategy is not `round`', () => {
+      // Not a law — a product may choose round. But the default that ships is
+      // deliberately not the rounded rectangle every shadcn product already is.
+      assert.notEqual(shapeDefaults.strategy, 'round')
+    })
+  })
+
+  // ── Annotation ink ────────────────────────────────────────────────────────
+
+  describe('doodle ink', () => {
+    it('both themes define ink and accent', () => {
+      for (const theme of [lightTheme, darkTheme]) {
+        assert.ok(theme['--doodle-ink'], 'missing --doodle-ink')
+        assert.ok(theme['--doodle-accent'], 'missing --doodle-accent')
+      }
+    })
+
+    it('ink is not the foreground colour', () => {
+      // A margin note at full text contrast is a second headline, not a note.
+      for (const theme of [lightTheme, darkTheme]) {
+        assert.notEqual(theme['--doodle-ink'], theme['--foreground'])
+      }
+    })
   })
 })
