@@ -252,8 +252,7 @@
   }
 
   .cham-lift::before {
-    inset: var(--border-w) var(--border-w-heavy) var(--border-w-heavy)
-      var(--border-w);
+    inset: var(--border-w) var(--border-w-heavy) var(--border-w-heavy) var(--border-w);
   }
 
   /* An outline control.
