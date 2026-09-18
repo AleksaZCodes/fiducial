@@ -265,6 +265,43 @@ is created, without being asked for. That is why the declaration lives next to
 the skill rather than only in the repository's CSS: the CSS governs the app, and
 the skill governs everything else the product ever has to hand someone.
 
+## Rule 5c · The tells are in the copy, not only the CSS
+
+A page can pass every rule above — exact families, named steps, measured
+contrast — and still read as generated, because the giveaway is usually the
+*writing* and the section furniture around it.
+
+The eyebrow is the clearest case. `PRINCIPLE` in tracked-out caps above a
+heading is a pattern that appears on essentially every generated landing page,
+and it almost never carries information: the heading underneath already says
+what the section is. It survives because it looks like design. **Do not put a
+label above a heading unless the label says something the heading does not.**
+
+This capability shipped `type-eyebrow` as a scale step and used it on six
+sections of a real product. That was wrong, and the step stays only because a
+genuine category label — a status, a date, a document class — is a real thing;
+it is no longer the default furniture of a section.
+
+The rest of the list, all of which are copy rather than CSS:
+
+- **A heading that names the section instead of making a claim.** "How it
+  works" is a table-of-contents entry. "Two channels must agree before anyone
+  is called" is the section.
+- **The three-part hero**: headline, one-sentence restatement, two buttons. If
+  the subtitle only rephrases the headline, delete one of them.
+- **Sentences built from "seamlessly", "robust", "powerful", "cutting-edge",
+  "leverage", "empower", "revolutionize".** None of them survive the question
+  *what would be different if the opposite were true?*
+- **Tricolon everywhere** — "faster, simpler, safer". One adjective that is
+  true beats three that rhyme.
+- **A number with no unit or date.** "99.9% accurate" is a claim; "99.9%
+  accurate, measured on 1,400 events over six weeks" is a fact.
+- **Symmetry that the content does not have.** Four features because four fits
+  the grid, when there are three.
+
+The test: read a section aloud and ask what a competitor could not also say. If
+the answer is nothing, the section is decoration no matter how well it is set.
+
 ## Rule 6 · Write the negative constraints
 
 The most useful half of a design system is the half that says what the product

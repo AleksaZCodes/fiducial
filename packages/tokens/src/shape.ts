@@ -73,9 +73,13 @@ export const doodle = {
 /** Shape values Fiducial ships. Products override the whole object, not one key. */
 export const shapeDefaults = {
   strategy: 'chamfer' as CornerStrategy,
-  panel: '1.5rem',
-  control: '0.75rem',
-  chip: '0.5rem',
+  // A cut is a detail, not a silhouette. These were larger, and at 1.5rem a
+  // button stopped reading as a rectangle with cut corners and started reading
+  // as an octagon — a shape with an opinion of its own, competing with the
+  // label inside it. The corner should be the second thing noticed.
+  panel: '1rem',
+  control: '0.5rem',
+  chip: '0.375rem',
   edge: '2px',
   hair: '1px',
   doodleStroke: '2.25px',

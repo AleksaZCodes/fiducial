@@ -102,8 +102,27 @@
 
      Callers set --edge and --fill; everything else follows.
 
-     Under the `round` corner strategy these classes are inert: --corner-* are
-     0 and the shape comes from --radius as usual. */
+     ── These are the OPT-IN, not the default ──────────────────────────────────
+
+     A component should say what it is — `.shape-panel`, `.shape-control`,
+     `.shape-chip` — and never how its corner is cut. Those classes are
+     GENERATED into tokens.css from the `strategy` in `design-system.md`, so a
+     product that declares `round` gets a real border and a real radius out of
+     every shipped component, and flipping one word re-renders all of them.
+
+     `.cham-*` here is the other thing: an explicit cut on one element, wanted
+     for its own sake. It works in any product, including one that is otherwise
+     entirely rounded, which is the point — the chamfer is an artistic addition
+     available anywhere, not the house style forced everywhere.
+
+     Reach for `.shape-*` when you mean "this is a card". Reach for `.cham`
+     when you mean "cut this one".
+
+     This comment used to claim these classes were inert under `round`. They
+     were not — nothing connected the strategy to them, and every shipped
+     component hardcoded `.cham`, so a product choosing `round` still got
+     clipped octagons. That is fixed by generating `.shape-*`; the note is kept
+     because a switch that silently does nothing is worth remembering. */
 
   .cham,
   .cham-sm,
@@ -116,6 +135,22 @@
     background: var(--edge);
   }
 
+  /* ── Why the inner chamfer is smaller than the outer one ──────────────────
+     The fill is inset by the border width on each side, and it used to be
+     clipped with the *same* `--c`. That draws a diagonal 41% too thick, and it
+     is visible: every cut corner looked heavier than the straight edges beside
+     it, on every card and every button.
+
+     The geometry. The outer cut is the line `x + y = c`, whose distance from
+     the corner is `c/√2`. Insetting the box by `w` shifts that line to
+     `x + y = c' + 2w`. The gap between the two — the border as you see it on
+     the diagonal — is `(c' + 2w − c)/√2`. Setting that equal to `w`, which is
+     what the straight edges get:
+
+         c' = c − (2 − √2)·w   ≈   c − 0.5858·w
+
+     Insetting alone moves a 45° line by `w√2`, which is where the 1.41 came
+     from. The inner chamfer has to shrink to take it back. */
   .cham::before,
   .cham-sm::before,
   .cham-xs::before,
@@ -125,10 +160,11 @@
     inset: var(--border-w);
     z-index: -1;
     background: var(--fill);
+    --c: calc(var(--c-outer) - 0.5857864 * var(--border-w));
   }
 
-  /* All four corners cut. `--c` is the only thing that differs between the
-     three sizes, so the polygon is written once and inherited. */
+  /* All four corners cut. `--c-outer` is the only thing that differs between
+     the three sizes, so the polygon is written once and inherited. */
   .cham,
   .cham::before,
   .cham-sm,
@@ -147,30 +183,39 @@
     );
   }
 
+  /* The outer element takes the declared corner; the fill takes the corrected
+     one through the rule above. */
+  .cham,
+  .cham-sm,
+  .cham-xs,
+  .cham-b {
+    --c: var(--c-outer);
+  }
+
   /* A chamfer must stay under half the element's height, or the two cuts on
      one edge meet and the box degenerates into a lozenge. That constraint is
      why there are three sizes and not one scalar:
        .cham     panels and cards       — taller than ~5rem
        .cham-sm  buttons, nav controls  — ~2.25rem and up
        .cham-xs  chips and pills        — ~1.75rem and up */
-  .cham,
-  .cham::before {
-    --c: var(--corner-panel);
+  .cham {
+    --c-outer: var(--corner-panel);
   }
-  .cham-sm,
-  .cham-sm::before {
-    --c: var(--corner-control);
+  .cham-sm {
+    --c-outer: var(--corner-control);
   }
-  .cham-xs,
-  .cham-xs::before {
-    --c: var(--corner-chip);
+  .cham-xs {
+    --c-outer: var(--corner-chip);
   }
 
   /* Bottom corners only — the shape of a bar hanging from the top of the
      viewport, rather than a panel floating near it. */
+  .cham-b {
+    --c-outer: var(--corner-panel);
+  }
+
   .cham-b,
   .cham-b::before {
-    --c: var(--corner-panel);
     clip-path: polygon(
       0 0,
       100% 0,
@@ -183,6 +228,32 @@
 
   .cham-b::before {
     inset: 0 var(--border-w) var(--border-w) var(--border-w);
+  }
+
+  /* ── Depth ─────────────────────────────────────────────────────────────────
+     A weighted edge on the bottom and right, so a panel reads as sitting above
+     the page rather than printed on it.
+
+     This is the chamfer system's answer to elevation, and it has to be: a
+     `clip-path` element cannot cast an outer `box-shadow` — the clip removes
+     it. The only surface available is the edge itself.
+
+     It works by pushing the fill further off the bottom-right than the
+     top-left, which thickens exactly those two edges. The two corners in
+     between get a border that grades from light to heavy around the cut, which
+     is what a bevel under a single light source actually does — so it reads as
+     depth rather than as an error.
+
+     The corner correction still applies, against the *light* weight: the
+     top-left cut is the one whose diagonal has to match the thin edges, and it
+     is the one the eye checks against them. */
+  .cham-lift {
+    --border-w-heavy: calc(var(--border-w) * 3);
+  }
+
+  .cham-lift::before {
+    inset: var(--border-w) var(--border-w-heavy) var(--border-w-heavy)
+      var(--border-w);
   }
 
   /* An outline control.

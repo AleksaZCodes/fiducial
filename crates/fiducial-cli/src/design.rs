@@ -585,6 +585,14 @@ impl DesignSystem {
 
 // ── Generation ───────────────────────────────────────────────────────────────
 
+/// How much smaller the inner chamfer must be, per unit of border width.
+///
+/// `2 − √2`. Insetting a 45° cut by `w` in both x and y moves it `w√2`
+/// perpendicular, so the inner cut has to shrink by this much for the diagonal
+/// border to come out the same weight as the straight edges. Without it the
+/// diagonals draw 41% heavy, which is visible on every card.
+const CHAMFER_INSET_K: f64 = 0.585_786_4;
+
 /// The `--color-*` slots `@theme inline` maps, in the shadcn order.
 const COLOR_INLINE_ORDER: &[&str] = &[
     "background",
@@ -637,6 +645,127 @@ impl DesignSystem {
         parts.push(format!("\"{}\"", r.family));
         parts.extend(r.fallback.iter().cloned());
         parts.join(", ")
+    }
+
+    /// The three shape classes, rendered for whichever corner strategy is
+    /// declared.
+    ///
+    /// # Why these are generated and `.cham-*` is not
+    ///
+    /// A component should say *what it is* — a panel, a control, a chip — and
+    /// never *how the corner is cut*. Those are different decisions with
+    /// different owners: the component knows it is a card, and the design
+    /// system knows whether cards are rounded in this product.
+    ///
+    /// Before this, components wrote `.cham` directly. That put the corner
+    /// strategy in every call site: a product declaring `strategy = "round"`
+    /// still got clipped octagons out of every shipped component, because
+    /// nothing connected the declaration to the class. The switch existed and
+    /// did nothing, which is worse than not having it.
+    ///
+    /// So `.shape-panel` / `.shape-control` / `.shape-chip` are emitted **from
+    /// the strategy**, and flipping one word in `design-system.md` re-renders
+    /// every component in the product. One place, not a thousand call sites.
+    ///
+    /// `.cham-*` survives in the marks layer as a deliberate opt-in — the
+    /// artistic exception, available on any element in any product, including
+    /// one that is otherwise entirely rounded. That is a different thing from
+    /// the default shape of a card, and it reads differently at the call site:
+    /// `.cham` there means "I want this one cut", not "this is a panel".
+    fn shape_classes(&self) -> String {
+        let mut s = String::new();
+        let steps = [
+            ("panel", &self.shape.panel, "cards, dialogs, sections"),
+            ("control", &self.shape.control, "buttons, inputs, nav items"),
+            ("chip", &self.shape.chip, "badges, pills, tags"),
+        ];
+
+        match self.shape.strategy.as_str() {
+            "chamfer" => {
+                s.push_str(
+                    "  /* Corner strategy: chamfer. The cut is drawn by the marks layer;\n\
+                     \x20    these bind each element class to its corner size. */\n",
+                );
+                for (name, _, note) in steps {
+                    s.push_str(&format!(
+                        "  .shape-{name} {{ /* {note} */\n    --c-outer: var(--corner-{name});\n  }}\n"
+                    ));
+                }
+                s.push_str(
+                    "  .shape-panel, .shape-control, .shape-chip {\n    \
+                     --edge: var(--border);\n    --fill: var(--card);\n    \
+                     position: relative;\n    isolation: isolate;\n    \
+                     background: var(--edge);\n  }\n",
+                );
+                s.push_str(&format!(
+                    "  .shape-panel::before, .shape-control::before, .shape-chip::before {{\n    \
+                     content: \"\";\n    position: absolute;\n    inset: var(--border-w);\n    \
+                     z-index: -1;\n    background: var(--fill);\n    \
+                     --c: calc(var(--c-outer) - {CHAMFER_INSET_K:.7} * var(--border-w));\n  }}\n"
+                ));
+                s.push_str(
+                    "  .shape-panel, .shape-panel::before,\n  \
+                     .shape-control, .shape-control::before,\n  \
+                     .shape-chip, .shape-chip::before {\n    \
+                     clip-path: polygon(\n      \
+                     var(--c) 0, calc(100% - var(--c)) 0,\n      \
+                     100% var(--c), 100% calc(100% - var(--c)),\n      \
+                     calc(100% - var(--c)) 100%, var(--c) 100%,\n      \
+                     0 calc(100% - var(--c)), 0 var(--c)\n    );\n  }\n",
+                );
+                s.push_str(
+                    "  .shape-panel, .shape-control, .shape-chip {\n    --c: var(--c-outer);\n  }\n",
+                );
+                // `--fill: transparent` is the trap here: the element's own
+                // background paints the edge, so a transparent fill reveals the
+                // edge colour across the whole box.
+                s.push_str(
+                    "  .shape-outline {\n    --edge: var(--border);\n    \
+                     --fill: var(--background);\n  }\n  \
+                     .shape-outline:hover {\n    --fill: var(--muted);\n  }\n",
+                );
+                // No box-shadow is possible under a clip, so depth is the edge:
+                // push the fill further off the bottom and right.
+                s.push_str(
+                    "  .shape-lift::before {\n    inset: var(--border-w) \
+                     calc(var(--border-w) * 3) calc(var(--border-w) * 3) var(--border-w);\n  }\n",
+                );
+            }
+            "square" => {
+                s.push_str(
+                    "  /* Corner strategy: square. The classes exist so components can\n\
+                     \x20    name what they are without knowing that; they simply cut nothing. */\n",
+                );
+                for (name, _, note) in steps {
+                    s.push_str(&format!(
+                        "  .shape-{name} {{ /* {note} */\n    border: var(--border-w) solid var(--border);\n    border-radius: 0;\n  }}\n"
+                    ));
+                }
+            }
+            // `round` and anything a future strategy adds: a real border and a
+            // real radius, which is what a shadcn-shaped component expects.
+            _ => {
+                s.push_str(
+                    "  /* Corner strategy: round. A real border and a real radius —\n\
+                     \x20    the shape a component copied from any shadcn-shaped registry\n\
+                     \x20    already expects. */\n",
+                );
+                for (name, _, note) in steps {
+                    s.push_str(&format!(
+                        "  .shape-{name} {{ /* {note} */\n    border: var(--border-w) solid var(--border);\n    border-radius: var(--corner-{name});\n  }}\n"
+                    ));
+                }
+                s.push_str(
+                    "  .shape-outline {\n    background: var(--background);\n  }\n  \
+                     .shape-outline:hover {\n    background: var(--muted);\n  }\n",
+                );
+                // Here a real shadow is available, because nothing is clipped.
+                // Same class, same meaning, the mechanism the strategy allows.
+                s.push_str("  .shape-lift {\n    box-shadow: 3px 3px 0 0 var(--border);\n  }\n");
+            }
+        }
+        s.push('\n');
+        s
     }
 
     pub fn generate_css(&self, source: &str) -> String {
@@ -772,6 +901,7 @@ impl DesignSystem {
              \x20  Needs an eleventh step? Add it to design-system.md. Do not inline it. */\n",
         );
         s.push_str("@layer components {\n");
+        s.push_str(&self.shape_classes());
         for name in &self.step_order {
             let st = &self.steps[name];
             s.push_str(&format!("  .type-{name} {{\n"));
@@ -1299,6 +1429,60 @@ title = "hero""#,
                 "the shipped design-system.md declares no `{surface}` surface"
             );
         }
+    }
+
+    #[test]
+    fn the_corner_strategy_actually_changes_what_components_get() {
+        // The bug this guards: `strategy` existed in the declaration, every
+        // shipped component hardcoded `.cham`, and nothing connected the two.
+        // A product choosing `round` still got clipped octagons. A switch that
+        // does nothing is worse than no switch, because it is believed.
+        let chamfer = sys().generate_css("x");
+        assert!(chamfer.contains(".shape-panel"), "no shape classes emitted");
+        assert!(chamfer.contains("clip-path: polygon("), "chamfer must clip");
+        assert!(
+            !chamfer.contains(".shape-panel { /* cards, dialogs, sections */\n    border-radius"),
+            "chamfer must not also set a radius"
+        );
+
+        let round_doc = DOC.replace(r#"strategy = "chamfer""#, r#"strategy = "round""#);
+        let round = parse(&round_doc).unwrap().generate_css("x");
+        assert!(
+            round.contains("border-radius: var(--corner-panel)"),
+            "round must give a real radius: {round}"
+        );
+        assert!(
+            !round.contains("clip-path: polygon("),
+            "round must not clip anything"
+        );
+    }
+
+    #[test]
+    fn every_strategy_emits_all_three_element_classes() {
+        // A component names what it is — panel, control, chip — and never how
+        // the corner is cut. So all three exist under every strategy, or a
+        // component breaks by changing one word in the declaration.
+        for strategy in ["chamfer", "round", "square"] {
+            let doc = DOC.replace(
+                r#"strategy = "chamfer""#,
+                &format!(r#"strategy = "{strategy}""#),
+            );
+            let css = parse(&doc).unwrap().generate_css("x");
+            for class in [".shape-panel", ".shape-control", ".shape-chip"] {
+                assert!(css.contains(class), "{strategy} is missing {class}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_chamfer_correction_is_derived_from_the_border_width() {
+        // Not a second constant typed next to the first. If --border-w changes,
+        // the diagonal stays the same weight as the straight edges by itself.
+        let css = sys().generate_css("x");
+        assert!(
+            css.contains("var(--c-outer) - 0.5857864 * var(--border-w)"),
+            "{css}"
+        );
     }
 
     #[test]

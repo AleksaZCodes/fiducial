@@ -258,14 +258,26 @@ wrong, it is a different shape.
 
 ```toml fid:shape
 strategy      = "chamfer"   # round | chamfer | square
-panel         = "1.5rem"    # cards, dialogs, sections (taller than ~5rem)
-control       = "0.75rem"   # buttons, inputs, nav items (~2.25rem and up)
-chip          = "0.5rem"    # badges, pills, tags (~1.75rem and up)
+panel         = "1rem"      # cards, dialogs, sections (taller than ~5rem)
+control       = "0.5rem"    # buttons, inputs, nav items (~2.25rem and up)
+chip          = "0.375rem"  # badges, pills, tags (~1.75rem and up)
 border        = "2px"       # structural edges
 hair          = "1px"       # rules and dividers
 doodle_stroke = "2.25px"    # mark weight — fixed, never scaled
 # radius = "0.625rem"       # only read under strategy = "round"
 ```
+
+A cut is a detail, not a silhouette. These are smaller than they were: at
+1.5rem a button stopped reading as a rectangle with cut corners and started
+reading as an octagon, which is a shape with an opinion of its own that
+competes with the label inside it. The corner should be noticed second.
+
+**Depth: `.cham-lift`.** A `clip-path` element cannot cast an outer
+`box-shadow` — the clip removes it — so elevation has to come from the edge.
+`.cham-lift` weights the bottom and right, and the two corners between grade
+from light to heavy, which is what a bevel under a single light source does.
+Use it on what is genuinely raised: a primary action, a floating panel. A page
+where everything lifts has nothing raised.
 
 Under `chamfer` and `square`, `--radius` is forced to 0 and the corner comes
 from `.cham-*` in the marks layer. The `--radius-*` scale is still emitted, so
