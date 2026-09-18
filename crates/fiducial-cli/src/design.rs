@@ -697,12 +697,22 @@ impl DesignSystem {
                      position: relative;\n    isolation: isolate;\n    \
                      background: var(--edge);\n  }\n",
                 );
+                // The bottom and right carry a heavier edge by default. A
+                // clipped element cannot cast a shadow, so the edge is the only
+                // place elevation can live — and a depth cue that has to be
+                // opted into at each call site is one the product does not have.
+                s.push_str(
+                    "  .shape-panel, .shape-control, .shape-chip {\n    \
+                     --border-w-heavy: calc(var(--border-w) * 3);\n  }\n",
+                );
                 s.push_str(&format!(
                     "  .shape-panel::before, .shape-control::before, .shape-chip::before {{\n    \
-                     content: \"\";\n    position: absolute;\n    inset: var(--border-w);\n    \
+                     content: \"\";\n    position: absolute;\n    \
+                     inset: var(--border-w) var(--border-w-heavy) var(--border-w-heavy) var(--border-w);\n    \
                      z-index: -1;\n    background: var(--fill);\n    \
                      --c: calc(var(--c-outer) - {CHAMFER_INSET_K:.7} * var(--border-w));\n  }}\n"
                 ));
+                s.push_str("  .shape-flat::before {\n    inset: var(--border-w);\n  }\n");
                 s.push_str(
                     "  .shape-panel, .shape-panel::before,\n  \
                      .shape-control, .shape-control::before,\n  \
@@ -723,12 +733,6 @@ impl DesignSystem {
                     "  .shape-outline {\n    --edge: var(--border);\n    \
                      --fill: var(--background);\n  }\n  \
                      .shape-outline:hover {\n    --fill: var(--muted);\n  }\n",
-                );
-                // No box-shadow is possible under a clip, so depth is the edge:
-                // push the fill further off the bottom and right.
-                s.push_str(
-                    "  .shape-lift::before {\n    inset: var(--border-w) \
-                     calc(var(--border-w) * 3) calc(var(--border-w) * 3) var(--border-w);\n  }\n",
                 );
             }
             "square" => {
@@ -759,9 +763,14 @@ impl DesignSystem {
                     "  .shape-outline {\n    background: var(--background);\n  }\n  \
                      .shape-outline:hover {\n    background: var(--muted);\n  }\n",
                 );
-                // Here a real shadow is available, because nothing is clipped.
-                // Same class, same meaning, the mechanism the strategy allows.
-                s.push_str("  .shape-lift {\n    box-shadow: 3px 3px 0 0 var(--border);\n  }\n");
+                // No default shadow here, deliberately. Under `chamfer` the
+                // weighted edge is the only elevation available and a flat cut
+                // looks unfinished, so weight is the default there. Under
+                // `round`, a card with a soft shadow is the most recognisable
+                // generated-UI surface there is — shadcn's own cards are flat,
+                // and this stays flat with them. `.shape-flat` exists in both
+                // so a call site can say "definitely not raised" either way.
+                s.push_str("  .shape-flat {\n    box-shadow: none;\n  }\n");
             }
         }
         s.push('\n');
