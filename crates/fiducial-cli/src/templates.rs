@@ -17,7 +17,6 @@ const TMPL_GITIGNORE: &str = include_str!("../templates/gitignore.tmpl");
 const TMPL_CLAUDE_SETTINGS: &str = include_str!("../templates/claude-settings.json.tmpl");
 const TMPL_AGENT_REVIEW: &str = include_str!("../templates/agents-fiducial-review.md.tmpl");
 const TMPL_AGENT_DESIGN: &str = include_str!("../templates/agents-fiducial-design.md.tmpl");
-const TMPL_CI_REVIEW: &str = include_str!("../templates/claude-review.yml.tmpl");
 const TMPL_CI: &str = include_str!("../templates/ci.yml.tmpl");
 const TMPL_README: &str = include_str!("../templates/README.md.tmpl");
 const TMPL_ROADMAP: &str = include_str!("../templates/ROADMAP.md.tmpl");
@@ -55,7 +54,6 @@ pub const SCAFFOLD_FILES: &[(&str, &str)] = &[
     (".claude/agents/fiducial-review.md", TMPL_AGENT_REVIEW),
     (".claude/agents/fiducial-design.md", TMPL_AGENT_DESIGN),
     (".github/workflows/ci.yml", TMPL_CI),
-    (".github/workflows/claude-review.yml", TMPL_CI_REVIEW),
 ];
 
 // ── Renamed templates ────────────────────────────────────────────────────────
@@ -106,7 +104,6 @@ pub fn raw(rel_path: &str) -> Option<&'static str> {
         ".claude/agents/fiducial-review.md" => Some(TMPL_AGENT_REVIEW),
         ".claude/agents/fiducial-design.md" => Some(TMPL_AGENT_DESIGN),
         ".github/workflows/ci.yml" => Some(TMPL_CI),
-        ".github/workflows/claude-review.yml" => Some(TMPL_CI_REVIEW),
         "README.md" => Some(TMPL_README),
         "ROADMAP.md" => Some(TMPL_ROADMAP),
         _ => None,

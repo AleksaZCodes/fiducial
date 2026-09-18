@@ -37,7 +37,6 @@ $ fid new demo-product
   wrote  .claude/agents/fiducial-review.md
   wrote  .claude/agents/fiducial-design.md
   wrote  .github/workflows/ci.yml
-  wrote  .github/workflows/claude-review.yml
   wrote  fiducial.lock
 ✦ fid add design — installing into demo-product
   wrote  design-system.md
@@ -121,7 +120,7 @@ $ fid doctor
 
   ✓ fiducial.toml valid  (product: demo-product, v0.1.0)
   ✓ guard: 2 rule(s), all implemented
-  ✓ fiducial.lock valid  (18 template(s) tracked, 0 migration(s) applied)
+  ✓ fiducial.lock valid  (17 template(s) tracked, 0 migration(s) applied)
   ✓ all template files unmodified
   ✓ no pending codemod migrations
   ✓ no hardcoded user-visible strings found
@@ -163,7 +162,6 @@ $ fid dash --section ci
 CI
   CI                           on push, pull_request  [checks artifact freshness]
                                  └ fid derive --check
-  Claude Review                on pull_request
   (declared workflows, not live run status — dash makes no network calls)
 ```
 

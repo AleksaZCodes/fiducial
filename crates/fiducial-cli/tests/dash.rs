@@ -309,13 +309,30 @@ fn ci_reports_declared_workflows_and_whether_any_guards_freshness() {
         "the guard should be visible in the CI section: {text}"
     );
 
-    // The negative case still has to work: the scaffolded review workflow runs
-    // no `fid derive --check`, and must be reported that way.
+    // The negative case still has to work, and it needs its own fixture now: a
+    // scaffold ships exactly one workflow and that one does gate. If
+    // `checks_freshness` were hardcoded true the dashboard would be useless, so
+    // a workflow that does not run the gate has to be reported as not running
+    // it.
+    //
+    // This used to lean on the scaffolded Claude review workflow, which no
+    // longer exists — an incidental fixture for a property that is not about
+    // reviews at all.
+    std::fs::write(
+        root.join(".github/workflows/nightly.yml"),
+        "name: Nightly\n\non:\n  schedule:\n    - cron: '0 3 * * *'\n\njobs:\n  \
+         build:\n    name: build\n    runs-on: ubuntu-latest\n    steps:\n      \
+         - run: echo no gate here\n",
+    )
+    .unwrap();
+
+    let d = dash(&root);
+    let workflows = d["ci"]["workflows"].as_array().unwrap();
     assert!(
         workflows
             .iter()
-            .any(|w| w["name"] == "Claude Review" && w["checks_freshness"] == false),
-        "review workflow does not check freshness: {workflows:?}"
+            .any(|w| w["name"] == "Nightly" && w["checks_freshness"] == false),
+        "a workflow without the gate must be reported as not having it: {workflows:?}"
     );
 
     // Freshness is detected per workflow, not inferred once for the repository.

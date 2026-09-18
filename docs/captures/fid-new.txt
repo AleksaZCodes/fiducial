@@ -10,7 +10,6 @@ $ fid new demo-product
   wrote  .claude/agents/fiducial-review.md
   wrote  .claude/agents/fiducial-design.md
   wrote  .github/workflows/ci.yml
-  wrote  .github/workflows/claude-review.yml
   wrote  fiducial.lock
 ✦ fid add design — installing into demo-product
   wrote  design-system.md
