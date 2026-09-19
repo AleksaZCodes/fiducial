@@ -10,8 +10,10 @@
 // So the facts come from the declarations that already own them — the company
 // name and domain from `[brand]`, the logo from the two brand primitives — and
 // only the prose a person must write lives in `press/`.
-import { readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+
+import { frontmatter as fm } from "./frontmatter.mjs";
 
 const at = (p) => new URL(`../${p}`, import.meta.url);
 const read = (p) => readFileSync(at(p), "utf8");
@@ -93,7 +95,9 @@ const decomment = (s) => s.replace(/<!--[\s\S]*?-->/g, "").trim();
 /** `## name` sections → { name: body }. */
 function sections(md) {
   const out = {};
-  const parts = decomment(md).split(/^##\s+/m).slice(1);
+  const parts = decomment(md)
+    .split(/^##\s+/m)
+    .slice(1);
   for (const p of parts) {
     const nl = p.indexOf("\n");
     out[p.slice(0, nl).trim()] = p.slice(nl + 1).trim();
@@ -103,21 +107,24 @@ function sections(md) {
 
 /** `key: value` lines → ordered pairs. Order is editorial, so it is kept. */
 function pairs(md) {
-  return decomment(md).split("\n").map((l) => l.match(/^([^:]+):\s*(.+)$/))
-    .filter(Boolean).map((m) => ({ label: m[1].trim(), value: m[2].trim() }));
+  return decomment(md)
+    .split("\n")
+    .map((l) => l.match(/^([^:]+):\s*(.+)$/))
+    .filter(Boolean)
+    .map((m) => ({ label: m[1].trim(), value: m[2].trim() }));
 }
 
 /** `---` frontmatter + body. */
 function frontmatter(md) {
-  const m = md.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (!m) return { meta: {}, body: decomment(md) };
-  const meta = {};
-  for (const line of m[1].split("\n")) {
-    const kv = line.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
-    if (kv) meta[kv[1]] = kv[2].trim();
-  }
-  return { meta, body: decomment(m[2]) };
+  // A story with no frontmatter is a boilerplate or facts document, which is
+  // body only — not an error.
+  if (!/^---\r?\n/.test(md)) return { meta: {}, body: decomment(md) };
+  const { meta, body } = fm(md, (msg) => {
+    throw new Error(`derive-press: ${msg}`);
+  });
+  return { meta, body: decomment(body) };
 }
+
 
 /**
  * The locales, read from `[i18n]`.
@@ -157,14 +164,23 @@ function loadLocale(loc) {
     .map((f) => {
       const { meta, body } = frontmatter(read(`${base}/stories/${f}`));
       return {
-        slug: f.replace(/\.md$/, ""), title: meta.title ?? f, angle: meta.angle ?? "",
-        date: meta.date ?? "", summary: meta.summary ?? "",
+        slug: f.replace(/\.md$/, ""),
+        title: meta.title ?? f,
+        angle: meta.angle ?? "",
+        date: meta.date ?? "",
+        summary: meta.summary ?? "",
         // A media key, not a URL: the renderer resolves it through the storage
         // adapter, so a story never knows which vendor holds its picture.
-        cover: meta.cover ?? "", coverAlt: meta.cover_alt ?? "", body,
+        cover: meta.cover ?? "",
+        coverAlt: meta.cover_alt ?? "",
+        body,
       };
     });
-  return { boilerplate: sections(read(`${base}/boilerplate.md`)), facts: pairs(read(`${base}/facts.md`)), stories };
+  return {
+    boilerplate: sections(read(`${base}/boilerplate.md`)),
+    facts: pairs(read(`${base}/facts.md`)),
+    stories,
+  };
 }
 
 // A press room with no contact is worse than no press room: a journalist who
@@ -189,7 +205,12 @@ const byLocale = Object.fromEntries(locales.map((l) => [l, loadLocale(l)]));
 // story in one language and not the other is not translated, it is two
 // different press rooms — and the one missing it is the one that reads as
 // marketing.
-const slugSets = locales.map((l) => byLocale[l].stories.map((s) => s.slug).sort().join("|"));
+const slugSets = locales.map((l) =>
+  byLocale[l].stories
+    .map((s) => s.slug)
+    .sort()
+    .join("|"),
+);
 if (new Set(slugSets).size > 1) {
   const detail = locales
     .map((l) => `    ${l}: ${byLocale[l].stories.map((s) => s.slug).join(", ") || "(none)"}`)
@@ -223,7 +244,7 @@ const lines = [
   `export const press = ${JSON.stringify(out, null, 2)} as const`,
   "",
   "export type PressLocale = (typeof press.locales)[number]",
-  "export type Story = (typeof press.byLocale)[PressLocale][\"stories\"][number]",
+  'export type Story = (typeof press.byLocale)[PressLocale]["stories"][number]',
   "",
   "/** One locale's press room. A locale absent here failed the build, not this call. */",
   "export const pressFor = (locale: PressLocale) => press.byLocale[locale]",
@@ -232,4 +253,6 @@ const lines = [
 const target = "apps/web/src/generated/press.ts";
 mkdirSync(dirname(at(target).pathname), { recursive: true });
 writeFileSync(at(target), lines.join("\n"));
-console.log(`wrote ${target} (${locales.length} locale(s), ${byLocale[locales[0]].stories.length} story/stories each)`);
+console.log(
+  `wrote ${target} (${locales.length} locale(s), ${byLocale[locales[0]].stories.length} story/stories each)`,
+);

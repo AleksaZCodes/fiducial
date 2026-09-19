@@ -1154,6 +1154,8 @@ fiducial/
 | **23b** | Texture and depth under `chamfer` | Two-sided bevel (weighted edge + inset highlight) and a fixed SVG grain layer, both removable, grain off under `prefers-reduced-motion` | ✅ |
 | **23c** | `[brand]` derives a TypeScript module | `src/generated/brand.ts` — the domain stops being retyped into app code for `metadataBase`, canonicals and OG tags | ✅ |
 | **23d** | Locales declare themselves | Each catalog carries its own endonym and flag region; the language picker maps over the locale list and survives a third locale | ✅ |
+| **24** | Workbench authoring — the `cms` capability | A local content editor over the repository's own files; its Decap config derived from `content.toml`, `press/` and the declared locales, so the editor cannot drift from the model. No store, no login, nothing deployed | ✅ |
+| **25** | Routes as a declaration — the `seo` capability | Sitemap, per-page metadata and hreflang derived from the content model and the locales; a social image per route, rendered before each build and never committed | ✅ |
 
 **What comes next is not recorded here.** This file is the record of what was
 *built*; [`ROADMAP.md`](ROADMAP.md) holds what is *intended* and in what order.

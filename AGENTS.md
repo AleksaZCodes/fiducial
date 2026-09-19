@@ -353,7 +353,8 @@ The capabilities this platform ships:
 |---|---|---|
 | `adapters` | declares `adapters`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability adapters` |
 | `brand` | declares `brand`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability brand` |
-| `content` | declares `content.toml`, `content/posts/en/hello.md`; 1 pipeline(s); 1 template file(s) | `fid add capability content` |
+| `cms` | declares `cms`; 1 pipeline(s); 4 template file(s); seeds a `fiducial.toml` block | `fid add capability cms` |
+| `content` | declares `content.toml`, `content/posts/en/hello.md`; 1 pipeline(s); 2 template file(s) | `fid add capability content` |
 | `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
 | `design` | declares `design-system.md`; 1 pipeline(s); 9 template file(s) | `fid add capability design` |
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
@@ -365,6 +366,7 @@ The capabilities this platform ships:
 | `migrations` | declares `migrations`; 1 pipeline(s) | `fid add capability migrations` |
 | `press` | declares `press`, `press/en/boilerplate.md`, `press/en/facts.md`, `press/en/stories/0001-why-this-exists.md`; 1 pipeline(s); 4 template file(s); seeds a `fiducial.toml` block | `fid add capability press` |
 | `realtime` | a skill | `fid add capability realtime` |
+| `seo` | declares `seo`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability seo` |
 | `tauri` | 5 template file(s); guard rules | `fid add capability tauri` |
 | `web-next` | 8 template file(s); guard rules | `fid add capability web-next` |
 | `web-svelte` | 8 template file(s); guard rules | `fid add capability web-svelte` |

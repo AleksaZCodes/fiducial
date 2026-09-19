@@ -46,7 +46,7 @@ per-entry fallback hides it completely.
 ```toml
 [collections.posts]
 kind   = "collection"
-schema = { title = "string", date = "date", summary = "string", tags = "string[]" }
+schema = { title = "string", date = "date", summary = "string", tags = "string[]", cover = "media" }
 body   = "rich"
 route  = "/blog/{slug}"
 ```
@@ -60,6 +60,16 @@ route  = "/blog/{slug}"
 - **Locales carrying different entries.** A collection with a post in one
   language and not the other is not translated; it is two collections, and the
   gap is invisible from whichever page you are on.
+Types: `string`, `date`, `number`, `boolean`, `string[]`, and `media` — a
+storage key like `press/gallery/icon.png`, which is a string at runtime and an
+image picker in the editor. A key is not a URL and not a path in git; see the
+product's `docs/media.md`.
+
+Entries are read by `scripts/frontmatter.mjs`, which reads the YAML a writer
+actually emits — wrapped scalars and block sequences included, because the
+editor writes those. A line-wise `key: value` reader loses a wrapped summary
+and turns a list into an empty string, silently.
+
 - **A frontmatter field not in the schema.** Almost always a typo, and a typo
   that silently disappears is how a paragraph goes missing with nobody able to
   find it.
@@ -103,12 +113,17 @@ writing a second markdown loader should be declaring a collection instead.
 button label and the wrong one for a blog post. `legal` keeps generating from
 jurisdiction, because it is derived from a fact rather than authored.
 
-## The dashboard
+## The editor
 
-Build it last, and build it as a *view over this model*: it reads `content.toml`
-for the schema, reads and writes entry files, and commits. Git stays the store.
+Built, as the `cms` capability, and built the way this section said to: a *view
+over this model*. It reads `content.toml` for the schema, reads and writes
+entry files, and stops — you commit. Git stays the store. `fid add cms`, then
+`pnpm cms`.
 
-A hosted CMS with its own database becomes the source of truth instead, which
-breaks the property everything here rests on — that the declaration is a file
+Its config is derived from this declaration, so the editor's fields follow the
+schema. Do not hand-edit `tools/cms/config.yml`.
+
+A hosted CMS with its own database would become the source of truth instead,
+which breaks the property everything here rests on — that the declaration is a file
 in the repository and `fid derive --check` can prove the artifact matches it.
 A database cannot be checked by CI.

@@ -1,0 +1,18 @@
+description = "A local content editor over the repository's own files, with its config derived from the content model"
+
+# The editor is the authoring slice of the workbench (design §10, v2): the
+# repository stays the database and this is a view that writes back as ordinary
+# file changes. It needs the content model to exist and the locales to be
+# declared, because those are what it derives its fields from — installed
+# without them it would render an empty editor and look broken.
+requires_capabilities = ["content", "i18n"]
+
+# Where uploads are staged and how they are keyed.
+#
+# `media_dir` is the gitignored staging directory; `media_prefix` is the key
+# prefix new uploads get, so an image added while writing a post lands at
+# `<media_dir>/<media_prefix>/<file>` locally and `<media_prefix>/<file>` in
+# the bucket. Content stores that key, never a URL — see the `content` skill.
+[[declarations.config]]
+block = "cms"
+seed = { media_dir = "media", media_prefix = "site/uploads" }

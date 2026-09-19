@@ -1,0 +1,29 @@
+name     = "cms"
+executor = "shell"
+args     = ["node", "scripts/derive-cms.mjs"]
+outputs  = ["tools/cms/config.yml"]
+
+# The content editor's config, derived from the content model.
+#
+# `tools/cms/` is a local tool: `pnpm cms` serves Decap CMS against this
+# working tree through `decap-server`, and every save is an ordinary file
+# change you review and commit. Nothing is deployed and there is no login,
+# because the way in is to have the repository checked out.
+#
+# ## Why the config is derived rather than written
+#
+# Decap's config lists every collection, field and widget. `content.toml`
+# already declares exactly that, and `press/` already has a layout. A
+# hand-written config would be a second declaration of the content model — and
+# the copy that drifts silently, because nothing renders from it. An editor
+# offering a field the schema does not have writes an entry `fid derive` then
+# rejects; an editor missing a field leaves it empty on everything made through
+# it, which nobody notices until a page renders blank.
+#
+# So the editor follows the declarations, and `fid derive --check` fails when
+# it is stale. Change a schema and the editor changes on the next derive.
+#
+# ## Ordering
+#
+# `cms` sorts after `content`, and the deriver imports `content`'s TOML reader
+# rather than the module it writes, so it does not depend on run order.

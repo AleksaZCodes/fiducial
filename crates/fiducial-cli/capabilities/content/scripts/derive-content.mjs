@@ -6,8 +6,9 @@
 // made five. Anything wanting to read or edit content had to learn all of them.
 //
 // See docs/specs/2026-09-19-content-is-one-layer.md.
-import { readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { frontmatter as fm } from "./frontmatter.mjs";
 
 const at = (p) => new URL(`../${p}`, import.meta.url);
 const read = (p) => readFileSync(at(p), "utf8");
@@ -17,10 +18,14 @@ const fail = (msg) => {
 
 // ── TOML, only as far as we need it ──────────────────────────────────────────
 // Handles `[a.b.c]` tables, quoted strings, inline tables and arrays, including
+// Exported: `scripts/derive-cms.mjs` reads the same `content.toml` to build the
+// editor's config, and a second TOML reach-in would be a second reading of the
+// declaration — the exact duplication this pipeline exists to remove.
+//
 // arrays written across lines. Multi-line arrays matter: `[i18n] locales` is
 // normally written that way, and a parser that stops at the newline reports no
 // locales at all rather than erroring.
-function parseToml(src) {
+export function parseToml(src) {
   const root = {};
   let table = root;
   let pending = null;
@@ -101,15 +106,9 @@ function parseValue(v) {
 
 // ── Frontmatter ──────────────────────────────────────────────────────────────
 function frontmatter(md, where) {
-  const m = md.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
-  if (!m) fail(`${where}: no frontmatter. An entry starts with a --- block.`);
-  const meta = {};
-  for (const line of m[1].split("\n")) {
-    const kv = line.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
-    if (kv) meta[kv[1]] = parseValue(kv[2].trim());
-  }
-  return { meta, body: m[2].trim() };
+  return fm(md, (msg) => fail(`${where}: ${msg}`));
 }
+
 
 // ── Schema check ─────────────────────────────────────────────────────────────
 // A field outside the schema is an error rather than extra data. It is almost
@@ -126,7 +125,9 @@ function checkSchema(meta, schema, where) {
           ? typeof v === "number"
           : type === "boolean"
             ? typeof v === "boolean"
-            : type === "date"
+            : type === "media"
+              ? typeof v === "string"
+              : type === "date"
               ? typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)
               : typeof v === "string";
     if (!ok) fail(`${where}: field \`${field}\` should be ${type}, got ${JSON.stringify(v)}`);
@@ -176,7 +177,9 @@ for (const [name, spec] of Object.entries(collections)) {
           `(MISSION.md 1c).\n  Write it, or remove \`${loc}\` from [i18n] locales.`,
       );
     }
-    const files = readdirSync(at(dir)).filter((f) => f.endsWith(".md")).sort();
+    const files = readdirSync(at(dir))
+      .filter((f) => f.endsWith(".md"))
+      .sort();
     if (kind === "singleton" && files.length !== 1) {
       fail(`singleton \`${name}\` (${loc}) must hold exactly one entry, found ${files.length}`);
     }
@@ -184,8 +187,10 @@ for (const [name, spec] of Object.entries(collections)) {
       const where = `${dir}/${f}`;
       const { meta, body } = frontmatter(read(where), where);
       checkSchema(meta, schema, where);
-      if (body && !wantsBody) fail(`${where}: collection declares body = "none" but this entry has one`);
-      if (!body && wantsBody) fail(`${where}: collection declares body = "rich" but this entry has none`);
+      if (body && !wantsBody)
+        fail(`${where}: collection declares body = "none" but this entry has one`);
+      if (!body && wantsBody)
+        fail(`${where}: collection declares body = "rich" but this entry has none`);
       return { slug: f.replace(/\.md$/, ""), ...meta, ...(wantsBody ? { body } : {}) };
     });
   }
@@ -193,7 +198,12 @@ for (const [name, spec] of Object.entries(collections)) {
   // Set parity. A collection carrying an entry in one language and not another
   // is not translated — it is two different collections, and the gap is
   // invisible on whichever page you happen to be reading.
-  const sets = locales.map((l) => byLocale[l].map((e) => e.slug).sort().join("|"));
+  const sets = locales.map((l) =>
+    byLocale[l]
+      .map((e) => e.slug)
+      .sort()
+      .join("|"),
+  );
   if (new Set(sets).size > 1) {
     const detail = locales
       .map((l) => `    ${l}: ${byLocale[l].map((e) => e.slug).join(", ") || "(none)"}`)
@@ -213,7 +223,16 @@ for (const [name, spec] of Object.entries(collections)) {
 // blog with no posts yet cannot be rendered. That is backwards: the schema in
 // content.toml is the declaration, the entries are its instances, and the type
 // should follow the declaration.
-const TS = { string: "string", date: "string", number: "number", boolean: "boolean", "string[]": "readonly string[]" };
+const TS = {
+  string: "string",
+  // A media key (`press/gallery/icon.png`), not a URL and not a file path.
+  // `mediaUrl()` turns it into something a browser can fetch.
+  media: "string",
+  date: "string",
+  number: "number",
+  boolean: "boolean",
+  "string[]": "readonly string[]",
+};
 const pascal = (s) => s.replace(/(^|[-_])(\w)/g, (_, __, c) => c.toUpperCase());
 
 const ifaces = [];

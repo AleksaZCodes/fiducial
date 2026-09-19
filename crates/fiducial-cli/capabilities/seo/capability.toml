@@ -1,0 +1,17 @@
+description = "Routes as a declaration: a real sitemap, per-page metadata, and a social image for every page"
+
+# Routes are computed from the content model and the locales, so this needs
+# both. Installed without them it would emit a sitemap of the pages listed in
+# `[seo] pages` and nothing else — which looks like it worked, and is exactly
+# the failure this capability exists to fix.
+requires_capabilities = ["content", "i18n"]
+
+# The pages that are pages rather than entries.
+#
+# Everything else is derived: a collection declares its own `route`, press
+# stories are counted where they live, and legal pages come from the
+# jurisdiction. This is the short list of routes nothing else declares, and
+# each one needs a title and description in the message catalogues.
+[[declarations.config]]
+block = "seo"
+seed = { pages = ["/"] }
