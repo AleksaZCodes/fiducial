@@ -30,6 +30,77 @@ one rule this whole capability exists to enforce:
 So `design-system.md` is not documentation of what was built. It is the input.
 Write it first, build second.
 
+## Components: start from shadcn/ui, then adapt
+
+**Do not write a Button. Do not write a Dialog.** Run
+`npx shadcn@latest add <name>` (or your package manager's runner), then change
+the corner and the surface to this product's, and change nothing else.
+
+The reason is not convenience. The parts of a component that are tedious to
+write are the parts that are invisible when they are wrong:
+
+- a focus ring that appears for keyboard users and not for mouse users
+- `aria-invalid` wired to a visible state
+- `disabled` that is unclickable and not merely faded
+- icons that do not swallow the click meant for the control
+- `asChild`, so a link that looks like a button is an `<a>` and not a
+  `<button>` inside an `<a>` — which is invalid HTML and a real screen-reader
+  bug
+
+Nobody re-derives that list from memory and gets all of it. A generated
+component that skips them looks finished and is not, and the gap is only found
+by someone using a keyboard or a screen reader — which is to say, not by the
+person who generated it.
+
+So: upstream for the mechanism, this product for the taste. Every adapted file
+must say at its top what it kept from upstream and what it changed, because the
+next person to open it needs to know which lines are load-bearing.
+
+This capability ships `button.tsx` and `card.tsx` already adapted, plus a
+`components.json` pointing shadcn at the product's aliases and stylesheet. Add
+any further components with the CLI and adapt them the same way.
+
+### What "adapt" means here, concretely
+
+Under the `chamfer` corner strategy, three changes and no others:
+
+1. `rounded-*` → `.cham` / `.cham-sm`. A chamfer cannot be a border-radius: it
+   is a clip plus a fill, because `clip-path` cuts a real border off along the
+   diagonal and leaves the corner bare.
+2. `bg-*` → `--edge` / `--fill`. On a chamfered box the element's own
+   background paints the edge and an inset pseudo-element paints the fill, so a
+   `bg-*` utility paints over the border and flattens it to nothing.
+3. `shadow-*` → removed. A `clip-path` element cannot cast an outer
+   `box-shadow`; the clip removes it. Depth comes from the weighted
+   bottom/right edge and the inset top highlight instead.
+
+Under `round`, only the surface tokens differ and upstream's classes mostly
+stand as shipped.
+
+## Design skills
+
+Install these once per product. They are the taste and review layer that sits
+on top of the mechanism above:
+
+```bash
+npx skills add shadcn/ui@shadcn      # component APIs, CLI, composition rules
+npx skills add Leonxlnx/taste-skill  # visual design direction
+npx skills add 21st-dev/skill        # component exploration and review
+```
+
+**They are advisory, and this file outranks them.** They are written for
+products with no design system, so they arrive with opinions already decided
+here — pill buttons, `rounded-[2rem]` cards, glassmorphism, eyebrow tags, 1px
+`#EAEAEA` borders, a named font list. A product whose `design-system.md`
+forbids those does not adopt them because a skill asked.
+
+Take from them what is genuinely general: composition, accessibility, spacing
+discipline, motion that respects `prefers-reduced-motion`, and the
+performance rules for texture and blur. Ignore anything that names a colour, a
+radius, a typeface or a silhouette. **Silence in the design system is a
+decision to use the default — but a skill's opinion is not the same thing as
+the product's decision.**
+
 ## The loop
 
 ```

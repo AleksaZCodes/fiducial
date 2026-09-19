@@ -1,4 +1,11 @@
 {
+  "locale": {
+    "name": "English",
+    "region": "GB"
+  },
+  "footer": {
+    "madeWith": "Made with"
+  },
   "nav": {
     "home": "Home",
     "settings": "Settings"

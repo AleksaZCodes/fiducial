@@ -41,10 +41,15 @@ $ fid new demo-product
 ✦ fid add design — installing into demo-product
   wrote  design-system.md
   wrote  pipelines/design.toml
+  wrote  apps/web/components.json
   wrote  apps/web/src/app/marks.css
   wrote  apps/web/src/components/ui/LICENSES.md
+  wrote  apps/web/src/components/ui/button.tsx
+  wrote  apps/web/src/components/ui/card.tsx
   wrote  apps/web/src/components/ui/doodle-arrows.tsx
+  wrote  apps/web/src/components/ui/dropdown-menu.tsx
   wrote  scripts/build-design-system.mjs
+  wrote  scripts/derive-logo.mjs
   wrote  .fiducial/skills/design.md
   wrote  .claude/skills/design.md
   patched fiducial.toml
@@ -55,6 +60,7 @@ $ fid new demo-product
   wrote  messages/en.json
   wrote  messages/sr.json
   wrote  pipelines/i18n.toml
+  wrote  apps/web/src/components/locale-picker.tsx
   wrote  .fiducial/skills/i18n.md
   wrote  .claude/skills/i18n.md
   patched fiducial.toml
@@ -122,7 +128,7 @@ $ fid doctor
 
   ✓ fiducial.toml valid  (product: demo-product, v0.1.0)
   ✓ guard: 2 rule(s), all implemented
-  ✓ fiducial.lock valid  (19 template(s) tracked, 0 migration(s) applied)
+  ✓ fiducial.lock valid  (25 template(s) tracked, 0 migration(s) applied)
   ✓ all template files unmodified
   ✓ no pending codemod migrations
   ✓ no hardcoded user-visible strings found

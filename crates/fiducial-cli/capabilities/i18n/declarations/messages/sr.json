@@ -1,4 +1,11 @@
 {
+  "locale": {
+    "name": "Srpski",
+    "region": "RS"
+  },
+  "footer": {
+    "madeWith": "Napravljeno koristeći"
+  },
   "nav": {
     "home": "Početna",
     "settings": "Podešavanja"

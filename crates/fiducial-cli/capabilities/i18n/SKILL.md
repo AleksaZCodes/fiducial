@@ -14,6 +14,56 @@ src/generated/messages.ts     ← generated: MessageKey union + per-locale recor
 fid derive --check            ← fails if any locale is missing a key
 ```
 
+
+## Every locale declares itself
+
+Each catalog carries its own name and its own flag region:
+
+```json
+// messages/sr.json
+"locale": { "name": "Srpski", "region": "RS" }
+```
+
+**The name is the endonym** — the language's name in that language. `Srpski`,
+not `Serbian`. `Deutsch`, not `German`.
+
+This is not a stylistic preference. The one person guaranteed to need a
+language picker is the person who cannot read the page they are looking at,
+and a picker that lists every language *in the language they are trying to
+leave* is precisely useless to them.
+
+It also removes the shape that breaks at three locales. The tempting design is
+one key holding "the other language" — a toggle. It works for exactly two
+locales and is silently wrong at three, because "the other one" stops being a
+thing and there is nowhere to put the third. A key in one catalog naming a
+different language is the same mistake wearing a different hat: it makes every
+catalog responsible for knowing about every other catalog.
+
+With the endonym declared per catalog, a picker is built by mapping over the
+locale list. Adding `messages/de.json` puts German in the menu and nothing else
+is touched — which is the whole test of whether an i18n layer is real or is a
+two-language special case that has not been asked a third question yet.
+
+`region` is a hint for a flag icon set and nothing more. A flag is a country,
+not a language, and the two do not line up; render it `aria-hidden` and let the
+endonym be the accessible label, so assistive tech announces the language and
+never the nation.
+
+`apps/web/src/components/locale-picker.tsx` is the reference implementation. It
+needs the `design` capability's shadcn components (`button`, `dropdown-menu`)
+and the `country-flag-icons` package.
+
+## The platform's own strings
+
+`footer.madeWith` is seeded in every catalog. It is the attribution line —
+"Made with Fiducial" — and it is a user-visible string, so principle 1c applies
+to it exactly as it applies to yours: declared once, one derivation per locale,
+and a missing translation is a missing artifact rather than a fallback.
+
+Render it with the current locale's value. Do not join every locale's copy
+together into one line: that is a bilingual layout pretending to be
+internationalization, and it gets longer with every language you add.
+
 ## Rules
 
 **1 · Never put user-visible text in a component.** Add a key to *every*

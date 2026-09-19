@@ -19,6 +19,53 @@ public/organization.jsonld    ← generated: never hand-edit these
 fid derive --check            ← fails if any is missing or stale
 ```
 
+
+## Two logo primitives, and everything else is a view
+
+A product that has a mark has exactly **two** drawings of it:
+
+| Primitive | What it is | Where it lands |
+|---|---|---|
+| `brand/icon.svg` | the mark alone, usually on a plate | favicon, app icon, a bullet, a stamp |
+| `brand/wordmark.svg` | the mark set with the name | nav, footer, a legal page header, a slide |
+
+Point `[brand] favicon` at the icon. Everything else — the React component, the
+deck, the leave-behind — reads generated geometry extracted from these two
+files, never its own copy of a path.
+
+The `design` capability ships `scripts/derive-logo.mjs` for the extraction: it
+reads the `data-layer` groups out of both SVGs and writes a
+`src/generated/logo.ts`. Wire it as a pipeline so `fid derive` keeps it fresh:
+
+```toml
+name     = "logo"
+executor = "shell"
+args     = ["node", "scripts/derive-logo.mjs"]
+outputs  = ["apps/web/src/generated/logo.ts"]
+```
+
+### Why this is a rule and not a suggestion
+
+A second copy of a logo is not a stale artifact. It is a *different* artifact,
+and nothing in this platform can tell you it is wrong, because freshness checks
+compare a derivation to its declaration and a hand-kept copy has neither.
+
+This was found in a shipped product. Its `brand/favicon.svg` carried its own
+copy of the mark under a comment arguing that deriving it would cost more
+machinery than the duplication saved. The mark was later redrawn; that file was
+not. The site served the old logo at 16px next to the new one on the page, and
+every gate stayed green.
+
+### One trap worth naming
+
+**An XML comment may not contain `--`.** A `.svg` is served as `image/svg+xml`
+and parsed strictly, so an illegal comment makes the browser render nothing —
+a broken image, with no error anyone sees.
+
+The way this happens, every time, is documenting the file: writing
+``guarded by `fid derive --check` `` into the comment that explains where the
+file comes from. `derive-logo.mjs` rejects it with that case named.
+
 ## The declaration
 
 ```toml
