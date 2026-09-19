@@ -42,6 +42,8 @@ $ fid new demo-product
   wrote  design-system.md
   wrote  pipelines/design.toml
   wrote  apps/web/src/app/marks.css
+  wrote  apps/web/src/components/ui/LICENSES.md
+  wrote  apps/web/src/components/ui/doodle-arrows.tsx
   wrote  scripts/build-design-system.mjs
   wrote  .fiducial/skills/design.md
   wrote  .claude/skills/design.md
@@ -120,7 +122,7 @@ $ fid doctor
 
   ✓ fiducial.toml valid  (product: demo-product, v0.1.0)
   ✓ guard: 2 rule(s), all implemented
-  ✓ fiducial.lock valid  (17 template(s) tracked, 0 migration(s) applied)
+  ✓ fiducial.lock valid  (19 template(s) tracked, 0 migration(s) applied)
   ✓ all template files unmodified
   ✓ no pending codemod migrations
   ✓ no hardcoded user-visible strings found

@@ -602,6 +602,29 @@ pub struct Brand {
         skip_serializing_if = "is_default_background_color"
     )]
     pub background_color: String,
+    /// Home-screen label. Falls back to `trading_name`.
+    ///
+    /// `site.webmanifest` used to put the trading name in both `name` and
+    /// `short_name`, which defeats the point of the field: `short_name` is what
+    /// a phone prints under an icon, in about twelve characters, and "Fire
+    /// Outreach Network" is not that. A product with a short name already
+    /// declares nothing here and loses nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub short_name: Option<String>,
+    /// A product-supplied favicon, relative to the product root.
+    ///
+    /// The generated favicon is initials on a coloured square, which is the
+    /// right default and the wrong answer for any product that has an actual
+    /// mark. Without this, the only ways out are hand-editing a derived file —
+    /// which `fid derive --check` correctly fails — or dropping `favicon.svg`
+    /// from the pipeline's outputs, which silently loses the artifact.
+    ///
+    /// So this is the documented override that MISSION.md principle 3 requires:
+    /// the file stays derived, `--check` still guards it, and the declaration
+    /// says where its content comes from. The file is copied verbatim; nothing
+    /// here parses or rewrites SVG.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub favicon: Option<String>,
 }
 
 fn default_primary_color() -> String {
@@ -713,6 +736,29 @@ pub struct Legal {
     /// Tracking purposes declared. `"necessary"` is always present.
     #[serde(default)]
     pub cookie_categories: Vec<String>,
+    /// The date these pages were last reviewed by a person, `YYYY-MM-DD`.
+    ///
+    /// Declared rather than stamped at derive time on purpose. A generated
+    /// timestamp would change on every `fid derive` — which breaks
+    /// `--check` — and, worse, it would say "reviewed today" about a page
+    /// nobody has read since it was scaffolded. This is a human fact, so a
+    /// human types it. Omitted, the pages say so out loud.
+    #[serde(default)]
+    pub last_updated: Option<String>,
+    /// Statutory identifiers for the entity, shown on the pages that need them.
+    ///
+    /// Serbia's Zakon o elektronskoj trgovini requires a trader to publish its
+    /// registration and tax numbers; the EU e-Commerce Directive asks for the
+    /// equivalent. An unincorporated project has neither, and omitting them is
+    /// correct in that case — inventing them is not.
+    #[serde(default)]
+    pub registration_number: Option<String>,
+    #[serde(default)]
+    pub tax_number: Option<String>,
+    /// Postal address of the controller. GDPR Art. 13(1)(a) asks for the
+    /// controller's identity and contact details; an email alone is thin.
+    #[serde(default)]
+    pub postal_address: Option<String>,
 }
 
 impl Legal {
@@ -825,6 +871,8 @@ mod brand_tests {
             contact_email: "hello@example.com".into(),
             primary_color: String::new(),
             background_color: String::new(),
+            short_name: None,
+            favicon: None,
         }
     }
 

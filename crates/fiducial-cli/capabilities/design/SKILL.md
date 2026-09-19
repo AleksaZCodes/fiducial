@@ -164,6 +164,34 @@ anything the moment it is decoration. The rules that go with it:
 
 `fid add component doodle` installs the set.
 
+### The arrow vocabulary
+
+`components/ui/doodle-arrows.tsx` carries fourteen hand-drawn arrows, each with
+**one** written meaning: `right`, `rightLong`, `left`, `down`, `downCurve`,
+`up`, `upCurl`, `rise`, `loop`, `back`, `dashed`, `bothWays`, `tick`, `cross`.
+
+**Pick by meaning, never by looks.** The set they were cut from has
+seventy-seven marks, which is a folder rather than a vocabulary; fourteen with
+fixed meanings is a vocabulary. If you are choosing between two because one
+looks nicer in the space, the mark is decoration and does not belong on the
+page. Two in particular are load-bearing:
+
+- **`dashed` is the only mark allowed beside an unbuilt claim.** A solid arrow
+  pointing at a roadmap item asserts it exists.
+- **`tick` means a person confirmed it**, not that a system succeeded.
+
+They are **filled outlines, not strokes**, so the `stroke-dasharray` draw used
+by the stroked marks does nothing to them. They animate with a directional wipe
+instead, and each mark records which end the hand started at. Do not override
+that direction to suit a layout: a mark wiped the wrong way reads as footage
+run backwards, which undoes the one thing the set is here for.
+
+> **They are CC BY 4.0, and the attribution is not optional.** Read
+> `components/ui/LICENSES.md`. The notice has to appear somewhere a *visitor*
+> can reach — a colophon or the footer — because a licence file in the source
+> tree is invisible to the people the licence protects. The creator's name is
+> not yet filled in there; fill it before the site is public.
+
 ## Rule 5a · The page is a component too
 
 A library that gives you a button and leaves the page to you stops being

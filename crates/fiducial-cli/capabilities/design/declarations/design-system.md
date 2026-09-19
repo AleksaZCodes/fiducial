@@ -123,9 +123,9 @@ display = { role = "display", size = "3.75rem",   leading = "1.04", weight = "60
 h1      = { role = "display", size = "2.75rem",   leading = "1.1",  weight = "600", tracking = "-0.02em",  wrap = "balance" }
 h2      = { role = "display", size = "2rem",      leading = "1.18", weight = "600", tracking = "-0.015em", wrap = "balance" }
 h3      = { role = "display", size = "1.25rem",   leading = "1.3",  weight = "600", tracking = "-0.01em" }
-subhead = { role = "body",    size = "1.1875rem", leading = "1.6",  weight = "400", wrap = "pretty" }
-body    = { role = "body",    size = "1rem",      leading = "1.65", weight = "400", wrap = "pretty" }
-small   = { role = "body",    size = "0.875rem",  leading = "1.6",  weight = "400", wrap = "pretty" }
+subhead = { role = "body",    size = "1.3125rem", leading = "1.55", weight = "400", wrap = "pretty" }
+body    = { role = "body",    size = "1.0625rem", leading = "1.65", weight = "400", wrap = "pretty" }
+small   = { role = "body",    size = "0.9375rem", leading = "1.6",  weight = "400", wrap = "pretty" }
 eyebrow = { role = "display", size = "0.75rem",   leading = "1",    weight = "600", tracking = "0.18em", uppercase = true }
 note    = { role = "script",  size = "1.25rem",   leading = "1.25", weight = "500" }
 mono    = { role = "mono",    size = "0.8125rem", leading = "1.5",  weight = "400" }
@@ -142,6 +142,12 @@ Rules that go with it:
 - One `display` step per page, at most.
 - Body measure caps at **68 characters**. Wider is not a longer line, it is a
   line nobody finishes.
+- **`body` is 17px, not 16px.** 16px is the browser default, which is why it is
+  the size every generated page comes out at, and it is a size chosen in 1996
+  for a 96dpi CRT. Running prose on a modern display wants 17 to 19, and a
+  serif at a text optical size wants the upper half of that. Set the measure
+  and the leading with it: a bigger size at the same line length is worse, not
+  better.
 
 ---
 
@@ -264,8 +270,17 @@ chip          = "0.375rem"  # badges, pills, tags (~1.75rem and up)
 border        = "2px"       # structural edges
 hair          = "1px"       # rules and dividers
 doodle_stroke = "2.25px"    # mark weight — fixed, never scaled
+edge_weight   = 1.5         # the weighted bottom/right edge; 1.0 flattens it
 # radius = "0.625rem"       # only read under strategy = "round"
 ```
+
+`edge_weight` is the only dial on depth. Under `chamfer` a clipped element
+cannot cast an outer `box-shadow`, so elevation is carried by weighting the
+bottom and right edges instead, and the two corners between grade from light to
+heavy the way a bevel under one light source does. It was briefly fixed at `3`,
+which does not read as depth: at three times the base edge the bottom of a card
+reads as a border someone got wrong. Keep it close to `1` — the cue works at
+the threshold where you notice it without looking at it.
 
 A cut is a detail, not a silhouette. These are smaller than they were: at
 1.5rem a button stopped reading as a rectangle with cut corners and started

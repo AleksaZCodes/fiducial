@@ -90,6 +90,49 @@
     }
   }
 
+  /* ── Filled marks ──────────────────────────────────────────────────────────
+     The arrow set is drawn as filled outlines rather than stroked paths, so
+     `stroke-dasharray` has nothing to dash and the rules above draw nothing at
+     all. The equivalent is a directional wipe: the mark is clipped to zero
+     along its own axis and opened up.
+
+     `--doodle-wipe` is set per mark by the <Arrow> component from the `from`
+     field in its table, because the direction is a property of how the mark
+     was drawn, not of where it sits on the page. A mark wiped the wrong way
+     reads as footage played backwards. */
+
+  .doodle-fill {
+    --doodle-wipe: inset(0 100% 0 0);
+  }
+
+  .doodle-fill-draw {
+    clip-path: var(--doodle-wipe);
+    animation: doodle-wipe 700ms cubic-bezier(0.32, 0.72, 0.3, 1) forwards;
+    animation-delay: var(--doodle-delay, 0ms);
+  }
+
+  @keyframes doodle-wipe {
+    to {
+      clip-path: inset(0 0 0 0);
+    }
+  }
+
+  @supports (animation-timeline: view()) {
+    .doodle-fill-draw {
+      animation-timeline: view();
+      animation-range: entry 10% cover 35%;
+      animation-fill-mode: both;
+      animation-delay: 0ms;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .doodle-fill-draw {
+      animation: none;
+      clip-path: none;
+    }
+  }
+
   /* ── Chamfer ───────────────────────────────────────────────────────────────
      A chamfered box with a real border, which clip-path alone cannot do:
      clipping cuts the stroke off along the diagonal and leaves the corners
@@ -174,15 +217,14 @@
     --c: calc(var(--c-outer) - 0.5857864 * var(--border-w));
   }
 
-  /* The heavy edge, relative to the light one. Declared here rather than in the
-     token block because it is a ratio, not a value someone picks per product —
-     3× is the point where the weight reads as depth rather than as a mistake. */
-  .cham,
-  .cham-sm,
-  .cham-xs,
-  .cham-b {
-    --border-w-heavy: calc(var(--border-w) * 3);
-  }
+  /* `--border-w-heavy` is NOT declared here. It is emitted into `tokens.css`
+     from `edge_weight` in `design-system.md`, because how loud the weighted
+     edge is turned out to be exactly the kind of taste value a product picks —
+     and it was briefly written as a literal `* 3` in this file and again in
+     `design.rs`, which is two copies of a number the declaration owns.
+
+     Set `edge_weight = 1.0` to flatten every surface without removing the
+     mechanism. */
 
   /* Flat, for the surface that genuinely is not raised: something inset into
      the page, or a control inside another chamfered box where a second bevel

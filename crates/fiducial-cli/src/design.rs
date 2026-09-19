@@ -111,6 +111,24 @@ pub struct Shape {
     /// Radius under the `round` strategy. Ignored otherwise — see `radius()`.
     #[serde(default)]
     pub radius: Option<String>,
+    /// How much heavier the weighted edge is than the base one.
+    ///
+    /// Under `chamfer`, a clipped element cannot cast an outer `box-shadow`, so
+    /// the bottom and right edges carry elevation instead. This is the only
+    /// dial on how loud that is, and it is declared rather than hardcoded
+    /// because the right number is a matter of taste per product — which is
+    /// exactly the kind of value that has no business being a literal in a
+    /// stylesheet.
+    ///
+    /// `1.0` turns the effect off without removing the mechanism. It was
+    /// briefly fixed at `3.0`, which does not read as depth: it reads as a
+    /// border someone got wrong.
+    #[serde(default = "default_edge_weight")]
+    pub edge_weight: f64,
+}
+
+fn default_edge_weight() -> f64 {
+    1.5
 }
 
 impl Shape {
@@ -701,10 +719,11 @@ impl DesignSystem {
                 // clipped element cannot cast a shadow, so the edge is the only
                 // place elevation can live — and a depth cue that has to be
                 // opted into at each call site is one the product does not have.
-                s.push_str(
-                    "  .shape-panel, .shape-control, .shape-chip {\n    \
-                     --border-w-heavy: calc(var(--border-w) * 3);\n  }\n",
-                );
+                //
+                // How much heavier is `--border-w-heavy`, emitted in the token
+                // block above from `edge_weight`. It used to be written here as
+                // `* 3`, in this file and again in `marks.css`, which is two
+                // copies of a number the declaration is supposed to own.
                 s.push_str(&format!(
                     "  .shape-panel::before, .shape-control::before, .shape-chip::before {{\n    \
                      content: \"\";\n    position: absolute;\n    \
@@ -842,6 +861,17 @@ impl DesignSystem {
         s.push_str(&format!("  --corner-chip: {};\n", self.shape.chip));
         s.push_str(&format!("  --border-w: {};\n", self.shape.border));
         s.push_str(&format!("  --hair-w: {};\n", self.shape.hair));
+        // The weighted edge, as a token rather than a literal in two
+        // stylesheets. `marks.css` and the generated `.shape-*` classes both
+        // read it, so the dial is in `design-system.md` and nowhere else.
+        s.push_str(
+            "  /* The weighted (bottom/right) edge. Elevation, since a clipped\n\
+             \x20    element cannot cast a shadow. Set `edge_weight = 1.0` to flatten. */\n",
+        );
+        s.push_str(&format!(
+            "  --border-w-heavy: calc(var(--border-w) * {});\n",
+            self.shape.edge_weight
+        ));
         s.push_str("\n  /* Annotation stroke. Fixed weight — a mark is drawn, not scaled. */\n");
         s.push_str(&format!(
             "  --doodle-stroke: {};\n",
@@ -1481,6 +1511,34 @@ title = "hero""#,
                 assert!(css.contains(class), "{strategy} is missing {class}");
             }
         }
+    }
+
+    #[test]
+    fn the_weighted_edge_is_declared_once_and_read_everywhere() {
+        // It used to be a literal `* 3` in this file AND in marks.css: two
+        // copies of a number, one of which anybody tuning the look would find
+        // and the other of which they would not. It is a token now, so the
+        // declaration is the only place it exists.
+        let css = sys().generate_css("x");
+        assert!(
+            css.contains("--border-w-heavy: calc(var(--border-w) * 1.5)"),
+            "{css}"
+        );
+        assert!(
+            !css.contains("calc(var(--border-w) * 3)"),
+            "the hardcoded 3x survived: {css}"
+        );
+
+        // And it is a dial, not a constant with extra steps.
+        let doc = DOC.replace(
+            r#"doodle_stroke = "2.25px""#,
+            "doodle_stroke = \"2.25px\"\nedge_weight = 1.0",
+        );
+        let css = parse(&doc).unwrap().generate_css("x");
+        assert!(
+            css.contains("--border-w-heavy: calc(var(--border-w) * 1)"),
+            "{css}"
+        );
     }
 
     #[test]

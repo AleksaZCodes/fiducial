@@ -70,10 +70,60 @@ must be configured before this pipeline runs.
 every placeholder, then have a qualified legal professional review the resulting
 pages for your jurisdiction before publishing.
 
+## Routing the pages
+
+**A generated catalog nobody can reach is not a legal page.** `fid derive`
+produces the content; the product owns the routes, because only the product
+knows its locale segments. The capability ships the two components that stand
+between them:
+
+| File | What it is |
+|---|---|
+| `src/components/legal-document.tsx` | Server component. Renders one `LegalPageContent`. Parses the small Markdown subset the generator emits. |
+| `src/components/cookie-consent.tsx` | Client component. The banner, the stored decision, and `hasConsent()`. |
+
+Wire one route per page per locale, from the catalog rather than from a list
+typed by hand — a hardcoded array of page slugs is a second declaration of
+`pages_for_jurisdiction`, and it goes stale the day the jurisdiction changes:
+
+```tsx
+export function generateStaticParams() {
+  return Object.keys(legalCatalogs[locale]).map((page) => ({ page }));
+}
+```
+
+Link every page from the footer, in every locale. A privacy policy reachable
+only by typing its URL is one nobody has been given.
+
+## Cookie consent
+
+`cookie-consent.tsx` stores a decision and nothing else. **It does not stop
+anything from loading.** The product reads `hasConsent("analytics")` before it
+loads an analytics script, and that ordering is the entire compliance story: a
+banner shown over a tag that has already fired is a banner that has documented
+its own violation.
+
+Three properties are load-bearing and should survive any restyle:
+
+- **Reject is one click, at the same weight as accept.** Burying it behind a
+  settings panel is the most commonly fined dark pattern in the EU.
+- **Optional categories start off.** No pre-ticked boxes.
+- **It is a `role="region"`, not a modal.** A focus trap over the page is a
+  consent wall, and consent given to get past a wall is not freely given.
+
+A product with `cookie_categories = ["necessary"]` renders no banner at all.
+That is correct, not an omission: there is nothing to ask about, and a banner
+that asks anyway trains people to dismiss the ones that matter.
+
 ## What this capability does not do yet
 
-Consent records, cookie banners, data export flows, and account deletion
-endpoints are all named in `ROADMAP.md §"Legal & compliance"` and are not derived
-here. Each needs a database adapter and a migrations declaration — a shape no
-existing capability has yet. Adding one is a new output in `pipelines/legal.toml`
-and a new branch in `fid-legal`, not a redesign of the declaration.
+Consent *records* — a server-side log of who consented to what and when — data
+export flows, and account deletion endpoints are named in
+`ROADMAP.md §"Legal & compliance"` and are not derived here. Each needs a
+database adapter and a migrations declaration, a shape no existing capability
+has yet. Adding one is a new output in `pipelines/legal.toml` and a new branch
+in `fid-legal`, not a redesign of the declaration.
+
+The client-side banner above is deliberately not a substitute for that: it
+records the visitor's choice on the visitor's own device, which is enough to
+honour the choice and not enough to prove it was made.

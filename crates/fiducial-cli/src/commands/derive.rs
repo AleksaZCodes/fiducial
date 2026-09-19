@@ -686,14 +686,32 @@ fn run_fid_brand(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             "sitemap.xml" => crate::brand::render_sitemap(&brand.domain),
             "site.webmanifest" => crate::brand::render_manifest(
                 &brand.trading_name,
+                brand.short_name.as_deref().unwrap_or(&brand.trading_name),
                 brand.primary_color(),
                 brand.background_color(),
             ),
-            "favicon.svg" => crate::brand::render_favicon_svg(
-                &brand.trading_name,
-                brand.primary_color(),
-                brand.background_color(),
-            ),
+            // The declared file wins over the generated initials, and the
+            // output stays derived either way — so `fid derive --check` still
+            // guards it and editing the copy in place still fails, which is the
+            // property that makes the override safe rather than a hole.
+            "favicon.svg" => match brand.favicon.as_deref() {
+                Some(src) => {
+                    let from = working_dir.join(src);
+                    std::fs::read_to_string(&from).with_context(|| {
+                        format!(
+                            "fid-brand: [brand] favicon = \"{src}\" could not be read.\n\
+                             The path is relative to the product root, and the file must exist \
+                             before `fid derive` runs. Remove the key to fall back to the \
+                             generated mark."
+                        )
+                    })?
+                }
+                None => crate::brand::render_favicon_svg(
+                    &brand.trading_name,
+                    brand.primary_color(),
+                    brand.background_color(),
+                ),
+            },
             "organization.jsonld" => crate::brand::render_jsonld(
                 &brand.legal_name,
                 &brand.trading_name,
