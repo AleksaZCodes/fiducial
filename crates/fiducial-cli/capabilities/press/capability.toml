@@ -12,7 +12,19 @@ description = "Press kit, brand guidelines, and the stories a journalist writes 
 # press room that looks complete. Nothing would fail; the product would find
 # out when a journalist who reads the other language opened the page. So the
 # prerequisite is declared and `fid add` refuses without it.
-requires_capabilities = ["i18n"]
+# And on `content`, for one concrete reason and one structural one.
+#
+# Concrete: a press story is an entry with frontmatter and a markdown body, and
+# it is read by the same frontmatter reader (`scripts/frontmatter.mjs`, shipped
+# by `content`). That reader has to handle what a YAML writer emits — wrapped
+# scalars, block sequences — because the content editor writes entries too, and
+# the first story saved through one was unreadable by a line-wise parser. Two
+# copies of it would be two things to fix the next time.
+#
+# Structural: a press room IS the content layer with a fixed shape. Boilerplate
+# is a singleton, facts is a singleton, stories are a collection. Declaring
+# that dependency is honest about what this capability is.
+requires_capabilities = ["i18n", "content"]
 
 # A declaration with no file of its own: a `fiducial.toml` block.
 #
