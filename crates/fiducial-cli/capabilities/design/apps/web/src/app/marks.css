@@ -34,9 +34,9 @@
   .doodle-note {
     display: inline-block;
     font-family: var(--type-script);
-    font-size: 1.625rem;
-    line-height: 1.25;
-    font-weight: 500;
+    font-size: 1.5rem;
+    line-height: 1.2;
+    font-weight: 600;
     /* The tilt is set inline by the <Note> component so it can vary per mark;
        a single fixed angle across a page reads as a template, not a hand. */
     transform-origin: center;
@@ -170,7 +170,8 @@
   .cham,
   .cham-sm,
   .cham-xs,
-  .cham-b {
+  .cham-b,
+  .cham-t {
     --edge: var(--border);
     --fill: var(--card);
     position: relative;
@@ -197,7 +198,8 @@
   .cham::before,
   .cham-sm::before,
   .cham-xs::before,
-  .cham-b::before {
+  .cham-b::before,
+  .cham-t::before {
     content: "";
     position: absolute;
     /* Weighted bottom and right — this is the default, not a modifier.
@@ -214,10 +216,6 @@
     inset: var(--border-w) var(--border-w-heavy) var(--border-w-heavy) var(--border-w);
     z-index: -1;
     background: var(--fill);
-    /* The lit side of the bevel. Inset, because an outer shadow cannot survive
-       the clip — see --surface-highlight in globals.css for the full argument.
-       `0 0 0` on the spread keeps it a hairline rather than a glow. */
-    box-shadow: inset 0 1px 0 0 var(--surface-highlight, transparent);
     --c: calc(var(--c-outer) - 0.5857864 * var(--border-w));
   }
 
@@ -262,7 +260,8 @@
   .cham,
   .cham-sm,
   .cham-xs,
-  .cham-b {
+  .cham-b,
+  .cham-t {
     --c: var(--c-outer);
   }
 
@@ -285,7 +284,33 @@
   /* Bottom corners only — the shape of a bar hanging from the top of the
      viewport, rather than a panel floating near it. */
   .cham-b {
-    --c-outer: var(--corner-panel);
+    --c-outer: var(--corner-band, var(--corner-panel));
+  }
+
+  /* Top corners only — the shape of a band rising from the bottom of the page,
+     which is the footer. The mirror of `.cham-b`: together they make the page's
+     two fixed bands cut toward the content and flush toward the viewport edge,
+     so neither shows a corner floating in the middle of nothing. */
+  .cham-t {
+    --c-outer: var(--corner-band, var(--corner-panel));
+  }
+
+  .cham-t,
+  .cham-t::before {
+    clip-path: polygon(
+      var(--c) 0,
+      calc(100% - var(--c)) 0,
+      100% var(--c),
+      100% 100%,
+      0 100%,
+      0 var(--c)
+    );
+  }
+
+  /* No bottom inset: the footer's bottom edge is the bottom of the document,
+     and an edge drawn there is a line under the last thing on the page. */
+  .cham-t::before {
+    inset: var(--border-w) var(--border-w-heavy) 0 var(--border-w);
   }
 
   .cham-b,
@@ -322,24 +347,45 @@
   }
 
   /* ── Frosted surface ───────────────────────────────────────────────────────
-     The blur lives on the fill pseudo-element, since that is what carries the
-     translucent surface. Where backdrop-filter is unsupported the fill goes
-     opaque — legibility is not a progressive enhancement. */
+     Blurred AND substantial, which is a pair of requirements that fight unless
+     the whole surface is translucent.
+
+     This did not work before, and it failed in a way that looked like success.
+     The blur was on the fill pseudo-element, on the reasoning that the fill is
+     what carries the translucent surface. But a chamfered box paints its EDGE
+     with the element's own background, so the pseudo-element's backdrop was
+     that opaque edge colour, not the page. `backdrop-filter` was blurring a
+     flat fill. The bar rendered as an opaque slab and every declaration in the
+     block was, individually, correct.
+
+     So the blur moves to the element itself, and the edge becomes translucent
+     along with the fill. Now the backdrop is the page, both bands let it
+     through, and the blur has something to do.
+
+     Opacity is deliberately high — the point is a surface you cannot read
+     through, not a window. Text scrolling under the bar must not compete with
+     the navigation on top of it. */
 
   .frosted {
     --fill: var(--surface-veil, var(--card));
+    /* Translucent too. An opaque edge is a band with nothing behind it. */
+    --edge: color-mix(in oklch, var(--border) 78%, transparent);
   }
 
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-    .frosted::before {
+    .frosted {
       -webkit-backdrop-filter: blur(14px) saturate(180%);
       backdrop-filter: blur(14px) saturate(180%);
     }
   }
 
+  /* Where backdrop-filter is unsupported the surface goes fully opaque.
+     Legibility is not a progressive enhancement: without the blur, a 75%
+     surface over running text is just text with text behind it. */
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .frosted {
       --fill: var(--background);
+      --edge: var(--border);
     }
   }
 

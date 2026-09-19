@@ -21,6 +21,8 @@ export function PressKit({
   locale,
   labels,
   logos,
+  storyHref,
+  angleLabel,
 }: {
   /**
    * Which locale's press room to render.
@@ -42,9 +44,24 @@ export function PressKit({
     | "short"
     | "medium"
     | "long"
-    | "guidelines",
+    | "guidelines"
+    | "download",
     string
   >;
+  /** Where one story lives. Omit and the index is titles only. */
+  storyHref?: (slug: string) => string;
+  /**
+   * The display label for an angle.
+   *
+   * `angle` in a story's frontmatter is a slug from a fixed vocabulary, and a
+   * slug is not a word a reader should see — least of all in the wrong
+   * language. Without this the index shows `failure` to a Serbian journalist.
+   *
+   * These are labels, not translations. `failure` as a bare noun reads as an
+   * accusation on a card, and the point of those stories is what was learned,
+   * so the label should say that in whichever language.
+   */
+  angleLabel?: (angle: string) => string;
   /** Downloadable marks. These are the brand primitives, not new files. */
   logos: { label: string; href: string }[];
 }) {
@@ -88,9 +105,17 @@ export function PressKit({
         <h2 className="type-h2">{labels.facts}</h2>
         <dl className="mt-6 grid gap-x-8 gap-y-3 sm:grid-cols-2">
           {room.facts.map((f) => (
-            <div key={f.label} className="flex justify-between gap-4 border-b border-border pb-2">
-              <dt className="type-small text-muted-foreground">{f.label}</dt>
-              <dd className="type-small font-medium">{f.value}</dd>
+            // `min-w-0` on both, and the value wraps instead of pushing.
+            // Without it a long value ("Architecture and firmware; nothing
+            // deployed in the field") sets the column's minimum width, the grid
+            // grows past its container, and the whole section is wider than the
+            // page it sits in.
+            <div
+              key={f.label}
+              className="flex min-w-0 flex-wrap justify-between gap-x-4 gap-y-1 border-b border-border pb-2"
+            >
+              <dt className="type-small min-w-0 shrink-0 text-muted-foreground">{f.label}</dt>
+              <dd className="type-small min-w-0 break-words font-medium">{f.value}</dd>
             </div>
           ))}
         </dl>
@@ -99,16 +124,28 @@ export function PressKit({
       <section className="mt-14">
         <h2 className="type-h2">{labels.assets}</h2>
         <p className="type-small mt-3 max-w-[60ch] text-muted-foreground">{labels.guidelines}</p>
-        <ul className="mt-6 flex flex-wrap gap-3">
+        {/* Previewed, then downloaded. A row of filenames asks someone to
+            download a file to find out whether it is the one they wanted, and
+            for a logo that is the difference between publishing the mark and
+            publishing the wrong mark. The preview is the asset itself, on the
+            surface it is meant to sit on. */}
+        <ul className="mt-6 grid gap-4 sm:grid-cols-2">
           {logos.map((l) => (
-            <li key={l.href}>
-              <a
-                href={l.href}
-                download
-                className="cham-sm cham-outline type-small inline-block px-4 py-2 font-medium"
-              >
-                {l.label}
-              </a>
+            <li key={l.href} className="cham flex flex-col gap-4 p-6">
+              <div className="flex min-h-28 items-center justify-center overflow-hidden bg-background p-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={l.href} alt={l.label} className="max-h-20 w-auto max-w-full" />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="type-small min-w-0 truncate font-medium">{l.label}</span>
+                <a
+                  href={l.href}
+                  download
+                  className="cham-sm cham-outline type-small shrink-0 px-3 py-1.5 font-medium"
+                >
+                  {labels.download}
+                </a>
+              </div>
             </li>
           ))}
         </ul>
@@ -120,11 +157,21 @@ export function PressKit({
           {room.stories.map((s) => (
             <li key={s.slug} className="cham p-6">
               <div className="flex items-baseline justify-between gap-4">
-                <h3 className="type-h3">{s.title}</h3>
+                <h3 className="type-h3 min-w-0">
+                  {storyHref ? (
+                    <a href={storyHref(s.slug)} className="underline-offset-4 hover:underline">
+                      {s.title}
+                    </a>
+                  ) : (
+                    s.title
+                  )}
+                </h3>
                 {/* The angle is the point of the index: it is what a reporter
                     scans for when deciding which story fits their section. */}
                 {s.angle ? (
-                  <span className="type-mono shrink-0 text-muted-foreground">{s.angle}</span>
+                  <span className="type-mono shrink-0 text-muted-foreground">
+                    {angleLabel ? angleLabel(s.angle) : s.angle}
+                  </span>
                 ) : null}
               </div>
               {s.summary ? (
