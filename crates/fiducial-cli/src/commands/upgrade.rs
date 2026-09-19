@@ -268,6 +268,42 @@ enum TemplateOutcome {
     Conflict(String),
 }
 
+/// Top-level `[section]` headers a merge would remove, named, or `None` when it
+/// removes nothing.
+///
+/// Only applied to `fiducial.toml`. Every other template is prose or code where
+/// a bracketed line means nothing, and where losing a line is a normal outcome
+/// of an upstream edit rather than a lost declaration.
+///
+/// Deliberately textual. Parsing both sides as TOML would be more precise and
+/// would also fail on the half-merged file this exists to catch, which is the
+/// wrong direction: the check has to work on output that may not parse.
+fn dropped_sections(rel_path: &str, local: &str, merged: &str) -> Option<String> {
+    if rel_path != crate::config::CONFIG_FILE {
+        return None;
+    }
+
+    let sections = |s: &str| -> Vec<String> {
+        s.lines()
+            .map(str::trim)
+            .filter(|l| l.starts_with('[') && l.ends_with(']'))
+            .map(|l| l.to_string())
+            .collect()
+    };
+
+    let after = sections(merged);
+    let lost: Vec<String> = sections(local)
+        .into_iter()
+        .filter(|s| !after.contains(s))
+        .collect();
+
+    if lost.is_empty() {
+        None
+    } else {
+        Some(lost.join(", "))
+    }
+}
+
 /// Merge one template. Returns `None` if no upstream change, `Some(outcome)` otherwise.
 fn merge_one_template(
     root: &std::path::Path,
@@ -338,6 +374,35 @@ fn merge_one_template(
 
     match merged {
         Ok(clean) => {
+            // A clean merge that silently deletes a declared block is not a
+            // clean merge, and `fiducial.toml` is the file where that costs the
+            // most: every fact the product owns lives in it.
+            //
+            // On 2026-09-18 an upgrade of a real product reported
+            // "merged cleanly from upstream" and replaced the whole file with
+            // the scaffolding template, dropping `[brand]`, `[i18n]`, `[legal]`
+            // and every entry in `[capabilities] enabled`. Nothing failed. The
+            // product looked scaffolded-but-empty, and the damage was only
+            // visible by reading the diff.
+            //
+            // The cause is that the serialized config orders its blocks
+            // alphabetically while the template orders them by narrative, so
+            // ours reads to a line-based merge as "deleted the file and wrote a
+            // different one" — and where theirs also touched those lines, diffy
+            // resolves toward theirs without conflicting.
+            //
+            // A proper fix merges this file semantically, key by key, which is
+            // real work and not this function's job. What is this function's
+            // job is refusing to write a result that loses a declaration. So
+            // the check is dumb on purpose: every `[section]` the local file had
+            // must still be there.
+            if let Some(lost) = dropped_sections(rel_path, &local, &clean) {
+                return Ok(Some(TemplateOutcome::Conflict(format!(
+                    "REFUSED — merging upstream would delete {lost} from your \
+                     declaration. Nothing was written. Reconcile {rel_path} by hand \
+                     against the platform template, then re-run"
+                ))));
+            }
             if !dry_run {
                 std::fs::write(&local_path, &clean)
                     .with_context(|| format!("writing {rel_path}"))?;
@@ -362,5 +427,51 @@ fn merge_one_template(
                 "CONFLICT — conflict markers written; resolve and run `fid upgrade` again".into(),
             )))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::dropped_sections;
+    use crate::config::CONFIG_FILE;
+
+    /// The regression this exists for.
+    ///
+    /// A real product's `fiducial.toml` was replaced wholesale by the
+    /// scaffolding template, and `fid upgrade` called it "merged cleanly from
+    /// upstream". Four declarations went with it.
+    #[test]
+    fn a_merge_that_deletes_a_declaration_is_not_clean() {
+        let local = "[brand]\nlegal_name = \"Fire Outreach Network\"\n\n\
+                     [capabilities]\nenabled = [\"legal\"]\n\n\
+                     [i18n]\ndefault = \"sr\"\n\n\
+                     [legal]\njurisdiction = \"RS\"\n\n\
+                     [product]\nname = \"fon\"\n";
+        let merged = "[product]\nname = \"fon\"\n\n[capabilities]\nenabled = []\n";
+
+        let lost = dropped_sections(CONFIG_FILE, local, merged).expect("must refuse");
+        assert!(lost.contains("[brand]"), "{lost}");
+        assert!(lost.contains("[i18n]"), "{lost}");
+        assert!(lost.contains("[legal]"), "{lost}");
+    }
+
+    #[test]
+    fn an_upgrade_that_only_adds_is_allowed_through() {
+        // The normal case, and the one this must not block: upstream introduces
+        // a block the product did not have.
+        let local = "[product]\nname = \"fon\"\n";
+        let merged = "[product]\nname = \"fon\"\n\n[freshness]\ngates = []\n";
+        assert!(dropped_sections(CONFIG_FILE, local, merged).is_none());
+    }
+
+    #[test]
+    fn only_the_config_file_is_guarded() {
+        // Every other template is prose or code. A bracketed line there is a
+        // Markdown link or an array, and losing one is an ordinary upstream
+        // edit rather than a lost declaration.
+        let local = "[a link](x)\n[brand]\n";
+        let merged = "nothing\n";
+        assert!(dropped_sections("README.md", local, merged).is_none());
+        assert!(dropped_sections(CONFIG_FILE, local, merged).is_some());
     }
 }

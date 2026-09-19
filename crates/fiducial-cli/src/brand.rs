@@ -50,11 +50,22 @@ pub fn render_favicon_svg(
 }
 
 /// `site.webmanifest` pointing at the generated favicon.
-pub fn render_manifest(trading_name: &str, primary_color: &str, background_color: &str) -> String {
+///
+/// `short_name` is what a phone prints under a home-screen icon, in roughly
+/// twelve characters. It used to be a second copy of `trading_name`, which
+/// makes the field do nothing — the launcher truncates and the product gets
+/// "Fire Outrea…". `[brand] short_name` overrides it; falling back to the
+/// trading name is right for the many products whose name is already short.
+pub fn render_manifest(
+    trading_name: &str,
+    short_name: &str,
+    primary_color: &str,
+    background_color: &str,
+) -> String {
     format!(
         "{{\n  \
          \"name\": \"{trading_name}\",\n  \
-         \"short_name\": \"{trading_name}\",\n  \
+         \"short_name\": \"{short_name}\",\n  \
          \"icons\": [\n    \
          {{ \"src\": \"/favicon.svg\", \"sizes\": \"any\", \"type\": \"image/svg+xml\" }}\n  \
          ],\n  \
@@ -138,10 +149,21 @@ mod tests {
 
     #[test]
     fn manifest_is_valid_json_pointing_at_the_favicon() {
-        let manifest = render_manifest("Acme", "#0EA5E9", "#0B1120");
+        let manifest = render_manifest("Acme", "Acme", "#0EA5E9", "#0B1120");
         let value: serde_json::Value = serde_json::from_str(&manifest).expect("valid JSON");
         assert_eq!(value["name"], "Acme");
         assert_eq!(value["icons"][0]["src"], "/favicon.svg");
+    }
+
+    #[test]
+    fn short_name_is_its_own_fact_not_a_copy_of_the_long_one() {
+        // `short_name` is what a launcher prints under an icon, in about twelve
+        // characters. It used to be a second copy of the trading name, which
+        // makes the field do nothing but truncate.
+        let manifest = render_manifest("Fire Outreach Network", "FON", "#b85207", "#110a07");
+        let value: serde_json::Value = serde_json::from_str(&manifest).expect("valid JSON");
+        assert_eq!(value["name"], "Fire Outreach Network");
+        assert_eq!(value["short_name"], "FON");
     }
 
     #[test]

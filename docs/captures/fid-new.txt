@@ -15,6 +15,8 @@ $ fid new demo-product
   wrote  design-system.md
   wrote  pipelines/design.toml
   wrote  apps/web/src/app/marks.css
+  wrote  apps/web/src/components/ui/LICENSES.md
+  wrote  apps/web/src/components/ui/doodle-arrows.tsx
   wrote  scripts/build-design-system.mjs
   wrote  .fiducial/skills/design.md
   wrote  .claude/skills/design.md
