@@ -1,0 +1,12 @@
+description = "Press kit, brand guidelines, and the stories a journalist writes from"
+
+# A declaration with no file of its own: a `fiducial.toml` block.
+#
+# Seeded so the pipeline this capability installs does not fail on the very
+# next `fid derive`. `founded` and `hq` are facts only this product knows;
+# `press_email` should be a real inbox someone reads, because a press contact
+# nobody answers is worse than none — a journalist on deadline moves on and
+# writes the story without you.
+[[declarations.config]]
+block = "press"
+seed = { founded = "", hq = "", press_email = "press@example.com", spokesperson = "" }

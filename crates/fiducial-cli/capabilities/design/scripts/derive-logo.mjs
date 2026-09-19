@@ -146,6 +146,17 @@ mkdirSync(dirname(new URL(`../${jsonOut}`, import.meta.url).pathname), { recursi
 writeFileSync(new URL(`../${jsonOut}`, import.meta.url), `${JSON.stringify(json, null, 2)}\n`);
 console.log(`wrote ${jsonOut}`);
 
+// The wordmark, published for download.
+//
+// The press kit needs a file a journalist can save, and `brand/icon.svg`
+// already reaches `public/favicon.svg` through the brand pipeline. This puts
+// the other primitive beside it. Copied from the primitive rather than
+// re-emitted, so there is still exactly one drawing of the mark.
+const pub = "apps/web/public/wordmark.svg";
+mkdirSync(dirname(new URL(`../${pub}`, import.meta.url).pathname), { recursive: true });
+writeFileSync(new URL(`../${pub}`, import.meta.url), read("brand/wordmark.svg"));
+console.log(`wrote ${pub}`);
+
 const out = "apps/web/src/generated/logo.ts";
 mkdirSync(dirname(new URL(`../${out}`, import.meta.url).pathname), { recursive: true });
 writeFileSync(new URL(`../${out}`, import.meta.url), lines.join("\n"));
