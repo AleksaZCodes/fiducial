@@ -42,16 +42,31 @@ const WIDGET = {
   number: { widget: "number", value_type: "int" },
   boolean: { widget: "boolean" },
   "string[]": { widget: "list" },
-  // A media key, not a URL: `media_folder` stages the file locally and
-  // `public_folder` is the prefix that ends up in the frontmatter.
-  media: {
-    widget: "image",
-    media_folder: `/${mediaDir}/${mediaPrefix}`,
-    public_folder: mediaPrefix,
-    allow_multiple: false,
-  },
+  media: { widget: "image", allow_multiple: false },
 };
 
+/**
+ * Where a collection's images live, on disk and in the key space.
+ *
+ * These two have to agree with how keys are actually written, because of how
+ * the editor resolves an existing one: it takes the **file name** out of the
+ * stored value and looks for it under the field's `media_folder`. So a key of
+ * `<prefix>/<file>` resolves, and `<prefix>/<extra>/<file>` does not — it asks
+ * the proxy for a path that was never there, which is a 500 in the console and
+ * a broken thumbnail on the page.
+ *
+ * `media` on the collection declares the prefix; the default is the
+ * collection's own name, which is the shape a new collection should use.
+ */
+const mediaFolders = (prefix) => ({
+  media_folder: `/${mediaDir}/${prefix}`,
+  public_folder: prefix,
+});
+
+// The folders are set on the COLLECTION, not on each media field: an image
+// dropped into a markdown body is the collection's too, and a field-level
+// folder leaves the body editor on the global default — which is how a post's
+// inline images ended up being looked for under the uploads prefix.
 const field = (name, type, extra = {}) => ({
   name,
   label: label(name),
@@ -71,6 +86,7 @@ function label(name) {
 // are writing rather than at the next build.
 const out = [];
 for (const [name, spec] of Object.entries(collections)) {
+  const prefix = spec.media ?? name;
   const fields = Object.entries(spec.schema ?? {}).map(([f, t]) =>
     // A date is the same instant in every language; duplicating it keeps the
     // locales from drifting apart by a day.
@@ -83,6 +99,7 @@ for (const [name, spec] of Object.entries(collections)) {
     name,
     label: label(name),
     folder: `content/${name}`,
+    ...mediaFolders(prefix),
     create: spec.kind !== "singleton",
     delete: spec.kind !== "singleton",
     slug: "{{slug}}",
@@ -136,6 +153,7 @@ if (has("press")) {
       name: `press-stories-${loc}`,
       label: `Press stories (${loc})`,
       folder: `press/${loc}/stories`,
+      ...mediaFolders("press/stories"),
       create: true,
       delete: true,
       slug: "{{slug}}",

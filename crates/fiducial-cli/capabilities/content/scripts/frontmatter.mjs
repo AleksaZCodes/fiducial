@@ -76,6 +76,18 @@ export function frontmatter(md, onError = () => {}) {
     const kv = line.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
     if (kv) {
       key = kv[1];
+      const raw = kv[2].trim();
+      // `alt: The FON icon: a white flame` is not YAML — a plain scalar may not
+      // contain ": ". This reader would happily take the rest of the line, and
+      // did, which is how twelve entries sat in the repository being read
+      // correctly here and rejected by every real YAML parser, including the
+      // content editor's. Quote the value.
+      if (raw && !/^["'[|>]/.test(raw) && (raw.includes(": ") || raw.endsWith(":"))) {
+        onError(
+          `\`${key}\` contains a colon and is not quoted, which is not valid YAML.\n` +
+            `  Write it as: ${key}: "${raw.replace(/"/g, '\\"')}"`,
+        );
+      }
       meta[key] = parseScalar(kv[2]);
       continue;
     }
