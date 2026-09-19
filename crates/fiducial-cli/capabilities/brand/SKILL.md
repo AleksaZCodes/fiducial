@@ -34,15 +34,39 @@ deck, the leave-behind — reads generated geometry extracted from these two
 files, never its own copy of a path.
 
 The `design` capability ships `scripts/derive-logo.mjs` for the extraction: it
-reads the `data-layer` groups out of both SVGs and writes a
-`src/generated/logo.ts`. Wire it as a pipeline so `fid derive` keeps it fresh:
+reads the `data-layer` groups out of both SVGs and writes `logo.ts` **and**
+`logo.json`. Wire it as a pipeline so `fid derive` keeps both fresh:
 
 ```toml
 name     = "logo"
 executor = "shell"
 args     = ["node", "scripts/derive-logo.mjs"]
-outputs  = ["apps/web/src/generated/logo.ts"]
+outputs  = [
+  "apps/web/src/generated/logo.ts",
+  "apps/web/src/generated/logo.json",
+]
 ```
+
+Two formats because there are two kinds of consumer. The TS module is for the
+components; the JSON is for anything running outside a bundler. Ship only the
+TS module and those scripts keep their own copy, which is the exact duplication
+the primitives exist to remove.
+
+### A node script should call the parser, not read the JSON
+
+`derive-logo.mjs` also **exports** `logoGeometry()`. A script in this repo that
+draws the mark — the design gallery, an OG-image generator — should import that
+rather than read `generated/logo.json`.
+
+The reason is a real hazard: **`fid derive` does not run pipelines in dependency
+order.** There is no `needs` field, and the order is not alphabetical either —
+in one product `logo-gallery` runs before `logo`. So a pipeline that reads a
+derived file can run before the pipeline that writes it, and a cold `fid derive`
+on a fresh clone produces a wrong artifact or an outright failure.
+
+Reading the primitives has no such hazard, because they are source. If you do
+add a pipeline that consumes another pipeline's output, test it by deleting the
+derived files and running a cold `fid derive` — do not assume an order.
 
 ### Why this is a rule and not a suggestion
 

@@ -55,19 +55,46 @@ function parse(svg) {
   return { viewBox, layer };
 }
 
-const iconSvg = read("brand/icon.svg");
-const wordSvg = read("brand/wordmark.svg");
-assertWellFormed("brand/icon.svg", iconSvg);
-assertWellFormed("brand/wordmark.svg", wordSvg);
-const icon = parse(iconSvg);
-const word = parse(wordSvg);
+/**
+ * The mark's geometry, read straight from the two primitives.
+ *
+ * Exported so that anything else drawing this logo calls it instead of reading
+ * a derived file. That matters for ordering: `fid derive` does not run
+ * pipelines in dependency order — it has no `needs` field, and the order turned
+ * out to be neither alphabetical nor declared — so a script that reads
+ * `generated/logo.json` may run before the pipeline that writes it. Reading the
+ * primitives has no such hazard, because they are source, not derived.
+ */
+export function logoGeometry() {
+  const iconSvg = read("brand/icon.svg");
+  const wordSvg = read("brand/wordmark.svg");
+  assertWellFormed("brand/icon.svg", iconSvg);
+  assertWellFormed("brand/wordmark.svg", wordSvg);
+  const icon = parse(iconSvg);
+  const word = parse(wordSvg);
 
-const flame = icon.layer("flame");
-const letters = word.layer("letters");
-const device = word.layer("device");
-if (!flame || !letters || !device) {
-  throw new Error("a primitive is missing a data-layer group (flame/letters/device)");
+  const flame = icon.layer("flame");
+  const letters = word.layer("letters");
+  const device = word.layer("device");
+  if (!flame || !letters || !device) {
+    throw new Error("a primitive is missing a data-layer group (flame/letters/device)");
+  }
+  return {
+    iconViewBox: icon.viewBox,
+    flameViewBox: flameBox(flame.paths.join(" ")),
+    wordmarkViewBox: word.viewBox,
+    FLAME: flame.paths.join(" "),
+    LETTERS: letters.paths,
+    DEVICE: device.polygons,
+  };
 }
+
+const g = logoGeometry();
+const icon = { viewBox: g.iconViewBox };
+const word = { viewBox: g.wordmarkViewBox };
+const flame = { paths: [g.FLAME] };
+const letters = { paths: g.LETTERS };
+const device = { polygons: g.DEVICE };
 
 // A square box tight to the flame and centred on its own width, for the places
 // the mark is used bare (an app icon slot, a bullet, a favicon caption). Derived
@@ -108,6 +135,17 @@ const lines = [
   `export const DEVICE = ${JSON.stringify(device.polygons, null, 2)} as const`,
   "",
 ];
+// JSON as well as TS. The TS module is for the React components; the JSON is
+// for the node scripts that also draw this mark — the design gallery, and
+// anything else that has to render it outside a bundler. Without it a script
+// keeps its own copy, which is precisely the failure this pipeline exists to
+// remove, and it had already happened twice.
+const json = g;
+const jsonOut = "apps/web/src/generated/logo.json";
+mkdirSync(dirname(new URL(`../${jsonOut}`, import.meta.url).pathname), { recursive: true });
+writeFileSync(new URL(`../${jsonOut}`, import.meta.url), `${JSON.stringify(json, null, 2)}\n`);
+console.log(`wrote ${jsonOut}`);
+
 const out = "apps/web/src/generated/logo.ts";
 mkdirSync(dirname(new URL(`../${out}`, import.meta.url).pathname), { recursive: true });
 writeFileSync(new URL(`../${out}`, import.meta.url), lines.join("\n"));
