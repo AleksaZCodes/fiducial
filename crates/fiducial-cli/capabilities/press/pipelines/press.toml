@@ -1,0 +1,27 @@
+name     = "press"
+executor = "shell"
+args     = ["node", "scripts/derive-press.mjs"]
+outputs  = ["apps/web/src/generated/press.ts"]
+
+# The press room, derived.
+#
+# `press/` holds the declarations a human writes — the boilerplate, the fast
+# facts, and the stories — and `[press]` in fiducial.toml holds the ones that
+# are structured. This pipeline turns them into a typed module the app renders,
+# so the press page cannot drift from the source and a story cannot be listed
+# without existing.
+#
+# ## Why the assets are not copied here
+#
+# A press kit's logo files are the brand primitives — `brand/icon.svg` and
+# `brand/wordmark.svg` — and they are already derived into the app by the
+# `brand` and `logo` pipelines. Copying them again would be a third drawing of
+# the mark, which is the specific failure the primitives exist to prevent and
+# which has shipped twice. The press page links to what is already there.
+#
+# ## Ordering
+#
+# This reads `press/` and `fiducial.toml` only, never another pipeline's
+# output, so it is safe wherever `fid derive` chooses to run it. That is
+# deliberate: `fid derive` has no `needs` field and its order is not
+# alphabetical, so a pipeline that consumes a derived file is a latent bug.

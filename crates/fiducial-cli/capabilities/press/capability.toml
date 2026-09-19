@@ -1,0 +1,26 @@
+description = "Press kit, brand guidelines, and the stories a journalist writes from"
+
+# Copy depends on i18n. Always.
+#
+# Everything this capability derives is prose a person reads: the boilerplate a
+# journalist pastes, the fast facts they quote, the stories they take an angle
+# from. That makes all of it a fact under MISSION.md 1c — declared once, one
+# derivation per locale, and a missing translation is a missing artifact rather
+# than a fallback.
+#
+# Installed without `i18n`, this capability would happily derive a monolingual
+# press room that looks complete. Nothing would fail; the product would find
+# out when a journalist who reads the other language opened the page. So the
+# prerequisite is declared and `fid add` refuses without it.
+requires_capabilities = ["i18n"]
+
+# A declaration with no file of its own: a `fiducial.toml` block.
+#
+# Seeded so the pipeline this capability installs does not fail on the very
+# next `fid derive`. `founded` and `hq` are facts only this product knows;
+# `press_email` should be a real inbox someone reads, because a press contact
+# nobody answers is worse than none — a journalist on deadline moves on and
+# writes the story without you.
+[[declarations.config]]
+block = "press"
+seed = { founded = "", hq = "", press_email = "press@example.com", spokesperson = "" }

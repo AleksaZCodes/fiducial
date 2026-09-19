@@ -22,7 +22,7 @@
 
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 
 use crate::config::{Config, CONFIG_FILE};
 use crate::lock::Lock;
@@ -117,6 +117,8 @@ pub fn find(id: &str) -> Option<&'static Capability> {
 /// 4. Merge capability guard rules into `fiducial.toml [guard]`.
 pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> {
     println!("✦ fid add {} — installing into {}", cap.id, root.display());
+
+    require_capabilities(cap, root)?;
 
     let mut lock = load_or_new_lock(root)?;
 
@@ -241,6 +243,50 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
         cap.id
     );
     Ok(())
+}
+
+/// Refuse to install a capability whose prerequisites are not present.
+///
+/// The case this exists for: **anything deriving user-visible copy depends on
+/// `i18n`.** Copy is a fact, a fact has one declaration and one derivation per
+/// locale (MISSION.md 1c), and a capability that writes prose without the
+/// locale machinery underneath it produces a monolingual artifact that looks
+/// finished. Nothing fails. The product discovers it when somebody who reads
+/// the other language opens the page — which is the precise failure 1c exists
+/// to prevent, arriving by the one route 1c does not cover.
+///
+/// So it is refused at install, where the fix is one more `fid add`, rather
+/// than surfaced later as a page in the wrong language.
+fn require_capabilities(cap: &Capability, root: &Path) -> Result<()> {
+    if cap.requires_capabilities.is_empty() {
+        return Ok(());
+    }
+    let config = Config::load(&root.join(crate::config::CONFIG_FILE))
+        .context("reading fiducial.toml to check capability prerequisites")?;
+    let missing: Vec<&String> = cap
+        .requires_capabilities
+        .iter()
+        .filter(|id| !config.capabilities.enabled.contains(id))
+        .collect();
+    if missing.is_empty() {
+        return Ok(());
+    }
+    let list = missing
+        .iter()
+        .map(|id| format!("`{id}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let adds = missing
+        .iter()
+        .map(|id| format!("fid add capability {id}"))
+        .collect::<Vec<_>>()
+        .join("\n  ");
+    bail!(
+        "[{}] requires {list}, which this product does not have.\n\n  \
+         {adds}\n\n\
+         Install the prerequisite first, then add this capability again.",
+        cap.id
+    );
 }
 
 /// Bring `messages/` in line with a declared locale set.
