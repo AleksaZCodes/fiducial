@@ -1,0 +1,45 @@
+name     = "seo"
+executor = "shell"
+args     = ["node", "scripts/derive-seo.mjs"]
+outputs  = [
+  "apps/web/src/generated/seo.ts",
+  "apps/web/src/generated/seo.json",
+  "apps/web/public/sitemap.xml",
+]
+
+# Routes → the sitemap, and the metadata every page renders.
+#
+# ## The declaration `fid-brand` said was missing
+#
+# The brand pipeline writes a sitemap with one URL in it, and its own comment
+# explains why: a route list "is a router's declaration, not the brand's",
+# left to be extended by hand "until routes become their own declaration".
+# Nobody extended it by hand. The site grew a press room, a blog, stories,
+# posts, legal pages and credits, and none of them was in the sitemap.
+#
+# This is that declaration, and it is not a list anyone keeps: every route is
+# computed from something that already declares it — the locales, each
+# collection's own `route`, the stories on disk, the legal pages the
+# jurisdiction produced, and the handful of plain pages in `[seo] pages`.
+#
+# ## Why the sitemap moved off `brand`
+#
+# Two pipelines writing one artifact is a race settled by pipeline name order,
+# silently. `apps/web/public/sitemap.xml` is removed from brand's outputs and
+# this owns it; the deriver refuses to run if it finds it listed in both,
+# rather than letting the last writer win.
+#
+# ## Social images are built, not derived here
+#
+# `generated/seo.json` is the same route list for the scripts that cannot
+# import TypeScript. `scripts/render-og.mjs` reads it before every web build
+# and renders one PNG per route into `public/og/`, which is gitignored: an OG
+# image is a picture of facts this repository already holds, and a committed
+# copy of a title is a copy that goes stale the day the title changes.
+#
+# ## Ordering
+#
+# `seo` sorts after `brand`, `content`, `legal` and `press`, which is what it
+# reads. That is alphabetical luck rather than a declared dependency, so the
+# deriver reads sources (and the legal catalogue, which is derived) defensively
+# and says what is missing instead of producing a short sitemap.

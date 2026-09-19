@@ -128,6 +128,7 @@ product actually needs.
 | `migrations` | declares `migrations`; 1 pipeline(s) | `fid add capability migrations` |
 | `press` | declares `press`, `press/en/boilerplate.md`, `press/en/facts.md`, `press/en/stories/0001-why-this-exists.md`; 1 pipeline(s); 4 template file(s); seeds a `fiducial.toml` block | `fid add capability press` |
 | `realtime` | a skill | `fid add capability realtime` |
+| `seo` | declares `seo`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability seo` |
 | `tauri` | 5 template file(s); guard rules | `fid add capability tauri` |
 | `web-next` | 8 template file(s); guard rules | `fid add capability web-next` |
 | `web-svelte` | 8 template file(s); guard rules | `fid add capability web-svelte` |
