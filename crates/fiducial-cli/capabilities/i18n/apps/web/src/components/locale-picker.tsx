@@ -75,7 +75,6 @@ export function LocalePicker({
 }) {
   const pathname = usePathname();
   const label = messages[locale]["nav.langLabel"];
-  const ActiveFlag = flagFor(locale);
   const icon = variant === "icon";
 
   return (
@@ -96,7 +95,7 @@ export function LocalePicker({
               : "gap-2 text-muted-foreground hover:text-foreground"
           }
         >
-          {ActiveFlag ? <ActiveFlag aria-hidden="true" className={FLAG_CLASS} /> : null}
+          <FlagFrame l={locale} />
           {icon ? null : messages[locale]["locale.name"]}
           {icon ? null : <ChevronDownIcon aria-hidden="true" className="opacity-60" />}
         </Button>
@@ -105,7 +104,6 @@ export function LocalePicker({
       <DropdownMenuContent align="end" className="min-w-44">
         <DropdownMenuGroup>
           {locales.map((l) => {
-            const Flag = flagFor(l);
             const current = l === locale;
             return (
               <DropdownMenuItem key={l} asChild>
@@ -119,7 +117,7 @@ export function LocalePicker({
                   lang={l}
                   aria-current={current}
                 >
-                  {Flag ? <Flag aria-hidden="true" className={FLAG_CLASS} /> : null}
+                  <FlagFrame l={l} />
                   <span className="flex-1">{messages[l]["locale.name"]}</span>
                   {current ? <CheckIcon aria-hidden="true" /> : null}
                 </Link>
@@ -139,18 +137,30 @@ export function LocalePicker({
  * nothing about any particular language and never needs editing.
  */
 /**
- * How a flag is drawn, everywhere.
+ * How a flag is drawn, everywhere: a 3:2 frame with a hairline border.
  *
- * A hairline border because several flags have white or near-white at their
- * edge — Serbia's has a white lower band — and without an outline those bleed
- * into a light surface and the mark loses its shape. The border is the
- * standard `--border`, not a bespoke grey, so it follows the theme.
+ * The frame is a `<span>`, not the `<svg>`, and that is the fix for a bug that
+ * drew the border as a SQUARE. Button and DropdownMenuItem both size every
+ * child svg that lacks a `size-*` class to `size-4` — 16 by 16 — through a
+ * descendant selector that outranks a plain `h-*`/`w-*` utility on the svg. So
+ * the flag's own 3:2 dimensions were overridden, the flag letterboxed inside a
+ * square, and the border traced the square.
  *
- * 3:2 is the aspect most of this set is drawn at; the explicit width stops a
- * flag with different proportions from setting its own size and making the row
- * jump.
+ * The span owns the 3:2 box and the border; the svg fills it with `size-full`,
+ * whose class name contains `size-` and so opts out of the parents' rule.
  */
-const FLAG_CLASS = "h-3.5 w-[1.3125rem] shrink-0 rounded-[1px] border border-border object-cover";
+function FlagFrame({ l }: { l: Locale }) {
+  const Flag = flagFor(l);
+  if (!Flag) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex h-3.5 w-[1.3125rem] shrink-0 overflow-hidden rounded-[1px] border border-border"
+    >
+      <Flag className="size-full" />
+    </span>
+  );
+}
 
 function flagFor(l: Locale) {
   const region = messages[l]["locale.region"];

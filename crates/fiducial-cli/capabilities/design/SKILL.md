@@ -205,8 +205,16 @@ element's height**, or the two cuts on one edge meet and the box degenerates
 into a lozenge. A chip given the panel corner is not slightly wrong, it is a
 different shape.
 
-`.cham` / `.cham-sm` / `.cham-xs` / `.cham-b` in the marks layer carry the
-chamfer. They are inert under `round`.
+`.cham` / `.cham-sm` / `.cham-xs` / `.cham-b` / `.cham-t` in the marks layer
+carry the chamfer. They are inert under `round`. `.cham-b` (the nav, cut along
+its bottom) and `.cham-t` (the footer, cut along its top) are the page's two
+fixed bands. They use `--corner-band` when it is set and fall back to the panel
+corner.
+
+`--corner-band` is not a `fid:shape` step. The scale has three steps, and
+`fid derive` drops keys it does not know **without an error**, so a
+`band = ...` line in `design-system.md` does nothing. Set it in the product's
+`globals.css` instead, and record the value and the reason in the changelog.
 
 ## Rule 5 · Annotation, with a budget
 

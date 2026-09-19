@@ -158,7 +158,10 @@ function loadLocale(loc) {
       const { meta, body } = frontmatter(read(`${base}/stories/${f}`));
       return {
         slug: f.replace(/\.md$/, ""), title: meta.title ?? f, angle: meta.angle ?? "",
-        date: meta.date ?? "", summary: meta.summary ?? "", body,
+        date: meta.date ?? "", summary: meta.summary ?? "",
+        // A media key, not a URL: the renderer resolves it through the storage
+        // adapter, so a story never knows which vendor holds its picture.
+        cover: meta.cover ?? "", coverAlt: meta.cover_alt ?? "", body,
       };
     });
   return { boilerplate: sections(read(`${base}/boilerplate.md`)), facts: pairs(read(`${base}/facts.md`)), stories };

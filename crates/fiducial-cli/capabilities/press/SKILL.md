@@ -60,6 +60,47 @@ So everything another declaration already owns is read from that declaration:
 Only the prose a person must write lives in `press/`, and `fid derive` turns it
 into `src/generated/press.ts`.
 
+## The page, in the order a journalist needs it
+
+`PressKit` lays the room out as: **assets** (the logo files, then a photo and
+diagram gallery), **fast facts**, **boilerplate**, **stories**, **contact**.
+Most visitors arrive with a story already and want a picture for it. Prose
+first puts the thing they came for three screens down.
+
+Every image carries a caption and a download button (`MediaFigure`), and every
+story card is one link covering the whole card, with the story's cover on it.
+
+## Media is keys, not files
+
+Stories may carry `cover` and `cover_alt` in their frontmatter. The gallery is
+a list of `{ key, alt, caption }`, and a content collection is the natural
+source for it:
+
+```toml
+# content.toml
+[collections.press-gallery]
+kind   = "collection"
+schema = { key = "string", alt = "string", caption = "string", order = "number" }
+body   = "none"
+route  = ""
+```
+
+`cover` and `key` are **object keys in the product's storage**
+(`press/stories/origin.png`), never URLs and never files in git. `mediaUrl()`
+in `src/lib/media.ts` turns a key into `/media/<key>`. The product serves that
+path from its `[adapters] storage` backend, with `?download` sending
+`Content-Disposition: attachment`, which is what the download buttons use. On
+Cloudflare that is a route handler reading the R2 binding. Changing storage
+vendor changes that route, not the content.
+
+An image with text in it needs one object per locale (`system.en.png`,
+`system.sr.png`), each named by its own locale's entry. A logo render or a
+photo is shared.
+
+Renders of the mark (a PNG of the wordmark for someone's slides) are media, but
+they are renders of the two primitives, not sources. Re-render them whenever the
+mark changes. The bucket is outside `fid derive`, so nothing will do it for you.
+
 ## Writing the boilerplate
 
 Three lengths — one sentence, two-to-three, a paragraph — because three are

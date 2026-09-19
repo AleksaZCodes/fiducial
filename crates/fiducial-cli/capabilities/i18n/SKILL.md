@@ -165,6 +165,21 @@ a currency is the same class of bug as a length without a unit.
 
 **Currency is independent of locale.** A Serbian reader may be invoiced in EUR.
 
+**Format with the catalog's `locale.tag`, not the locale code.** Every
+catalog carries a full BCP 47 tag (`"locale": { "tag": "sr-Latn-RS" }`) and
+that is what goes to `Intl`. The short code is a routing key, and it is not
+precise enough to format with. `Intl` resolves a bare `sr` to Cyrillic, so a
+site written in Latin script prints its dates in the other alphabet. Nothing
+fails; it just looks wrong on every page that shows a date.
+
+```ts
+formatDate(instant, messages[locale]["locale.tag"], "Europe/Belgrade")
+```
+
+A date-only value from frontmatter (`2026-09-19`) parses as UTC midnight.
+Format it with `timeZone: "UTC"`, or a reader west of Greenwich sees the day
+before.
+
 ## Hardcoded strings
 
 `fid doctor` and `fid dash` report user-visible literals not going through

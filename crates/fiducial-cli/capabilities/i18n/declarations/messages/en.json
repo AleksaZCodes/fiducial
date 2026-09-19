@@ -1,7 +1,8 @@
 {
   "locale": {
     "name": "English",
-    "region": "GB"
+    "region": "GB",
+    "tag": "en-GB"
   },
   "footer": {
     "madeWith": "Made with"

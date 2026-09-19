@@ -128,10 +128,10 @@ const lines = [
   "/** The flame. Outer contour then counter — fill-rule evenodd. */",
   `export const FLAME = ${JSON.stringify(flame.paths.join(" "))}`,
   "",
-  "/** `utreach`, lifted unmodified from the Outreach wordmark. */",
+  "/** The wordmark's letters: every path in `data-layer=\"letters\"`. */",
   `export const LETTERS = ${JSON.stringify(letters.paths, null, 2)} as const`,
   "",
-  "/** The radio-transmission device on the `h`. */",
+  "/** The wordmark's `data-layer=\"device\"` polygons, drawn apart from the letters. */",
   `export const DEVICE = ${JSON.stringify(device.polygons, null, 2)} as const`,
   "",
 ];
