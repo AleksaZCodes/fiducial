@@ -164,6 +164,22 @@ function loadLocale(loc) {
   return { boilerplate: sections(read(`${base}/boilerplate.md`)), facts: pairs(read(`${base}/facts.md`)), stories };
 }
 
+// A press room with no contact is worse than no press room: a journalist who
+// cannot reach you writes the piece anyway, without the quote checked.
+//
+// This exists because the block went missing and nothing noticed. `[press]` was
+// dropped from fiducial.toml by an unrelated edit, every field read as an empty
+// string, the page rendered with a blank contact section, and the build stayed
+// green. An empty required fact fails here, where it is cheap, rather than on a
+// page somebody is reading on deadline.
+if (!press.press_email) {
+  throw new Error(
+    "derive-press: [press] press_email is empty or missing from fiducial.toml.\n\n" +
+      "  A press kit exists to be used. Without a contact address it is a page that\n" +
+      "  tells a journalist to go and find someone else.",
+  );
+}
+
 const byLocale = Object.fromEntries(locales.map((l) => [l, loadLocale(l)]));
 
 // Every locale must carry the same stories. A press room that has the failure

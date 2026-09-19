@@ -49,6 +49,28 @@ pub struct Config {
     /// not added the `legal` capability carries no empty `[legal]` block.
     #[serde(default, skip_serializing_if = "Legal::is_empty")]
     pub legal: Legal,
+
+    /// Every other top-level block, kept verbatim.
+    ///
+    /// Without this, `fid` round-trips `fiducial.toml` through a typed struct
+    /// and **silently deletes any block it does not have a field for** — which
+    /// is every block a capability outside this binary declares. The platform
+    /// invites exactly that: `[[declarations.config]] block = "..."` is how a
+    /// capability says it owns a `fiducial.toml` block, and a capability can be
+    /// installed `--from` a path or a git repository without the CLI knowing
+    /// anything about it.
+    ///
+    /// It was found the ordinary way. The `press` capability declared
+    /// `[press]`, a product filled it in, and three later `fid add` runs — for
+    /// unrelated capabilities — dropped it. Nothing failed: the block was gone,
+    /// the pipeline read empty strings, and the press page rendered with no
+    /// contact address. A deletion that leaves a working build is the kind that
+    /// reaches production.
+    ///
+    /// `flatten` collects them on read and writes them back on save, so a block
+    /// this binary has never heard of survives contact with it.
+    #[serde(flatten, default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub extra: std::collections::BTreeMap<String, toml::Value>,
 }
 
 /// `[ai]` — what an AI gateway needs that nothing can derive.
@@ -861,7 +883,7 @@ impl Config {
 
 #[cfg(test)]
 mod brand_tests {
-    use super::Brand;
+    use super::{Brand, Config};
 
     fn filled() -> Brand {
         Brand {
@@ -909,5 +931,56 @@ mod brand_tests {
         brand.primary_color = "blue".into();
         let err = brand.validate().unwrap_err();
         assert!(format!("{err:#}").contains("primary_color"));
+    }
+
+    /// A block this binary has never heard of survives a read/write round trip.
+    ///
+    /// The regression: `fid` round-trips `fiducial.toml` through this struct,
+    /// and before `Config::extra` existed it silently dropped every top-level
+    /// block without a matching field. That is every block a capability outside
+    /// this binary declares — and the platform explicitly invites those, via
+    /// `[[declarations.config]]` and `fid add capability --from`.
+    ///
+    /// It cost a product its `[press]` block. Nothing failed: the pipeline read
+    /// empty strings and the press page rendered with no contact address. A
+    /// deletion that leaves a green build is the kind that ships.
+    #[test]
+    fn unknown_blocks_survive_a_round_trip() {
+        let src = r#"
+[product]
+name = "x"
+version = "0.1.0"
+
+[press]
+press_email = "keep@me.com"
+founded = "2026"
+
+[whatever-someone-ships-next]
+nested = { a = 1 }
+"#;
+        let config: Config = toml::from_str(src).expect("parses");
+        let out = toml::to_string_pretty(&config).expect("serializes");
+
+        assert!(out.contains("[press]"), "the [press] block was dropped:\n{out}");
+        assert!(out.contains("keep@me.com"), "a value inside it was dropped:\n{out}");
+        // Asserted on the data, not the spelling: TOML writes a table whose
+        // only member is a table as `[a.b]`, which is the same document. A test
+        // that pins the header text fails on a correct serializer.
+        assert!(
+            out.contains("whatever-someone-ships-next"),
+            "an unknown block was dropped:\n{out}"
+        );
+        let reparsed: toml::Value = toml::from_str(&out).expect("valid toml");
+        assert_eq!(
+            reparsed["whatever-someone-ships-next"]["nested"]["a"].as_integer(),
+            Some(1),
+            "a nested value inside an unknown block was lost:\n{out}"
+        );
+
+        // And it is still there after a second trip, which is what `fid add`
+        // followed by `fid add` actually does.
+        let again: Config = toml::from_str(&out).expect("reparses");
+        let twice = toml::to_string_pretty(&again).expect("reserializes");
+        assert!(twice.contains("keep@me.com"), "lost on the second trip:\n{twice}");
     }
 }

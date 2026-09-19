@@ -9,10 +9,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { type Locale, locales, messages } from "@/generated/messages";
-import { localePath } from "@/lib/i18n";
+import { switchLocalePath } from "@/lib/i18n";
 import * as Flags from "country-flag-icons/react/3x2";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 /**
  * The language picker.
@@ -72,6 +73,7 @@ export function LocalePicker({
   locale: Locale;
   variant?: LocalePickerVariant;
 }) {
+  const pathname = usePathname();
   const label = messages[locale]["nav.langLabel"];
   const ActiveFlag = flagFor(locale);
   const icon = variant === "icon";
@@ -88,9 +90,13 @@ export function LocalePicker({
           size={icon ? "icon-sm" : "sm"}
           aria-label={label}
           title={icon ? messages[locale]["locale.name"] : undefined}
-          className={icon ? "text-muted-foreground hover:text-foreground" : "gap-2 text-muted-foreground hover:text-foreground"}
+          className={
+            icon
+              ? "text-muted-foreground hover:text-foreground"
+              : "gap-2 text-muted-foreground hover:text-foreground"
+          }
         >
-          {ActiveFlag ? <ActiveFlag aria-hidden="true" className="h-3 w-[1.125rem]" /> : null}
+          {ActiveFlag ? <ActiveFlag aria-hidden="true" className={FLAG_CLASS} /> : null}
           {icon ? null : messages[locale]["locale.name"]}
           {icon ? null : <ChevronDownIcon aria-hidden="true" className="opacity-60" />}
         </Button>
@@ -107,8 +113,13 @@ export function LocalePicker({
                     crawlable — a locale switcher that is a click handler is
                     invisible to a search engine and to anyone opening it in a
                     new tab. `hrefLang` states the relationship outright. */}
-                <Link href={localePath(l)} hrefLang={l} lang={l} aria-current={current}>
-                  {Flag ? <Flag aria-hidden="true" className="h-3 w-[1.125rem]" /> : null}
+                <Link
+                  href={switchLocalePath(pathname, locale, l)}
+                  hrefLang={l}
+                  lang={l}
+                  aria-current={current}
+                >
+                  {Flag ? <Flag aria-hidden="true" className={FLAG_CLASS} /> : null}
                   <span className="flex-1">{messages[l]["locale.name"]}</span>
                   {current ? <CheckIcon aria-hidden="true" /> : null}
                 </Link>
@@ -127,6 +138,20 @@ export function LocalePicker({
  * The lookup is on the catalog's own `locale.region`, so this function knows
  * nothing about any particular language and never needs editing.
  */
+/**
+ * How a flag is drawn, everywhere.
+ *
+ * A hairline border because several flags have white or near-white at their
+ * edge — Serbia's has a white lower band — and without an outline those bleed
+ * into a light surface and the mark loses its shape. The border is the
+ * standard `--border`, not a bespoke grey, so it follows the theme.
+ *
+ * 3:2 is the aspect most of this set is drawn at; the explicit width stops a
+ * flag with different proportions from setting its own size and making the row
+ * jump.
+ */
+const FLAG_CLASS = "h-3.5 w-[1.3125rem] shrink-0 rounded-[1px] border border-border object-cover";
+
 function flagFor(l: Locale) {
   const region = messages[l]["locale.region"];
   return (Flags as Record<string, React.ComponentType<{ className?: string }> | undefined>)[region];
