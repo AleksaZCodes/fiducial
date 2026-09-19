@@ -207,7 +207,7 @@ One file is a complete capability. The failure mode for an extension system is
 ceremony, so `capability.toml` is optional and a capability without one takes
 its description from the first line of prose in its own skill.
 
-### The four kinds, and why the difference is not cosmetic
+### The six kinds, and why the difference is not cosmetic
 
 <!-- fid:describes crates/fiducial-cli/src/capability/manifest.rs#pub fn derive -->
 
@@ -217,6 +217,7 @@ its description from the first line of prose in its own skill.
 | **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/eda.toml` |
 | **Adapter** | a swappable vendor behind a fixed contract | `storage = "r2"` |
 | **Tool** | an external command the capability's work needs on PATH — declared, never installed | `requires_tools = ["wrangler"]` |
+| **Prerequisite** | another capability this one cannot work without — checked at install, not at first failure | `requires_capabilities = ["i18n"]` |
 | **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
 
 <!-- fid:end-describes -->

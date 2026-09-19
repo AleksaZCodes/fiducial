@@ -315,7 +315,7 @@ a schedule is a fact `SHIPPED.md` owns, and a second copy of it drifts.
 
 ## What a capability is made of
 
-Four kinds, and the difference is not cosmetic — see
+Six kinds, and the difference is not cosmetic — see
 `docs/specs/2026-09-14-capability-taxonomy.md`.
 
 <!-- fid:describes crates/fiducial-cli/src/capability/manifest.rs#pub fn derive -->
@@ -326,6 +326,7 @@ Four kinds, and the difference is not cosmetic — see
 | **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/eda.toml` |
 | **Adapter** | a swappable vendor behind a fixed contract, selected in `[adapters]` | `storage = "none"` |
 | **Tool** | an external command the capability's work needs on PATH — declared, never installed | `requires_tools = ["wrangler"]` |
+| **Prerequisite** | another capability this one cannot work without — checked at install, not at first failure | `requires_capabilities = ["i18n"]` |
 | **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
 
 <!-- fid:end-describes -->
