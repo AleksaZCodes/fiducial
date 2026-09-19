@@ -69,7 +69,11 @@ pub struct Config {
     ///
     /// `flatten` collects them on read and writes them back on save, so a block
     /// this binary has never heard of survives contact with it.
-    #[serde(flatten, default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    #[serde(
+        flatten,
+        default,
+        skip_serializing_if = "std::collections::BTreeMap::is_empty"
+    )]
     pub extra: std::collections::BTreeMap<String, toml::Value>,
 }
 
@@ -961,8 +965,14 @@ nested = { a = 1 }
         let config: Config = toml::from_str(src).expect("parses");
         let out = toml::to_string_pretty(&config).expect("serializes");
 
-        assert!(out.contains("[press]"), "the [press] block was dropped:\n{out}");
-        assert!(out.contains("keep@me.com"), "a value inside it was dropped:\n{out}");
+        assert!(
+            out.contains("[press]"),
+            "the [press] block was dropped:\n{out}"
+        );
+        assert!(
+            out.contains("keep@me.com"),
+            "a value inside it was dropped:\n{out}"
+        );
         // Asserted on the data, not the spelling: TOML writes a table whose
         // only member is a table as `[a.b]`, which is the same document. A test
         // that pins the header text fails on a correct serializer.
@@ -981,6 +991,9 @@ nested = { a = 1 }
         // followed by `fid add` actually does.
         let again: Config = toml::from_str(&out).expect("reparses");
         let twice = toml::to_string_pretty(&again).expect("reserializes");
-        assert!(twice.contains("keep@me.com"), "lost on the second trip:\n{twice}");
+        assert!(
+            twice.contains("keep@me.com"),
+            "lost on the second trip:\n{twice}"
+        );
     }
 }
