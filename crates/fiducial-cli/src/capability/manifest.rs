@@ -149,6 +149,16 @@ pub struct Capability {
     /// itself as a command-not-found halfway through a release rather than at
     /// the moment the capability is installed.
     pub requires_tools: Vec<String>,
+    /// Other capabilities this one cannot work without.
+    ///
+    /// Not a convenience. A capability that derives user-visible copy is
+    /// incomplete without `i18n`, because copy is a fact and a fact has one
+    /// declaration and one derivation per locale (MISSION.md 1c). Installed
+    /// alone, such a capability quietly produces a monolingual artifact and the
+    /// product only discovers it when someone who reads the other language
+    /// looks at the page — which is the exact failure 1c exists to prevent, so
+    /// it is caught at install instead.
+    pub requires_capabilities: Vec<String>,
     pub guard_rules: Vec<String>,
     pub templates: Vec<FileEntry>,
     pub skill_md: String,
@@ -167,6 +177,8 @@ struct Manifest {
     requires_adapters: Vec<String>,
     #[serde(default)]
     requires_tools: Vec<String>,
+    #[serde(default)]
+    requires_capabilities: Vec<String>,
     #[serde(default)]
     declarations: ManifestDeclarations,
 }
@@ -285,6 +297,7 @@ pub fn derive(id: &str, files: &BTreeMap<String, String>, source: Source) -> Res
         pipelines,
         requires_adapters: manifest.requires_adapters,
         requires_tools: manifest.requires_tools,
+        requires_capabilities: manifest.requires_capabilities,
         guard_rules: manifest.guard_rules,
         templates,
         skill_md,

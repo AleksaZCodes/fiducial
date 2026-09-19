@@ -1,6 +1,6 @@
 import type * as React from "react";
 
-import { press } from "@/generated/press";
+import { type PressLocale, press, pressFor } from "@/generated/press";
 
 /**
  * The press room: guidelines, kit, and stories.
@@ -18,9 +18,18 @@ import { press } from "@/generated/press";
  * copies as plain text, which is the entire job.
  */
 export function PressKit({
+  locale,
   labels,
   logos,
 }: {
+  /**
+   * Which locale's press room to render.
+   *
+   * Required, and there is no fallback. A locale missing its boilerplate fails
+   * `fid derive`, so by the time this renders every declared locale is
+   * complete — which is why this can index without a guard.
+   */
+  locale: PressLocale;
   /** Localized headings. The capability does not own this product's copy. */
   labels: Record<
     | "title"
@@ -39,6 +48,8 @@ export function PressKit({
   /** Downloadable marks. These are the brand primitives, not new files. */
   logos: { label: string; href: string }[];
 }) {
+  const room = pressFor(locale);
+
   return (
     <div className="mx-auto max-w-4xl px-5 py-20 sm:px-8">
       <h1 className="type-h1">{labels.title}</h1>
@@ -47,7 +58,7 @@ export function PressKit({
         <h2 className="type-h2">{labels.boilerplate}</h2>
         <div className="mt-6 flex flex-col gap-6">
           {(["short", "medium", "long"] as const).map((k) =>
-            press.boilerplate[k] ? (
+            room.boilerplate[k] ? (
               <div key={k}>
                 <h3 className="type-small font-display font-semibold">{labels[k]}</h3>
                 {/* `bg-transparent` is load-bearing: a textarea paints its own
@@ -65,7 +76,7 @@ export function PressKit({
                   rows={k === "long" ? 9 : k === "medium" ? 5 : 3}
                   style={{ fieldSizing: "content" } as React.CSSProperties}
                   className="cham type-small mt-2 w-full resize-none bg-transparent p-4 font-body text-foreground"
-                  value={press.boilerplate[k]}
+                  value={room.boilerplate[k]}
                 />
               </div>
             ) : null,
@@ -76,7 +87,7 @@ export function PressKit({
       <section className="mt-14">
         <h2 className="type-h2">{labels.facts}</h2>
         <dl className="mt-6 grid gap-x-8 gap-y-3 sm:grid-cols-2">
-          {press.facts.map((f) => (
+          {room.facts.map((f) => (
             <div key={f.label} className="flex justify-between gap-4 border-b border-border pb-2">
               <dt className="type-small text-muted-foreground">{f.label}</dt>
               <dd className="type-small font-medium">{f.value}</dd>
@@ -106,7 +117,7 @@ export function PressKit({
       <section className="mt-14">
         <h2 className="type-h2">{labels.stories}</h2>
         <ul className="mt-6 flex flex-col gap-4">
-          {press.stories.map((s) => (
+          {room.stories.map((s) => (
             <li key={s.slug} className="cham p-6">
               <div className="flex items-baseline justify-between gap-4">
                 <h3 className="type-h3">{s.title}</h3>

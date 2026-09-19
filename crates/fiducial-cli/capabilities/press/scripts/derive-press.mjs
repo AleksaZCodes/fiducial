@@ -36,21 +36,51 @@ const read = (p) => readFileSync(at(p), "utf8");
 function tomlBlock(src, name) {
   const out = {};
   let inside = false;
+  let pending = null; // key whose array value spans lines
+
   for (const raw of src.split("\n")) {
     const line = raw.trim();
+
+    // A multi-line array. TOML allows `locales = [` … `]` across lines and
+    // `[i18n]` is normally written that way, so a line-wise parser that stops
+    // at the newline reads the value as `[` and reports no locales at all.
+    if (pending !== null) {
+      pending.buf += ` ${line}`;
+      if (line.includes("]")) {
+        out[pending.key] = pending.buf.trim();
+        pending = null;
+      }
+      continue;
+    }
+
     if (/^\[[^\]]+\]$/.test(line)) {
       inside = line === `[${name}]`;
       continue;
     }
     if (!inside || !line || line.startsWith("#")) continue;
-    const kv = raw.match(/^\s*([A-Za-z_][\w-]*)\s*=\s*(.+?)\s*$/);
+
+    const kv = raw.match(/^\s*([A-Za-z_][\w-]*)\s*=\s*(.*)$/);
     if (!kv) continue;
     let v = kv[2].trim();
+
+    if (v.startsWith("[") && !v.includes("]")) {
+      pending = { key: kv[1], buf: v };
+      continue;
+    }
     if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
-    else v = v.replace(/\s*#.*$/, "").trim();
+    else if (!v.startsWith("[")) v = v.replace(/\s*#.*$/, "").trim();
     out[kv[1]] = v;
   }
   return out;
+}
+
+/** A TOML array literal (single or multi-line) → string[]. */
+function tomlArray(v) {
+  return String(v ?? "")
+    .replace(/^\[|\]$/g, "")
+    .split(",")
+    .map((s) => s.trim().replace(/^"|"$/g, ""))
+    .filter(Boolean);
 }
 
 const cfg = read("fiducial.toml");
@@ -89,19 +119,70 @@ function frontmatter(md) {
   return { meta, body: decomment(m[2]) };
 }
 
-const boilerplate = sections(read("press/boilerplate.md"));
-const facts = pairs(read("press/facts.md"));
+/**
+ * The locales, read from `[i18n]`.
+ *
+ * This capability requires `i18n`, so the block is always there. Copy is a
+ * fact and a fact has one derivation per locale.
+ */
+const i18n = tomlBlock(cfg, "i18n");
+const locales = tomlArray(i18n.locales);
+if (locales.length === 0) {
+  throw new Error("derive-press: [i18n] declares no locales");
+}
 
-const dir = at("press/stories");
-const stories = (existsSync(dir) ? readdirSync(dir) : [])
-  .filter((f) => f.endsWith(".md")).sort()
-  .map((f) => {
-    const { meta, body } = frontmatter(readFileSync(new URL(`press/stories/${f}`, at("")), "utf8"));
-    return { slug: f.replace(/\.md$/, ""), title: meta.title ?? f, angle: meta.angle ?? "",
-             date: meta.date ?? "", summary: meta.summary ?? "", body };
-  });
+/** Load one locale's press room, or say exactly what is missing. */
+function loadLocale(loc) {
+  const base = `press/${loc}`;
+  const need = [`${base}/boilerplate.md`, `${base}/facts.md`];
+  const absent = need.filter((f) => !existsSync(at(f)));
+  if (absent.length) {
+    // MISSION.md 1c: a missing translation is a MISSING ARTIFACT, not a
+    // fallback. Falling back to the default locale here is the tempting
+    // behaviour and the wrong one — it ships a press kit that silently serves
+    // English boilerplate to a Serbian journalist, who quotes it, and nobody
+    // finds out.
+    throw new Error(
+      `derive-press: locale \`${loc}\` is declared in [i18n] but its press room ` +
+        `is incomplete.\n\n  missing:\n` +
+        absent.map((f) => `    ${f}`).join("\n") +
+        `\n\n  A missing translation is a missing artifact, not a fallback ` +
+        `(MISSION.md 1c).\n  Write them, or remove \`${loc}\` from [i18n] locales.`,
+    );
+  }
+  const storyDir = at(`${base}/stories`);
+  const stories = (existsSync(storyDir) ? readdirSync(storyDir) : [])
+    .filter((f) => f.endsWith(".md"))
+    .sort()
+    .map((f) => {
+      const { meta, body } = frontmatter(read(`${base}/stories/${f}`));
+      return {
+        slug: f.replace(/\.md$/, ""), title: meta.title ?? f, angle: meta.angle ?? "",
+        date: meta.date ?? "", summary: meta.summary ?? "", body,
+      };
+    });
+  return { boilerplate: sections(read(`${base}/boilerplate.md`)), facts: pairs(read(`${base}/facts.md`)), stories };
+}
+
+const byLocale = Object.fromEntries(locales.map((l) => [l, loadLocale(l)]));
+
+// Every locale must carry the same stories. A press room that has the failure
+// story in one language and not the other is not translated, it is two
+// different press rooms — and the one missing it is the one that reads as
+// marketing.
+const slugSets = locales.map((l) => byLocale[l].stories.map((s) => s.slug).sort().join("|"));
+if (new Set(slugSets).size > 1) {
+  const detail = locales
+    .map((l) => `    ${l}: ${byLocale[l].stories.map((s) => s.slug).join(", ") || "(none)"}`)
+    .join("\n");
+  throw new Error(
+    `derive-press: the locales do not carry the same stories.\n\n${detail}\n\n` +
+      `  Every story exists in every locale, or it exists in none.`,
+  );
+}
 
 const out = {
+  locales,
   pressEmail: press.press_email ?? "",
   founded: press.founded ?? "",
   hq: press.hq ?? "",
@@ -109,7 +190,7 @@ const out = {
   legalName: brand.legal_name ?? "",
   tradingName: brand.trading_name ?? "",
   domain: brand.domain ?? "",
-  boilerplate, facts, stories,
+  byLocale,
 };
 
 const lines = [
@@ -122,10 +203,14 @@ const lines = [
   "",
   `export const press = ${JSON.stringify(out, null, 2)} as const`,
   "",
-  "export type Story = (typeof press.stories)[number]",
+  "export type PressLocale = (typeof press.locales)[number]",
+  "export type Story = (typeof press.byLocale)[PressLocale][\"stories\"][number]",
+  "",
+  "/** One locale's press room. A locale absent here failed the build, not this call. */",
+  "export const pressFor = (locale: PressLocale) => press.byLocale[locale]",
   "",
 ];
 const target = "apps/web/src/generated/press.ts";
 mkdirSync(dirname(at(target).pathname), { recursive: true });
 writeFileSync(at(target), lines.join("\n"));
-console.log(`wrote ${target} (${stories.length} story/stories)`);
+console.log(`wrote ${target} (${locales.length} locale(s), ${byLocale[locales[0]].stories.length} story/stories each)`);

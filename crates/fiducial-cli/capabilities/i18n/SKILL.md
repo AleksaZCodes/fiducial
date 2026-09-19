@@ -15,6 +15,55 @@ fid derive --check            ← fails if any locale is missing a key
 ```
 
 
+
+## Anything that derives copy depends on this capability
+
+Not "should consider". Depends — as a declared prerequisite, enforced at
+install by `requires_capabilities` in a capability's `capability.toml`:
+
+```toml
+requires_capabilities = ["i18n"]
+```
+
+`fid add` refuses to install without it and names what to add first.
+
+The rule is a consequence of 1c rather than a new idea. A user-visible string
+is a fact; a fact has one declaration and one derivation per locale; a missing
+translation is a missing artifact. A capability that writes prose without the
+locale machinery underneath it cannot satisfy any of that, so it is not "i18n
+later" — it is a capability that produces a monolingual artifact and reports
+success.
+
+That is the specific danger. Monolingual output does not look broken. It looks
+finished, ships, and is discovered when somebody who reads the other language
+opens the page — which is exactly the failure 1c exists to prevent, arriving by
+the one route 1c does not cover, because there was never a second catalog for
+anything to be missing from.
+
+`press` is the worked example: boilerplate, fast facts and stories are all
+copy, so it declares the dependency, keeps its declarations under
+`press/<locale>/`, and fails the build when a declared locale is short a file
+or when the locales do not carry the same set of stories.
+
+### Structure copy per locale, not per file
+
+```
+press/en/boilerplate.md
+press/en/facts.md
+press/en/stories/0002-what-the-enclosure-got-wrong.md
+press/sr/boilerplate.md
+press/sr/facts.md
+press/sr/stories/0002-what-the-enclosure-got-wrong.md
+```
+
+Same filenames under each locale, so a missing translation is a missing *file*
+— something a build can see. A single directory with a language suffix on each
+name hides the gap in a listing, and a per-file fallback hides it completely.
+
+**Check set parity, not just presence.** A press room carrying the failure
+story in one language and not the other is not translated; it is two different
+press rooms, and the one missing that story is the one that reads as marketing.
+
 ## Every locale declares itself
 
 Each catalog carries its own name and its own flag region:
