@@ -718,9 +718,18 @@ fn run_fid_brand(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
                 &brand.domain,
                 &brand.contact_email,
             ),
+            "brand.ts" => crate::brand::render_brand_ts(
+                &brand.legal_name,
+                &brand.trading_name,
+                brand.short_name.as_deref().unwrap_or(&brand.trading_name),
+                &brand.domain,
+                &brand.contact_email,
+                brand.primary_color(),
+                brand.background_color(),
+            ),
             other => bail!(
                 "fid-brand: unknown output `{other}` (supported: robots.txt, sitemap.xml, \
-                 site.webmanifest, favicon.svg, organization.jsonld)"
+                 site.webmanifest, favicon.svg, organization.jsonld, brand.ts)"
             ),
         };
 

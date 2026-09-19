@@ -1150,6 +1150,10 @@ fiducial/
 | **21** | The documentation layer | Step-by-step guides for humans and agents; terminal captures checked by CI | ✅ |
 | **21b** | Namespaced agents — `fiducial-design` / `-review` / `-implement` | A subagent's filename is its identity; a colliding name is silently unavailable | ✅ |
 | **22** | i18n — localized by construction | A missing translation fails `fid derive --check` | ✅ |
+| **23** | Components start at shadcn/ui | `design` ships `components.json` and adapted `button` / `card` / `dropdown-menu`; the corner and surface change, the accessibility does not | ✅ |
+| **23b** | Texture and depth under `chamfer` | Two-sided bevel (weighted edge + inset highlight) and a fixed SVG grain layer, both removable, grain off under `prefers-reduced-motion` | ✅ |
+| **23c** | `[brand]` derives a TypeScript module | `src/generated/brand.ts` — the domain stops being retyped into app code for `metadataBase`, canonicals and OG tags | ✅ |
+| **23d** | Locales declare themselves | Each catalog carries its own endonym and flag region; the language picker maps over the locale list and survives a third locale | ✅ |
 
 **What comes next is not recorded here.** This file is the record of what was
 *built*; [`ROADMAP.md`](ROADMAP.md) holds what is *intended* and in what order.
