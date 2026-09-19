@@ -1,0 +1,32 @@
+# Content collections.
+#
+# A COLLECTION is a directory of entries: blog posts, press stories, case
+# studies. A SINGLETON is a collection with exactly one entry: the landing
+# page's copy, a boilerplate block, an about page.
+#
+# Both live under a locale:
+#
+#   content/<collection>/<locale>/<slug>.md
+#
+# Same filenames under every locale, so a missing translation is a missing
+# FILE — something a build can see. A language suffix on each name hides the
+# gap in a directory listing; a per-entry fallback hides it completely.
+#
+# ## Fields
+#
+#   kind    "collection" | "singleton"
+#   schema  frontmatter fields and their types. Types are checked at derive:
+#           string, date, number, boolean, and `string[]` for a list.
+#           A field not in the schema is an error, not extra data — it is
+#           usually a typo, and a typo that silently disappears is the whole
+#           reason this is checked.
+#   body    "rich"  the markdown body is part of the entry
+#           "none"  frontmatter only; a body is an error
+#   route   what a renderer mounts, with {slug}. Empty means not routed —
+#           a singleton feeding a section of another page is not a URL.
+
+[collections.posts]
+kind = "collection"
+schema = { title = "string", date = "date", summary = "string", tags = "string[]" }
+body = "rich"
+route = "/blog/{slug}"

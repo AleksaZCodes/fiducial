@@ -59,22 +59,40 @@ import Link from "next/link";
  * rather than as a broken image, and the row still works — the name was always
  * the thing carrying the meaning.
  */
-export function LocalePicker({ locale }: { locale: Locale }) {
+export type LocalePickerVariant =
+  /** Flag, endonym, chevron. The default, and the one to use in a footer. */
+  | "full"
+  /** Flag only. For a dense bar where the name costs more than it earns. */
+  | "icon";
+
+export function LocalePicker({
+  locale,
+  variant = "full",
+}: {
+  locale: Locale;
+  variant?: LocalePickerVariant;
+}) {
   const label = messages[locale]["nav.langLabel"];
   const ActiveFlag = flagFor(locale);
+  const icon = variant === "icon";
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
+        {/* `aria-label` carries the name in BOTH variants, so the icon-only
+            trigger is not a mystery button to a screen reader. That is the
+            whole cost of dropping the visible name, and it is why the name is
+            never the only thing announcing what this control is. */}
         <Button
           variant="outline"
-          size="sm"
+          size={icon ? "icon-sm" : "sm"}
           aria-label={label}
-          className="gap-2 text-muted-foreground hover:text-foreground"
+          title={icon ? messages[locale]["locale.name"] : undefined}
+          className={icon ? "text-muted-foreground hover:text-foreground" : "gap-2 text-muted-foreground hover:text-foreground"}
         >
           {ActiveFlag ? <ActiveFlag aria-hidden="true" className="h-3 w-[1.125rem]" /> : null}
-          {messages[locale]["locale.name"]}
-          <ChevronDownIcon aria-hidden="true" className="opacity-60" />
+          {icon ? null : messages[locale]["locale.name"]}
+          {icon ? null : <ChevronDownIcon aria-hidden="true" className="opacity-60" />}
         </Button>
       </DropdownMenuTrigger>
 

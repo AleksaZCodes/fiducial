@@ -1,0 +1,23 @@
+name     = "content"
+executor = "shell"
+args     = ["node", "scripts/derive-content.mjs"]
+outputs  = ["apps/web/src/generated/content.ts"]
+
+# content.toml + content/ → one typed module.
+#
+# ## The output imports nothing
+#
+# `generated/content.ts` is plain data: no React, no Svelte, no framework at
+# all. That is the property that makes a port mechanical rather than a rewrite.
+# Today a page usually holds both the content access and the markup; split
+# them, and moving from Next.js to SvelteKit is rewriting markup against a data
+# module that does not change.
+#
+# The derivation asserts it, so the property cannot rot: if the generated file
+# ever gains a framework import, the build fails.
+#
+# ## Ordering
+#
+# Reads `content.toml`, `content/` and `fiducial.toml` only — never another
+# pipeline's output. `fid derive` has no `needs` field and its order is not
+# alphabetical, so a pipeline consuming a derived file is a latent bug.

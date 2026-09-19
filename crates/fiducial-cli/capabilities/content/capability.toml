@@ -1,0 +1,10 @@
+description = "One content layer — collections, singletons, localized by construction, framework-agnostic"
+
+# Copy depends on i18n. Always.
+#
+# Everything this capability derives is prose or values a person reads, which
+# makes all of it a fact under MISSION.md 1c: declared once, one derivation per
+# locale, and a missing translation is a missing artifact rather than a
+# fallback. Without the locale machinery underneath it, this capability would
+# derive a monolingual artifact that looks finished.
+requires_capabilities = ["i18n"]
