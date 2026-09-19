@@ -63,12 +63,33 @@ the press layout to suit the editor, which is the tail wagging the dog.
 ## Media
 
 Images dropped into the editor are staged in `media/` and stored as **keys**
-(`site/uploads/photo.jpg`), never URLs and never files in git. `pnpm
-media:push` uploads what changed to the product's bucket, comparing hashes
-against a machine-local record; `--all` ignores that record.
+(`site/blog/photo.jpg`), never URLs and never files in git.
 
-Anything already in the bucket but not staged locally shows no thumbnail in
-the editor. The value is still correct, and the page renders it.
+- `pnpm media:push` uploads what changed, against a machine-local hash record;
+  `--all` ignores it.
+- `pnpm media:pull` stages what the content already refers to. Run it on a
+  fresh checkout, or the editor will ask its proxy for files nobody has.
+
+### A key is `<prefix>/<file>`, and the prefix is declared
+
+This is a rule, not a convention, because of how the editor resolves an
+existing image: it takes the **file name** out of the stored value and looks
+for it under the collection's media folder. So `site/blog/cover.png` resolves
+and `site/blog/flame/cover.png` does not — the editor asks for a path that was
+never written, which is a 500 in the console and an empty thumbnail on an entry
+that is perfectly correct and renders fine in production.
+
+Each collection declares its prefix in `content.toml`:
+
+```toml
+[collections.posts]
+media = "site/blog"    # defaults to the collection's own name
+```
+
+The folders are set on the **collection**, not on each field, because an image
+dropped into a markdown body belongs to the collection too. A field-level
+folder leaves the body editor on the global default, which is the same failure
+one level down.
 
 ## What an agent should do with this
 

@@ -15,7 +15,7 @@
 // and commit it. There is no database and no sync step, which is the whole
 // reason the editor can be this thin.
 import { spawn } from "node:child_process";
-import { createReadStream, existsSync, watch } from "node:fs";
+import { createReadStream, existsSync, readFileSync, watch } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,15 +38,55 @@ const proxy = spawn("npx", ["decap-server"], {
   shell: process.platform === "win32",
 });
 
-const site = createServer((req, res) => {
-  const path = new URL(req.url, "http://localhost").pathname;
-  const file = join(here, path === "/" ? "index.html" : path.replace(/^\/+/, ""));
-  if (!file.startsWith(here) || !existsSync(file)) {
-    res.writeHead(404).end("Not found");
-    return;
-  }
+// The origin the media bucket is served from, for previewing an image that is
+// in the bucket but not staged locally. Read from the derived brand module, so
+// the domain is still declared exactly once.
+const brand = join(repo, "apps/web/src/generated/brand.ts");
+const siteOrigin = existsSync(brand)
+  ? `https://${readFileSync(brand, "utf8").match(/export const domain = "([^"]+)"/)?.[1]}`
+  : null;
+
+const send = (res, file) => {
   res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream" });
   createReadStream(file).pipe(res);
+};
+
+const site = createServer((req, res) => {
+  const path = new URL(req.url, "http://localhost").pathname;
+  const rel = path.replace(/^\/+/, "");
+
+  // The editor's own files.
+  const file = join(here, path === "/" ? "index.html" : rel);
+  if (file.startsWith(here) && existsSync(file)) {
+    send(res, file);
+    return;
+  }
+
+  // The site's icon, so the tab is not a broken square.
+  if (path === "/favicon.svg") {
+    const icon = join(repo, "apps/web/public/favicon.svg");
+    if (existsSync(icon)) {
+      send(res, icon);
+      return;
+    }
+  }
+
+  // A media key. The editor asks for a stored value as a path — `cover:
+  // site/blog/flame-cover.png` becomes a request for `/site/blog/flame-cover.png`
+  // — so serve it from the staging directory, and fall back to the live bucket
+  // for anything not staged. Without the fallback, every image already
+  // uploaded shows as a broken thumbnail while you edit.
+  const staged = join(repo, "media", rel);
+  if (staged.startsWith(join(repo, "media")) && existsSync(staged)) {
+    send(res, staged);
+    return;
+  }
+  if (siteOrigin && rel && !rel.startsWith("_")) {
+    res.writeHead(302, { location: `${siteOrigin}/media/${rel}` }).end();
+    return;
+  }
+
+  res.writeHead(404).end("Not found");
 });
 
 // Debounced: one save writes several files, and `fid derive` on each of them
