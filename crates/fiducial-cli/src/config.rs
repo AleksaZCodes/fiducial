@@ -40,6 +40,14 @@ pub struct Config {
     /// `[ai]` — the model this product talks to, and how it identifies itself.
     #[serde(default, skip_serializing_if = "Ai::is_empty")]
     pub ai: Ai,
+    /// `[systemOne]` — the decision model this product asks typed questions of.
+    #[serde(
+        default,
+        rename = "systemOne",
+        alias = "system-one",
+        skip_serializing_if = "SystemOne::is_empty"
+    )]
+    pub system_one: SystemOne,
     /// `[freshness]` — gates other than `fid derive --check`.
     #[serde(default, skip_serializing_if = "Freshness::is_empty")]
     pub freshness: Freshness,
@@ -100,6 +108,31 @@ pub struct Ai {
     /// unknown model at the first call rather than at deploy.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub model: String,
+}
+
+/// `[systemOne]` — facts for the typed-decision contract.
+///
+/// Unlike [`Ai`], `model` here is **optional**, and the difference is not an
+/// oversight. `[ai] model` has no safe default because any model the platform
+/// picked would be a vendor choice made for the product, and would age into an
+/// id that no longer exists. The decision vendors publish a *tracking alias* —
+/// `typesafe/jev-latest` through the gateway, `jev-latest` direct — which by
+/// definition names the current model, so defaulting to it neither picks a
+/// version nor rots. Declaring `model` pins a version instead, which is what a
+/// product wants once an answer distribution matters to it.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct SystemOne {
+    /// Decision model id, e.g. `typesafe/jev-1.13`. Empty means the vendor's
+    /// tracking alias.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub model: String,
+}
+
+impl SystemOne {
+    /// True when the product declares no decision facts at all.
+    pub fn is_empty(&self) -> bool {
+        self.model.is_empty()
+    }
 }
 
 impl Ai {

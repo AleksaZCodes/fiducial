@@ -144,14 +144,15 @@ commit. A name under *Planned* cannot be selected and fails with a message
 saying so: a selectable name with nothing behind it is a promise the platform
 does not keep.
 
-Two of those `none`s **fail rather than succeed silently**: `auth` and `ai`.
-The difference is whether the caller reads a result. A no-op send or enqueue is
-indistinguishable from the real thing at the call site — the caller wanted an
-effect elsewhere. A session and a completion *are* the result, so returning a
-fabricated one turns "no vendor selected" into a logged-in stranger or a blank
-answer in the UI, and both get debugged as bugs somewhere else. They still cost
-nothing to wire in: constructing them is free, and nothing fails until
-something actually asks.
+Three of those `none`s **fail rather than succeed silently**: `auth`, `ai` and
+`systemOne`. The difference is whether the caller reads a result. A no-op send
+or enqueue is indistinguishable from the real thing at the call site — the
+caller wanted an effect elsewhere. A session, a completion and a decision *are*
+the result, so returning a fabricated one turns "no vendor selected" into a
+logged-in stranger, a blank answer in the UI, or a confidently wrong branch
+taken in production — and all three get debugged as bugs somewhere else. They
+still cost nothing to wire in: constructing them is free, and nothing fails
+until something actually asks.
 
 <!-- fid:end-describes -->
 
@@ -168,6 +169,7 @@ something actually asks.
 | `queue` | Asynchronous job/message queue (producer side) | `none`, `cloudflare-queues` | `sqs` |
 | `ai` | Language-model calls: chat, streaming, tool use | `none`, `openrouter` | `workers-ai`, `anthropic`, `openai` |
 | `auth` | Users and authentication: sign-up, sign-in, sessions | `none`, `supabase` | `clerk`, `auth.js` |
+| `systemOne` | Typed probabilistic decisions: yes/no, one-of-N, ordered levels | `none`, `openrouter`, `typesafe` | — |
 <!-- fid:end adapters -->
 
 Both tables are generated from the registries that enforce them, by
@@ -331,8 +333,9 @@ fiducial/
 │   ├── fiducial-sim             Numerical simulation — ODE integration that runs native (wi…
 │   ├── fiducial-tauri           Serial transport and device discovery for Fiducial Tauri apps.
 │   └── fiducial-wasm            WASM bindings for fiducial-core — browser, edge, and Cloudf…
-└── packages/             12 members
+└── packages/             13 members
     ├── adapters                 Cross-platform adapter contracts for Fiducial — database, s…
+    ├── advisor                  Advisory checks for Fiducial — typed judgments where determ…
     ├── board-schema             TypeScript types for board.interface.json — mirrors the Rus…
     ├── cli                      fid — the Fiducial platform CLI
     ├── fiducial                 Declare each fact once. Derive every artifact from it.

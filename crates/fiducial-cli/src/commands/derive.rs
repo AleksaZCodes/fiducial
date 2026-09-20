@@ -1464,6 +1464,7 @@ const ADAPTER_SLOTS: &[(&str, &str)] = &[
     ("queue", "queue"),
     ("newsletter", "newsletter"),
     ("ai", "ai"),
+    ("systemOne", "systemOne"),
 ];
 
 /// Generate adapter factory code from `[adapters]` in `fiducial.toml`.
@@ -1594,6 +1595,12 @@ fn vendor_ts_class(contract: &str, vendor: &str) -> String {
 fn vendor_extra_args(contract: &str, vendor: &str, config: &Config) -> String {
     match (contract, vendor) {
         ("ai", "openrouter") => format!(", {}", ts_string(&config.ai.model)),
+        // Omitted when undeclared, rather than passed as `""`: the vendor
+        // classes fall back to their tracking alias, and an empty string would
+        // override that fallback with a model id that does not exist.
+        ("systemOne", "openrouter" | "typesafe") if !config.system_one.model.is_empty() => {
+            format!(", {}", ts_string(&config.system_one.model))
+        }
         _ => String::new(),
     }
 }
@@ -1618,6 +1625,7 @@ fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
         "newsletter" => ("NoneNewsletter", "@fiducial/adapters/newsletter"),
         "ai" => ("NoneAi", "@fiducial/adapters/ai"),
         "auth" => ("NoneAuth", "@fiducial/adapters/auth"),
+        "systemOne" => ("NoneSystemOne", "@fiducial/adapters/system-one"),
         _ => ("NoneDatabase", "@fiducial/adapters"),
     };
 
@@ -1634,6 +1642,10 @@ fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
         ("newsletter", "resend") => Some(("ResendNewsletter", "@fiducial/adapters/newsletter")),
         ("ai", "openrouter") => Some(("OpenRouterAi", "@fiducial/adapters/ai")),
         ("auth", "supabase") => Some(("SupabaseAuth", "@fiducial/adapters/auth")),
+        ("systemOne", "openrouter") => {
+            Some(("OpenRouterSystemOne", "@fiducial/adapters/system-one"))
+        }
+        ("systemOne", "typesafe") => Some(("TypeSafeSystemOne", "@fiducial/adapters/system-one")),
         ("database", "supabase") => Some(("SupabaseDatabase", "@fiducial/adapters/database")),
         ("storage", "supabase-storage") => Some(("SupabaseStorage", "@fiducial/adapters/storage")),
         _ => None,

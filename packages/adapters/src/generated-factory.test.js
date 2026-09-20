@@ -71,6 +71,7 @@ const REAL_VENDORS = {
   newsletter: 'resend',
   auth: 'supabase',
   ai: 'openrouter',
+  systemOne: 'openrouter',
   // `errors` has no real vendor yet — `none` is a real implementation, so it
   // belongs in the typechecked set rather than omitted.
   errors: 'none',

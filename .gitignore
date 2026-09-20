@@ -29,3 +29,6 @@ Thumbs.db
 # so committing it is committing a derived artifact — the rule this repository
 # spends a whole phase enforcing everywhere else.
 .svelte-check/
+
+# Per-developer Claude Code permissions — machine-specific absolute paths.
+.claude/settings.local.json

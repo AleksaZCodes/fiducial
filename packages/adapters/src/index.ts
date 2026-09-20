@@ -52,6 +52,35 @@ export type {
 } from "./ai.js";
 export { AiError, NoneAi, OpenRouterAi } from "./ai.js";
 
+export type {
+  Answer,
+  ChoiceAnswer,
+  ChoiceQuestion,
+  Instructions,
+  NoulAnswer,
+  NoulQuestion,
+  Question,
+  RetryPolicy,
+  ScoreAnswer,
+  ScoreQuestion,
+  SystemOne,
+  SystemOneErrorKind,
+  SystemOneRequest,
+  SystemOneResponse,
+  SystemOneUsage,
+} from "./system-one.js";
+export {
+  choiceOf,
+  noulOf,
+  NoneSystemOne,
+  OPENROUTER_DEFAULT_MODEL,
+  OpenRouterSystemOne,
+  scoreOf,
+  SystemOneError,
+  TYPESAFE_DEFAULT_MODEL,
+  TypeSafeSystemOne,
+} from "./system-one.js";
+
 // `Auth` is not part of `AdapterSet` — see its own doc comment in auth.ts for
 // why: every other contract here is env-scoped, and a real Auth
 // implementation is request-scoped (it needs a session store bound to the
@@ -82,6 +111,7 @@ import type { BotProtection } from "./bot-protection.js";
 import type { Queue } from "./queue.js";
 import type { Newsletter } from "./newsletter.js";
 import type { Ai } from "./ai.js";
+import type { SystemOne } from "./system-one.js";
 import { NoneDatabase } from "./database.js";
 import { NoneStorage } from "./storage.js";
 import { NoneEmail } from "./email.js";
@@ -90,6 +120,7 @@ import { NoneBotProtection } from "./bot-protection.js";
 import { NoneQueue } from "./queue.js";
 import { NoneNewsletter } from "./newsletter.js";
 import { NoneAi } from "./ai.js";
+import { NoneSystemOne } from "./system-one.js";
 
 /**
  * The full adapter set — one of these per product, built from `[adapters]`
@@ -112,6 +143,7 @@ export interface AdapterSet {
   queue: Queue;
   newsletter: Newsletter;
   ai: Ai;
+  systemOne: SystemOne;
 }
 
 /**
@@ -131,5 +163,6 @@ export function createNoneAdapters(): AdapterSet {
     queue: new NoneQueue(),
     newsletter: new NoneNewsletter(),
     ai: new NoneAi(),
+    systemOne: new NoneSystemOne(),
   };
 }

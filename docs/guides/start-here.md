@@ -203,6 +203,7 @@ Capabilities
   queue          not selected
   ai             not selected
   auth           not selected
+  systemOne      not selected
 ```
 
 <!-- /capture -->

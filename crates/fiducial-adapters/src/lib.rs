@@ -21,6 +21,7 @@
 //! | `Newsletter`     | `newsletter`      |
 //! | `Auth`           | `auth`            |
 //! | `Ai`             | `ai`              |
+//! | `SystemOne`      | `systemOne`       |
 //! | (n/a)            | `deploy`          |
 //!
 //! `deploy` is a build-time/pipeline concern, not a runtime call — no trait.
@@ -63,6 +64,7 @@ pub mod firmware;
 pub mod newsletter;
 pub mod queue;
 pub mod storage;
+pub mod system_one;
 
 pub use ai::{
     Ai, AiError, ChatRequest, ChatResponse, Message as AiMessage, NoneAi, Role, StopReason,
@@ -78,6 +80,11 @@ pub use newsletter::{
 };
 pub use queue::{NoneQueue, Queue, QueueError};
 pub use storage::{NoneStorage, Storage, StorageError};
+pub use system_one::{
+    Answer, ChoiceAnswer, ChoiceQuestion, NoneSystemOne, NoulAnswer, NoulQuestion, Question,
+    ScoreAnswer, ScoreQuestion, SystemOne, SystemOneError, SystemOneErrorKind, SystemOneRequest,
+    SystemOneResponse,
+};
 
 /// Object-safe async return type used by every contract trait.
 ///
