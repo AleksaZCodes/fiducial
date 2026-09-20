@@ -109,6 +109,10 @@ What does not move into copy: an obligation. A CC BY attribution or a
 disclosure a regulator requires is still required after a rewrite, so say so in
 the component that used to render it.
 
+A gallery of brand assets should also declare the surface each one is drawn
+for (`tone = "light" | "dark"`): a transparent asset has no background, so the
+page has to supply one, and a cream mark on a cream card is an empty rectangle.
+
 A collection can also declare where its images live:
 
 ```toml

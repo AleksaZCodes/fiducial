@@ -101,6 +101,39 @@ Renders of the mark (a PNG of the wordmark for someone's slides) are media, but
 they are renders of the two primitives, not sources. Re-render them whenever the
 mark changes. The bucket is outside `fid derive`, so nothing will do it for you.
 
+## The asset set, which is the standard
+
+What an outsider is handed is not "the logo". It is four files per mark, and
+the set is derived rather than exported by hand:
+
+|  | Light background | Dark background |
+|---|---|---|
+| **Wordmark** | `brand/wordmark-light.svg` + `.png` | `brand/wordmark-dark.svg` + `.png` |
+| **Mark** | `brand/icon-light.svg` + `.png` | `brand/icon-dark.svg` + `.png` |
+
+Three properties, each for a failure somebody hit:
+
+- **Transparent.** An asset with a baked background can only be used on that
+  background, and the first thing anyone does is put the mark on their own
+  surface.
+- **A variant per surface, not one file plus an instruction.** "Use the other
+  colour on dark" is a rule nobody reads; two files is not.
+- **SVG and PNG.** SVG is better and PNG is what a slide deck, a print shop
+  and half the CMSes in the world accept.
+
+**The dark variant should be one colour** unless the product has a reason
+otherwise: it is then also the one-ink asset for print and engraving, and it
+sidesteps the question of what the accent looks like on near black.
+
+A gallery entry declares the surface its asset is for (`tone`). A transparent
+cream wordmark previewed on a cream card is an empty rectangle with a caption
+under it, which looks like a broken image and is not one.
+
+The SVGs come from `scripts/derive-logo.mjs`, with their colours read from the
+design tokens, so the palette owns them. The PNGs are rendered from those SVGs
+by `scripts/render-brand.mjs` into the media staging directory — they are
+media, not artifacts, so they live in the bucket and not in git.
+
 ## Writing the boilerplate
 
 Three lengths — one sentence, two-to-three, a paragraph — because three are

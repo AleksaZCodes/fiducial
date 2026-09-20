@@ -21,11 +21,11 @@
 // every inline image in a body. Not the whole bucket — there is no listing
 // call here, and a bucket may hold assets no page refers to.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseToml } from "./derive-content.mjs";
-import { frontmatter } from "./frontmatter.mjs";
+import { referencedKeys } from "./media-keys.mjs";
 
 const repo = fileURLToPath(new URL("..", import.meta.url));
 const at = (p) => join(repo, p);
@@ -39,37 +39,7 @@ if (!bucket) {
 }
 const force = process.argv.includes("--all");
 
-/** Every markdown file under a directory. */
-function markdown(dir) {
-  const abs = at(dir);
-  if (!existsSync(abs)) return [];
-  return readdirSync(abs).flatMap((name) => {
-    const p = join(dir, name);
-    return statSync(at(p)).isDirectory() ? markdown(p) : p.endsWith(".md") ? [p] : [];
-  });
-}
-
-// Which frontmatter fields hold a key is a fact `content.toml` already states.
-const collections = parseToml(read("content.toml")).collections ?? {};
-const mediaFields = new Set(["cover", "key"]);
-for (const spec of Object.values(collections)) {
-  for (const [field, type] of Object.entries(spec.schema ?? {})) {
-    if (type === "media") mediaFields.add(field);
-  }
-}
-
-const keys = new Set();
-for (const file of [...markdown("content"), ...markdown("press")]) {
-  const src = read(file);
-  const { meta, body } = frontmatter(src, () => {});
-  for (const [field, value] of Object.entries(meta)) {
-    if (mediaFields.has(field) && typeof value === "string" && value) keys.add(value);
-  }
-  // Inline images in a body: `![alt](key "caption")`.
-  for (const m of body.matchAll(/!\[[^\]]*\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g)) {
-    if (!/^(https?:)?\/\//.test(m[1])) keys.add(m[1]);
-  }
-}
+const keys = referencedKeys();
 
 if (!keys.size) {
   console.log("no media keys in content — nothing to pull.");

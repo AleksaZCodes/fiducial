@@ -181,8 +181,12 @@ function loadLocale(loc) {
       };
     });
   return {
-    boilerplate: sections(read(`${base}/boilerplate.md`)),
-    facts: pairs(read(`${base}/facts.md`)),
+    // The BODY, not the file. These documents carry frontmatter now — a title
+    // the editor lists them by — and reading the raw file turned that line
+    // into a fact: the press room published "title: Brze činjenice" as the
+    // first row of its fast-facts table.
+    boilerplate: sections(frontmatter(read(`${base}/boilerplate.md`)).body),
+    facts: pairs(frontmatter(read(`${base}/facts.md`)).body),
     stories,
   };
 }

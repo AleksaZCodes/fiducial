@@ -353,10 +353,10 @@ The capabilities this platform ships:
 |---|---|---|
 | `adapters` | declares `adapters`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability adapters` |
 | `brand` | declares `brand`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability brand` |
-| `cms` | declares `cms`; 1 pipeline(s); 5 template file(s); seeds a `fiducial.toml` block | `fid add capability cms` |
+| `cms` | declares `cms`; 1 pipeline(s); 6 template file(s); seeds a `fiducial.toml` block | `fid add capability cms` |
 | `content` | declares `content.toml`, `content/posts/en/hello.md`; 1 pipeline(s); 2 template file(s) | `fid add capability content` |
 | `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
-| `design` | declares `design-system.md`; 1 pipeline(s); 9 template file(s) | `fid add capability design` |
+| `design` | declares `design-system.md`; 1 pipeline(s); 10 template file(s) | `fid add capability design` |
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
 | `firmware-rp2040` | 10 template file(s); guard rules | `fid add capability firmware-rp2040` |
 | `firmware-stm32` | 9 template file(s); guard rules | `fid add capability firmware-stm32` |
