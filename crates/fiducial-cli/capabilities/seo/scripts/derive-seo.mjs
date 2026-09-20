@@ -256,13 +256,18 @@ const xml = [
 ];
 for (const r of entries) {
   xml.push("  <url>");
-  xml.push(`    <loc>${origin}${r.path}</loc>`);
+  // The root is `https://host`, not `https://host/`: that is the form the page
+  // itself declares as canonical, and a sitemap that names a different string
+  // for the same page is a discrepancy a crawler has to resolve on its own.
+  xml.push(`    <loc>${origin}${r.path === "/" ? "" : r.path}</loc>`);
   for (const [loc, path] of Object.entries(r.alternates)) {
-    xml.push(`    <xhtml:link rel="alternate" hreflang="${loc}" href="${origin}${path}"/>`);
+    xml.push(
+      `    <xhtml:link rel="alternate" hreflang="${loc}" href="${origin}${path === "/" ? "" : path}"/>`,
+    );
   }
   if (r.alternates[defaultLocale]) {
     xml.push(
-      `    <xhtml:link rel="alternate" hreflang="x-default" href="${origin}${r.alternates[defaultLocale]}"/>`,
+      `    <xhtml:link rel="alternate" hreflang="x-default" href="${origin}${r.alternates[defaultLocale] === "/" ? "" : r.alternates[defaultLocale]}"/>`,
     );
   }
   if (r.date) xml.push(`    <lastmod>${r.date}</lastmod>`);
