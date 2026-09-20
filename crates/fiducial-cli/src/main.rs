@@ -499,34 +499,6 @@ EXAMPLES
         check: bool,
     },
 
-    /// Documentation freshness, including prose nothing can generate
-    #[command(long_about = "\
-Check that documentation still matches what it describes.
-
-`fid context` keeps GENERATED blocks current. This keeps HAND-WRITTEN ones
-honest, which nothing did before: a paragraph goes stale silently, and every
-other gate stays green while it does. AGENTS.md said every adapter contract
-implemented only `none` for six vendors after that stopped being true.
-
-Prose is not generated — a paragraph explaining why a contract is shaped a
-certain way cannot be derived from the contract, or it would carry nothing the
-code does not. What is derived is the OBLIGATION TO REVISIT IT.
-
-A block declares what it describes:
-
-  <!-- fid:describes crates/fiducial-cli/src/adapter.rs#CONTRACTS -->
-  Adapters name contracts, not vendors…
-  <!-- fid:end-describes -->
-
-When that source changes and the prose was not revisited, --check fails and
-names both. Narrow the watch with #Symbol: a whole-file hash fires on every
-unrelated edit, and a gate that cries wolf trains you to accept without
-reading.
-
-EXAMPLES
-  fid docs             report which blocks need re-reading
-  fid docs --check     fail when one does (the CI gate)
-  fid docs --accept    record that you have read them against their sources")]
     /// Is the published design gallery the system this product declares?
     #[command(long_about = "\
 Check the design gallery before it is published.
@@ -560,6 +532,34 @@ EXAMPLES
     #[command(subcommand)]
     Repo(RepoCmd),
 
+    /// Documentation freshness, including prose nothing can generate
+    #[command(long_about = "\
+Check that documentation still matches what it describes.
+
+`fid context` keeps GENERATED blocks current. This keeps HAND-WRITTEN ones
+honest, which nothing did before: a paragraph goes stale silently, and every
+other gate stays green while it does. AGENTS.md said every adapter contract
+implemented only `none` for six vendors after that stopped being true.
+
+Prose is not generated — a paragraph explaining why a contract is shaped a
+certain way cannot be derived from the contract, or it would carry nothing the
+code does not. What is derived is the OBLIGATION TO REVISIT IT.
+
+A block declares what it describes:
+
+  <!-- fid:describes crates/fiducial-cli/src/adapter.rs#CONTRACTS -->
+  Adapters name contracts, not vendors…
+  <!-- fid:end-describes -->
+
+When that source changes and the prose was not revisited, --check fails and
+names both. Narrow the watch with #Symbol: a whole-file hash fires on every
+unrelated edit, and a gate that cries wolf trains you to accept without
+reading.
+
+EXAMPLES
+  fid docs             report which blocks need re-reading
+  fid docs --check     fail when one does (the CI gate)
+  fid docs --accept    record that you have read them against their sources")]
     Docs {
         /// Fail instead of reporting, for CI
         #[arg(long)]

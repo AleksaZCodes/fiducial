@@ -304,9 +304,9 @@ rule that matters most.
 | `fid dash` | The workbench — one read-only view of roadmap, decisions, CI, graph, freshness |
 | `fid harvest` | Survey an existing codebase for reusable logic, art, UI and principles |
 | `fid context` | Regenerate the derivable parts of AGENTS.md / CLAUDE.md |
-| `fid design` | Documentation freshness, including prose nothing can generate Is the published design gallery the system this product declares? |
+| `fid design` | Is the published design gallery the system this product declares? |
 | `fid repo` | Make the remote enforce what `[guard]` already claims |
-| `fid docs` | — |
+| `fid docs` | Documentation freshness, including prose nothing can generate |
 | `fid doctor` | Check for drift: outdated deps, stale templates, un-applied migrations |
 <!-- fid:end commands -->
 

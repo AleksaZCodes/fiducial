@@ -546,4 +546,15 @@ mod tests {
             "What this does."
         );
     }
+
+    #[test]
+    fn every_command_has_a_description() {
+        use clap::CommandFactory as _;
+        let command = crate::Cli::command();
+        let table = render_commands(&command);
+        assert!(
+            !table.contains("| — |"),
+            "every command in the generated table must have a description:\n{table}"
+        );
+    }
 }
