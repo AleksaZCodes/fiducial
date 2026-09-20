@@ -121,9 +121,17 @@ Three properties, each for a failure somebody hit:
 - **SVG and PNG.** SVG is better and PNG is what a slide deck, a print shop
   and half the CMSes in the world accept.
 
-**The dark variant should be one colour** unless the product has a reason
-otherwise: it is then also the one-ink asset for print and engraving, and it
-sidesteps the question of what the accent looks like on near black.
+**Both variants keep the accent.** What changes between them is the ink the
+letters take, and usually which value of the accent is used — a mid-tone
+primary that reads on white often goes muddy on near black, so the dark asset
+takes the dark theme's value of the same token.
+
+A product that has no dark *theme* still needs the dark asset: that decision is
+about the product's own surfaces, not about where anyone else puts the mark. A
+logo that drops its accent on half the surfaces it lands on has two identities.
+
+If one-ink print or engraving is a real requirement, that is a **third** asset
+and not a reinterpretation of the dark one.
 
 A gallery entry declares the surface its asset is for (`tone`). A transparent
 cream wordmark previewed on a cream card is an empty rectangle with a caption
