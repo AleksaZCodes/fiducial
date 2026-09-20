@@ -83,6 +83,12 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
 
+  packages/advisor:
+    dependencies:
+      '@fiducial/adapters':
+        specifier: workspace:*
+        version: link:../adapters
+
   packages/board-schema:
     devDependencies:
       typescript:

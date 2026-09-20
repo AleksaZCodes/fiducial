@@ -124,6 +124,21 @@ pub static CONTRACTS: &[Contract] = &[
         implementations: &[NONE, "supabase"],
         candidates: &["clerk", "auth.js"],
     },
+    Contract {
+        name: "systemOne",
+        // Names the three question shapes, in the same register as its siblings
+        // ("put, get, signed URLs"). It used to read "classify, route, score",
+        // which was a use-case list borrowed from the vendor's own marketing and
+        // wrong twice over: `classify` and `route` are both a Choice, so it
+        // implied three shapes where there are two, and it omitted the Noul —
+        // the one shape with no analogue in ordinary API vocabulary, and so the
+        // one most needing to be named. Plain words rather than `noul, choice,
+        // score`, because this string is what `fid capability list --all` shows
+        // someone meeting the platform for the first time.
+        description: "Typed probabilistic decisions: yes/no, one-of-N, ordered levels",
+        implementations: &[NONE, "openrouter", "typesafe"],
+        candidates: &[],
+    },
 ];
 
 /// Look up a contract by name.

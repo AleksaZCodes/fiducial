@@ -560,6 +560,76 @@ EXAMPLES
     #[command(subcommand)]
     Repo(RepoCmd),
 
+    /// Advisory review of the rules code cannot check — asks, never gates
+    #[command(
+        args_conflicts_with_subcommands = true,
+        long_about = "\
+Ask a decision model about the things this platform's deterministic checks
+cannot reach, and print what it says.
+
+WHAT IT ASKS, AND WHY A MODEL AT ALL
+  Every question here is one code cannot answer. A regex can see that two
+  constants both hold 1.6; it cannot see that `board_thickness` and
+  `pcb_height` are one fact declared twice — which is the precise violation
+  principle 1 exists to prevent. The checks:
+
+    a fact may be declared twice        semantic, not textual
+    logic sits above the layer it could reach   requires knowing what it does
+    a physical quantity has no unit or tolerance   code narrows, model judges
+    an abstraction has no escape hatch  principle 3, a judgment
+    a comment explains what, not why    a judgment about prose
+    the diff does more than was asked   scope, a judgment
+    the change is left half-finished    a judgment
+
+WHAT IT DELIBERATELY DOES NOT ASK
+  Anything already decided exactly: whether an artifact was hand-edited
+  (`fid derive --check`), whether a translation is missing (the i18n pipeline),
+  contrast ratios (`fid-design`), a cost ceiling (arithmetic), a push to main
+  (the guard). Spending a probabilistic answer where a certain one exists is a
+  regression dressed as a feature.
+
+IT CANNOT BREAK ANYTHING
+  Exits 0 even with findings, and when the key is missing, the network is down,
+  or the model is overloaded. Pass --strict to opt into a non-zero exit for a
+  hook of your own — never wire it into a gate that must not flake.
+
+SEEING WHAT LEAVES THE MACHINE
+  This sends your diff to a third-party API. `--dry-run` resolves no key, sends
+  nothing, and prints the exact request body instead.
+
+EXAMPLES
+  fid advise                                  review uncommitted changes
+  fid advise --task \"fix the retry bug\"        judge scope against the ask
+  fid advise --base main                      review the whole branch
+  fid advise --facts                          duplicate-check new declarations
+  fid advise --dry-run                        show what would be sent
+  fid advise key set                          store the key that unlocks this
+  fid advise status                           is it available, and what runs"
+    )]
+    Advise {
+        /// Manage the key, or report availability
+        #[command(subcommand)]
+        cmd: Option<commands::advise::AdviseCmd>,
+        /// Check new declarations for semantic duplicates instead of reviewing a diff
+        #[arg(long)]
+        facts: bool,
+        /// Review everything since this ref rather than uncommitted changes
+        #[arg(long, value_name = "REF")]
+        base: Option<String>,
+        /// What was actually asked for, so scope can be judged against it
+        #[arg(long, value_name = "TEXT")]
+        task: Option<String>,
+        /// Print the request body and send nothing
+        #[arg(long)]
+        dry_run: bool,
+        /// Machine-readable output
+        #[arg(long)]
+        json: bool,
+        /// Exit non-zero on a firm finding. Never use in a gate that must not flake.
+        #[arg(long)]
+        strict: bool,
+    },
+
     Docs {
         /// Fail instead of reporting, for CI
         #[arg(long)]
@@ -650,6 +720,37 @@ fn main() -> Result<()> {
         Commands::Context { check } => commands::context::run(check),
         Commands::Design { check, plan } => commands::design::run(check, plan),
         Commands::Repo(RepoCmd::Protect { apply, except }) => commands::repo::run(apply, &except),
+        Commands::Advise { cmd: Some(cmd), .. } => commands::advise::run(cmd),
+        Commands::Advise {
+            cmd: None,
+            facts,
+            base,
+            task,
+            dry_run,
+            json,
+            strict,
+        } => {
+            let mut args: Vec<String> = vec![if facts { "facts" } else { "diff" }.to_string()];
+            if let Some(base) = &base {
+                args.push("--base".into());
+                args.push(base.clone());
+            }
+            if let Some(task) = &task {
+                args.push("--task".into());
+                args.push(task.clone());
+            }
+            if dry_run {
+                args.push("--dry-run".into());
+            }
+            if json {
+                args.push("--json".into());
+            }
+            if strict {
+                args.push("--strict".into());
+            }
+            let borrowed: Vec<&str> = args.iter().map(String::as_str).collect();
+            commands::advise::delegate(&borrowed)
+        }
         Commands::Docs { check, accept } => commands::docs::run(check, accept),
         Commands::Doctor => commands::doctor::run(),
         Commands::GuardCheck => guard::check_from_stdin(),

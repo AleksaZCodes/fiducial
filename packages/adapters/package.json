@@ -55,6 +55,10 @@
     "./ai": {
       "import": "./dist/ai.js",
       "types": "./dist/ai.d.ts"
+    },
+    "./system-one": {
+      "import": "./dist/system-one.js",
+      "types": "./dist/system-one.d.ts"
     }
   },
   "files": ["dist", "README.md"],
@@ -62,7 +66,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "node --test src/adapters.test.js src/migrate.test.js",
+    "test": "node --test src/adapters.test.js src/migrate.test.js src/system-one.test.js",
     "test:generated": "node --test src/generated-factory.test.js"
   },
   "dependencies": {

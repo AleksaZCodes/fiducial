@@ -1,4 +1,5 @@
 pub mod add;
+pub mod advise;
 pub mod capability;
 pub mod component;
 pub mod context;

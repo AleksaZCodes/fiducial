@@ -211,7 +211,7 @@ fn every_contract_is_listed_whether_selected_or_not() {
     // `REAL_VENDORS` is for vendors in the generated-factory suite.
     assert_eq!(
         adapters.len(),
-        10,
+        11,
         "every contract is a fact about the product"
     );
     for a in adapters {
