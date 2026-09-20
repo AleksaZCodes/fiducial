@@ -15,7 +15,7 @@
 // and commit it. There is no database and no sync step, which is the whole
 // reason the editor can be this thin.
 import { spawn } from "node:child_process";
-import { createReadStream, existsSync, readFileSync, watch } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync, watch } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,6 +30,12 @@ const TYPES = {
   ".yml": "text/yaml; charset=utf-8",
   ".svg": "image/svg+xml",
 };
+
+// The upload folder has to exist before the editor asks for it: the media
+// library lists a directory, and a directory that has never been written to
+// makes the Media tab look broken rather than empty.
+const uploads = join(repo, "media", "site/uploads");
+mkdirSync(uploads, { recursive: true });
 
 const proxy = spawn("npx", ["decap-server"], {
   cwd: repo,

@@ -60,6 +60,12 @@ route  = "/blog/{slug}"
 - **Locales carrying different entries.** A collection with a post in one
   language and not the other is not translated; it is two collections, and the
   gap is invisible from whichever page you are on.
+- **A frontmatter field not in the schema.** Almost always a typo, and a typo
+  that silently disappears is how a paragraph goes missing with nobody able to
+  find it.
+- **A body where `body = "none"`, or none where `body = "rich"`.**
+- **A generated module that imports a framework.** See below.
+
 Types: `string`, `date`, `number`, `boolean`, `string[]`, and `media` — a
 storage key like `press/gallery/icon.png`, which is a string at runtime and an
 image picker in the editor. A key is not a URL and not a path in git; see the
@@ -76,17 +82,38 @@ the line and everything looks fine, which is how a dozen entries sat in a repo
 being read correctly by the deriver and rejected by every other YAML parser,
 including the editor's. The reader now says so instead of guessing.
 
+## Authoring a page the product composes
+
+Some pages are assembled rather than written: a credits page from licence
+facts, legal pages from the jurisdiction. That is the right default — the facts
+are declared once and the page cannot forget one — and the wrong ceiling, since
+the wording is then only changeable by editing a message catalogue key by key
+or a generator in the platform.
+
+Declare a `pages` collection and let the route prefer it:
+
+```toml
+[collections.pages]
+kind = "collection"
+schema = { title = "string" }
+body = "rich"
+route = ""          # the route already exists; this is its content
+```
+
+`content/pages/<locale>/<slug>.md` then replaces the composed page, **one
+language at a time** — a page with no entry in a locale keeps the composed
+version in that locale. Seed the entries from what the page already renders, so
+an edit starts from the real text rather than a blank document.
+
+What does not move into copy: an obligation. A CC BY attribution or a
+disclosure a regulator requires is still required after a rewrite, so say so in
+the component that used to render it.
+
 A collection can also declare where its images live:
 
 ```toml
 media = "site/blog"    # keys are this prefix plus a file name, nothing deeper
 ```
-
-- **A frontmatter field not in the schema.** Almost always a typo, and a typo
-  that silently disappears is how a paragraph goes missing with nobody able to
-  find it.
-- **A body where `body = "none"`, or none where `body = "rich"`.**
-- **A generated module that imports a framework.** See below.
 
 ## Framework-agnostic, and checked
 
