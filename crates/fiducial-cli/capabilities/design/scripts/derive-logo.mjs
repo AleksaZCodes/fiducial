@@ -185,14 +185,18 @@ function tokenColour(css, name, theme) {
 }
 
 const tokensCss = read("apps/web/src/app/tokens.css");
-// The dark variant is ONE COLOUR, not the light one with a brighter orange.
+// The dark variant keeps the accent.
 //
-// That is this product's rule rather than a rendering detail: orange on near
-// black is a combination with an association this project does not want, and
-// it is why the site has no dark theme at all (design-system.md). A dark
-// background gets the whole mark in the dark theme's foreground — letters,
-// signal and flame together — which is also what one-ink print and engraving
-// need, so it is one asset for both.
+// Both variants are the mark in colour; what changes between them is the ink
+// the letters take, because black letters on a dark ground are not letters.
+// The flame and the signal stay `--primary` — the dark theme's value of it,
+// which is the lighter one, because the light theme's ember goes muddy on
+// near black.
+//
+// This is allowed and declared (design-system.md § 3). The product has no dark
+// *theme*, which is a decision about the site's surfaces; it was never a
+// statement that the mark may not appear on a dark one. A logo that loses its
+// accent on half the surfaces it lands on is a logo with two identities.
 const THEMES = {
   light: {
     ink: tokenColour(tokensCss, "foreground", "light") ?? "#150F0C",
@@ -200,7 +204,7 @@ const THEMES = {
   },
   dark: {
     ink: tokenColour(tokensCss, "foreground", "dark") ?? "#F6F3EF",
-    ember: tokenColour(tokensCss, "foreground", "dark") ?? "#F6F3EF",
+    ember: tokenColour(tokensCss, "primary", "dark") ?? "#F4741E",
   },
 };
 
