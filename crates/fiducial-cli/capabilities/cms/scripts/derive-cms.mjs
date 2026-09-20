@@ -130,39 +130,58 @@ const STORY_FIELDS = [
 // on the press page would come out blank.
 const ANGLES = ["origin", "technical", "customer", "failure", "milestone", "people", "market"];
 
-if (has("press")) {
-  const files = [];
-  for (const loc of locales) {
-    for (const doc of ["boilerplate", "facts"]) {
-      if (!has(`press/${loc}/${doc}.md`)) continue;
-      files.push({
-        name: `${doc}-${loc}`,
-        label: `${label(doc)} (${loc})`,
-        file: `press/${loc}/${doc}.md`,
-        fields: [{ name: "body", label: label(doc), widget: "markdown" }],
-      });
-    }
-  }
-  if (files.length) {
-    out.push({ name: "press-docs", label: "Press: boilerplate and facts", files });
+// The press room, whose layout nests the locale under each collection exactly
+// as `content/` does — press/docs/<locale>/ and press/stories/<locale>/ — so
+// both are folder collections the editor shows in every language side by side.
+// A file collection cannot do that: Decap supports i18n on one only as a
+// single file holding every language, which is not how these are written.
+if (has("press/docs") || has("press/stories")) {
+  if (has("press/docs")) {
+    out.push({
+      name: "press-docs",
+      label: "Press: boilerplate and facts",
+      folder: "press/docs",
+      // Two fixed documents per locale, not a list someone adds to.
+      create: false,
+      delete: false,
+      extension: "md",
+      format: "frontmatter",
+      i18n: true,
+      // These two documents are body only — there is no title to infer an
+      // entry name from, and Decap says so loudly. The file name is the name:
+      // `boilerplate` and `facts` are what they are called everywhere else.
+      fields: [
+        // A title, because an entry list with nothing to name entries by
+        // renders the whole document as its own label. It is the document's
+        // name in that language, not a heading the press page prints.
+        { name: "title", label: "Name", widget: "string", i18n: true },
+        { name: "body", label: "Text", widget: "markdown", i18n: true },
+      ],
+    });
   }
 
-  for (const loc of locales) {
-    if (!has(`press/${loc}/stories`)) continue;
+  if (has("press/stories")) {
     out.push({
-      name: `press-stories-${loc}`,
-      label: `Press stories (${loc})`,
-      folder: `press/${loc}/stories`,
+      name: "press-stories",
+      label: "Press stories",
+      folder: "press/stories",
       ...mediaFolders("press/stories"),
       create: true,
       delete: true,
       slug: "{{slug}}",
       extension: "md",
       format: "frontmatter",
+      i18n: true,
       fields: STORY_FIELDS.map(([f, t]) =>
         f === "angle"
-          ? { name: "angle", label: "Angle", widget: "select", options: ANGLES }
-          : field(f, t),
+          ? {
+              name: "angle",
+              label: "Angle",
+              widget: "select",
+              options: ANGLES,
+              i18n: "duplicate",
+            }
+          : field(f, t, { i18n: t === "date" ? "duplicate" : true }),
       ),
     });
   }

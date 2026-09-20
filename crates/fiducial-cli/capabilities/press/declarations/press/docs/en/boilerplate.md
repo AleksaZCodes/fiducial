@@ -1,3 +1,7 @@
+---
+title: "Boilerplate"
+---
+
 <!--
   The boilerplate: the paragraph a journalist pastes at the bottom of a piece.
 

@@ -116,11 +116,15 @@ const legalPages =
   ) ?? [];
 for (const locale of locales) {
   for (const page of legalPages) {
-    // The heading of the generated catalogue entry is the page's real title.
+    // An authored override owns the title when it exists; otherwise the
+    // generated catalogue's heading is the page's real title.
+    const overridePath = `content/legal-pages/${locale}/${page}.md`;
     const catalog = legalTs.split(`export const ${locale}: LegalCatalog`)[1] ?? "";
-    const title =
-      catalog.split(`${page}:`)[1]?.match(/title:\s*"([^"]+)"/)?.[1] ??
-      page.charAt(0).toUpperCase() + page.slice(1);
+    const title = existsSync(at(overridePath))
+      ? (frontmatter(read(overridePath), () => {}).meta.title ??
+        page.charAt(0).toUpperCase() + page.slice(1))
+      : (catalog.split(`${page}:`)[1]?.match(/title:\s*"([^"]+)"/)?.[1] ??
+        page.charAt(0).toUpperCase() + page.slice(1));
     add({
       path: `${prefix(locale)}/legal/${page}`,
       locale,
@@ -157,7 +161,7 @@ for (const [name, spec] of Object.entries(collections)) {
 
 // Press stories.
 for (const locale of locales) {
-  const dir = `press/${locale}/stories`;
+  const dir = `press/stories/${locale}`;
   if (!existsSync(at(dir))) continue;
   for (const file of readdirSync(at(dir)).filter((f) => f.endsWith(".md"))) {
     const slug = file.replace(/\.md$/, "");

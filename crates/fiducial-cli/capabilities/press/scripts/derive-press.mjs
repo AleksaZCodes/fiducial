@@ -140,7 +140,11 @@ if (locales.length === 0) {
 
 /** Load one locale's press room, or say exactly what is missing. */
 function loadLocale(loc) {
-  const base = `press/${loc}`;
+  // The locale sits UNDER each collection — press/docs/<locale>/… and
+  // press/stories/<locale>/… — the same nesting `content/` uses. It was the
+  // other way round, which reads fine on disk and is the one arrangement an
+  // editor cannot show two languages of side by side.
+  const base = `press/docs/${loc}`;
   const need = [`${base}/boilerplate.md`, `${base}/facts.md`];
   const absent = need.filter((f) => !existsSync(at(f)));
   if (absent.length) {
@@ -157,12 +161,12 @@ function loadLocale(loc) {
         `(MISSION.md 1c).\n  Write them, or remove \`${loc}\` from [i18n] locales.`,
     );
   }
-  const storyDir = at(`${base}/stories`);
+  const storyDir = at(`press/stories/${loc}`);
   const stories = (existsSync(storyDir) ? readdirSync(storyDir) : [])
     .filter((f) => f.endsWith(".md"))
     .sort()
     .map((f) => {
-      const { meta, body } = frontmatter(read(`${base}/stories/${f}`));
+      const { meta, body } = frontmatter(read(`press/stories/${loc}/${f}`));
       return {
         slug: f.replace(/\.md$/, ""),
         title: meta.title ?? f,
