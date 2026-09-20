@@ -1,3 +1,21 @@
+<!--
+────────────────────────────────────────────────────────────────────────────────
+BEFORE YOU FILL THIS IN — are you an outside contributor?
+
+Pull requests from outside contributors are not currently being merged. This is
+about the project's stage, not your work: novel work here is headed for patent
+filings where most of the world allows no grace period after disclosure, every
+outside commit carries a permanent CLA obligation, and the project is one
+person. CONTRIBUTING.md states it in full.
+
+Please open an ISSUE instead. A report is worth as much as a patch here — the
+fix is usually the easy half and noticing is the hard one — and reported bugs
+are fixed with a `Reported-by:` trailer naming you in the commit.
+
+Maintainers listed in .github/cla-exempt.txt: carry on.
+────────────────────────────────────────────────────────────────────────────────
+-->
+
 ## What changed, and why
 
 <!-- The why matters more than the what — the diff already says what. -->
