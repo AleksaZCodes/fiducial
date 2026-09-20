@@ -10,7 +10,7 @@
 // duplication was cheaper than deriving it. It was not — the site shipped the
 // old mark at 16px while the wordmark on the page showed the new one, and
 // nothing could have told anyone.
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
@@ -128,10 +128,10 @@ const lines = [
   "/** The flame. Outer contour then counter — fill-rule evenodd. */",
   `export const FLAME = ${JSON.stringify(flame.paths.join(" "))}`,
   "",
-  "/** The wordmark's letters: every path in `data-layer=\"letters\"`. */",
+  "/** `utreach` from the Outreach wordmark; the transmitter core is merged into the `h`. */",
   `export const LETTERS = ${JSON.stringify(letters.paths, null, 2)} as const`,
   "",
-  "/** The wordmark's `data-layer=\"device\"` polygons, drawn apart from the letters. */",
+  "/** The four signal brackets beside the `h`. Drawn in `--primary`, like the flame. */",
   `export const DEVICE = ${JSON.stringify(device.polygons, null, 2)} as const`,
   "",
 ];
@@ -156,6 +156,75 @@ const pub = "apps/web/public/wordmark.svg";
 mkdirSync(dirname(new URL(`../${pub}`, import.meta.url).pathname), { recursive: true });
 writeFileSync(new URL(`../${pub}`, import.meta.url), read("brand/wordmark.svg"));
 console.log(`wrote ${pub}`);
+
+// ── The asset set ────────────────────────────────────────────────────────────
+// What anybody outside this project is given: the wordmark and the mark, each
+// in a light-background and a dark-background variant, on **transparent**.
+//
+// Three properties, each for a reason someone hit:
+//
+//   · **Transparent.** An asset with a baked background can only be used on
+//     that background. The first thing a journalist or a partner does is put
+//     the mark on their own surface.
+//   · **Two variants, not one plus an instruction.** The flame at `--primary`
+//     is legible on light and muddy on dark, and the letters invert outright.
+//     "Use the other colour" is a rule nobody reads; two files is not.
+//   · **Colours from the tokens, not typed here.** The light variant is the
+//     light theme's `--primary` and `--foreground`; the dark variant is the
+//     dark theme's. Change the palette and the downloads follow.
+//
+// SVG here; `scripts/render-brand.mjs` renders the PNG of each, because a
+// slide deck and a print shop take PNG and this is the set they get.
+function tokenColour(css, name, theme) {
+  // tokens.css carries the hex in a comment beside each oklch value, which is
+  // the only place the literal exists — deriving it from oklch here would be a
+  // second colour pipeline.
+  const blocks = css.split("prefers-color-scheme: dark");
+  const scope = theme === "dark" ? (blocks[1] ?? "") : blocks[0];
+  return scope.match(new RegExp(`--${name}:[^;]+;\\s*/\\* (#[0-9A-Fa-f]{6})`))?.[1];
+}
+
+const tokensCss = read("apps/web/src/app/tokens.css");
+// The dark variant is ONE COLOUR, not the light one with a brighter orange.
+//
+// That is this product's rule rather than a rendering detail: orange on near
+// black is a combination with an association this project does not want, and
+// it is why the site has no dark theme at all (design-system.md). A dark
+// background gets the whole mark in the dark theme's foreground — letters,
+// signal and flame together — which is also what one-ink print and engraving
+// need, so it is one asset for both.
+const THEMES = {
+  light: {
+    ink: tokenColour(tokensCss, "foreground", "light") ?? "#150F0C",
+    ember: tokenColour(tokensCss, "primary", "light") ?? "#B85207",
+  },
+  dark: {
+    ink: tokenColour(tokensCss, "foreground", "dark") ?? "#F6F3EF",
+    ember: tokenColour(tokensCss, "foreground", "dark") ?? "#F6F3EF",
+  },
+};
+
+const asset = (name, body) => {
+  const dest = `apps/web/public/brand/${name}.svg`;
+  mkdirSync(dirname(new URL(`../${dest}`, import.meta.url).pathname), { recursive: true });
+  writeFileSync(new URL(`../${dest}`, import.meta.url), body);
+  console.log(`wrote ${dest}`);
+};
+
+for (const [theme, { ink, ember }] of Object.entries(THEMES)) {
+  asset(
+    `wordmark-${theme}`,
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${g.wordmarkViewBox}" fill="none">\n` +
+      `  <g fill="${ink}">${g.LETTERS.map((d) => `<path d="${d}"/>`).join("")}</g>\n` +
+      `  <g fill="${ember}">${g.DEVICE.map((pts) => `<polygon points="${pts}"/>`).join("")}</g>\n` +
+      `  <path fill-rule="evenodd" d="${g.FLAME}" fill="${ember}"/>\n</svg>\n`,
+  );
+  asset(
+    `icon-${theme}`,
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${g.flameViewBox}" fill="none">\n` +
+      `  <path fill-rule="evenodd" d="${g.FLAME}" fill="${ember}"/>\n</svg>\n`,
+  );
+}
 
 const out = "apps/web/src/generated/logo.ts";
 mkdirSync(dirname(new URL(`../${out}`, import.meta.url).pathname), { recursive: true });

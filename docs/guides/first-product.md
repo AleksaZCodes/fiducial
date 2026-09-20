@@ -50,6 +50,7 @@ $ fid new demo-product
   wrote  apps/web/src/components/ui/dropdown-menu.tsx
   wrote  scripts/build-design-system.mjs
   wrote  scripts/derive-logo.mjs
+  wrote  scripts/render-brand.mjs
   wrote  .fiducial/skills/design.md
   wrote  .claude/skills/design.md
   patched fiducial.toml
@@ -128,7 +129,7 @@ $ fid doctor
 
   ✓ fiducial.toml valid  (product: demo-product, v0.1.0)
   ✓ guard: 2 rule(s), all implemented
-  ✓ fiducial.lock valid  (25 template(s) tracked, 0 migration(s) applied)
+  ✓ fiducial.lock valid  (26 template(s) tracked, 0 migration(s) applied)
   ✓ all template files unmodified
   ✓ no pending codemod migrations
   ✓ no hardcoded user-visible strings found

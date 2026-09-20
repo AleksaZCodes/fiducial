@@ -69,6 +69,15 @@ Images dropped into the editor are staged in `media/` and stored as **keys**
   `--all` ignores it.
 - `pnpm media:pull` stages what the content already refers to. Run it on a
   fresh checkout, or the editor will ask its proxy for files nobody has.
+- `pnpm media:push --prune` also deletes what nothing refers to any more.
+
+**Deleting an entry deletes its text and leaves its picture.** The record is
+gone from the site and the object is still in the bucket, paid for and
+reachable by anyone who kept the URL. Push reports those orphans every time
+and deletes them only when asked, because the bucket is the one place here
+where a mistake is not a `git revert`. Both directions read one definition of
+"referenced" (`scripts/media-keys.mjs`); two would disagree, and the
+disagreement would read as data loss.
 
 ### A key is `<prefix>/<file>`, and the prefix is declared
 

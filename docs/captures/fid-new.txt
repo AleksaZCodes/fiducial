@@ -23,6 +23,7 @@ $ fid new demo-product
   wrote  apps/web/src/components/ui/dropdown-menu.tsx
   wrote  scripts/build-design-system.mjs
   wrote  scripts/derive-logo.mjs
+  wrote  scripts/render-brand.mjs
   wrote  .fiducial/skills/design.md
   wrote  .claude/skills/design.md
   patched fiducial.toml
