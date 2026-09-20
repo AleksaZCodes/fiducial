@@ -1,3 +1,7 @@
+---
+title: "Fast facts"
+---
+
 <!--
   Fast facts: the table a journalist checks against.
 

@@ -70,6 +70,37 @@ must be configured before this pipeline runs.
 every placeholder, then have a qualified legal professional review the resulting
 pages for your jurisdiction before publishing.
 
+**4 · Edit the pages by overriding them, never by editing the generated
+module.** `generated/legal.ts` is an artifact: the next `fid derive` overwrites
+whatever was typed into it, so an edit there is not an edit. The moment a page
+has to state a fact the generator does not know — a processor, a retention
+period, a clause someone redrafted — put the whole page in the content layer
+instead:
+
+```toml
+# content.toml
+[collections.legal-pages]
+kind = "collection"
+schema = { title = "string" }
+body = "rich"
+route = ""                      # the legal route already exists
+```
+
+`content/legal-pages/<locale>/<page>.md` then replaces the generated page of
+that slug, and a page with no entry keeps the generated text. Seed the entries
+from the generated catalogue so editing starts from what the page already said,
+and render the override in the legal route:
+
+```tsx
+const override = entry("legal-pages", locale, page);
+const content = override ?? legalCatalogs[locale][page];
+```
+
+This is principle 3 — an abstraction with a documented way out — and it is also
+what makes legal pages editable in the content editor like anything else. What
+it does not do is lower the bar in rule 3: an overridden page is authored text
+and wants the same review.
+
 ## Routing the pages
 
 **A generated catalog nobody can reach is not a legal page.** `fid derive`

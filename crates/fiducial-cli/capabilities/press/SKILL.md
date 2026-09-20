@@ -121,8 +121,20 @@ because nobody reviewing it is the engineer who knows better.
 Boilerplate and stories are user-visible strings, so principle 1c applies:
 declared once, one derivation per locale, and a missing translation is a
 missing artifact rather than a fallback. A product with `i18n` installed should
-carry `press/<locale>/` rather than a single directory, and fail the build when
-a locale is short a story it advertises.
+carry a locale directory under each collection and fail the build when a
+locale is short a story it advertises:
+
+```
+press/docs/<locale>/boilerplate.md
+press/docs/<locale>/facts.md
+press/stories/<locale>/<slug>.md
+```
+
+**The locale sits under the collection, not above it.** `press/<locale>/stories/`
+reads fine on disk and is the one arrangement an editor cannot show two
+languages of side by side — a content editor groups locales only for a folder
+collection nested this way. The layout above is the same one `content/` uses,
+so both are edited the same way.
 
 ## Setup
 
