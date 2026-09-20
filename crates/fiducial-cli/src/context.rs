@@ -464,6 +464,68 @@ fn unknown_markers(text: &str) -> Vec<String> {
 mod tests {
     use super::*;
 
+    /// Every command has a description, and no command has two.
+    ///
+    /// Both halves of that came from one real bug, reported by an outside
+    /// reader: the `///` and `long_about` written for `Docs` were placed above
+    /// `Design` instead, so `clap` concatenated two summaries into `fid design`
+    /// and left `fid docs` with none. It reached `main` and sat there, because
+    /// nothing looked. `render_commands` printed `—` for the empty one — a
+    /// dash in a committed table is not loud enough to notice.
+    ///
+    /// Asserting on `get_about()` rather than on the generated table keeps this
+    /// pointed at the cause: the table is derived, so a test against its text
+    /// would fail for formatting reasons too and stop meaning this.
+    ///
+    /// The upper bound catches the *other* direction. A missing description is
+    /// invisible; a doubled one reads as prose and is easy to skim past, which
+    /// is exactly what happened. Two concatenated summaries comfortably exceed
+    /// any single one written here.
+    #[test]
+    fn every_command_has_exactly_one_description() {
+        use clap::CommandFactory;
+
+        const MAX: usize = 90;
+        let command = crate::Cli::command();
+
+        let mut missing: Vec<&str> = Vec::new();
+        let mut doubled: Vec<String> = Vec::new();
+
+        for sub in command.get_subcommands() {
+            if sub.is_hide_set() {
+                continue;
+            }
+            match sub.get_about() {
+                None => missing.push(sub.get_name()),
+                Some(about) => {
+                    let text = about.to_string();
+                    if text.chars().count() > MAX {
+                        doubled.push(format!(
+                            "  fid {} — {} chars: {text}",
+                            sub.get_name(),
+                            text.chars().count()
+                        ));
+                    }
+                }
+            }
+        }
+
+        assert!(
+            missing.is_empty(),
+            "these commands have no `///` summary, so `fid <cmd> --help` and the \
+             AGENTS.md table both show nothing for them:\n\n  {}\n\n\
+             The usual cause is the summary being attached to the variant above.",
+            missing.join("\n  ")
+        );
+        assert!(
+            doubled.is_empty(),
+            "these command summaries are over {MAX} characters, which usually means \
+             two `///` blocks stacked on one variant:\n\n{}\n\n\
+             Check whether the first belongs to the variant above it.",
+            doubled.join("\n")
+        );
+    }
+
     #[test]
     fn a_description_is_shortened_on_a_character_boundary() {
         // These descriptions are full of em-dashes; `truncate` panics on one.

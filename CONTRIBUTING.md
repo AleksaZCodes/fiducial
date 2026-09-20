@@ -4,6 +4,38 @@ Thank you for considering it. This page is short on purpose — most of what you
 need is already written somewhere, and a second copy of it here is the exact
 failure mode this project exists to prevent.
 
+## Where this project is right now
+
+**Issues, bug reports and questions are genuinely welcome. Pull requests from
+outside contributors are not currently being merged.**
+
+That is a statement about the project's stage, not about the quality of anyone's
+work, and it is worth being concrete about why:
+
+- **Patents.** Novel work here — protocols, algorithms, hardware designs — is
+  headed for provisional filings, and most of the world allows no grace period
+  after disclosure (see [`IP-POLICY.md`](IP-POLICY.md)). Outside code in the
+  tree makes the provenance of a claimed invention a question that has to be
+  answered rather than assumed.
+- **Relicensing.** Every outside commit needs a CLA sign-off, permanently, or
+  the project loses the ability to be relicensed without tracking down each
+  contributor individually. `CLA.md` explains it in full. That is a real
+  obligation to take on, and taking it on casually is worse than declining.
+- **It is one person.** Reviewing a patch to the standard the gates in this repo
+  demand costs more than writing it. A queue of well-meant PRs is a queue.
+
+**So: if you find something wrong, please open an issue.** A report is worth as
+much as a patch here — arguably more, because the fix is usually the easy half
+and *noticing* is the hard one. Reported bugs get fixed with a
+`Reported-by:` trailer naming you in the commit, which is real credit in the
+history and carries none of the above complications.
+
+If you would like to work on the platform itself rather than report to it, say
+so in an issue and we can talk about it directly.
+
+The rest of this page describes the standard a change is held to, and stands
+regardless — the maintainer is bound by all of it too.
+
 ## Read first
 
 **[`AGENTS.md`](AGENTS.md)** is the working context for this repository: the
@@ -17,9 +49,14 @@ cheaper than finding out in a PR.
 
 ## Before you write code
 
-**Open an issue first for anything non-trivial.** There are templates for a
+**Open an issue.** There are templates for a
 [new capability](.github/ISSUE_TEMPLATE/capability.md) and for
-[drift](.github/ISSUE_TEMPLATE/drift.md). A bug fix or a typo needs no issue.
+[drift](.github/ISSUE_TEMPLATE/drift.md).
+
+This used to say "a bug fix or a typo needs no issue", which invited the pull
+requests the section above now declines — an outside contributor followed that
+sentence exactly and in good faith, and the contradiction was the project's
+fault rather than theirs. An issue is the path for a bug of any size.
 
 The bar for adding to the platform is deliberately high, and it is stated in
 `MISSION.md` as anti-goal 2: *nothing is added speculatively; a capability

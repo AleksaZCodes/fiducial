@@ -79,7 +79,31 @@ fn base_ref() -> Option<&'static str> {
             return Some(candidate);
         }
     }
-    // Neither exists — a shallow CI checkout or a fresh clone.
+
+    // Neither exists. Locally that is a fresh clone with nothing to compare
+    // against, and skipping is right. **In CI it is a failure**, and it has to
+    // be loud: every gate in this file resolves its range through here, so a
+    // `None` here silently passed Conventional Commits, subject length, and the
+    // CLA sign-off that IP-POLICY.md rule 3 depends on — all while reporting
+    // green, for as long as the checkout was shallow.
+    //
+    // The default `actions/checkout@v4` is `fetch-depth: 1`, so that was every
+    // run. It surfaced when a commit violating two of these rules passed here
+    // and failed on a developer's machine. A gate that cannot determine what to
+    // check has not passed; it has not run.
+    // Set *and non-empty*: `var_os(..).is_some()` is true for `CI=`, which by
+    // convention means unset, and treating it as CI made this fire on a
+    // developer's machine that exports it empty.
+    let in_ci = std::env::var("CI").is_ok_and(|v| !v.is_empty());
+    if in_ci {
+        panic!(
+            "commit hygiene cannot run: neither `origin/main` nor `main` is a ref.\n\n\
+             This is a shallow checkout, so there is no range to compare against and \
+             every rule in this file would silently pass.\n\n\
+             Fix the workflow, not this test:\n\n  \
+             - uses: actions/checkout@v4\n    with:\n      fetch-depth: 0\n"
+        );
+    }
     None
 }
 
