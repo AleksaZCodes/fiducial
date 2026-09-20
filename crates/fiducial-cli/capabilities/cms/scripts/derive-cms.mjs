@@ -31,6 +31,14 @@ const cms = cfg.cms ?? {};
 // Uploads land in the gitignored staging directory, keyed the way content
 // refers to media everywhere else. `pnpm media:push` syncs them to the bucket.
 const mediaDir = cms.media_dir ?? "media";
+// Where a loose upload goes: one whose entry has no collection of its own,
+// or one made from the Media tab rather than from a field.
+//
+// The Media tab shows exactly this folder and no other. Decap's media library
+// is FLAT — the proxy lists the files directly inside a folder and does not
+// walk into subdirectories — so there is no "everything" view to point it at.
+// Each collection's own folder is what its image picker shows, which is where
+// an entry's images are actually found.
 const mediaPrefix = cms.media_prefix ?? "site/uploads";
 
 const collections = parseToml(read("content.toml")).collections ?? {};
@@ -172,7 +180,8 @@ if (has("press/docs") || has("press/stories")) {
       extension: "md",
       format: "frontmatter",
       i18n: true,
-      fields: STORY_FIELDS.map(([f, t]) =>
+      fields: [
+        ...STORY_FIELDS.map(([f, t]) =>
         f === "angle"
           ? {
               name: "angle",
@@ -182,7 +191,11 @@ if (has("press/docs") || has("press/stories")) {
               i18n: "duplicate",
             }
           : field(f, t, { i18n: t === "date" ? "duplicate" : true }),
-      ),
+        ),
+        // The story itself. It was missing, which made the editor a form for
+        // everything about a story except the story.
+        { name: "body", label: "Story", widget: "markdown", i18n: true },
+      ],
     });
   }
 }
