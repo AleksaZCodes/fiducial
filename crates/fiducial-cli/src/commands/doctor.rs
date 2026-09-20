@@ -70,6 +70,9 @@ pub fn run() -> Result<()> {
         check_branch_protection(&root, cfg, &mut reports, &mut ok);
     }
 
+    // ── 11. Does every web app still send its security headers? ───────────
+    check_security_headers(&root, &mut issues, &mut ok);
+
     // ── Report ────────────────────────────────────────────────────────────
     for msg in &ok {
         println!("  ✓ {msg}");
@@ -514,5 +517,83 @@ fn check_pending_migrations(
                 m.id, m.description
             ));
         }
+    }
+}
+
+/// Every web app this product has still declares the required response headers.
+///
+/// # Why this is an issue and not a warning
+///
+/// A missing security header is not drift from a preference — it is protection
+/// the product is believed to have and does not. `fire.outreachnet.work` served
+/// none of these for its whole life: the capability template never had them, no
+/// build failed, no page broke, and the gap was visible only to someone who
+/// thought to run `curl -I`. A warning would have been read the same way the
+/// absence was.
+///
+/// # Why it reads the config and not the deployed response
+///
+/// `fid` makes no network calls, and a gate that probes production cannot run in
+/// CI before a deploy, cannot run offline, and answers about what *is* deployed
+/// rather than what is about to be. The declaration is the thing a commit can
+/// change, so the declaration is what this checks — see `crate::security` for
+/// the coarseness that buys and what it therefore cannot catch.
+///
+/// Shapes the product does not have are skipped silently. A product with no web
+/// app is not failing a web rule.
+fn check_security_headers(root: &Path, issues: &mut Vec<String>, ok: &mut Vec<String>) {
+    use crate::security::{missing_headers, WEB_APP_SHAPES};
+
+    let mut checked = 0usize;
+
+    for shape in WEB_APP_SHAPES {
+        if !root.join(shape.marker).exists() {
+            continue;
+        }
+        checked += 1;
+
+        let config = root.join(shape.config);
+        let Ok(source) = std::fs::read_to_string(&config) else {
+            issues.push(format!(
+                "{} app has no `{}`, so nothing sets its response headers.\n      \
+                 Every request it serves goes out without HSTS, CSP, or any of the rest.",
+                shape.name, shape.config
+            ));
+            continue;
+        };
+
+        let missing = missing_headers(&source);
+        if missing.is_empty() {
+            continue;
+        }
+
+        let mut detail = format!(
+            "{} app is missing {} required security header(s) in `{}`:",
+            shape.name,
+            missing.len(),
+            shape.config
+        );
+        for h in &missing {
+            detail.push_str(&format!(
+                "\n      · {} — without it: {}",
+                h.name, h.protects
+            ));
+        }
+        detail.push_str(
+            "\n      Fix by extending the platform set rather than restating it:\n        \
+             import { securityHeaders } from … ; headers: [...securityHeaders]\n      \
+             Reasoning and the HSTS preload caveat: docs/specs/2026-09-20-hsts-preload.md",
+        );
+        issues.push(detail);
+    }
+
+    if checked > 0 && issues.is_empty() {
+        ok.push(format!(
+            "security headers: {checked} web app(s) declare all {} required",
+            crate::security::SECURITY_HEADERS
+                .iter()
+                .filter(|h| h.required)
+                .count()
+        ));
     }
 }
