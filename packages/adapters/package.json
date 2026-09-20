@@ -1,6 +1,6 @@
 {
   "name": "@fiducial/adapters",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Cross-platform adapter contracts for Fiducial — database, storage, email, diagnostics, bot protection, queue, auth, AI.",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
