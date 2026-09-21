@@ -1,6 +1,4 @@
 $ fid graph
-pipeline: design (fid-design)
-  → artifact: apps/web/src/app/tokens.css
 pipeline: eda (fid-validate)
   → artifact: board/board.interface.json
 pipeline: enclosure (fid-mesh)
@@ -8,8 +6,6 @@ pipeline: enclosure (fid-mesh)
   → artifact: enclosure/case-lid.stl
   → artifact: enclosure/gasket.stl
   → artifact: enclosure/case.glb
-pipeline: i18n (fid-i18n)
-  → artifact: src/generated/messages.ts
 pipeline: thesis (fid-thesis)
   → artifact: PITCH.md
   → artifact: apps/web/src/generated/thesis.ts

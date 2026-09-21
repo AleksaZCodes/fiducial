@@ -3,12 +3,10 @@ $ fid doctor
 
   ✓ fiducial.toml valid  (product: demo-product, v0.1.0)
   ✓ guard: 2 rule(s), all implemented
-  ✓ fiducial.lock valid  (28 template(s) tracked, 0 migration(s) applied)
+  ✓ fiducial.lock valid  (11 template(s) tracked, 0 migration(s) applied)
   ✓ all template files unmodified
+  ✓ templates up to date with platform vX.Y.Z
   ✓ no pending codemod migrations
-  ✓ no hardcoded user-visible strings found
   ✓ tooling: 1 command(s) present
 
-  ⚠ fiducial.toml: upstream template updated (installed: X.Y.Z, current: X.Y.Z) — run `fid upgrade`
-
-✦ fiducial doctor: clean (with 1 upgrade hint(s) — run `fid upgrade`)
+✦ fiducial doctor: clean

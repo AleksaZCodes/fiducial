@@ -129,6 +129,10 @@ fn the_typescript_module_waits_for_an_app_instead_of_conjuring_one() {
 
     // Give the product a real app and the module starts deriving, with no
     // further ceremony — the same rule `fid-design` uses for its stylesheet.
+    //
+    // The directory has to be created too: a minimal scaffold has no `apps/`
+    // at all, which is the state this test exists to protect.
+    std::fs::create_dir_all(root.join("apps/web")).unwrap();
     std::fs::write(
         root.join("apps/web/package.json"),
         "{\"name\":\"web\",\"private\":true}\n",

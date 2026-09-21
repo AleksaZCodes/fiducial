@@ -52,13 +52,34 @@ pub const SCAFFOLD_FILES: &[(&str, &str)] = &[
     ("pipelines/thesis.toml", TMPL_PIPELINE_THESIS),
     ("AGENTS.md", TMPL_AGENTS_MD),
     ("README.md", TMPL_README),
-    ("ROADMAP.md", TMPL_ROADMAP),
     (".gitignore", TMPL_GITIGNORE),
     (".claude/settings.json", TMPL_CLAUDE_SETTINGS),
     (".claude/agents/fiducial-review.md", TMPL_AGENT_REVIEW),
     (".claude/agents/fiducial-design.md", TMPL_AGENT_DESIGN),
     (".github/workflows/ci.yml", TMPL_CI),
 ];
+
+/// Templates written only by `fid new --full`.
+///
+/// A roadmap for a product that has not decided what it claims is a form to
+/// fill in, and being handed one before you have had the idea is the weight
+/// this scaffold was carrying. `fid dash` already reports an absent roadmap as
+/// an absence rather than an error, and there is a test for it — the state was
+/// always supported, it just was not reachable.
+///
+/// Deliberately **not** in `SCAFFOLD_FILES`, and the difference matters.
+/// `fid upgrade` updates whatever a product's lock already tracks, and uses
+/// `SCAFFOLD_FILES` only to find templates the platform added since. So a
+/// product created with `--full` keeps getting roadmap updates, and one created
+/// minimal is never handed a roadmap it declined — which is the whole point of
+/// declining it.
+///
+/// `.github/workflows/ci.yml` stays in the core set despite being on the same
+/// list of things a small tool should not need. CI is what runs
+/// `fid derive --check`, and a product that drifts from its own declarations is
+/// worse than a product with one extra file. There is also no `fid add ci` to
+/// recover it with, and a default you cannot undo is not a default.
+pub const FULL_ONLY_FILES: &[(&str, &str)] = &[("ROADMAP.md", TMPL_ROADMAP)];
 
 // ── Renamed templates ────────────────────────────────────────────────────────
 

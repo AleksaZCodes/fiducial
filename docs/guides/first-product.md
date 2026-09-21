@@ -33,46 +33,13 @@ $ fid new demo-product
   wrote  pipelines/thesis.toml
   wrote  AGENTS.md
   wrote  README.md
-  wrote  ROADMAP.md
   wrote  .gitignore
   wrote  .claude/settings.json
   wrote  .claude/agents/fiducial-review.md
   wrote  .claude/agents/fiducial-design.md
   wrote  .github/workflows/ci.yml
   wrote  fiducial.lock
-✦ fid add design — installing into demo-product
-  wrote  design-system.md
-  wrote  pipelines/design.toml
-  wrote  apps/web/components.json
-  wrote  apps/web/src/app/marks.css
-  wrote  apps/web/src/components/ui/LICENSES.md
-  wrote  apps/web/src/components/ui/button.tsx
-  wrote  apps/web/src/components/ui/card.tsx
-  wrote  apps/web/src/components/ui/doodle-arrows.tsx
-  wrote  apps/web/src/components/ui/dropdown-menu.tsx
-  wrote  scripts/build-design-system.mjs
-  wrote  scripts/derive-logo.mjs
-  wrote  scripts/render-brand.mjs
-  wrote  .fiducial/skills/design.md
-  wrote  .claude/skills/design.md
-  patched fiducial.toml
-  ✓ design installed
-  ✓ no guard rules — this capability adds none
-  ✓ instructions → .fiducial/skills/design.md (any agent; see AGENTS.md)
-✦ fid add i18n — installing into demo-product
-  wrote  messages/en.json
-  wrote  messages/sr.json
-  wrote  pipelines/i18n.toml
-  wrote  apps/web/src/components/locale-picker.tsx
-  wrote  .fiducial/skills/i18n.md
-  wrote  .claude/skills/i18n.md
-  patched fiducial.toml
-  ✓ i18n installed
-  ✓ no guard rules — this capability adds none
-  ✓ instructions → .fiducial/skills/i18n.md (any agent; see AGENTS.md)
 
-  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓
-  ▶ i18n (fid-i18n) ✓
   ▶ thesis (fid-thesis) ✓
 
 ✦ fid derive complete — fiducial.lock updated
@@ -88,6 +55,11 @@ Initialized empty Git repository in /home/you/dev/demo-product/.git/
   fid thesis            # what is still unanswered about it
 
   # Edit fiducial.toml — set spine.enabled = true if you want the L0 Rust core.
+
+  # Foundations, when the product needs them — not before:
+  fid add design        # a design system, so the defaults are not the decision
+  fid add i18n          # locales, before the first user-visible string
+  fid add brand         # name, colours, domain, contact
 
   fid add app next      # add a Next.js web app
   fid add app svelte    # add a SvelteKit app
@@ -107,15 +79,23 @@ Initialized empty Git repository in /home/you/dev/demo-product/.git/
 
 <!-- /capture -->
 
-Nine files. The ones that matter:
+Twelve files, and the whole tree is under 50KB. The ones that matter:
 
 | File | Is |
 |---|---|
+| `thesis.toml` | The one claim this product is built to test. Start here. |
 | `fiducial.toml` | Your product's declaration: name, capabilities, guard rules |
 | `fiducial.lock` | Hashes of every template and every generated artifact |
-| `MISSION.md` | Copied verbatim, not per-product. The tiebreaker. |
+| `MISSION.md` | The context a structured claim cannot hold |
 | `AGENTS.md` | Context for AI agents working in this repo |
 | `.github/workflows/ci.yml` | Runs `fid doctor` and `fid derive --check` |
+
+**What is deliberately absent:** a design system, message catalogs, a brand, a
+roadmap. Each is one `fid add` away and produces exactly the tree it would have
+produced at minute zero — `fid new --full` still creates the lot in one step.
+The default is the minimum because a small tool should not need a design system
+to exist, and because every foundation installed before there is a product
+thought is a decision made on your behalf while you were not looking.
 
 That last one is the point of the whole system, and it is scaffolded rather than
 left as something to remember. Note the branch is `main` — the guard rule, the
@@ -136,15 +116,13 @@ $ fid doctor
 
   ✓ fiducial.toml valid  (product: demo-product, v0.1.0)
   ✓ guard: 2 rule(s), all implemented
-  ✓ fiducial.lock valid  (28 template(s) tracked, 0 migration(s) applied)
+  ✓ fiducial.lock valid  (11 template(s) tracked, 0 migration(s) applied)
   ✓ all template files unmodified
+  ✓ templates up to date with platform vX.Y.Z
   ✓ no pending codemod migrations
-  ✓ no hardcoded user-visible strings found
   ✓ tooling: 1 command(s) present
 
-  ⚠ fiducial.toml: upstream template updated (installed: X.Y.Z, current: X.Y.Z) — run `fid upgrade`
-
-✦ fiducial doctor: clean (with 1 upgrade hint(s) — run `fid upgrade`)
+✦ fiducial doctor: clean
 ```
 
 <!-- /capture -->
@@ -260,8 +238,6 @@ fid graph
 
 ```text
 $ fid graph
-pipeline: design (fid-design)
-  → artifact: apps/web/src/app/tokens.css
 pipeline: eda (fid-validate)
   → artifact: board/board.interface.json
 pipeline: enclosure (fid-mesh)
@@ -269,8 +245,6 @@ pipeline: enclosure (fid-mesh)
   → artifact: enclosure/case-lid.stl
   → artifact: enclosure/gasket.stl
   → artifact: enclosure/case.glb
-pipeline: i18n (fid-i18n)
-  → artifact: src/generated/messages.ts
 pipeline: thesis (fid-thesis)
   → artifact: PITCH.md
   → artifact: apps/web/src/generated/thesis.ts

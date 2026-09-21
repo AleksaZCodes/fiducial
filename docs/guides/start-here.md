@@ -150,19 +150,17 @@ Product
   version        0.1.0
   root           /home/you/dev/demo-product
   spine          disabled
-  capabilities   design, i18n
+  capabilities   (none)
   guard rules    2
 
 Git
   branch         main
   head           no commits yet
-  working tree   17 file(s) with uncommitted changes
+  working tree   10 file(s) with uncommitted changes
   upstream       not tracking a remote branch
 
 Roadmap
-  source         ROADMAP.md
-  progress       0 done, 0 in progress, 1 to do  (1 tracked)
-  next           _Replace this row_ _and say what it costs to defer_
+  state          no roadmap found (looked for ROADMAP.md, SHIPPED.md, PHASES.md, docs/ROADMAP.md)
 
 Decisions
   state          none recorded (looked in docs/specs, docs/decisions, docs/adr)
@@ -173,28 +171,20 @@ CI
   (declared workflows, not live run status — dash makes no network calls)
 
 Graph
-  design (fid-design)
-    → apps/web/src/app/tokens.css
-  i18n (fid-i18n)
-    → src/generated/messages.ts
   thesis (fid-thesis)
     → PITCH.md
     → apps/web/src/generated/thesis.ts
 
 Freshness
-  artifacts      1 fresh, 0 stale, 0 missing, 0 never derived
+  artifacts      0 fresh, 0 stale, 0 missing, 0 never derived
   templates      unmodified
   everything the lock tracks is current
 
 Localization
-  locales        sr, en (default: sr)
-  no hardcoded user-visible strings found
+  not localized — no locales declared in [i18n]
 
 Capabilities
-  ✓ design-system.md                   declared (design)
-  ✓ i18n                               declared (i18n)
-  ✓ messages/en.json                   declared (i18n)
-  ✓ messages/sr.json                   declared (i18n)
+  no declarations — installed capabilities introduce no facts
 
   database       not selected
   storage        not selected

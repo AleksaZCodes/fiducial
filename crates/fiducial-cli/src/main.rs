@@ -148,27 +148,45 @@ hyphens. Examples: `my-product`, `ring-of-pursuit`, `lora-walkie`."
         )]
         name: String,
 
-        /// Locales this product ships, comma-separated; `none` to opt out
+        /// Locales this product ships, comma-separated; omit for none
         #[arg(
             long,
             value_name = "LIST",
-            default_value = "sr,en",
             long_help = "Locales the product ships, comma-separated — for example `en,fr,de`.
 
-The product is created localized. Principle 1c says a user-visible string is a
-fact with one derivation per locale, and monolingual is a state you pass through
-before the first commit, not one you ship: added later, localization is a
-refactoring pass over strings that have already been missed.
+Naming any locale installs the i18n capability. Omit the flag and the product
+is created with no catalogs at all, which is the right starting point for a
+tool that has no user-visible text yet and for one that does not know whether
+it will.
 
 A catalog is written for every locale named here. Where the platform ships one
 (sr, en) it is used; otherwise the locale starts as a copy of the default, which
 `fid derive` then reports as untranslated — visible work rather than a silent
 gap.
 
-Pass `--locales none` for a product that genuinely has no user-visible text,
-such as a CLI or a firmware image."
+Principle 1c still holds: a user-visible string is a fact with one derivation
+per locale, and retrofitting localization means a refactoring pass over strings
+that have already been missed. That argues for adding locales before the first
+user-visible string, not before the first thought — `fid add i18n` is one
+command and produces exactly the same tree."
         )]
         locales: Option<String>,
+
+        /// Scaffold the full set of foundations: design system and locales
+        #[arg(
+            long,
+            long_help = "\
+Create the product with the foundations a `fid new` used to install
+unconditionally: the design capability, and the platform's seeded locales.
+
+Equivalent to `fid new <name> --locales sr,en` followed by `fid add design`.
+
+The default is the minimum, because the platform was too heavy to start an
+idea in: 34 files and 416KB before anyone had had a product thought. Use this
+when you already know the product has a face and an audience — reaching for it
+later costs one command and produces an identical tree."
+        )]
+        full: bool,
 
         /// Locale a reader falls back to; must be one of --locales
         #[arg(
@@ -758,7 +776,8 @@ fn main() -> Result<()> {
             name,
             locales,
             default_locale,
-        } => commands::new::run(&name, locales.as_deref(), default_locale.as_deref()),
+            full,
+        } => commands::new::run(&name, locales.as_deref(), default_locale.as_deref(), full),
         Commands::Add { target } => commands::add::run(target),
         Commands::Capability { action } => commands::capability::run(action),
         Commands::Derive { check, pipeline } => commands::derive::run(check, pipeline),

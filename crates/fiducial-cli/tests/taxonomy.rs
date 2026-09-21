@@ -36,7 +36,10 @@ fn text(out: &Output) -> String {
 }
 
 fn scaffold(tmp: &Path) -> PathBuf {
-    assert!(run(tmp, &["new", "p"]).status.success(), "fid new");
+    assert!(
+        run(tmp, &["new", "p", "--full"]).status.success(),
+        "fid new"
+    );
     tmp.join("p")
 }
 

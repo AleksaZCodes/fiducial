@@ -23,8 +23,14 @@ fn run(dir: &Path, args: &[&str]) -> std::process::Output {
         .expect("failed to invoke fid")
 }
 
+/// A product with the full set of foundations.
+///
+/// `--full` rather than the default, because these tests are about `fid dash`
+/// — a view over roadmap, decisions, pipelines and freshness — and want a
+/// product that actually has those things to render. The minimal scaffold is
+/// the subject of `new.rs`'s own tests, not of this file.
 fn scaffold(tmp: &Path) -> std::path::PathBuf {
-    let out = run(tmp, &["new", "demo"]);
+    let out = run(tmp, &["new", "demo", "--full"]);
     assert!(out.status.success(), "fid new failed: {out:?}");
     tmp.join("demo")
 }
