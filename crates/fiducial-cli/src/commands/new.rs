@@ -318,8 +318,12 @@ fn print_checklist(name: &str) {
     println!("✦ {name} is ready. Next steps:");
     println!();
     println!("  cd {name}");
+    println!();
+    println!("  # Start here. One sentence someone could disagree with:");
+    println!("  fid thesis set \"<what this product claims>\"");
+    println!("  fid thesis            # what is still unanswered about it");
+    println!();
     println!("  # Edit fiducial.toml — set spine.enabled = true if you want the L0 Rust core.");
-    println!("  # Edit MISSION.md   — one paragraph: what is this product for?");
     println!();
     println!("  fid add app next      # add a Next.js web app");
     println!("  fid add app svelte    # add a SvelteKit app");

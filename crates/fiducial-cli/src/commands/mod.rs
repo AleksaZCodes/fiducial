@@ -13,4 +13,5 @@ pub mod harvest;
 pub mod new;
 pub mod release;
 pub mod repo;
+pub mod thesis;
 pub mod upgrade;

@@ -29,6 +29,8 @@ $ fid new demo-product
 ✦ fid new demo-product
   wrote  fiducial.toml
   wrote  MISSION.md
+  wrote  thesis.toml
+  wrote  pipelines/thesis.toml
   wrote  AGENTS.md
   wrote  README.md
   wrote  ROADMAP.md
@@ -71,6 +73,7 @@ $ fid new demo-product
 
   ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓
   ▶ i18n (fid-i18n) ✓
+  ▶ thesis (fid-thesis) ✓
 
 ✦ fid derive complete — fiducial.lock updated
 Initialized empty Git repository in /home/you/dev/demo-product/.git/
@@ -79,8 +82,12 @@ Initialized empty Git repository in /home/you/dev/demo-product/.git/
 ✦ demo-product is ready. Next steps:
 
   cd demo-product
+
+  # Start here. One sentence someone could disagree with:
+  fid thesis set "<what this product claims>"
+  fid thesis            # what is still unanswered about it
+
   # Edit fiducial.toml — set spine.enabled = true if you want the L0 Rust core.
-  # Edit MISSION.md   — one paragraph: what is this product for?
 
   fid add app next      # add a Next.js web app
   fid add app svelte    # add a SvelteKit app
@@ -129,7 +136,7 @@ $ fid doctor
 
   ✓ fiducial.toml valid  (product: demo-product, v0.1.0)
   ✓ guard: 2 rule(s), all implemented
-  ✓ fiducial.lock valid  (26 template(s) tracked, 0 migration(s) applied)
+  ✓ fiducial.lock valid  (28 template(s) tracked, 0 migration(s) applied)
   ✓ all template files unmodified
   ✓ no pending codemod migrations
   ✓ no hardcoded user-visible strings found
@@ -264,6 +271,9 @@ pipeline: enclosure (fid-mesh)
   → artifact: enclosure/case.glb
 pipeline: i18n (fid-i18n)
   → artifact: src/generated/messages.ts
+pipeline: thesis (fid-thesis)
+  → artifact: PITCH.md
+  → artifact: apps/web/src/generated/thesis.ts
 ```
 
 <!-- /capture -->
