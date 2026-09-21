@@ -257,9 +257,8 @@ mod tests {
         let classified: Vec<&str> = PRODUCT_OWNED
             .iter()
             .chain(PLATFORM_OWNED_EXCEPTIONS.iter())
-            .filter_map(|r| match r {
-                Rule::Exact(p) => Some(*p),
-                Rule::Prefix(p) => Some(*p),
+            .map(|r| match r {
+                Rule::Exact(p) | Rule::Prefix(p) => *p,
             })
             .collect();
 
