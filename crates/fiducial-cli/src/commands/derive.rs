@@ -108,8 +108,8 @@ fn run_derive(
                         lock.artifacts.remove(out.as_str());
                         if root.join(out).exists() {
                             println!(
-                                "      note: `{out}` is no longer derived \
-                                 ([identity] storage = \"none\") but still exists"
+                                "      note: `{out}` is no longer derived ({}) but still exists",
+                                not_applicable_reason(pipeline, out, root)
                             );
                         }
                         continue;
@@ -169,7 +169,22 @@ pub(crate) fn outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<St
         // So the output is not applicable until the app it belongs to exists.
         // Add one — `fid add app next` — and it starts deriving with no further
         // ceremony.
-        "fid-design" => pipeline
+        // The thesis pipeline waits for two different things.
+        //
+        // Until a claim is declared, nothing is applicable at all. A scaffolded
+        // `thesis.toml` is a page of questions with no `[[thesis]]` in it, and
+        // that is a legitimate state — it is the state every product starts in.
+        // Demanding a PITCH.md from a product that has not decided what it
+        // claims would make the thesis a blocker, which is the one thing it
+        // must never be.
+        "fid-thesis" if !thesis_is_declared(root) => pipeline.outputs.clone(),
+
+        // Once it is declared, the remaining question is the same one
+        // `fid-design` asks. `PITCH.md` sits at the product root and is always
+        // applicable — a product having a thesis and a pitch before it has an
+        // app is the point. `thesis.ts` is for an app to import, so it waits
+        // for one.
+        "fid-design" | "fid-thesis" => pipeline
             .outputs
             .iter()
             .filter(|o| !app_root_exists(root, o))
@@ -190,6 +205,45 @@ pub(crate) fn outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<St
 /// fires and a firmware-only product carries a stylesheet it has no way to
 /// load. A `package.json` or `Cargo.toml` is what actually says "an app lives
 /// here".
+/// Why is this output not applicable to this product?
+///
+/// The note used to state one hardcoded cause — `[identity] storage = "none"` —
+/// for every executor that skipped an output. That was already wrong for
+/// `fid-design`, whose outputs wait for an app and have nothing to do with
+/// identity storage; nobody had noticed, because the note only prints when a
+/// stale file is still sitting there, which for `fid-design` it never was.
+///
+/// A message that names the wrong cause is worse than one that names none: it
+/// sends the reader to `fiducial.toml` to change a setting that is not the
+/// reason.
+fn not_applicable_reason(pipeline: &Pipeline, output: &str, root: &Path) -> String {
+    match pipeline.executor.as_str() {
+        "fid-identity" => "[identity] storage = \"none\"".to_string(),
+        "fid-thesis" if !thesis_is_declared(root) => {
+            format!("no thesis is declared in {}", crate::thesis::THESIS_FILE)
+        }
+        "fid-design" | "fid-thesis" if !app_root_exists(root, output) => {
+            "there is no app at that path".to_string()
+        }
+        other => format!("`{other}` does not derive it in this configuration"),
+    }
+}
+
+/// Has this product declared a thesis yet?
+///
+/// A missing or unparseable `thesis.toml` counts as "not yet" rather than as an
+/// error. This function only decides whether to *ask* for derived artifacts;
+/// `run_fid_thesis` is where a malformed declaration is reported, with the
+/// parse error the author needs. Reporting it from here would surface a TOML
+/// syntax error as "your pipeline outputs are missing", which points at the
+/// wrong file.
+fn thesis_is_declared(root: &Path) -> bool {
+    std::fs::read_to_string(root.join(crate::thesis::THESIS_FILE))
+        .ok()
+        .and_then(|raw| crate::thesis::parse(&raw).ok())
+        .is_some_and(|f| !f.thesis.is_empty())
+}
+
 fn app_root_exists(root: &Path, output: &str) -> bool {
     let mut parts = Path::new(output).components();
     let (Some(a), Some(b)) = (parts.next(), parts.next()) else {
@@ -739,6 +793,91 @@ fn run_fid_brand(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
                 .with_context(|| format!("creating parent for `{out}`"))?;
         }
         std::fs::write(&abs, content).with_context(|| format!("writing {out}"))?;
+    }
+
+    Ok(())
+}
+
+// ── Built-in fid-thesis executor ─────────────────────────────────────────────
+
+/// Derive the pitch and the importable claim from `thesis.toml`.
+///
+/// **The claim was being retyped, and the copies had already diverged.** fon
+/// states it three ways: `MISSION.md` has "no unverified alert ever reaches a
+/// responder", `messages/en.json` has "A person confirms every event", and
+/// `README.md` has a third wording. Three hand-written restatements of one
+/// claim, with no source among them — so no one could say which was canonical,
+/// and nothing could notice when a fourth appeared.
+///
+/// This executor writes two files and neither is prose to be re-edited:
+///
+/// - `PITCH.md` — the arc assembled in the order you would say it out loud.
+/// - `thesis.ts` — the claim and its parts as a typed constant, so a landing
+///   page or a metadata export *imports* the sentence instead of retyping it.
+///
+/// Deliberately not derived here: `README.md`, the i18n catalogs, or the hero
+/// copy. Those are hand-written and stay that way — a generated region inside a
+/// translated catalog would mean deriving Serbian from an English claim through
+/// a pipeline that has no translator. `fid advise` checks them against the
+/// thesis instead and flags drift without rewriting, which is advice, not a
+/// gate. `docs/specs/2026-09-21-the-thesis-is-a-fact.md` argues the boundary.
+fn run_fid_thesis(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    let path = working_dir.join(crate::thesis::THESIS_FILE);
+    let raw = std::fs::read_to_string(&path).with_context(|| {
+        format!(
+            "fid-thesis needs {}. Declare one with `fid thesis set \"<claim>\"` — \
+             a single sentence is enough.",
+            crate::thesis::THESIS_FILE
+        )
+    })?;
+    let file = crate::thesis::parse(&raw)?;
+
+    // A scaffolded thesis.toml with no `[[thesis]]` in it is the state every
+    // product starts in, so it derives nothing and says nothing. Declaring a
+    // claim starts the derivation with no further ceremony.
+    if file.thesis.is_empty() {
+        return Ok(());
+    }
+    let current = crate::thesis::current(&file)?;
+
+    // The product's own name, for the pitch heading. `[product] name` is the
+    // declaration; falling back to the directory name keeps this working in a
+    // product that has a thesis before it has a fiducial.toml, which is the
+    // order this whole feature is arguing for.
+    let product_name = Config::load(&working_dir.join(crate::config::CONFIG_FILE))
+        .ok()
+        .map(|c| c.product.name)
+        .or_else(|| {
+            working_dir
+                .file_name()
+                .and_then(|s| s.to_str())
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| "This product".to_string());
+
+    // Consult the same applicability rule `fid derive` and `fid dash` use.
+    // Writing an output the pipeline has already declared inapplicable creates
+    // the orphan it was meant to prevent — `apps/web/src/generated/thesis.ts`
+    // in a product with no `apps/web`, conjuring three directories and then
+    // reporting the file as one that "is no longer derived but still exists".
+    let skip = outputs_not_applicable(pipeline, working_dir);
+
+    for out in &pipeline.outputs {
+        if skip.contains(out) {
+            continue;
+        }
+        let name = Path::new(out)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| anyhow::anyhow!("fid-thesis: output `{out}` has no file name"))?;
+
+        let content = match name {
+            "PITCH.md" => crate::thesis::render_pitch_md(current, &product_name, "fid-thesis"),
+            "thesis.ts" => crate::thesis::render_ts(current, "fid-thesis"),
+            other => bail!("fid-thesis: unknown output `{other}` (supported: PITCH.md, thesis.ts)"),
+        };
+
+        write_output(working_dir, out, &content)?;
     }
 
     Ok(())
@@ -1810,6 +1949,7 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             "fid-mesh" => return run_fid_mesh(pipeline, working_dir),
             "fid-i18n" => return run_fid_i18n(pipeline, working_dir),
             "fid-brand" => return run_fid_brand(pipeline, working_dir),
+            "fid-thesis" => return run_fid_thesis(pipeline, working_dir),
             "fid-deploy" => return run_fid_deploy(pipeline, working_dir),
             "fid-identity" => return run_fid_identity(pipeline, working_dir),
             "fid-adapters" => return run_fid_adapters(pipeline, working_dir),

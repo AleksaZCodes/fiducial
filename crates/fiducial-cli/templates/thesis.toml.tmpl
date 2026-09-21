@@ -1,0 +1,60 @@
+# thesis.toml — what {{name}} claims, and what would prove it wrong.
+#
+# Scaffolded by `fid new` (fiducial {{version}}). Product-owned, and the one
+# file here worth filling in before anything else exists.
+#
+# A thesis is the single claim this product is built to test. Not a description
+# of what it does — a claim someone could argue with. If nobody could disagree
+# with it, it is a slogan and it will not help you decide anything.
+#
+# This file is APPEND-ONLY. When the claim sharpens, add a new [[thesis]] that
+# supersedes the old one and says why; never edit an entry. How the thinking
+# matured is most of what a reader wants, and editing a sentence destroys it.
+#
+# `claim` is the only required field. One rough line is a valid thesis and
+# nothing here blocks a build — `fid derive` produces identical bytes whether
+# this is complete or a stub. Fill the rest in as it becomes answerable.
+#
+#   fid thesis           what is claimed, and what is still unanswered
+#   fid thesis log       how the claim got here
+#   fid advise           is it falsifiable? could a reasonable person disagree?
+
+# Nothing is declared yet, and that is a valid state: no thesis means no
+# PITCH.md, and `fid derive --check` does not ask for one. Declare the first
+# claim whenever you have it —
+#
+#   fid thesis set "One sentence someone could disagree with."
+#
+# — or uncomment the block below and write it here. Either way the rest of this
+# file is yours to fill in over time.
+#
+# [[thesis]]
+# date  = "2026-01-01"
+# claim = "One sentence someone could disagree with."
+
+# The pitch, in the order you would say it out loud. `fid derive` assembles
+# PITCH.md from exactly these, skipping whatever is not yet declared.
+#
+# [thesis.arc]
+# what     = "What are you making?"
+# for_whom = "Who is it for? Specifically enough to go and find one."
+# problem  = "The tension it resolves. A conflict, not a topic."
+# why_now  = "What changed that makes this possible or urgent now?"
+# why_us   = "What do you carry that someone starting today does not?"
+# how      = "The mechanism — the smallest thing that would test the claim."
+# where    = "The geography, channel or context this happens in."
+
+# What makes it a thesis rather than a slogan. Fill these first if you fill
+# anything: a claim that cannot be wrong cannot be useful.
+#
+# [thesis.test]
+# falsified_by = "What would you have to observe to admit this is wrong?"
+# disagrees    = "Who is the reasonable person who disagrees, and why?"
+
+# What may honestly be claimed today, kept separate from what is intended.
+# This is what stops a derived pitch from overclaiming while you are still
+# building — say the unproven part plainly here and it stays said everywhere.
+#
+# [thesis.evidence]
+# proven  = ["What you have actually shown."]
+# not_yet = ["What you have not."]

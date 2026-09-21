@@ -156,7 +156,7 @@ Product
 Git
   branch         main
   head           no commits yet
-  working tree   16 file(s) with uncommitted changes
+  working tree   17 file(s) with uncommitted changes
   upstream       not tracking a remote branch
 
 Roadmap
@@ -177,6 +177,9 @@ Graph
     → apps/web/src/app/tokens.css
   i18n (fid-i18n)
     → src/generated/messages.ts
+  thesis (fid-thesis)
+    → PITCH.md
+    → apps/web/src/generated/thesis.ts
 
 Freshness
   artifacts      1 fresh, 0 stale, 0 missing, 0 never derived

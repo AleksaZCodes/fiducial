@@ -12,6 +12,8 @@
 
 const TMPL_FIDUCIAL_TOML: &str = include_str!("../templates/fiducial.toml.tmpl");
 const TMPL_MISSION_MD: &str = include_str!("../templates/MISSION.md.tmpl");
+const TMPL_THESIS_TOML: &str = include_str!("../templates/thesis.toml.tmpl");
+const TMPL_PIPELINE_THESIS: &str = include_str!("../templates/pipelines-thesis.toml.tmpl");
 const TMPL_AGENTS_MD: &str = include_str!("../templates/AGENTS.md.tmpl");
 const TMPL_GITIGNORE: &str = include_str!("../templates/gitignore.tmpl");
 const TMPL_CLAUDE_SETTINGS: &str = include_str!("../templates/claude-settings.json.tmpl");
@@ -46,6 +48,8 @@ const PRINCIPLES: &str = include_str!(concat!(env!("OUT_DIR"), "/principles.md")
 pub const SCAFFOLD_FILES: &[(&str, &str)] = &[
     ("fiducial.toml", TMPL_FIDUCIAL_TOML),
     ("MISSION.md", TMPL_MISSION_MD),
+    ("thesis.toml", TMPL_THESIS_TOML),
+    ("pipelines/thesis.toml", TMPL_PIPELINE_THESIS),
     ("AGENTS.md", TMPL_AGENTS_MD),
     ("README.md", TMPL_README),
     ("ROADMAP.md", TMPL_ROADMAP),
@@ -98,6 +102,8 @@ pub fn raw(rel_path: &str) -> Option<&'static str> {
         // fid new templates
         "fiducial.toml" => Some(TMPL_FIDUCIAL_TOML),
         "MISSION.md" => Some(TMPL_MISSION_MD),
+        "thesis.toml" => Some(TMPL_THESIS_TOML),
+        "pipelines/thesis.toml" => Some(TMPL_PIPELINE_THESIS),
         "AGENTS.md" => Some(TMPL_AGENTS_MD),
         ".gitignore" => Some(TMPL_GITIGNORE),
         ".claude/settings.json" => Some(TMPL_CLAUDE_SETTINGS),

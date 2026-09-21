@@ -257,10 +257,10 @@ what the declaration implies.
 
 Executors are `shell` and `cargo-test` — which need no platform change at all —
 plus the in-process ones (`fid-validate`, `fid-mesh`, `fid-i18n`, `fid-brand`,
-`fid-deploy`, `fid-identity`, `fid-adapters`, `fid-schema`, `fid-legal`,
-`fid-design`). Reach for `shell` first; a new in-process executor is warranted
-only when the work is genuinely a Rust library call rather than a tool
-invocation.
+`fid-thesis`, `fid-deploy`, `fid-identity`, `fid-adapters`, `fid-schema`,
+`fid-legal`, `fid-design`). Reach for `shell` first; a new in-process executor
+is warranted only when the work is genuinely a Rust library call rather than a
+tool invocation.
 
 `fid-design` is the clearest case of that line: it parses a declaration, runs
 OKLCH-to-sRGB conversion and WCAG contrast arithmetic over the palette, and

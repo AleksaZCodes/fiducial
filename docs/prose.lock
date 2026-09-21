@@ -12,4 +12,4 @@
 "AGENTS.md::rust-toolchain.toml" = "55e68d5e0504383adf20de2c53ea374b14966b0e27eeb742236eed406d797edc"
 "README.md::crates/fiducial-cli/src/adapter.rs#pub static CONTRACTS" = "d1c901180283f0937983e0af631c6b78613236462b4f44c24006f23d188606f4"
 "README.md::crates/fiducial-cli/src/capability/manifest.rs#pub fn derive" = "45e7f32e9d38cdbc29befb496c08d2fdb038ed57cb4e5825a1ca16490fc6a50b"
-"README.md::crates/fiducial-cli/src/commands/derive.rs#fn run_pipeline_command" = "8ced6bd253086503afbafe7c78982171e6e243eb26c5b5b1a1fc08e5c77108ac"
+"README.md::crates/fiducial-cli/src/commands/derive.rs#fn run_pipeline_command" = "80d15a28fe5ed1b10ff708a4fc255fbfac7e208ed97e2f759c977ce72dc4368f"

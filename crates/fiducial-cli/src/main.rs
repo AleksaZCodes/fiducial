@@ -18,6 +18,7 @@ mod prose;
 mod schema;
 mod security;
 mod templates;
+mod thesis;
 
 // ── Top-level CLI ────────────────────────────────────────────────────────────
 
@@ -366,6 +367,47 @@ SEE ALSO
         action: commands::release::ReleaseAction,
     },
 
+    /// The thesis — the one claim this product is built to test
+    #[command(
+        long_about = "\
+Read, declare and sharpen this product's thesis.
+
+A thesis is the single claim a product exists to test: the sentence you would
+sell with, that a reasonable person could disagree with, and that some future
+observation could prove wrong. It is declared in `thesis.toml`, once, with its
+parts separable — the arc you would pitch, the test that makes it falsifiable,
+and the evidence you actually have.
+
+It is a Fact with a Decision's lifecycle. `thesis.toml` is append-only: a
+sharper claim supersedes the old one and says why, and the old wording is never
+edited away, because how the thinking matured is most of what a reader wants.
+
+One rough line is a valid thesis. `claim` is the only required field; every
+other part is optional and answerable months later. Nothing here gates a build,
+and `fid derive` is byte-identical whether a thesis is complete or a stub.
+
+  fid thesis                      what the product currently claims
+  fid thesis log                  how that claim got here
+  fid thesis set \"<claim>\"        declare or sharpen it
+
+What is derived from it — PITCH.md, a TypeScript module the app imports — comes
+from the `fid-thesis` pipeline. `fid advise` argues with the claim itself.",
+        after_long_help = "\
+EXAMPLES
+  fid thesis set \"No unverified alert ever reaches a responder.\"
+  fid thesis set \"<sharper>\" --because \"Cheap was never the objection.\"
+  fid thesis log
+
+SEE ALSO
+  thesis.toml    the declaration
+  PITCH.md       the arc, assembled by `fid derive`
+  fid advise     is it falsifiable? could anyone disagree?"
+    )]
+    Thesis {
+        #[command(subcommand)]
+        action: Option<commands::thesis::ThesisAction>,
+    },
+
     /// The workbench — one read-only view of roadmap, decisions, CI, graph, freshness
     #[command(
         long_about = "\
@@ -707,6 +749,7 @@ fn main() -> Result<()> {
         Commands::Upgrade { dry_run, portfolio } => commands::upgrade::run(dry_run, portfolio),
         Commands::Graph { format } => commands::graph::run(&format),
         Commands::Release { action } => commands::release::run(action),
+        Commands::Thesis { action } => commands::thesis::run(action),
         Commands::Dash {
             json,
             section,

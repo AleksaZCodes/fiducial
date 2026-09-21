@@ -302,6 +302,7 @@ rule that matters most.
 | `fid upgrade` | Pull upstream template and package updates into this product |
 | `fid graph` | Emit the facts → pipelines → artifacts dependency graph |
 | `fid release` | Platform version management and version-skew enforcement |
+| `fid thesis` | The thesis — the one claim this product is built to test |
 | `fid dash` | The workbench — one read-only view of roadmap, decisions, CI, graph, freshness |
 | `fid harvest` | Survey an existing codebase for reusable logic, art, UI and principles |
 | `fid context` | Regenerate the derivable parts of AGENTS.md / CLAUDE.md |
