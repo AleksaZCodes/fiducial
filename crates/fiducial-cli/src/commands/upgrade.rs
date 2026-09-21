@@ -268,6 +268,26 @@ enum TemplateOutcome {
     Conflict(String),
 }
 
+/// Does this file still carry unresolved conflict markers?
+///
+/// Both an opening and a closing marker must be present, each at the start of
+/// its own line. Requiring the pair keeps prose safe: a document that happens
+/// to discuss `<<<<<<<` — this repository has several, including the one
+/// explaining this function — is not a file mid-conflict, and refusing to
+/// upgrade it would be a new bug in place of the old one.
+fn has_conflict_markers(text: &str) -> bool {
+    let mut opened = false;
+    let mut closed = false;
+    for line in text.lines() {
+        if line.starts_with("<<<<<<<") {
+            opened = true;
+        } else if line.starts_with(">>>>>>>") {
+            closed = true;
+        }
+    }
+    opened && closed
+}
+
 /// Top-level `[section]` headers a merge would remove, named, or `None` when it
 /// removes nothing.
 ///
@@ -368,6 +388,30 @@ fn merge_one_template(
             return Err(e).with_context(|| format!("reading {rel_path}"));
         }
     };
+
+    // Refuse to merge a file that still has conflict markers in it.
+    //
+    // The conflict branch below writes markers and deliberately leaves the lock
+    // alone, so that a human can resolve them and re-run. That intent is right
+    // and the implementation did not deliver it: on the next run `ours` is the
+    // file *containing the markers*, so the 3-way merge runs again against a
+    // base that never moved and writes markers around markers. Each run
+    // compounds the damage, which is why a real product's CI carries the note
+    // that `fid upgrade` "rewrites conflict markers into fiducial.toml —
+    // corrupting it further every time" and why `fid doctor` is
+    // `continue-on-error` there.
+    //
+    // Detecting the markers is what makes "resolve and re-run" true. A file
+    // mid-conflict is not a file this can reason about, so it says so and
+    // writes nothing.
+    if has_conflict_markers(&local) {
+        return Ok(Some(TemplateOutcome::Conflict(format!(
+            "UNRESOLVED — {rel_path} still contains conflict markers from an \
+             earlier upgrade. Nothing was written: merging it again would nest \
+             markers inside markers and lose more of the file each run. Resolve \
+             the markers, then re-run"
+        ))));
+    }
 
     // 3-way merge: base=what-was-installed, ours=local-file, theirs=upstream.
     let merged = diffy::merge(&base, &local, &upstream);
@@ -473,5 +517,45 @@ mod tests {
         let merged = "nothing\n";
         assert!(dropped_sections("README.md", local, merged).is_none());
         assert!(dropped_sections(CONFIG_FILE, local, merged).is_some());
+    }
+}
+
+#[cfg(test)]
+mod conflict_marker_tests {
+    use super::has_conflict_markers;
+
+    #[test]
+    fn a_file_mid_conflict_is_recognised() {
+        let mid = "a = 1\n<<<<<<< ours\nb = 2\n=======\nb = 3\n>>>>>>> theirs\n";
+        assert!(has_conflict_markers(mid));
+    }
+
+    #[test]
+    fn an_ordinary_file_is_not() {
+        assert!(!has_conflict_markers("a = 1\nb = 2\n"));
+    }
+
+    #[test]
+    fn prose_discussing_the_markers_is_not() {
+        // This function's own doc comment names `<<<<<<<`, and so do several
+        // files in this repository. Matching a lone mention would refuse to
+        // upgrade them — a new bug in place of the old one.
+        let prose = "A conflict writes <<<<<<< into the file.\nResolve it by hand.\n";
+        assert!(!has_conflict_markers(prose));
+    }
+
+    #[test]
+    fn a_marker_must_start_its_line() {
+        // Indented or quoted, it is content rather than a marker.
+        let quoted = "note = \"see <<<<<<< ours\"\nother = \">>>>>>> theirs\"\n";
+        assert!(!has_conflict_markers(quoted));
+    }
+
+    #[test]
+    fn an_opening_marker_alone_is_not_enough() {
+        // Half a marker pair is likelier to be prose than a conflict, and a
+        // genuinely truncated conflict is a corrupted file rather than one
+        // this can reason about either way.
+        assert!(!has_conflict_markers("<<<<<<< ours\na = 1\n"));
     }
 }
