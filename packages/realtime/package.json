@@ -1,6 +1,6 @@
 {
   "name": "@fiducial/realtime",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Supabase Realtime typed wrappers \u2014 Broadcast, Presence, and Postgres Changes",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
