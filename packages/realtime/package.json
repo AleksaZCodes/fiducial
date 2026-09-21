@@ -1,7 +1,7 @@
 {
   "name": "@fiducial/realtime",
   "version": "0.1.0",
-  "description": "Supabase Realtime typed wrappers — Broadcast, Presence, and Postgres Changes",
+  "description": "Supabase Realtime typed wrappers \u2014 Broadcast, Presence, and Postgres Changes",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
   "repository": {
@@ -22,6 +22,18 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./durable-object": {
+      "import": "./dist/durable-object.js",
+      "types": "./dist/durable-object.d.ts"
+    },
+    "./client": {
+      "import": "./dist/durable-object-client.js",
+      "types": "./dist/durable-object-client.d.ts"
+    },
+    "./relay": {
+      "import": "./dist/relay.js",
+      "types": "./dist/relay.d.ts"
     }
   },
   "files": [
@@ -38,7 +50,8 @@
     "test": "node --test src/realtime.test.js"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "@types/ws": "^8.5.13"
   },
   "peerDependencies": {
     "@supabase/supabase-js": ">=2"
@@ -47,5 +60,11 @@
     "@supabase/supabase-js": {
       "optional": true
     }
+  },
+  "bin": {
+    "realtime-relay": "./dist/relay-bin.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
   }
 }

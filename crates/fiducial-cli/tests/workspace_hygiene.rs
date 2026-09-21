@@ -833,3 +833,83 @@ fn the_release_workflow_runs_on_a_schedule_not_only_on_merges() {
          that re-derives its work needs something that reports the result.\n"
     );
 }
+
+/// No published package ships its own test files.
+///
+/// `@fiducial/advisor@0.2.0` shipped `advisor.test.js` and `endtoend.test.js` to
+/// every consumer — 26KB of test code in `node_modules`, including a suite that
+/// spawns subprocesses and binds a local HTTP server. `@fiducial/cli` shipped
+/// one too. Neither was noticed, because publishing succeeds either way and
+/// nothing downstream complains about a file it simply does not import.
+///
+/// The cause is `files: ["src"]`, which is correct-looking and sweeps the whole
+/// directory. Packages that build to `dist` never had the problem; the two that
+/// ship sources directly both did. So the rule is checked rather than
+/// remembered: name entry points in `files`, or keep tests out of the published
+/// directory.
+#[test]
+fn no_published_package_ships_its_tests() {
+    let root = workspace_root();
+    let mut offenders: Vec<String> = Vec::new();
+
+    let Ok(entries) = std::fs::read_dir(root.join("packages")) else {
+        return;
+    };
+
+    for entry in entries.filter_map(Result::ok) {
+        let dir = entry.path();
+        let manifest = dir.join("package.json");
+        let Ok(raw) = std::fs::read_to_string(&manifest) else {
+            continue;
+        };
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(&raw) else {
+            continue;
+        };
+        if json.get("private").and_then(|v| v.as_bool()) == Some(true) {
+            continue;
+        }
+
+        // Only a wholesale directory entry can sweep a sibling test in. A named
+        // file cannot, and neither can `dist`, which tests are not compiled to.
+        let sweeps_src = json
+            .get("files")
+            .and_then(|f| f.as_array())
+            .is_some_and(|files| {
+                files
+                    .iter()
+                    .filter_map(|f| f.as_str())
+                    .any(|f| f.trim_end_matches('/') == "src")
+            });
+        if !sweeps_src {
+            continue;
+        }
+
+        let Ok(src) = std::fs::read_dir(dir.join("src")) else {
+            continue;
+        };
+        let tests: Vec<String> = src
+            .filter_map(Result::ok)
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .filter(|n| n.contains(".test.") || n.contains(".spec."))
+            .collect();
+
+        if !tests.is_empty() {
+            let name = json
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("(unnamed)");
+            offenders.push(format!(
+                "  {name} — `files: [\"src\"]` ships {}",
+                tests.join(", ")
+            ));
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "these packages publish their own test files to every consumer:\n\n{}\n\n\
+         Name the entry points in `files` instead of the whole `src` directory, \
+         or move the tests out of it.",
+        offenders.join("\n")
+    );
+}
