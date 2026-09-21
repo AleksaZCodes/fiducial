@@ -339,6 +339,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # `version-check` diffs against the merge base with main, so it needs
+          # history. A shallow clone has no merge base to find.
+          fetch-depth: 0
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -356,6 +360,13 @@ jobs:
         run: |
           cargo build -p fiducial-cli --bin fid
           ./target/debug/fid release check
+
+      # The other skew, and the one that actually shipped: main and crates.io
+      # both saying 0.2.2 while holding different binaries. On a push to main
+      # the merge base is HEAD, so this is a no-op there by construction — it
+      # is a pull-request gate, which is where a bump can still be added.
+      - name: fid release version-check (crate source changed ⇒ version moved)
+        run: ./target/debug/fid release version-check --base origin/main
 
       # The cross-implementation anchor. Runs WITHOUT FIDUCIAL_WRITE_VECTORS,
       # so a wire change that did not regenerate the committed vectors fails
