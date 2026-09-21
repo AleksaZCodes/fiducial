@@ -1,6 +1,6 @@
 {
   "name": "@fiducial/advisor",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Advisory checks for Fiducial \u2014 typed judgments where deterministic rules cannot reach. Never gates anything.",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
