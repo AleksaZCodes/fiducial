@@ -72,8 +72,11 @@ asks.")]
     },
 }
 
-pub fn run(action: Option<ThesisAction>) -> Result<()> {
+pub fn run(action: Option<ThesisAction>, json: bool) -> Result<()> {
     let root = std::env::current_dir().context("reading the working directory")?;
+    if json {
+        return emit_json(&root);
+    }
     match action {
         None => show(&root),
         Some(ThesisAction::Log) => log(&root),
@@ -118,6 +121,47 @@ fn show(root: &Path) -> Result<()> {
         println!("  answerable. None of this blocks anything.");
     }
     println!();
+    Ok(())
+}
+
+// ── json ──────────────────────────────────────────────────────────────────────
+
+/// The machine-readable view: what is claimed, what is unanswered, what it
+/// replaced.
+///
+/// This exists so nothing else has to parse `thesis.toml`. `fid advise` is
+/// JavaScript and would otherwise need a TOML reader plus its own idea of which
+/// entry is current and which fields are missing — a second parser for one
+/// declaration, which is the duplication this whole platform is against.
+///
+/// A product with no thesis yet emits `{"declared": false}` and exits 0. It is
+/// a normal state, and a consumer that has to distinguish "no thesis" from "the
+/// command failed" by reading stderr will get it wrong.
+fn emit_json(root: &Path) -> Result<()> {
+    let path = root.join(THESIS_FILE);
+    let file = match fs::read_to_string(&path) {
+        Ok(raw) => thesis::parse(&raw)?,
+        Err(_) => thesis::ThesisFile::default(),
+    };
+
+    if file.thesis.is_empty() {
+        println!("{}", serde_json::json!({ "declared": false }));
+        return Ok(());
+    }
+
+    let t = thesis::current(&file)?;
+    let gaps: Vec<serde_json::Value> = thesis::gaps(t)
+        .iter()
+        .map(|g| serde_json::json!({ "field": g.field, "question": g.question }))
+        .collect();
+
+    let out = serde_json::json!({
+        "declared": true,
+        "current": t,
+        "gaps": gaps,
+        "history": file.thesis,
+    });
+    println!("{}", serde_json::to_string_pretty(&out)?);
     Ok(())
 }
 

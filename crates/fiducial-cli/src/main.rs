@@ -406,6 +406,14 @@ SEE ALSO
     Thesis {
         #[command(subcommand)]
         action: Option<commands::thesis::ThesisAction>,
+
+        /// Emit the current thesis, its gaps and its history as JSON
+        ///
+        /// The machine-readable view other tools read rather than re-parsing
+        /// `thesis.toml`. `fid advise` uses it, so there is one parser for the
+        /// declaration and it is the one with the tests behind it.
+        #[arg(long, global = true)]
+        json: bool,
     },
 
     /// The workbench — one read-only view of roadmap, decisions, CI, graph, freshness
@@ -749,7 +757,7 @@ fn main() -> Result<()> {
         Commands::Upgrade { dry_run, portfolio } => commands::upgrade::run(dry_run, portfolio),
         Commands::Graph { format } => commands::graph::run(&format),
         Commands::Release { action } => commands::release::run(action),
-        Commands::Thesis { action } => commands::thesis::run(action),
+        Commands::Thesis { action, json } => commands::thesis::run(action, json),
         Commands::Dash {
             json,
             section,
