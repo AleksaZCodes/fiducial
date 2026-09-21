@@ -324,6 +324,208 @@ export const DECISION_QUESTIONS = {
 };
 
 /**
+ * Questions asked about a product's thesis.
+ *
+ * A thesis is the one claim a product is built to test, declared in
+ * `thesis.toml` (`docs/specs/2026-09-21-the-thesis-is-a-fact.md`). Everything
+ * about its *structure* is already checked by code — `fid thesis` reports which
+ * fields are empty, and the parser rejects an entry that supersedes one that
+ * does not exist. None of that is asked here.
+ *
+ * What is asked is the part no rule reaches: whether the sentence is actually a
+ * thesis. A claim nobody could disagree with is a slogan, and no amount of
+ * schema tells you which one you wrote.
+ *
+ * This is advice about the most personal thing in the repository, so the
+ * thresholds matter more than usual. A tool that tells you your thesis is weak
+ * every time you run it is a tool you stop running, and then the one time it
+ * was right you are not listening.
+ */
+export const THESIS_QUESTIONS = {
+  not_falsifiable: {
+    type: "noul",
+    instructions:
+      "A thesis is a claim some future observation could prove wrong. The " +
+      "claim is in `claim`. Is it unfalsifiable — is there no observation, " +
+      "even in principle, that would show it to be false?",
+    criteria: {
+      true:
+        "Nothing could count as evidence against it: it is a definition, a " +
+        "value statement, an aspiration, or so hedged that any outcome is " +
+        "consistent with it.",
+      false:
+        "A concrete observation would contradict it, whether or not the " +
+        "claim states what that observation is.",
+    },
+  },
+
+  nobody_disagrees: {
+    type: "noul",
+    instructions:
+      "The claim is in `claim`; `for_whom` and `problem` give its context " +
+      "where they are declared. Would essentially every informed person in " +
+      "this field already agree with the claim as stated?",
+    criteria: {
+      true:
+        "It is a consensus position, a truism, or a statement of good " +
+        "intentions no one would argue against — so believing it commits you " +
+        "to nothing and it cannot guide a decision.",
+      false:
+        "A reasonable, informed person could hold the opposite, or could " +
+        "argue the emphasis is wrong.",
+    },
+  },
+
+  describes_instead_of_claiming: {
+    type: "noul",
+    instructions:
+      "A thesis asserts something contestable about the world; a description " +
+      "says what the product is or does. Does `claim` merely describe the " +
+      "product rather than assert a position?",
+    criteria: {
+      true:
+        "It reads as a summary of features, technology, or scope — what is " +
+        "being built rather than what is being claimed about the world.",
+      false:
+        "It takes a position: something is true, or should be, and the " +
+        "product is the bet on it.",
+    },
+  },
+
+  falsifier_does_not_falsify: {
+    type: "noul",
+    instructions:
+      "`claim` states the thesis and `falsified_by` states what its author " +
+      "believes would disprove it. Would observing exactly what " +
+      "`falsified_by` describes leave the claim standing?",
+    criteria: {
+      true:
+        "The stated falsifier tests something adjacent, weaker, or " +
+        "unrelated — the claim could survive it intact, so it is not the " +
+        "test it is presented as.",
+      false:
+        "Observing it would genuinely force the author to abandon or revise " +
+        "the claim.",
+    },
+  },
+
+  dissent_is_a_strawman: {
+    type: "noul",
+    instructions:
+      "`disagrees` names the person who holds the opposite of `claim` and " +
+      "what they believe. Is that opposing position a strawman — too weak, " +
+      "too foolish, or too easily dismissed to be the real objection?",
+    criteria: {
+      true:
+        "Nobody serious holds the stated position, or it is phrased so that " +
+        "holding it looks obviously wrong, which means the real objection " +
+        "has not been faced.",
+      false:
+        "It is a position a competent, well-intentioned person actually " +
+        "holds for reasons that make sense from where they stand.",
+    },
+  },
+
+  copy_contradicts_the_claim: {
+    type: "noul",
+    instructions:
+      "`claim` is the declared thesis. `restatements` holds hand-written " +
+      "product copy — README openings, meta descriptions, landing text — " +
+      "found mechanically, each labelled with the file it came from. Does at " +
+      "least one of them sell something materially different from the claim?",
+    criteria: {
+      true:
+        "A restatement emphasises a different benefit, drops the part of the " +
+        "claim that makes it contestable, or promises something the claim " +
+        "does not support — so a reader meets two different products.",
+      false:
+        "They are consistent with the claim: shorter or differently worded, " +
+        "but selling the same thing.",
+    },
+  },
+
+  overclaims_against_evidence: {
+    type: "noul",
+    instructions:
+      "`evidence_not_yet` lists what this product has explicitly NOT shown. " +
+      "`restatements` holds its hand-written public copy. Does any of that " +
+      "copy assert, or let a reader assume, something `evidence_not_yet` " +
+      "says has not happened?",
+    criteria: {
+      true:
+        "Public copy states or strongly implies a capability, deployment, " +
+        "result, or user base that the product's own evidence says does not " +
+        "exist yet.",
+      false:
+        "The copy stays within what has actually been shown, or marks the " +
+        "rest as intended rather than done.",
+    },
+  },
+};
+
+/**
+ * How much each thesis finding matters, and what to print when it fires.
+ *
+ * `overclaims_against_evidence` outranks everything, including the questions
+ * about whether the thesis is any good. A weak thesis costs you focus; public
+ * copy claiming a wildfire-detection deployment that does not exist costs
+ * someone's trust, and it is the failure fon's MISSION.md already has to guard
+ * against in prose.
+ */
+export const THESIS_WEIGHTS = {
+  overclaims_against_evidence: {
+    weight: 1.0,
+    title: "public copy may claim more than the evidence supports",
+    advice:
+      "Say the unproven part plainly in the copy, or move it out of " +
+      "`evidence.not_yet` because it is now true. Nothing else here matters " +
+      "as much.",
+  },
+  not_falsifiable: {
+    weight: 0.95,
+    title: "the claim may not be falsifiable",
+    advice:
+      "Write what you would have to observe to admit it is wrong. If nothing " +
+      "would, it is a value, not a thesis — and it cannot settle an argument.",
+  },
+  nobody_disagrees: {
+    weight: 0.9,
+    title: "the claim may be one nobody would argue with",
+    advice:
+      "Find the sentence a competent person in this field would push back " +
+      "on. A claim everyone shares decides nothing.",
+  },
+  copy_contradicts_the_claim: {
+    weight: 0.85,
+    title: "product copy may sell something other than the claim",
+    advice:
+      "Either the copy drifted or the thesis has moved on without being " +
+      "updated. Decide which, and if it is the thesis, supersede it.",
+  },
+  describes_instead_of_claiming: {
+    weight: 0.8,
+    title: "the claim may describe the product rather than assert anything",
+    advice:
+      "Rewrite it as something that could be true or false about the world, " +
+      "not as what you are building.",
+  },
+  falsifier_does_not_falsify: {
+    weight: 0.7,
+    title: "the stated falsifier may not actually test the claim",
+    advice:
+      "Check that observing it would really make you abandon the claim. If " +
+      "not, it is reassurance rather than a test.",
+  },
+  dissent_is_a_strawman: {
+    weight: 0.6,
+    title: "the opposing position may be a strawman",
+    advice:
+      "State the objection the way someone who holds it would state it. The " +
+      "real one is the one you have to answer.",
+  },
+};
+
+/**
  * Turn raw answers into weighted, ranked findings.
  *
  * Two thresholds rather than one, because a probability is not a verdict.
@@ -334,12 +536,20 @@ export const DECISION_QUESTIONS = {
  *
  * Choice findings additionally require `confidence`, since a Choice's top
  * option can win a near-uniform distribution and mean nothing.
+ *
+ * `weights` selects which question set is being weighed — `DIFF_WEIGHTS` for a
+ * working diff, `THESIS_WEIGHTS` for a thesis. A key with no entry in the
+ * chosen set is skipped, which is what keeps a stray answer from one set out of
+ * the other's findings.
  */
-export function weigh(answers, { mention = 0.55, report = 0.8, choiceConfidence = 0.6 } = {}) {
+export function weigh(
+  answers,
+  { mention = 0.55, report = 0.8, choiceConfidence = 0.6, weights = DIFF_WEIGHTS } = {},
+) {
   const findings = [];
 
   for (const [key, answer] of Object.entries(answers)) {
-    const spec = DIFF_WEIGHTS[key];
+    const spec = weights[key];
     if (!spec) continue;
 
     if (answer.type === "noul") {

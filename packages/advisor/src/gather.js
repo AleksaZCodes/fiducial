@@ -289,3 +289,119 @@ export function fitDiff(diff, maxChars = 60_000) {
   }
   return { diff: kept.join(""), omitted };
 }
+
+/**
+ * The declared thesis, read through `fid` rather than re-parsed here.
+ *
+ * `fid thesis --json` already resolves which entry is current, which fields are
+ * unanswered, and what supersedes what — with the tests behind it. Reading
+ * `thesis.toml` again in JavaScript would be a second parser for one
+ * declaration, and the two would disagree the first time the schema moved.
+ *
+ * Returns `null` when there is no thesis, no `fid` on PATH, or a `fid` too old
+ * to know the flag. Every one of those is "nothing to advise about" rather than
+ * an error: this runs in a hook, and a product without a thesis is a normal
+ * product.
+ */
+export function collectThesis(cwd) {
+  let raw;
+  try {
+    raw = execFileSync("fid", ["thesis", "--json"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed?.declared ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Hand-written copy that restates the claim, with where each piece came from.
+ *
+ * This is the mechanical half of `copy_contradicts_the_claim` and
+ * `overclaims_against_evidence`. It is deliberately over-inclusive and shallow:
+ * finding the sentences a product sells itself with is a fixed set of
+ * conventional places, and deciding whether one of them contradicts the thesis
+ * is the judgment.
+ *
+ * The places, and why each:
+ *
+ * - `README.md`'s opening prose — the first thing a reader meets.
+ * - `meta.description` in every `messages/*.json` — what a search result shows,
+ *   and in fon's case the file that restates the thesis as "A person confirms
+ *   every event" with nothing connecting the two.
+ * - `MISSION.md`'s opening — where the claim used to live, and where it drifts
+ *   back to.
+ *
+ * Every entry is labelled with its file so a finding can point at a real line
+ * instead of describing something the model believes it saw.
+ */
+export function restatements(cwd, limit = 12) {
+  const out = [];
+
+  const readIf = (rel) => {
+    try {
+      const p = join(cwd, rel);
+      if (!statSync(p).isFile()) return null;
+      return readFileSync(p, "utf8");
+    } catch {
+      return null;
+    }
+  };
+
+  // The first real paragraph of a Markdown file: past the H1, past badges,
+  // blockquotes and HTML comments, stopping at the first blank line after it.
+  const openingProse = (text) => {
+    const lines = text.split("\n");
+    const para = [];
+    for (const line of lines) {
+      const t = line.trim();
+      if (!para.length) {
+        if (!t) continue;
+        if (t.startsWith("#") || t.startsWith("<!--") || t.startsWith("[!")) continue;
+        if (t.startsWith("![") || t.startsWith("---")) continue;
+        para.push(t.replace(/^>\s*/, ""));
+        continue;
+      }
+      if (!t) break;
+      para.push(t.replace(/^>\s*/, ""));
+    }
+    const joined = para.join(" ").trim();
+    return joined.length > 20 ? joined.slice(0, 600) : null;
+  };
+
+  for (const rel of ["README.md", "MISSION.md"]) {
+    const text = readIf(rel);
+    if (!text) continue;
+    const prose = openingProse(text);
+    if (prose) out.push(`${rel} (opening): ${prose}`);
+  }
+
+  const catalogs = (git(["ls-files", "messages/*.json", "**/messages/*.json"], cwd) ?? "")
+    .split("\n")
+    .filter(Boolean)
+    .slice(0, 8);
+
+  for (const rel of catalogs) {
+    const text = readIf(rel);
+    if (!text) continue;
+    let description;
+    try {
+      description = JSON.parse(text)?.meta?.description;
+    } catch {
+      continue;
+    }
+    if (typeof description === "string" && description.trim()) {
+      out.push(`${rel} (meta.description): ${description.trim().slice(0, 600)}`);
+    }
+  }
+
+  return out.slice(0, limit);
+}

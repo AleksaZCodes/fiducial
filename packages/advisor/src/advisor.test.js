@@ -20,8 +20,21 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { DIFF_QUESTIONS, DIFF_WEIGHTS, duplicateOfQuestion, weigh } from "./checks.js";
-import { addedLines, collectDiff, fitDiff, numericCandidates } from "./gather.js";
+import {
+  DIFF_QUESTIONS,
+  DIFF_WEIGHTS,
+  THESIS_QUESTIONS,
+  THESIS_WEIGHTS,
+  duplicateOfQuestion,
+  weigh,
+} from "./checks.js";
+import {
+  addedLines,
+  collectDiff,
+  fitDiff,
+  numericCandidates,
+  restatements,
+} from "./gather.js";
 import { resolveKey } from "./key.js";
 
 // ── Question shape ────────────────────────────────────────────────────────────
@@ -381,5 +394,124 @@ describe("resolveKey", () => {
     const r = resolveKey({ XDG_CONFIG_HOME: "/nonexistent-fiducial-test" });
     assert.equal(r.vendor, null);
     assert.match(r.reason, /fid advise key set/);
+  });
+});
+
+// ── Thesis questions ──────────────────────────────────────────────────────────
+
+describe("thesis question set", () => {
+  it("is all nouls, phrased so true means a problem", () => {
+    // Mixed polarity across a question set is how a threshold ends up
+    // inverted, and an inverted advisory check reports clean theses and stays
+    // quiet on empty ones.
+    for (const [name, q] of Object.entries(THESIS_QUESTIONS)) {
+      assert.equal(q.type, "noul", `${name} is not a noul`);
+      assert.ok(q.criteria?.true, `${name} missing true criteria`);
+      assert.ok(q.criteria?.false, `${name} missing false criteria`);
+    }
+  });
+
+  it("weighs every question it asks, and asks every question it weighs", () => {
+    // A question with no weight is asked, paid for, and silently discarded by
+    // `weigh`. A weight with no question is a finding that can never fire.
+    assert.deepEqual(
+      Object.keys(THESIS_QUESTIONS).sort(),
+      Object.keys(THESIS_WEIGHTS).sort(),
+    );
+  });
+
+  it("ranks overclaiming above every judgment about the claim itself", () => {
+    // A weak thesis costs focus. Public copy claiming a deployment that does
+    // not exist costs someone's trust.
+    const top = Object.entries(THESIS_WEIGHTS).sort((a, b) => b[1].weight - a[1].weight)[0];
+    assert.equal(top[0], "overclaims_against_evidence");
+  });
+
+  it("gives every finding advice that says what to do", () => {
+    for (const [name, w] of Object.entries(THESIS_WEIGHTS)) {
+      assert.ok(w.title && w.advice, `${name} missing title or advice`);
+      assert.ok(w.weight > 0 && w.weight <= 1, `${name} weight out of range`);
+    }
+  });
+});
+
+describe("weigh with a question set", () => {
+  it("keeps one set's answers out of the other's findings", () => {
+    const answers = {
+      not_falsifiable: { type: "noul", noul: 0.9 },
+      duplicate_declaration: { type: "noul", noul: 0.95 },
+    };
+
+    const thesis = weigh(answers, { weights: THESIS_WEIGHTS });
+    assert.deepEqual(thesis.map((f) => f.key), ["not_falsifiable"]);
+
+    const diff = weigh(answers);
+    assert.deepEqual(diff.map((f) => f.key), ["duplicate_declaration"]);
+  });
+});
+
+// ── Restatements ──────────────────────────────────────────────────────────────
+
+describe("restatements", () => {
+  function product() {
+    const dir = mkdtempSync(join(tmpdir(), "fid-restate-"));
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    return dir;
+  }
+
+  it("finds the opening prose and every locale's meta description", () => {
+    // This is fon's exact shape: the claim restated in four places, none of
+    // them marked as the source.
+    const dir = product();
+    writeFileSync(
+      join(dir, "README.md"),
+      "# fon\n\n[![badge](x)](y)\n\nEarly wildfire detection for Serbia, human-confirmed.\n\nSecond paragraph.\n",
+    );
+    execFileSync("mkdir", ["-p", join(dir, "messages")]);
+    writeFileSync(
+      join(dir, "messages/en.json"),
+      JSON.stringify({ meta: { description: "A person confirms every event." } }),
+    );
+    writeFileSync(
+      join(dir, "messages/sr.json"),
+      JSON.stringify({ meta: { description: "Svaki dogadjaj potvrdjuje covek." } }),
+    );
+    execFileSync("git", ["add", "-A"], { cwd: dir });
+
+    const found = restatements(dir);
+    assert.ok(found.some((r) => r.startsWith("README.md (opening):")));
+    assert.ok(found.some((r) => r.includes("Early wildfire detection for Serbia")));
+    assert.ok(
+      !found.some((r) => r.includes("Second paragraph")),
+      "only the opening paragraph, not the whole file",
+    );
+    assert.ok(found.some((r) => r.includes("messages/en.json") && r.includes("A person confirms")));
+    assert.ok(found.some((r) => r.includes("messages/sr.json")));
+  });
+
+  it("skips the heading, badges and HTML comments above the prose", () => {
+    const dir = product();
+    writeFileSync(
+      join(dir, "README.md"),
+      "# Title\n\n<!-- a comment -->\n\n![logo](a.png)\n\nThe actual opening sentence lives here.\n",
+    );
+    const found = restatements(dir);
+    assert.equal(found.length, 1);
+    assert.ok(found[0].includes("The actual opening sentence lives here."));
+  });
+
+  it("returns nothing for a product with no copy yet", () => {
+    // Which is what makes `fid advise thesis` drop the two copy questions
+    // rather than judging an empty list.
+    assert.deepEqual(restatements(product()), []);
+  });
+
+  it("ignores a catalog with no meta description and malformed JSON", () => {
+    const dir = product();
+    execFileSync("mkdir", ["-p", join(dir, "messages")]);
+    writeFileSync(join(dir, "messages/en.json"), JSON.stringify({ nav: { skip: "Skip" } }));
+    writeFileSync(join(dir, "messages/broken.json"), "{not json");
+    execFileSync("git", ["add", "-A"], { cwd: dir });
+    assert.deepEqual(restatements(dir), []);
   });
 });

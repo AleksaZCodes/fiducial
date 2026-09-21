@@ -27,18 +27,27 @@
  * # Usage
  *
  *   fid-advise diff [--base <ref>] [--task "<text>"] [--json]   (via: fid advise)
+ *   fid-advise thesis [--json] [--dry-run]                     (via: fid advise thesis)
  *   fid-advise facts [--json]                                  (via: fid advise --facts)
  *   fid-advise status                                          (via: fid advise status)
  */
 
 import { OpenRouterSystemOne, TypeSafeSystemOne } from "@fiducial/adapters/system-one";
-import { DIFF_QUESTIONS, duplicateOfQuestion, weigh } from "./checks.js";
+import {
+  DIFF_QUESTIONS,
+  THESIS_QUESTIONS,
+  THESIS_WEIGHTS,
+  duplicateOfQuestion,
+  weigh,
+} from "./checks.js";
 import {
   addedLines,
   collectDiff,
+  collectThesis,
   existingDeclarations,
   fitDiff,
   numericCandidates,
+  restatements,
 } from "./gather.js";
 import { credentialsPath, resolveKey } from "./key.js";
 
@@ -264,6 +273,116 @@ if (command === "diff") {
 
 // ── facts ─────────────────────────────────────────────────────────────────────
 
+if (command === "thesis") {
+  // The declaration is read through `fid thesis --json`, so this command and
+  // the platform never disagree about which entry is current.
+  const thesis = collectThesis(cwd);
+  if (!thesis) {
+    // No thesis is a normal state, not a failure. A product is supposed to be
+    // able to exist before it has decided what it claims, and saying so is
+    // more useful than an error about a missing file.
+    if (json) console.log(JSON.stringify({ findings: [], scope: "thesis", empty: true }));
+    else {
+      console.log("✦ fid advise — no thesis declared yet");
+      console.log();
+      console.log('  Declare one with `fid thesis set "<claim>"`. One rough line is enough;');
+      console.log("  this command is for sharpening it, not for starting it.");
+    }
+    process.exit(0);
+  }
+
+  const dryRun = has("dry-run");
+  const c = dryRun ? {} : client();
+  if (c.error) {
+    if (json) console.log(JSON.stringify({ findings: [], skipped: c.error }));
+    else console.log(`✦ fid advise — skipped: ${c.error}`);
+    process.exit(0);
+  }
+
+  const current = thesis.current ?? {};
+  const copy = restatements(cwd);
+  const notYet = current.evidence?.not_yet ?? [];
+
+  // A question whose input is missing is not asked — the same discipline that
+  // drops `bare_quantity` with no numeric candidates. Every one of these has a
+  // required input that an early thesis simply will not have yet, and asking
+  // anyway would mean judging an empty string and reporting the result as
+  // advice about the product.
+  const questions = { ...THESIS_QUESTIONS };
+  if (!current.test?.falsified_by) delete questions.falsifier_does_not_falsify;
+  if (!current.test?.disagrees) delete questions.dissent_is_a_strawman;
+  if (copy.length === 0) {
+    delete questions.copy_contradicts_the_claim;
+    delete questions.overclaims_against_evidence;
+  } else if (notYet.length === 0) {
+    // Copy exists but the thesis never says what is unproven, so there is
+    // nothing to measure an overclaim against. `fid thesis` already asks for
+    // `evidence.not_yet`; inventing a standard here would be worse than silence.
+    delete questions.overclaims_against_evidence;
+  }
+
+  const state = {
+    claim: current.claim,
+    ...(current.arc?.problem ? { problem: current.arc.problem } : {}),
+    ...(current.arc?.for_whom ? { for_whom: current.arc.for_whom } : {}),
+    ...(current.test?.falsified_by ? { falsified_by: current.test.falsified_by } : {}),
+    ...(current.test?.disagrees ? { disagrees: current.test.disagrees } : {}),
+    ...(notYet.length ? { evidence_not_yet: notYet } : {}),
+    ...(copy.length ? { restatements: copy } : {}),
+  };
+
+  if (dryRun) {
+    const body = { state, questions };
+    if (json) {
+      console.log(JSON.stringify(body, null, 2));
+    } else {
+      console.log("✦ fid advise thesis --dry-run — nothing sent. This is the exact request body.");
+      console.log();
+      console.log(`  claim             ${current.claim}`);
+      console.log(`  questions asked   ${Object.keys(questions).join(", ")}`);
+      const skipped = Object.keys(THESIS_QUESTIONS).filter((k) => !(k in questions));
+      console.log(`  not asked         ${skipped.length ? skipped.join(", ") : "none"}`);
+      console.log(`  restatements      ${copy.length}`);
+      for (const r of copy) console.log(`    ↳ ${r.slice(0, 96)}`);
+      console.log(`  unanswered fields ${(thesis.gaps ?? []).map((g) => g.field).join(", ") || "none"}`);
+      console.log();
+      console.log("  Add --json to see the full body verbatim.");
+    }
+    process.exit(0);
+  }
+
+  let response;
+  try {
+    response = await c.impl.decide({
+      state,
+      questions,
+      sessionId: `advise-thesis-${Date.now()}`,
+    });
+  } catch (err) {
+    if (json) console.log(JSON.stringify({ findings: [], skipped: String(err.message ?? err) }));
+    else console.log(`✦ fid advise — skipped: ${err.message ?? err}`);
+    process.exit(0);
+  }
+
+  const findings = weigh(response.answers, { weights: THESIS_WEIGHTS });
+
+  // Point the copy findings at the actual sentences, so "your copy contradicts
+  // the claim" arrives with the copy attached rather than as a description of
+  // something the model believes it read.
+  for (const f of findings) {
+    if (f.key === "copy_contradicts_the_claim" || f.key === "overclaims_against_evidence") {
+      f.evidence = copy;
+    }
+  }
+
+  printFindings(findings, {
+    scope: "this product's thesis",
+    cost: response.usage.cost,
+    model: response.model,
+  });
+  finish(findings);
+}
+
 if (command === "facts") {
   const c = client();
   if (c.error) {
@@ -347,6 +466,7 @@ if (command === "facts") {
 console.error(`fid-advise: unknown command \`${command}\`
 
   fid-advise diff [--base <ref>] [--task "<what was asked>"] [--json] [--strict]
+  fid-advise thesis [--json] [--dry-run]
   fid-advise facts [--json]
   fid-advise status`);
 process.exit(2);
