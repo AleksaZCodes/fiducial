@@ -42,11 +42,22 @@
 # its prose gate.
 #
 # So a 404 is retried until a **shared deadline** (`VERIFY_SETTLE_SECS`,
-# default 120). Shared, not per-package: the first missing thing absorbs the
+# default 300). Shared, not per-package: the first missing thing absorbs the
 # wait and everything after it fails fast, so a run costs that window once —
 # plus the 10-second poll it is in when the deadline passes — no matter how
 # much is genuinely absent. Set it to 0 for an immediate answer when you know
 # nothing was just published.
+#
+# The default was 120 and that was not enough. It failed twice more on releases
+# that had in fact worked: `@fiducial/advisor@0.2.0` on 2026-09-20 and
+# `@fiducial/realtime@0.2.0` on 2026-09-21, both serving from the registry
+# shortly afterwards. Two false reds in two days is the exact pattern the
+# paragraph above warns about, so the window follows the evidence rather than
+# the other way round.
+#
+# A **first-ever publish of a package name** is the slow case — npm has to
+# create the packument, not just add a version to one — and it is also the case
+# a release is most likely to hit, because a new package is new exactly once.
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -62,7 +73,7 @@ ua="fiducial-release (https://github.com/AleksaZCodes/fiducial)"
 LEGACY_FILE="docs/release/legacy-untagged.txt"
 
 # One deadline for the whole run, fixed before any request goes out.
-settle_secs=${VERIFY_SETTLE_SECS:-120}
+settle_secs=${VERIFY_SETTLE_SECS:-300}
 settle_until=$(( $(date -u +%s) + settle_secs ))
 
 # The HTTP status for a URL, retrying a 404 until the shared deadline.
@@ -199,7 +210,23 @@ echo "✗ ${#missing[@]} thing(s) the repository declares are not actually publi
 printf '    %s\n' "${missing[@]}" >&2
 echo >&2
 echo "A publish step exiting 0 is not evidence anything was published — that is" >&2
-echo "what this script exists to say. Re-run the release workflow; if it reports" >&2
-echo "success again while this still fails, the publish step is lying and the" >&2
-echo "workflow is the bug." >&2
+echo "what this script exists to say." >&2
+echo >&2
+echo "Two things it can be, and they are distinguishable:" >&2
+echo >&2
+echo "  1. The publish genuinely did not happen. Check the publish step's log" >&2
+echo "     for the version above; if it is absent there, that is the bug." >&2
+echo >&2
+echo "  2. The registry has not caught up. This waited ${settle_secs}s" >&2
+echo "     (VERIFY_SETTLE_SECS). A first-ever publish of a package NAME is the" >&2
+echo "     slow case. Check by hand before assuming a failure:" >&2
+echo >&2
+for thing in "${missing[@]}"; do
+  case "$thing" in
+    npm:*) echo "       npm view ${thing#npm:} version" >&2 ;;
+  esac
+done
+echo >&2
+echo "  If that resolves, nothing is broken and this window was too short —" >&2
+echo "  raise VERIFY_SETTLE_SECS rather than re-running until it passes." >&2
 exit 1
