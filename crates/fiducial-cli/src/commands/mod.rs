@@ -11,6 +11,7 @@ pub mod doctor;
 pub mod graph;
 pub mod harvest;
 pub mod new;
+pub mod rebaseline;
 pub mod release;
 pub mod repo;
 pub mod thesis;
