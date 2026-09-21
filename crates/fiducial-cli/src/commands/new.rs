@@ -17,9 +17,21 @@ const PLATFORM_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
-pub fn run(name: &str, locales: Option<&str>, default_locale: Option<&str>) -> Result<()> {
+pub fn run(
+    name: &str,
+    locales: Option<&str>,
+    default_locale: Option<&str>,
+    full: bool,
+) -> Result<()> {
     validate_name(name)?;
-    let requested = locales.map(str::to_string).unwrap_or_else(default_locales);
+    // Foundations are opt-in. `--locales` names them explicitly and implies
+    // them; `--full` asks for the set a product used to be born with. See
+    // `docs/specs/2026-09-21-foundations-are-additive.md`.
+    let requested = match (locales, full) {
+        (Some(explicit), _) => explicit.to_string(),
+        (None, true) => default_locales(),
+        (None, false) => "none".to_string(),
+    };
     let locales = parse_locales(&requested)?;
     let default_locale = resolve_default_locale(&locales, default_locale)?;
 
@@ -43,24 +55,30 @@ pub fn run(name: &str, locales: Option<&str>, default_locale: Option<&str>) -> R
     for (rel_path, template) in templates::SCAFFOLD_FILES {
         write_template(&dest, rel_path, template, name, &mut lock)?;
     }
+    if full {
+        for (rel_path, template) in templates::FULL_ONLY_FILES {
+            write_template(&dest, rel_path, template, name, &mut lock)?;
+        }
+    }
 
     // Write fiducial.lock — after all templates are recorded.
     lock.save(&dest.join("fiducial.lock"))
         .context("writing fiducial.lock")?;
     println!("  wrote  fiducial.lock");
 
-    // A design system from the first commit, for the same reason as i18n:
-    // the alternative to having one is not "no design", it is the default one —
-    // Inter, an indigo primary, `rounded-xl`, a gradient hero. Those are absent
-    // decisions, not neutral ones, and they are absent in the same direction in
-    // every product that never wrote anything down.
+    // A design system used to be installed here unconditionally, and the
+    // argument for it was good: the alternative to having one is not "no
+    // design", it is the default one — Inter, an indigo primary, `rounded-xl`,
+    // a gradient hero. Those are absent decisions, not neutral ones.
     //
-    // `design-system.md` ships filled in rather than as a checklist, and its
-    // pipeline measures the palette's contrast pairs on the first derive. If
-    // the product has no web app yet the stylesheet is simply not written —
-    // see `outputs_not_applicable` — so this costs a firmware product nothing
-    // but the document, which is the part worth having early anyway.
-    {
+    // That argument is still true and it is still not a reason to install it
+    // at minute zero. It cost 34 files and 416KB before anyone had had a
+    // product thought, and the absent-decision problem does not begin until
+    // there is something to look at. `fid add design` is one command, it
+    // produces exactly this tree, and the checklist says so — so the decision
+    // stays available at the moment it starts to matter instead of being made
+    // for you before it does.
+    if full {
         let cap = capability::find("design").expect("the design capability is built in");
         capability::install(cap, &dest, name)?;
     }
@@ -83,8 +101,9 @@ pub fn run(name: &str, locales: Option<&str>, default_locale: Option<&str>) -> R
         println!();
         super::derive::run_in(&dest, false, None)?;
     } else {
-        // No i18n, but `design` still declares a pipeline — leave the scaffold
-        // derived either way, so a product never starts life failing its own
+        // No i18n, but `thesis` always declares a pipeline and `design` does
+        // when installed — leave the scaffold derived either way, so a product
+        // never starts life failing its own
         // `fid derive --check`.
         println!();
         super::derive::run_in(&dest, false, None)?;
@@ -324,6 +343,11 @@ fn print_checklist(name: &str) {
     println!("  fid thesis            # what is still unanswered about it");
     println!();
     println!("  # Edit fiducial.toml — set spine.enabled = true if you want the L0 Rust core.");
+    println!();
+    println!("  # Foundations, when the product needs them — not before:");
+    println!("  fid add design        # a design system, so the defaults are not the decision");
+    println!("  fid add i18n          # locales, before the first user-visible string");
+    println!("  fid add brand         # name, colours, domain, contact");
     println!();
     println!("  fid add app next      # add a Next.js web app");
     println!("  fid add app svelte    # add a SvelteKit app");

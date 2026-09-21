@@ -35,7 +35,10 @@ fn text(out: &Output) -> String {
 
 /// A scaffolded product with the i18n capability installed and derived once.
 fn localized_product(tmp: &Path) -> PathBuf {
-    assert!(run(tmp, &["new", "p"]).status.success(), "fid new");
+    assert!(
+        run(tmp, &["new", "p", "--full"]).status.success(),
+        "fid new"
+    );
     let root = tmp.join("p");
     assert!(
         run(&root, &["add", "i18n"]).status.success(),
@@ -286,7 +289,7 @@ fn the_skill_lands_where_every_agent_can_find_it() {
 #[test]
 fn a_new_product_is_born_localized() {
     let tmp = tempfile::tempdir().unwrap();
-    assert!(run(tmp.path(), &["new", "p"]).status.success());
+    assert!(run(tmp.path(), &["new", "p", "--full"]).status.success());
     let root = tmp.path().join("p");
 
     let config = std::fs::read_to_string(root.join("fiducial.toml")).unwrap();
@@ -409,7 +412,7 @@ export default function Page({ count }: { count: number }) {
 "#;
 
 fn with_component(tmp: &Path) -> PathBuf {
-    assert!(run(tmp, &["new", "p"]).status.success());
+    assert!(run(tmp, &["new", "p", "--full"]).status.success());
     let root = tmp.join("p");
     std::fs::create_dir_all(root.join("app")).unwrap();
     std::fs::write(root.join("app/page.tsx"), COMPONENT).unwrap();

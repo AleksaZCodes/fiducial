@@ -159,7 +159,9 @@ fn differing(a: &BTreeMap<String, String>, b: &BTreeMap<String, String>) -> Vec<
 /// — but that one which *has* the contract wired still does.
 fn product(tmp: &Path, home: &Path) -> PathBuf {
     assert!(
-        run_without_keys(tmp, home, &["new", "p"]).status.success(),
+        run_without_keys(tmp, home, &["new", "p", "--full"])
+            .status
+            .success(),
         "fid new"
     );
     let root = tmp.join("p");

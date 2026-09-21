@@ -6,46 +6,13 @@ $ fid new demo-product
   wrote  pipelines/thesis.toml
   wrote  AGENTS.md
   wrote  README.md
-  wrote  ROADMAP.md
   wrote  .gitignore
   wrote  .claude/settings.json
   wrote  .claude/agents/fiducial-review.md
   wrote  .claude/agents/fiducial-design.md
   wrote  .github/workflows/ci.yml
   wrote  fiducial.lock
-✦ fid add design — installing into demo-product
-  wrote  design-system.md
-  wrote  pipelines/design.toml
-  wrote  apps/web/components.json
-  wrote  apps/web/src/app/marks.css
-  wrote  apps/web/src/components/ui/LICENSES.md
-  wrote  apps/web/src/components/ui/button.tsx
-  wrote  apps/web/src/components/ui/card.tsx
-  wrote  apps/web/src/components/ui/doodle-arrows.tsx
-  wrote  apps/web/src/components/ui/dropdown-menu.tsx
-  wrote  scripts/build-design-system.mjs
-  wrote  scripts/derive-logo.mjs
-  wrote  scripts/render-brand.mjs
-  wrote  .fiducial/skills/design.md
-  wrote  .claude/skills/design.md
-  patched fiducial.toml
-  ✓ design installed
-  ✓ no guard rules — this capability adds none
-  ✓ instructions → .fiducial/skills/design.md (any agent; see AGENTS.md)
-✦ fid add i18n — installing into demo-product
-  wrote  messages/en.json
-  wrote  messages/sr.json
-  wrote  pipelines/i18n.toml
-  wrote  apps/web/src/components/locale-picker.tsx
-  wrote  .fiducial/skills/i18n.md
-  wrote  .claude/skills/i18n.md
-  patched fiducial.toml
-  ✓ i18n installed
-  ✓ no guard rules — this capability adds none
-  ✓ instructions → .fiducial/skills/i18n.md (any agent; see AGENTS.md)
 
-  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓
-  ▶ i18n (fid-i18n) ✓
   ▶ thesis (fid-thesis) ✓
 
 ✦ fid derive complete — fiducial.lock updated
@@ -61,6 +28,11 @@ Initialized empty Git repository in /home/you/dev/demo-product/.git/
   fid thesis            # what is still unanswered about it
 
   # Edit fiducial.toml — set spine.enabled = true if you want the L0 Rust core.
+
+  # Foundations, when the product needs them — not before:
+  fid add design        # a design system, so the defaults are not the decision
+  fid add i18n          # locales, before the first user-visible string
+  fid add brand         # name, colours, domain, contact
 
   fid add app next      # add a Next.js web app
   fid add app svelte    # add a SvelteKit app
