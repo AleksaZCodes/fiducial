@@ -1,7 +1,7 @@
 {
   "name": "@fiducial/advisor",
   "version": "0.2.0",
-  "description": "Advisory checks for Fiducial — typed judgments where deterministic rules cannot reach. Never gates anything.",
+  "description": "Advisory checks for Fiducial \u2014 typed judgments where deterministic rules cannot reach. Never gates anything.",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
   "repository": {
@@ -9,7 +9,13 @@
     "url": "https://github.com/AleksaZCodes/fiducial.git"
   },
   "homepage": "https://github.com/AleksaZCodes/fiducial",
-  "keywords": ["fiducial", "advisory", "system-one", "code-review", "decisions"],
+  "keywords": [
+    "fiducial",
+    "advisory",
+    "system-one",
+    "code-review",
+    "decisions"
+  ],
   "type": "module",
   "bin": {
     "fid-advise": "./src/cli.js"
@@ -20,8 +26,16 @@
     "./gather": "./src/gather.js",
     "./key": "./src/key.js"
   },
-  "files": ["src", "README.md"],
-  "engines": { "node": ">=20" },
+  "files": [
+    "src/checks.js",
+    "src/cli.js",
+    "src/gather.js",
+    "src/key.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "test": "node --test src/advisor.test.js src/endtoend.test.js"
   },

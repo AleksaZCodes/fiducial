@@ -1,7 +1,7 @@
 {
   "name": "@fiducial/cli",
   "version": "0.2.0",
-  "description": "fid — the Fiducial platform CLI",
+  "description": "fid \u2014 the Fiducial platform CLI",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
   "repository": {
@@ -21,14 +21,14 @@
     "fid": "./src/cli.js"
   },
   "files": [
-    "src",
+    "src/cli.js",
     "README.md"
   ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "build": "echo 'nothing to build (JS shim only — binary ships as a native install)'",
+    "build": "echo 'nothing to build (JS shim only \u2014 binary ships as a native install)'",
     "typecheck": "echo 'no TS in this package'",
     "lint": "echo 'no linter configured yet'",
     "test": "node --test src/cli.test.js"
