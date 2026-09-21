@@ -1,0 +1,7 @@
+description = "Research & authoring: sources, references, and a derivation pipeline to a submittable artifact"
+
+# The [paper] block is the declaration: title, authors, venue, reference paths.
+# The pipeline produces the typeset artifact from Markdown + references.
+[[declarations.config]]
+block = "paper"
+seed = { title = "", authors = [], venue = "", references_dir = "references/" }

@@ -1,21 +1,36 @@
 /**
- * @fiducial/realtime — Supabase Realtime typed wrappers.
+ * @fiducial/realtime — typed Broadcast and Presence over Cloudflare Durable Objects.
  *
- * Three contracts, one declaration each:
+ * Two contracts, one declaration each:
  *
  * 1. **Broadcast** — fire-and-forget ephemeral messages to all subscribers on a
- *    channel.  No persistence, no history.
+ *    channel.  No persistence, no history.  Backed by a RealtimeDO Durable Object
+ *    that fans messages out over WebSocket Hibernation — idle connections do not
+ *    consume CPU time.
  *
  * 2. **Presence** — shared state about who is online.  Tracks join/leave events
- *    and exposes a typed snapshot of the current presence set.
+ *    and exposes a typed snapshot of the current presence set.  State lives in DO
+ *    memory; on reconnect the DO sends a `presence:sync` frame with the current
+ *    snapshot.
  *
- * 3. **Postgres Changes** — CDC stream from a Postgres table: INSERT, UPDATE,
- *    DELETE.  Arrives with the new row (or old row on DELETE).
+ * Each contract is a thin typed layer over an adapter interface — the package
+ * does not import any Cloudflare runtime directly, so tests run without a DO
+ * and any WebSocket-backed implementation satisfies the interface.
  *
- * Each contract is a thin typed layer over whatever channel implementation the
- * caller provides.  The package does **not** import `@supabase/supabase-js`
- * directly — it accepts an adapter interface, so tests run without a live
- * connection and products swap in their own Supabase client.
+ * ## Entry points
+ *
+ * | Import | Contents |
+ * |--------|----------|
+ * | `@fiducial/realtime` | Contract types + `createBroadcast` / `createPresence` |
+ * | `@fiducial/realtime/durable-object` | `RealtimeDO` — the Worker-side DO class |
+ * | `@fiducial/realtime/client` | `connectChannel` — client-side WebSocket adapter |
+ *
+ * ## Postgres Changes
+ *
+ * CDC from Postgres is Supabase-specific (not a DO contract) and is re-exported
+ * from this entry point for convenience — it is an adapter interface like the
+ * others, backed by a Supabase channel in practice.  It lives here because it
+ * is a realtime pattern, not because DOs implement it.
  */
 
 export type { BroadcastAdapter, BroadcastSender, BroadcastHandler } from './broadcast.js';
