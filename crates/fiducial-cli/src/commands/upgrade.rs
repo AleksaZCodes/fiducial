@@ -358,7 +358,14 @@ fn merge_one_template(
     };
 
     // Has upstream changed since last install/upgrade?
-    if upstream == base {
+    //
+    // Compared at the version the product recorded rather than at this
+    // binary's. `upstream` above carries the *current* `{{version}}` stamp, so
+    // comparing against it made every version-stamped template look changed
+    // the moment the platform moved — and then opened a 3-way merge on a file
+    // nobody upstream had touched, which is how a product accumulates
+    // conflicts. See `templates::upstream_changed`.
+    if !templates::upstream_changed(raw, product_name, &record.source_version, &base) {
         return Ok(None); // No upstream change.
     }
 
