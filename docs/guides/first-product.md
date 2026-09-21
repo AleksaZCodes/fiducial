@@ -90,17 +90,17 @@ Twelve files, and the whole tree is under 50KB. The ones that matter:
 | `AGENTS.md` | Context for AI agents working in this repo |
 | `.github/workflows/ci.yml` | Runs `fid doctor` and `fid derive --check` |
 
+That last one is the point of the whole system, and it is scaffolded rather than
+left as something to remember. Note the branch is `main` — the guard rule, the
+review agent and the workflow all reference it, so it would be incoherent to
+start on `master`.
+
 **What is deliberately absent:** a design system, message catalogs, a brand, a
 roadmap. Each is one `fid add` away and produces exactly the tree it would have
 produced at minute zero — `fid new --full` still creates the lot in one step.
 The default is the minimum because a small tool should not need a design system
 to exist, and because every foundation installed before there is a product
 thought is a decision made on your behalf while you were not looking.
-
-That last one is the point of the whole system, and it is scaffolded rather than
-left as something to remember. Note the branch is `main` — the guard rule, the
-review agent and the workflow all reference it, so it would be incoherent to
-start on `master`.
 
 ## 2 · Check it
 
@@ -117,7 +117,7 @@ $ fid doctor
   ✓ fiducial.toml valid  (product: demo-product, v0.1.0)
   ✓ guard: 2 rule(s), all implemented
   ✓ fiducial.lock valid  (11 template(s) tracked, 0 migration(s) applied)
-  ✓ all template files unmodified
+  ✓ no platform-owned file has been modified
   ✓ templates up to date with platform vX.Y.Z
   ✓ no pending codemod migrations
   ✓ tooling: 1 command(s) present
@@ -128,8 +128,14 @@ $ fid doctor
 <!-- /capture -->
 
 `doctor` answers a narrow question: *is this product internally consistent?* It
-verifies the config parses, the lock matches what is on disk, no template has
-been hand-edited, and no codemod is pending.
+verifies the config parses, the lock matches what is on disk, no **platform-owned**
+file has been hand-edited, and no codemod is pending.
+
+The word platform-owned is load-bearing. Editing `MISSION.md`, your catalogs or
+your own pages is the intended use — those are yours, `doctor` counts them and
+moves on. It reports only files the platform maintains and `fid upgrade` will
+rewrite, because those are the edits about to be merged over. `fid rebaseline`
+is how you tell it a fork was deliberate.
 
 ## 3 · See the whole thing
 

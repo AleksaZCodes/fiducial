@@ -432,22 +432,47 @@ fn check_lock(
         lock.applied_migrations.len()
     ));
 
-    // Check every recorded template file using lock.verify().
-    let raw_issues = lock.verify(root);
-    let mut drifted: Vec<String> = raw_issues
-        .into_iter()
-        .map(|(path, problem)| {
-            let rel = path
-                .strip_prefix(root)
-                .unwrap_or(&path)
-                .display()
-                .to_string();
-            format!("{rel}: {problem}. If intentional, run `fid upgrade` to re-baseline.")
-        })
-        .collect();
+    // Check every recorded template file using lock.verify(), then split the
+    // result by who owns the file.
+    //
+    // Editing a product-owned file is the intended use — `MISSION.md`'s own
+    // footer says "It is product-owned — edit it freely" — so reporting it as
+    // an issue meant the platform contradicted its own templates. fon had
+    // seventeen of them and runs `fid doctor` with `continue-on-error` as a
+    // result, which costs every real finding too. See `crate::ownership`.
+    let mut drifted: Vec<String> = Vec::new();
+    let mut owned_edits = 0usize;
+
+    for (path, problem) in lock.verify(root) {
+        let rel = path
+            .strip_prefix(root)
+            .unwrap_or(&path)
+            .display()
+            .to_string();
+        // `fiducial.lock` keys are forward-slashed; a Windows path is not.
+        let key = rel.replace('\\', "/");
+
+        if crate::ownership::of(&key).is_product() {
+            owned_edits += 1;
+            continue;
+        }
+        drifted.push(format!(
+            "{rel}: {problem}. This file is platform-owned — `fid upgrade` will \
+             rewrite it, so an edit here will be merged over."
+        ));
+    }
+
+    if owned_edits > 0 {
+        // Counted rather than silent: "you have edited 17 of your own files" is
+        // a true and occasionally useful thing to know. It is not a problem,
+        // so it goes in the ✓ column.
+        ok.push(format!(
+            "{owned_edits} product-owned file(s) edited — expected, not drift"
+        ));
+    }
 
     if drifted.is_empty() {
-        ok.push("all template files unmodified".into());
+        ok.push("no platform-owned file has been modified".into());
     } else {
         issues.append(&mut drifted);
     }

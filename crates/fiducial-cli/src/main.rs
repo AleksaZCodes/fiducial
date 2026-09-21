@@ -13,6 +13,7 @@ mod i18n;
 mod legal;
 mod lock;
 mod migration;
+mod ownership;
 mod pipeline;
 mod prose;
 mod schema;
@@ -434,6 +435,41 @@ SEE ALSO
         json: bool,
     },
 
+    /// Accept a deliberate fork of a platform-owned file
+    #[command(
+        long_about = "\
+Record a platform-owned file as yours, so `fid upgrade` merges into it rather
+than over it.
+
+`fiducial.lock` stores the content the platform wrote for every scaffolded file.
+That record is a merge base: it is how `fid upgrade` tells an upstream change
+apart from a local one. Re-baselining replaces it with the file as it stands
+now — declaring the difference intentional.
+
+That is only ever right for a file the PLATFORM owns. A product-owned file —
+MISSION.md, your catalogs, your pages — must keep its original base, because
+that base is the only thing that makes a 3-way merge possible; overwrite it and
+the next upgrade cannot tell your paragraph from the platform's. `fid doctor`
+does not report those at all, so there is nothing to silence, and this command
+refuses them.
+
+There is no `--all`. Each listed file is a real divergence `fid upgrade` is
+about to act on, and silencing the whole list in one keystroke is how a warning
+stops being one.
+
+  fid rebaseline                    what could be accepted, and the alternatives
+  fid rebaseline .github/workflows/ci.yml",
+        after_long_help = "\
+SEE ALSO
+  fid doctor      which files differ, and who owns each
+  fid upgrade     take the platform's version instead, merging where it can"
+    )]
+    Rebaseline {
+        /// Files to accept. Omit to see what could be accepted.
+        #[arg(value_name = "PATH")]
+        paths: Vec<String>,
+    },
+
     /// The workbench — one read-only view of roadmap, decisions, CI, graph, freshness
     #[command(
         long_about = "\
@@ -785,6 +821,7 @@ fn main() -> Result<()> {
         Commands::Graph { format } => commands::graph::run(&format),
         Commands::Release { action } => commands::release::run(action),
         Commands::Thesis { action, json } => commands::thesis::run(action, json),
+        Commands::Rebaseline { paths } => commands::rebaseline::run(&paths),
         Commands::Dash {
             json,
             section,
