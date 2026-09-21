@@ -86,6 +86,7 @@ secret.
 WHAT THIS UNLOCKS
   fid advise           review uncommitted changes for the rules code cannot check
   fid advise --facts   check new declarations against existing ones
+  fid advise --thesis  argue with this product's claim
 
 WHAT THIS DOES NOT CHANGE
   Everything else. `fid derive`, `fid derive --check`, `fid doctor`, `fid dash`
@@ -260,6 +261,7 @@ fn key_set(vendor: &str) -> Result<()> {
     println!("  Unlocked:");
     println!("    fid advise            review uncommitted changes");
     println!("    fid advise --facts    check new declarations for duplicates");
+    println!("    fid advise --thesis   argue with this product's claim");
     println!();
     println!("  Nothing else changes. `fid derive`, `fid doctor` and the guard are");
     println!("  byte-for-byte identical with or without this key — see");

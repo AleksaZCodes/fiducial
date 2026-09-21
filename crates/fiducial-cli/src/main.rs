@@ -636,6 +636,14 @@ EXAMPLES
         /// Check new declarations for semantic duplicates instead of reviewing a diff
         #[arg(long)]
         facts: bool,
+        /// Argue with this product's thesis instead of reviewing a diff
+        ///
+        /// Is the claim falsifiable? Could a reasonable person disagree? Does
+        /// the product's own copy sell something else, or claim more than the
+        /// evidence supports? Advisory, like everything else here — it cannot
+        /// change a file and it cannot fail a build.
+        #[arg(long)]
+        thesis: bool,
         /// Review everything since this ref rather than uncommitted changes
         #[arg(long, value_name = "REF")]
         base: Option<String>,
@@ -776,13 +784,26 @@ fn main() -> Result<()> {
         Commands::Advise {
             cmd: None,
             facts,
+            thesis,
             base,
             task,
             dry_run,
             json,
             strict,
         } => {
-            let mut args: Vec<String> = vec![if facts { "facts" } else { "diff" }.to_string()];
+            // `--thesis` wins over `--facts` when both are given rather than
+            // silently reviewing declarations: the thesis is the narrower,
+            // more deliberate request, and picking it makes the mistake
+            // visible in the output instead of producing a plausible report
+            // about something else.
+            let mode = if thesis {
+                "thesis"
+            } else if facts {
+                "facts"
+            } else {
+                "diff"
+            };
+            let mut args: Vec<String> = vec![mode.to_string()];
             if let Some(base) = &base {
                 args.push("--base".into());
                 args.push(base.clone());

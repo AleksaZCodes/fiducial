@@ -24,7 +24,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -325,6 +325,134 @@ describe("end to end", () => {
         // declaration is forced to match something.
         assert.ok("none_of_these" in q.criteria);
       }
+    } finally {
+      await s.close();
+    }
+  });
+});
+
+// ── Thesis ────────────────────────────────────────────────────────────────────
+
+/**
+ * A product with a declared thesis, and a fake `fid` on PATH that reports it.
+ *
+ * `collectThesis` shells out to `fid thesis --json` on purpose — one parser for
+ * the declaration, the one with the Rust tests behind it. That makes the real
+ * binary a dependency of this path, and a JS suite that needs a freshly-built
+ * Rust binary on PATH is a suite that fails for reasons unrelated to what it
+ * tests. So the contract is stubbed the same way the vendor is: a script that
+ * speaks the documented shape.
+ */
+function thesisRepo(payload) {
+  const dir = repo();
+  const bin = join(dir, ".bin");
+  mkdirSync(bin, { recursive: true });
+  const fake = join(bin, "fid");
+  writeFileSync(
+    fake,
+    `#!/bin/sh\ncat <<'JSON'\n${JSON.stringify(payload, null, 2)}\nJSON\n`,
+  );
+  chmodSync(fake, 0o755);
+  return { dir, bin };
+}
+
+const THESIS_PAYLOAD = {
+  declared: true,
+  current: {
+    date: "2026-09-21",
+    claim: "No unverified alert ever reaches a responder.",
+    arc: { problem: "A network that cries wolf is worse than no network." },
+    test: { falsified_by: "Responders act on machine-only alerts at the same rate." },
+    evidence: { not_yet: ["No field deployment, no pilot, no live public alerting."] },
+  },
+  gaps: [{ field: "arc.why_now", question: "What changed?" }],
+  history: [],
+};
+
+const THESIS_CLEAN = {
+  model: "typesafe/jev-1.13-20260917",
+  provider: "TypeSafe",
+  answers: {
+    not_falsifiable: { type: "noul", noul: 0.03 },
+    nobody_disagrees: { type: "noul", noul: 0.09 },
+    describes_instead_of_claiming: { type: "noul", noul: 0.05 },
+    falsifier_does_not_falsify: { type: "noul", noul: 0.07 },
+    copy_contradicts_the_claim: { type: "noul", noul: 0.04 },
+    overclaims_against_evidence: { type: "noul", noul: 0.02 },
+  },
+  usage: { input_tokens: 300, output_tokens: 30, cost: 0.0000121 },
+};
+
+describe("end to end — thesis", () => {
+  it("asks only the questions whose inputs exist, and never leaks the diff", async () => {
+    const { dir, bin } = thesisRepo(THESIS_PAYLOAD);
+    writeFileSync(join(dir, "README.md"), "# fon\n\nHuman-confirmed wildfire detection.\n");
+
+    const s = await stub(THESIS_CLEAN);
+    try {
+      const out = await runCli(dir, s.url, ["thesis"], { PATH: `${bin}:${process.env.PATH}` });
+      assert.equal(out.code, 0, out.stderr);
+
+      const body = s.captured.bodies[0];
+      const asked = Object.keys(body.questions);
+
+      // `disagrees` is not declared in the payload, so the strawman question
+      // is not asked at all — the same discipline as dropping `bare_quantity`
+      // with no numeric candidates.
+      assert.ok(!asked.includes("dissent_is_a_strawman"), asked.join(", "));
+      assert.ok(asked.includes("falsifier_does_not_falsify"), asked.join(", "));
+      assert.ok(asked.includes("overclaims_against_evidence"), asked.join(", "));
+
+      // The thesis pass ships the claim and the copy, never the working diff.
+      assert.equal(body.state.claim, "No unverified alert ever reaches a responder.");
+      assert.ok(body.state.restatements.some((r) => r.includes("Human-confirmed")));
+      assert.equal(body.state.diff, undefined);
+      assert.equal(body.state.numeric_candidates, undefined);
+
+      assert.match(out.stdout, /nothing to flag in this product's thesis/);
+    } finally {
+      await s.close();
+    }
+  });
+
+  it("reports an overclaim first and still exits 0", async () => {
+    const { dir, bin } = thesisRepo(THESIS_PAYLOAD);
+    writeFileSync(join(dir, "README.md"), "# fon\n\nDeployed across Serbia today.\n");
+
+    const dirty = {
+      ...THESIS_CLEAN,
+      answers: {
+        ...THESIS_CLEAN.answers,
+        overclaims_against_evidence: { type: "noul", noul: 0.94 },
+        nobody_disagrees: { type: "noul", noul: 0.61 },
+      },
+    };
+
+    const s = await stub(dirty);
+    try {
+      const out = await runCli(dir, s.url, ["thesis"], { PATH: `${bin}:${process.env.PATH}` });
+      assert.equal(out.code, 0, "advisory output never fails the caller by default");
+
+      const firstFinding = out.stdout.indexOf("public copy may claim more");
+      const secondFinding = out.stdout.indexOf("nobody would argue with");
+      assert.ok(firstFinding !== -1 && secondFinding !== -1, out.stdout);
+      assert.ok(firstFinding < secondFinding, `overclaim must rank first:\n${out.stdout}`);
+
+      // And it arrives with the offending sentence attached.
+      assert.match(out.stdout, /Deployed across Serbia today/);
+    } finally {
+      await s.close();
+    }
+  });
+
+  it("says so, sends nothing, and exits 0 when no thesis is declared", async () => {
+    const { dir, bin } = thesisRepo({ declared: false });
+    const s = await stub(THESIS_CLEAN);
+    try {
+      const out = await runCli(dir, s.url, ["thesis"], { PATH: `${bin}:${process.env.PATH}` });
+      assert.equal(out.code, 0);
+      assert.equal(s.captured.count, 0, "a product without a thesis sends nothing");
+      assert.match(out.stdout, /no thesis declared yet/);
     } finally {
       await s.close();
     }
