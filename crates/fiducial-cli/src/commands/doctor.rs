@@ -473,8 +473,11 @@ fn check_upstream_templates(
             Some(r) => r,
             None => continue, // Path not in registry.
         };
-        let upstream = templates::expand(raw, &cfg.product.name, PLATFORM_VERSION);
-        if upstream != *base {
+        // Compared at the version the product recorded, not at this binary's:
+        // otherwise every template carrying a `{{version}}` stamp reads as
+        // drift the moment the platform version moves. See
+        // `templates::upstream_changed`.
+        if templates::upstream_changed(raw, &cfg.product.name, &record.source_version, base) {
             warnings.push(format!(
                 "{rel_path}: upstream template updated (installed: {}, current: {}) — run `fid upgrade`",
                 record.source_version, PLATFORM_VERSION

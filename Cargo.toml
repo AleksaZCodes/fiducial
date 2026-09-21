@@ -20,7 +20,7 @@ members = [
 exclude = ["firmware/*"]
 
 [workspace.package]
-version      = "0.6.0"
+version      = "0.6.1"
 edition      = "2021"
 license      = "MIT"
 repository   = "https://github.com/AleksaZCodes/fiducial"
@@ -100,14 +100,14 @@ ts-rs             = { version = "10" }
 # A test asserting the same thing was written here and deleted. A second gate
 # standing behind a stronger one is not defence in depth; it is one more thing
 # to maintain that can only ever fire later than the thing in front of it.
-fiducial-adapters = { path = "crates/fiducial-adapters", version = "0.6.0" }
-fiducial-core     = { path = "crates/fiducial-core", version = "0.6.0" }
-fiducial-quantity = { path = "crates/fiducial-quantity", version = "0.6.0" }
-fiducial-model    = { path = "crates/fiducial-model", version = "0.6.0" }
-fiducial-protocol = { path = "crates/fiducial-protocol", version = "0.6.0" }
-fiducial-eda      = { path = "crates/fiducial-eda", version = "0.6.0" }
-fiducial-geometry = { path = "crates/fiducial-geometry", version = "0.6.0" }
-fiducial-mesh     = { path = "crates/fiducial-mesh", version = "0.6.0" }
-fiducial-ota      = { path = "crates/fiducial-ota", version = "0.6.0" }
-fiducial-sim      = { path = "crates/fiducial-sim", version = "0.6.0" }
-fiducial-tauri    = { path = "crates/fiducial-tauri", version = "0.6.0" }
+fiducial-adapters = { path = "crates/fiducial-adapters", version = "0.6.1" }
+fiducial-core     = { path = "crates/fiducial-core", version = "0.6.1" }
+fiducial-quantity = { path = "crates/fiducial-quantity", version = "0.6.1" }
+fiducial-model    = { path = "crates/fiducial-model", version = "0.6.1" }
+fiducial-protocol = { path = "crates/fiducial-protocol", version = "0.6.1" }
+fiducial-eda      = { path = "crates/fiducial-eda", version = "0.6.1" }
+fiducial-geometry = { path = "crates/fiducial-geometry", version = "0.6.1" }
+fiducial-mesh     = { path = "crates/fiducial-mesh", version = "0.6.1" }
+fiducial-ota      = { path = "crates/fiducial-ota", version = "0.6.1" }
+fiducial-sim      = { path = "crates/fiducial-sim", version = "0.6.1" }
+fiducial-tauri    = { path = "crates/fiducial-tauri", version = "0.6.1" }
