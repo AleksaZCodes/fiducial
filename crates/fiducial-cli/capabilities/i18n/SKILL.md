@@ -209,3 +209,43 @@ For a genuine exception — a brand name, a code sample — mark it:
 3. `fid derive`
 
 The default locale in `[i18n] default` is a **decision**, not `locales[0]`.
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+## What this capability installs into the app
+
+Three files, and which ones depend on the web framework installed.
+
+**`apps/web/src/lib/intl.ts`** — always. The generated catalog bound to
+`@fiducial/i18n`: `formatContentDate`, `formatInstant`, `formatNumber`,
+`formatPrice`, `formatList`, `formatRelativeTime`, `pluralCategory`. Use it
+instead of calling `Intl` directly, and never keep a locale→BCP-47 table: the
+tag is declared once per language as `locale.tag` in that language's own
+catalog, and this module reads it from there. A hand-kept map is a second
+declaration of the locale set, wrong the first time a language is added and
+only that map is missed.
+
+Two mistakes it exists to stop, both of which have shipped:
+
+- `new Date("2026-09-24")` is **midnight UTC**, so formatting it anywhere west
+  of Greenwich prints the 23rd. `formatContentDate` parses at UTC noon.
+- An instant rendered without a timezone shows the *server's* zone. An event
+  happens at 12:00 in Belgrade whoever is reading it, so `formatInstant`
+  requires the zone rather than defaulting it.
+
+**`apps/web/src/lib/locale-href.ts`** — always. Two builders,
+`queryLocaleHref` (`?lang=en`, needs no routing) and `prefixLocaleHref`
+(`/en/press`, needs a locale segment). Which one a product uses is a routing
+decision; the picker takes a builder rather than hard-coding either. The rule
+that is not negotiable: **switching language keeps the reader on the page they
+are on.** A picker that links to the locale's home page teleports the one
+person least able to find their way back.
+
+**The locale picker** — `LocalePicker.svelte` under `web-svelte`, or
+`locale-picker.tsx` under `web-next`. Same decisions, two frameworks; change
+one, change both. A list not a toggle (a toggle is wrong at three locales),
+every locale under its own endonym read from its own catalog, the flag
+`aria-hidden` because a flag is a country and a locale is a language, and each
+row a real `<a href>` so it is middle-clickable and crawlable.
+
+Adding `messages/de.json` with a `locale` block puts German in that menu and
+nothing else has to be touched. That is the test of whether an i18n layer is
+real: no table of languages anywhere, no branch on a locale code.

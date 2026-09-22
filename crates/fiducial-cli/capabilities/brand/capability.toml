@@ -5,6 +5,13 @@ description = "One declaration → favicon, manifest, sitemap, robots.txt, JSON-
 # also installs does not fail on the very next `fid derive`. Every field here
 # is a fact about one product that this platform cannot decide on its
 # behalf — replace all five before deriving for real.
+#
+# `platform_credit` is seeded false, and seeded *explicitly* rather than left
+# to the struct default, because a flag nobody can see is a flag nobody uses.
+# It is the one field here the platform does have an opinion about: a "Made
+# with Fiducial" line is a sentence printed under someone else's brand, to
+# their readers, so it is opt-in. Set it true and `generated/brand.ts` exports
+# `platformCredit = true`, which the layout templates already read.
 [[declarations.config]]
 block = "brand"
-seed = { legal_name = "Example LLC", trading_name = "Example", domain = "example.com", contact_email = "hello@example.com", primary_color = "#0EA5E9", background_color = "#0B1120" }
+seed = { legal_name = "Example LLC", trading_name = "Example", domain = "example.com", contact_email = "hello@example.com", primary_color = "#0EA5E9", background_color = "#0B1120", platform_credit = false }

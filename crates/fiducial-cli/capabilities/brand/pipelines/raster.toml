@@ -1,0 +1,59 @@
+name     = "raster"
+executor = "shell"
+args     = ["node", "scripts/rasterize.mjs"]
+
+# Brand SVG marks → PNG, at derive time.
+#
+# ## This list is the declaration
+#
+# Each output's **name** says which mark and at what size:
+#
+#   apps/web/static/brand/mark-ink-2048.png       2048 × 2048 of mark-ink.svg
+#   apps/web/static/brand/mark-ink-1200x630.png   1200 ×  630 of the same
+#
+# The same convention `pipelines/brand.toml` already uses, where the file name
+# says which artifact and this list says where it lands. `rasterize.mjs` reads
+# *this file* for the list rather than a second copy in `fiducial.toml`,
+# because `fid derive --check` already gates it — and a second copy is the one
+# that goes stale.
+#
+# `[raster]` in fiducial.toml holds only what a path cannot say:
+#
+#   [raster]
+#   source_dir = "apps/web/static/brand"   # where <mark>.svg lives
+#
+#   [raster.marks.mark-ink]
+#   background = "#08221F"   # omit for transparent
+#   padding    = 0.191       # fraction of the short edge
+#   artbox     = "38 78.6 179.9 127.64"   # the box to centre, if not the viewBox
+#
+# `artbox` is the one that is not obvious. Centring a logo's *full drawing* is
+# usually wrong: a mark with an ascender rising out of the letterforms sits
+# visibly low, because the ascender is being counted as part of what to
+# centre. Declaring the cap box centres what a reader reads as the mark and
+# lets the rest hang outside it.
+#
+# ## Empty by default, and that is not an oversight
+#
+# A capability cannot know which rasters a product needs, and seeding a
+# plausible one would write a file nobody asked for and then fail `--check`
+# when the mark it guessed at does not exist. Add lines here, declare
+# `[raster] source_dir`, and run `fid derive`.
+#
+# ## What it will not render
+#
+# Paths, groups, flat `#rgb`/`#rrggbb` fills and affine transforms. Anything
+# else — text, gradients, filters, images, arcs — is a hard error rather than
+# an approximation, because a mark that renders *wrong* is the failure that
+# ships: nobody reviews the OG image of a page they did not change. Text needs
+# a font, and a font's version is not pinned by anything here, so two machines
+# would produce different pixels; convert text to paths in the source SVG.
+#
+# ## Ordering
+#
+# Reads `fiducial.toml`, this file, and the SVGs under `[raster] source_dir` —
+# never another pipeline's output. `fid derive` has no `needs` field and its
+# order is not alphabetical, so a pipeline consuming a derived file is a
+# latent bug. If the marks themselves are derived (the `design` capability's
+# logo step), point `source_dir` at their *source*, not at its output.
+outputs = []

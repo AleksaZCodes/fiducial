@@ -319,7 +319,7 @@ a schedule is a fact `SHIPPED.md` owns, and a second copy of it drifts.
 
 ## What a capability is made of
 
-Six kinds, and the difference is not cosmetic — see
+Seven kinds, and the difference is not cosmetic — see
 `docs/specs/2026-09-14-capability-taxonomy.md`.
 
 <!-- fid:describes crates/fiducial-cli/src/capability/manifest.rs#pub fn derive -->
@@ -332,12 +332,21 @@ Six kinds, and the difference is not cosmetic — see
 | **Tool** | an external command the capability's work needs on PATH — declared, never installed | `requires_tools = ["wrangler"]` |
 | **Prerequisite** | another capability this one cannot work without — checked at install, not at first failure | `requires_capabilities = ["i18n"]` |
 | **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
+| **Scoped template** | a template under `for/<capability>/`, installed only alongside that capability | `for/web-svelte/…/LocalePicker.svelte` |
 
 <!-- fid:end-describes -->
 
 The test for a declaration: *could two different pipelines read this and both be
 correct?* If yes it is a declaration; if it is one tool's config file it is a
 template.
+
+The test for a **scoped** template: *would this file be dead weight in a
+product that has the capability but not the other one?* A React component in a
+SvelteKit app is the case the kind exists for — `design` shipped four of them
+into every product, `fiducial.lock` recorded them as platform-owned, and `fid
+doctor` then required the presence of code nothing could import. Install order
+does not matter: adding the target capability later back-fills what the others
+were holding for it.
 
 Filing one as another is not a style mistake. A pipeline outside `pipelines/` is
 installed and never runs; a `pipelines/` file listed as a template is installed
@@ -356,25 +365,25 @@ The capabilities this platform ships:
 | Capability | Contributes | Install |
 |---|---|---|
 | `adapters` | declares `adapters`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability adapters` |
-| `brand` | declares `brand`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability brand` |
+| `brand` | declares `brand`; 2 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability brand` |
 | `cms` | declares `cms`; 1 pipeline(s); 6 template file(s); seeds a `fiducial.toml` block | `fid add capability cms` |
 | `content` | declares `content.toml`, `content/posts/en/hello.md`; 1 pipeline(s); 2 template file(s) | `fid add capability content` |
 | `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
-| `design` | declares `design-system.md`; 1 pipeline(s); 10 template file(s) | `fid add capability design` |
+| `design` | declares `design-system.md`; 1 pipeline(s); 4 template file(s) | `fid add capability design` |
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
 | `firmware-rp2040` | 10 template file(s); guard rules | `fid add capability firmware-rp2040` |
 | `firmware-stm32` | 9 template file(s); guard rules | `fid add capability firmware-stm32` |
-| `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); 1 template file(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
+| `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
 | `legal` | declares `legal`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability legal` |
 | `migrations` | declares `migrations`; 1 pipeline(s) | `fid add capability migrations` |
-| `press` | declares `press`, `press/docs/en/boilerplate.md`, `press/docs/en/facts.md`, `press/stories/en/0001-why-this-exists.md`; 1 pipeline(s); 4 template file(s); seeds a `fiducial.toml` block | `fid add capability press` |
+| `press` | declares `press`, `press/docs/en/boilerplate.md`, `press/docs/en/facts.md`, `press/stories/en/0001-why-this-exists.md`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability press` |
 | `realtime` | a skill | `fid add capability realtime` |
 | `research` | declares `paper`; seeds a `fiducial.toml` block | `fid add capability research` |
 | `seo` | declares `seo`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability seo` |
 | `tauri` | 5 template file(s); guard rules | `fid add capability tauri` |
-| `web-next` | 8 template file(s); guard rules | `fid add capability web-next` |
-| `web-svelte` | 8 template file(s); guard rules | `fid add capability web-svelte` |
+| `web-next` | 10 template file(s); guard rules | `fid add capability web-next` |
+| `web-svelte` | 10 template file(s); guard rules | `fid add capability web-svelte` |
 | `worker-cloudflare` | 1 template file(s); guard rules | `fid add capability worker-cloudflare` |
 <!-- fid:end capabilities -->
 

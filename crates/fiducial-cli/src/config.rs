@@ -641,6 +641,10 @@ impl I18n {
 /// placeholder text precisely so `is_empty` is false and the pipeline it
 /// installs does not fail on the very next `fid derive`; `validate` then
 /// catches whichever placeholder a product forgot to replace.
+// `Default` is derived rather than written out. Every field's default is its
+// type's — empty strings, `None`, and `platform_credit: false`, which is the
+// opt-in default a credit line should have. A hand-written impl listing nine
+// fields is one more place to forget a field when a tenth is added.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Brand {
     #[serde(default)]
@@ -684,6 +688,21 @@ pub struct Brand {
     /// here parses or rewrites SVG.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub favicon: Option<String>,
+    /// Whether the product's footer credits Fiducial.
+    ///
+    /// **Opt-in, and false by default.** A credit line is a sentence printed on
+    /// somebody else's page, under their brand, to their readers. A platform
+    /// that adds one unless you find the switch has made a claim on a surface
+    /// it does not own, and the products most likely to never notice are
+    /// exactly the ones — a client site, a white-label build — where it is
+    /// least appropriate. Opting in costs one line; opting out of something you
+    /// never knew was there costs finding out from the client.
+    ///
+    /// Always serialized rather than hidden when false, so the flag is
+    /// discoverable by reading `fiducial.toml` instead of by reading this
+    /// struct (MISSION.md 4: everything explicit, in git).
+    #[serde(default)]
+    pub platform_credit: bool,
 }
 
 fn default_primary_color() -> String {
@@ -932,6 +951,7 @@ mod brand_tests {
             background_color: String::new(),
             short_name: None,
             favicon: None,
+            platform_credit: false,
         }
     }
 

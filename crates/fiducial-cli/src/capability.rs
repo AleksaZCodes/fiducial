@@ -122,6 +122,13 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
 
     let mut lock = load_or_new_lock(root)?;
 
+    // Which capabilities are already here decides which `for/<id>/` templates
+    // this one contributes. Read before the config is patched, so `cap.id` is
+    // not yet in the set and a capability cannot condition on itself.
+    let already_installed: Vec<String> = Config::load(&root.join(CONFIG_FILE))
+        .map(|c| c.capabilities.enabled)
+        .unwrap_or_default();
+
     // 1. Declarations, pipelines, then templates.
     //
     // Declarations first: a pipeline whose declaration is not yet on disk
@@ -135,6 +142,18 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
     }
     files.extend(cap.pipelines.iter());
     files.extend(cap.templates.iter());
+
+    // `for/<id>/` templates for the capabilities this product already has.
+    for (target, entries) in &cap.conditional_templates {
+        if already_installed.iter().any(|id| id == target) {
+            files.extend(entries.iter());
+        } else {
+            println!(
+                "  · skipped {} file(s) for `{target}` (not installed)",
+                entries.len()
+            );
+        }
+    }
 
     // A declared directory is created empty. The product fills it — that is
     // what makes it a declaration of the product's rather than the
@@ -161,6 +180,14 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
             PLATFORM_VERSION,
         );
     }
+
+    // The other direction: capabilities already installed may have been
+    // holding `for/<cap.id>/` templates back, waiting for this one. Without
+    // this pass the result would depend on the order somebody ran `fid add`
+    // in, which is the kind of state nobody can reason about later — install
+    // `i18n` then `web-svelte` and you get the picker; the other order and you
+    // silently do not.
+    backfill_conditional_templates(root, &cap.id, &already_installed, &mut lock, product_name)?;
 
     // 2. SKILL.md → a vendor-neutral path, plus a pointer for Claude Code.
     //
@@ -242,6 +269,55 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
         "  ✓ instructions → .fiducial/skills/{}.md (any agent; see AGENTS.md)",
         cap.id
     );
+    Ok(())
+}
+
+/// Install the `for/<new_id>/` templates of capabilities already present.
+///
+/// Only built-in definitions can be re-read here: an external capability was
+/// resolved from a path or a git revision this function does not have, and
+/// guessing one would install bytes nobody asked for. Those are named instead,
+/// with the command that re-runs them — honest about the gap rather than
+/// silently leaving a product half-wired.
+fn backfill_conditional_templates(
+    root: &Path,
+    new_id: &str,
+    already_installed: &[String],
+    lock: &mut Lock,
+    product_name: &str,
+) -> Result<()> {
+    let mut unresolvable: Vec<&str> = Vec::new();
+    for installed_id in already_installed {
+        let Some(other) = find(installed_id) else {
+            unresolvable.push(installed_id);
+            continue;
+        };
+        let Some(entries) = other.conditional_templates.get(new_id) else {
+            continue;
+        };
+        println!(
+            "  · {installed_id} contributes {} file(s) for {new_id}",
+            entries.len()
+        );
+        for FileEntry { path: rel, content } in entries {
+            let expanded = content
+                .replace("{{name}}", product_name)
+                .replace("{{version}}", PLATFORM_VERSION);
+            write_file(root, rel, &expanded)?;
+            lock.record(
+                rel.replace('\\', "/"),
+                expanded.as_bytes(),
+                PLATFORM_VERSION,
+            );
+        }
+    }
+    if !unresolvable.is_empty() {
+        println!(
+            "  ! could not check {} for `{new_id}` templates — \
+             re-run `fid add capability <id> --from <source>` if it ships any",
+            unresolvable.join(", ")
+        );
+    }
     Ok(())
 }
 
@@ -458,6 +534,17 @@ fn content_hash(cap: &Capability) -> String {
     for f in &cap.templates {
         parts.push(format!("tmpl\u{1f}{}\u{1f}{}", f.path, f.content));
     }
+    // Keyed by target, because the same path shipped for two frameworks is two
+    // different files and a hash that could not tell them apart would call two
+    // different capabilities identical.
+    for (target, entries) in &cap.conditional_templates {
+        for f in entries {
+            parts.push(format!(
+                "tmpl-for\u{1f}{target}\u{1f}{}\u{1f}{}",
+                f.path, f.content
+            ));
+        }
+    }
     parts.sort();
     crate::lock::sha256_hex(parts.join("\u{1e}").as_bytes())
 }
@@ -539,6 +626,27 @@ pub fn check_capability(cap: &Capability) -> Vec<String> {
         }
     }
 
+    // A `for/<id>/` directory naming nothing real installs nothing, forever,
+    // and says so nowhere. Only built-in ids can be checked — a third-party
+    // capability may legitimately target another third-party one.
+    for target in cap.conditional_templates.keys() {
+        if find(target).is_none() {
+            errors.push(format!(
+                "[{}] ships templates under `for/{target}/`, but `{target}` is not a \
+                 known capability — those files would never install. Check the spelling \
+                 against `fid capability list --all`",
+                cap.id
+            ));
+        }
+        if target == &cap.id {
+            errors.push(format!(
+                "[{}] conditions templates on itself via `for/{target}/` — \
+                 they are plain templates; move them out of `for/`",
+                cap.id
+            ));
+        }
+    }
+
     // A capability that derives something must say what it derives it *from*.
     // Without this the taxonomy is decoration: a pipeline with no declared
     // input reads a fact nothing is responsible for putting there.
@@ -602,6 +710,29 @@ mod tests {
             }
             paths.extend(cap.pipelines.iter().map(|f| f.path.as_str()));
             paths.extend(cap.templates.iter().map(|f| f.path.as_str()));
+            // A conditional template sharing a path with an unconditional one
+            // is written twice with whichever content the loop reached last.
+            // Two conditional templates for *different* targets may share a
+            // path — that is the feature — so they are checked per target.
+            for entries in cap.conditional_templates.values() {
+                let mut per_target: Vec<&str> = entries.iter().map(|f| f.path.as_str()).collect();
+                per_target.sort_unstable();
+                let n = per_target.len();
+                per_target.dedup();
+                assert_eq!(
+                    n,
+                    per_target.len(),
+                    "capability `{}` ships a path twice under one `for/` target",
+                    cap.id
+                );
+                for p in per_target {
+                    assert!(
+                        !paths.contains(&p),
+                        "capability `{}` installs `{p}` both conditionally and unconditionally",
+                        cap.id
+                    );
+                }
+            }
 
             let mut seen = paths.clone();
             seen.sort_unstable();
@@ -699,6 +830,11 @@ mod tests {
             assert_eq!(from_disk.declarations, cap.declarations, "[{}]", cap.id);
             assert_eq!(from_disk.pipelines, cap.pipelines, "[{}]", cap.id);
             assert_eq!(from_disk.templates, cap.templates, "[{}]", cap.id);
+            assert_eq!(
+                from_disk.conditional_templates, cap.conditional_templates,
+                "[{}]",
+                cap.id
+            );
             assert_eq!(from_disk.guard_rules, cap.guard_rules, "[{}]", cap.id);
             assert_eq!(
                 from_disk.requires_adapters, cap.requires_adapters,

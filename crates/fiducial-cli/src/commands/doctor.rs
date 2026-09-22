@@ -581,7 +581,7 @@ fn check_security_headers(root: &Path, issues: &mut Vec<String>, ok: &mut Vec<St
         checked += 1;
 
         let config = root.join(shape.config);
-        let Ok(source) = std::fs::read_to_string(&config) else {
+        let Ok(primary) = std::fs::read_to_string(&config) else {
             issues.push(format!(
                 "{} app has no `{}`, so nothing sets its response headers.\n      \
                  Every request it serves goes out without HSTS, CSP, or any of the rest.",
@@ -589,6 +589,20 @@ fn check_security_headers(root: &Path, issues: &mut Vec<String>, ok: &mut Vec<St
             ));
             continue;
         };
+
+        // A header may be declared in the framework's own config rather than
+        // in the headers file — for SvelteKit, `Content-Security-Policy`
+        // *belongs* in `svelte.config.js`, because only SvelteKit can hash the
+        // inline bootstrap script it emits. Reading both means the check still
+        // fails when a header is absent everywhere, and stops failing a
+        // product for putting it where it works.
+        let source = shape.also.iter().fold(primary, |mut acc, extra| {
+            if let Ok(more) = std::fs::read_to_string(root.join(extra)) {
+                acc.push('\n');
+                acc.push_str(&more);
+            }
+            acc
+        });
 
         let missing = missing_headers(&source);
         if missing.is_empty() {
