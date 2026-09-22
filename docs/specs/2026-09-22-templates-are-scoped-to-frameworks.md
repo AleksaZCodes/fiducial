@@ -203,6 +203,64 @@ the scale is the component's and the typeface is the product's.
 component against a product whose design system is nothing like the one you
 wrote it in, and look at it.
 
+## Decision 7 — the deploy capability describes a *shape*, not one artifact
+
+`[deploy]` could only describe a standalone Worker at `apps/worker/`, so
+installing the capability on a SvelteKit product wrote an
+`apps/worker/wrangler.toml` describing nothing the product runs while the real
+config stayed untracked and hand-edited. That is worse than not running it,
+and it is why one product declared `[adapters] deploy = "cloudflare"` and then
+deliberately did not install the capability — a declaration whose only honest
+reading was "the platform cannot do this yet".
+
+`[deploy] shape` names which artifact is being described:
+
+- `worker` (the default) — `apps/worker/`, entrypoint `src/index.ts`, a source
+  file this repository wrote.
+- `sveltekit` — `apps/web` **is** the Worker under
+  `@sveltejs/adapter-cloudflare`. The entrypoint and the static assets are both
+  *build output*, and the config lives at the product root because that is
+  where the adapter looks.
+
+Three sub-decisions, each of which was a bug first:
+
+**An unknown shape is an error, not a fallback.** `shape = "svelekit"` falling
+back to `worker` generates a perfectly valid config for the wrong thing, which
+is precisely the failure this field exists to end. It is refused by name.
+
+**`main` is not seeded.** The capability used to seed `main = "src/index.ts"`
+so the declaration would look complete. That value outlives the shape it was
+true for: a product that later declares `shape = "sveltekit"` keeps pointing at
+a source file it does not have, and the deploy succeeds onto nothing. `main`
+now defaults to whatever the shape implies, so changing the shape moves the
+entrypoint with it, and a product declares the field only to override it. The
+general rule: **seed what cannot be derived, never what merely looks tidy** —
+a seeded default is indistinguishable from an intentional one the moment
+something else changes.
+
+**The output path picks the format.** `.json`/`.jsonc` is written as JSONC,
+anything else as TOML. Wrangler reads both, and which one a product wants is
+not derivable from anything else: an app scaffolded by `create-cloudflare`
+already has a `wrangler.jsonc`, and generating a second config in the other
+format leaves two files disagreeing — the exact condition this capability
+exists to end. The path was already saying *where*; saying *which format* costs
+no new field.
+
+`[deploy]` also gained `kv_namespaces`, `vars` and `observability`. KV has no
+`[adapters]` contract to derive a binding from, and the id is load-bearing in
+the worst way: point a deploy at a different namespace and the data is silently
+gone rather than missing.
+
+**How this was checked.** Field by field against a live, hand-written
+`wrangler.jsonc` deploying a real SvelteKit Worker: `name`, `main`,
+`compatibility_date`, `compatibility_flags`, `observability`, `assets` and
+`kv_namespaces` all match what the generator emits. The one difference is
+`vars`, where the generator additionally emits `FIDUCIAL_PRODUCT` — an existing
+convention of the Worker shape, not a new behaviour. That product is **not**
+migrated onto the capability here: doing so would rewrite a live Worker name,
+KV id and domain binding days before the thing it serves happens, and the
+generator being provably correct is not a reason to do it today.
+
 ## Consequences
 
 - A capability can ship the same idea for two frameworks without either
@@ -215,6 +273,8 @@ wrote it in, and look at it.
   seeded explicitly rather than left to a struct default, because a flag
   nobody can see is a flag nobody uses.
 - A capability still cannot declare an npm dependency; see Decision 1.
+- The `deploy` capability now covers the SvelteKit shape, so the routing work
+  sequenced behind it is unblocked — but nothing live is migrated onto it yet.
 - Domain-per-locale routing is still not addressed. `locale-href.ts` ships the
   two builders that work today (`?lang=` and `/en/…`); choosing between them
   is a routing decision a component must not make, and a *third* strategy is

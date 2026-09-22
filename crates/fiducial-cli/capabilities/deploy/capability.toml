@@ -16,6 +16,14 @@ requires_tools = ["wrangler"]
 # ids, so the pipeline this capability also installs does not fail on the very
 # next `fid derive` — and `Deploy::validate` names any placeholder that
 # survived to a real derive, per vendor the product actually selected.
+#
+# `main` is deliberately NOT seeded. It already defaults to the entrypoint the
+# declared `shape` implies — `src/index.ts` for a standalone Worker, the
+# adapter's `_worker.js` for SvelteKit. Seeding the Worker's answer writes a
+# path that outlives the shape it was true for: a product that later declares
+# `shape = "sveltekit"` keeps pointing at a source file it does not have, and
+# the deploy succeeds onto nothing. A field is declared when a product overrides
+# it, not so the file looks complete.
 [[declarations.config]]
 block = "deploy"
-seed = { compatibility_date = "2025-01-01", compatibility_flags = ["nodejs_compat"], main = "src/index.ts", d1_database_id = "REPLACE_WITH_DATABASE_ID", r2_bucket_name = "REPLACE_WITH_BUCKET_NAME", queue_name = "REPLACE_WITH_QUEUE_NAME" }
+seed = { compatibility_date = "2025-01-01", compatibility_flags = ["nodejs_compat"], d1_database_id = "REPLACE_WITH_DATABASE_ID", r2_bucket_name = "REPLACE_WITH_BUCKET_NAME", queue_name = "REPLACE_WITH_QUEUE_NAME" }

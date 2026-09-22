@@ -343,3 +343,177 @@ fn selecting_openrouter_emits_the_openrouter_api_key_secret() {
     // `wrangler secret put` line and never as a plaintext var beside one.
     assert!(!w.contains("anthropic/claude-opus-5"), "{w}");
 }
+
+// ── The SvelteKit shape ──────────────────────────────────────────────────────
+//
+// A SvelteKit app deployed through `@sveltejs/adapter-cloudflare` is a Worker,
+// but not the shape this executor was written for: `apps/web` **is** the
+// Worker, the entrypoint and the assets are build output rather than source,
+// and the config lives at the product root because that is where the adapter
+// looks. Generating `apps/worker/wrangler.toml` for it describes nothing the
+// product runs while the real config stays untracked — which is why one
+// product declared `[adapters] deploy = "cloudflare"` and deliberately did not
+// install this capability.
+
+/// A product whose `[deploy]` describes the SvelteKit shape, with a KV
+/// namespace of its own and a JSONC output.
+fn sveltekit_product(tmp: &Path) -> PathBuf {
+    assert!(run(tmp, &["new", "p"]).status.success(), "fid new");
+    let root = tmp.join("p");
+    assert!(
+        run(&root, &["add", "deploy"]).status.success(),
+        "add deploy"
+    );
+
+    // `fid add deploy` has already seeded a `[deploy]` block, so this edits
+    // that block rather than appending a second one — two `[deploy]` headers
+    // is a duplicate key and the config stops parsing at all.
+    let config_path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&config_path).unwrap();
+    let config = config.replace(
+        "[deploy]\n",
+        "[deploy]\nshape = \"sveltekit\"\nname = \"upoznaj-biznis\"\n\
+         observability = true\nvars = { SPOTS_DEFAULT = \"14\" }\n",
+    );
+    let config = config
+        .replace("\"2025-01-01\"", "\"2026-08-31\"")
+        .replace("REPLACE_WITH_DATABASE_ID", "db-id-1")
+        .replace("REPLACE_WITH_BUCKET_NAME", "p-assets")
+        .replace("REPLACE_WITH_QUEUE_NAME", "p-jobs");
+    let config = format!(
+        "{config}\n[adapters]\ndeploy = \"cloudflare\"\n\n\
+         [[deploy.kv_namespaces]]\nbinding = \"SPOTS\"\n\
+         id = \"a6a236c7ea344ddca04548dd4c90fb44\"\n",
+    );
+    std::fs::write(&config_path, config).unwrap();
+
+    // The output path is what says which format — the same convention the
+    // brand pipeline uses, where the file name says which artifact.
+    std::fs::write(
+        root.join("pipelines/deploy.toml"),
+        "name     = \"deploy\"\nexecutor = \"fid-deploy\"\noutputs  = [\"wrangler.jsonc\"]\n",
+    )
+    .unwrap();
+
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "fid derive: {}", text(&out));
+    root
+}
+
+/// The entrypoint and the assets are the adapter's build output.
+///
+/// Pointing `main` at `src/index.ts` — the standalone Worker's default — names
+/// a file a SvelteKit product does not have, and omitting `assets` entirely
+/// makes every static file 404 while the Worker itself looks healthy.
+#[test]
+fn the_sveltekit_shape_points_at_the_adapters_build_output() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = sveltekit_product(tmp.path());
+    let cfg = std::fs::read_to_string(root.join("wrangler.jsonc")).expect("wrangler.jsonc");
+
+    assert!(
+        cfg.contains("\".svelte-kit/cloudflare/_worker.js\""),
+        "{cfg}"
+    );
+    assert!(
+        cfg.contains("\"directory\": \".svelte-kit/cloudflare\""),
+        "{cfg}"
+    );
+    assert!(cfg.contains("\"binding\": \"ASSETS\""), "{cfg}");
+    assert!(!cfg.contains("src/index.ts"), "{cfg}");
+    assert!(
+        !root.join("apps/worker/wrangler.toml").exists(),
+        "a SvelteKit product must not also get a bare-Worker config"
+    );
+}
+
+/// A KV namespace is declared, not derived, and its id is load-bearing.
+///
+/// No `[adapters]` contract describes "this product's own KV namespace", so
+/// there was nowhere to state it — and one product's live signup counter is
+/// written by an external script into a namespace whose id has to survive
+/// every migration. Point a deploy at a different id and the data is silently
+/// gone rather than missing.
+#[test]
+fn a_products_own_kv_namespace_is_declared_and_survives_derivation() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = sveltekit_product(tmp.path());
+    let cfg = std::fs::read_to_string(root.join("wrangler.jsonc")).unwrap();
+
+    assert!(cfg.contains("\"binding\": \"SPOTS\""), "{cfg}");
+    assert!(cfg.contains("a6a236c7ea344ddca04548dd4c90fb44"), "{cfg}");
+    // The Worker's name is its identity on the account: a changed name is a
+    // second deployment, not a rename.
+    assert!(cfg.contains("\"name\": \"upoznaj-biznis\""), "{cfg}");
+    assert!(cfg.contains("\"SPOTS_DEFAULT\": \"14\""), "{cfg}");
+    assert!(
+        cfg.contains("\"observability\": { \"enabled\": true }"),
+        "{cfg}"
+    );
+}
+
+/// The generated JSONC is still JSON once the comments are taken out.
+///
+/// The comments are deliberate — a generated file a reader does not know is
+/// generated is one they hand-edit and lose — but a config `wrangler` cannot
+/// parse is worse than no config.
+#[test]
+fn the_generated_jsonc_parses_once_comments_are_stripped() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = sveltekit_product(tmp.path());
+    let cfg = std::fs::read_to_string(root.join("wrangler.jsonc")).unwrap();
+
+    let stripped: String = cfg
+        .lines()
+        .filter(|l| !l.trim_start().starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let value: serde_json::Value =
+        serde_json::from_str(&stripped).unwrap_or_else(|e| panic!("not JSON: {e}\n{stripped}"));
+
+    assert_eq!(value["name"], "upoznaj-biznis");
+    assert_eq!(value["kv_namespaces"][0]["binding"], "SPOTS");
+    assert_eq!(value["assets"]["binding"], "ASSETS");
+}
+
+/// `fid derive --check` gates it like any other artifact.
+#[test]
+fn a_hand_edited_sveltekit_config_fails_the_gate() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = sveltekit_product(tmp.path());
+    let path = root.join("wrangler.jsonc");
+
+    let cfg = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        cfg.replace("a6a236c7ea344ddca04548dd4c90fb44", "some-other-namespace"),
+    )
+    .unwrap();
+
+    let out = run(&root, &["derive", "--check"]);
+    assert!(
+        !out.status.success(),
+        "editing a KV id by hand must fail the gate: {}",
+        text(&out)
+    );
+}
+
+/// A shape nobody implements is an error, not a silent fall back to the
+/// default — a typo would otherwise generate a valid config for the wrong
+/// thing, which is the failure this field exists to end.
+#[test]
+fn an_unknown_shape_is_refused_by_name() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = sveltekit_product(tmp.path());
+    let config_path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&config_path).unwrap();
+    std::fs::write(
+        &config_path,
+        config.replace("shape = \"sveltekit\"", "shape = \"svelte-kit\""),
+    )
+    .unwrap();
+
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success(), "{}", text(&out));
+    assert!(text(&out).contains("svelte-kit"), "{}", text(&out));
+}

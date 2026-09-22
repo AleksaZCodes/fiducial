@@ -433,6 +433,76 @@ pub struct Deploy {
     /// its `workers.dev` subdomain declares none.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub route: String,
+
+    /// What is being deployed — and it is not the same artifact in both cases.
+    ///
+    /// `worker` (the default) is a standalone Worker at `apps/worker/`, whose
+    /// entrypoint is a source file this repository wrote.
+    ///
+    /// `sveltekit` is a SvelteKit app where **`apps/web` is the Worker**, by
+    /// way of `@sveltejs/adapter-cloudflare`: the entrypoint and the static
+    /// assets are both *build output*, and the config lives at the product
+    /// root because that is where the adapter looks for it.
+    ///
+    /// Without this, `fid add deploy` on a SvelteKit product wrote an
+    /// `apps/worker/wrangler.toml` describing nothing the product runs, while
+    /// the real config stayed untracked — worse than not running it, and the
+    /// reason one product declared `[adapters] deploy = "cloudflare"` and
+    /// deliberately did not install this capability.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub shape: String,
+
+    /// Where the adapter writes the static assets it wants served.
+    ///
+    /// Only read for `shape = "sveltekit"`, and defaulted to the adapter's own
+    /// output directory — a product that has not moved it declares nothing.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub assets_directory: String,
+
+    /// The binding the Worker reads those assets through.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub assets_binding: String,
+
+    /// Whether to turn on Workers observability.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub observability: bool,
+
+    /// KV namespaces this product binds that no `[adapters]` contract covers.
+    ///
+    /// The derived bindings come from vendor selections, which is right for
+    /// the contracts that exist — but a product's own KV namespace is not a
+    /// vendor choice, it is a fact about its account. One product's live
+    /// signup counter is written by an external script into a namespace whose
+    /// id must survive every migration; there was nowhere to declare that, so
+    /// its config could not be derived at all.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub kv_namespaces: Vec<KvNamespace>,
+
+    /// Plain environment variables. Values are **not** secrets — those are
+    /// named in a comment and set with `wrangler secret put`, never written
+    /// into a file in the repository.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub vars: std::collections::BTreeMap<String, String>,
+}
+
+/// One KV namespace binding: the name the Worker reads, and the account's id.
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+pub struct KvNamespace {
+    /// The binding name in the Worker, e.g. `SPOTS`.
+    pub binding: String,
+    /// The namespace id from `wrangler kv namespace create`. Account-specific,
+    /// and **load-bearing**: point a deploy at a different id and the data is
+    /// silently gone rather than missing.
+    pub id: String,
+}
+
+/// Which artifact `fid-deploy` is describing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeployShape {
+    /// A standalone Worker at `apps/worker/`.
+    Worker,
+    /// A SvelteKit app deployed through `@sveltejs/adapter-cloudflare`.
+    SvelteKit,
 }
 
 impl Deploy {
@@ -446,6 +516,44 @@ impl Deploy {
             && self.r2_bucket_name.is_empty()
             && self.queue_name.is_empty()
             && self.route.is_empty()
+            && self.shape.is_empty()
+            && self.kv_namespaces.is_empty()
+            && self.vars.is_empty()
+    }
+
+    /// Which artifact is being described, defaulting to a standalone Worker.
+    ///
+    /// An unknown value is an error rather than a silent fall back to the
+    /// default: a typo would otherwise generate a perfectly valid config for
+    /// the wrong thing, which is the failure mode this field exists to end.
+    pub fn resolve_shape(&self) -> Result<DeployShape> {
+        match self.shape.as_str() {
+            "" | "worker" => Ok(DeployShape::Worker),
+            "sveltekit" => Ok(DeployShape::SvelteKit),
+            other => bail!(
+                "[deploy] shape = \"{other}\" is not a shape this executor knows. \
+                 Use \"worker\" (a standalone Worker at apps/worker/) or \
+                 \"sveltekit\" (apps/web IS the Worker, via adapter-cloudflare)."
+            ),
+        }
+    }
+
+    /// Where `@sveltejs/adapter-cloudflare` writes what it wants served.
+    pub fn resolved_assets_directory(&self) -> &str {
+        if self.assets_directory.is_empty() {
+            ".svelte-kit/cloudflare"
+        } else {
+            &self.assets_directory
+        }
+    }
+
+    /// The binding the Worker reads its assets through.
+    pub fn resolved_assets_binding(&self) -> &str {
+        if self.assets_binding.is_empty() {
+            "ASSETS"
+        } else {
+            &self.assets_binding
+        }
     }
 
     /// The facts the pipeline needs, each named when it is missing.
