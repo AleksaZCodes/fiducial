@@ -517,3 +517,39 @@ fn an_unknown_shape_is_refused_by_name() {
     assert!(!out.status.success(), "{}", text(&out));
     assert!(text(&out).contains("svelte-kit"), "{}", text(&out));
 }
+
+/// Adopting this capability must not change what a live Worker runs.
+///
+/// A generated config that adds an environment variable the hand-written one
+/// did not have is a change to a running deploy, dressed up as a migration.
+/// `FIDUCIAL_PRODUCT` tells a *standalone* Worker which product it belongs to;
+/// a SvelteKit Worker is the product's own web app and already imports the
+/// generated brand module. So the SvelteKit shape emits only the product's own
+/// `vars`, and migrating is a no-op at the deploy target.
+#[test]
+fn the_sveltekit_shape_injects_no_variable_of_its_own() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = sveltekit_product(tmp.path());
+    let cfg = std::fs::read_to_string(root.join("wrangler.jsonc")).expect("wrangler.jsonc");
+
+    assert!(cfg.contains("\"SPOTS_DEFAULT\": \"14\""), "{cfg}");
+    assert!(
+        !cfg.contains("FIDUCIAL_PRODUCT"),
+        "a migration must not add a var to a live Worker: {cfg}"
+    );
+}
+
+/// The Worker shape keeps it: there, the name is `<product>-worker` and no
+/// bundle carries the product's identity, so the variable is the only thing
+/// that does.
+#[test]
+fn the_worker_shape_still_names_its_product() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = product_with_deploy(tmp.path(), "deploy = \"cloudflare\"");
+    assert!(run(&root, &["derive"]).status.success());
+    assert!(
+        wrangler(&root).contains("FIDUCIAL_PRODUCT"),
+        "{}",
+        wrangler(&root)
+    );
+}

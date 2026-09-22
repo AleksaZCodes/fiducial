@@ -256,10 +256,24 @@ gone rather than missing.
 `compatibility_date`, `compatibility_flags`, `observability`, `assets` and
 `kv_namespaces` all match what the generator emits. The one difference is
 `vars`, where the generator additionally emits `FIDUCIAL_PRODUCT` — an existing
-convention of the Worker shape, not a new behaviour. That product is **not**
-migrated onto the capability here: doing so would rewrite a live Worker name,
-KV id and domain binding days before the thing it serves happens, and the
-generator being provably correct is not a reason to do it today.
+convention of the Worker shape, not a new behaviour. That product **is** now
+migrated onto the capability, and the migration is a no-op at the deploy
+target: the generated file and the hand-written one it replaces parse to the
+same JSON.
+
+Making that literally true required one more decision. `FIDUCIAL_PRODUCT` names
+the product a running Worker belongs to, and emitting it under the SvelteKit
+shape would have added an environment variable the live Worker did not have —
+a change to a running deploy, dressed up as a migration. Only a *standalone*
+Worker needs telling: a SvelteKit Worker is the product's own web app and
+already imports the generated brand module. The variable is now scoped to the
+Worker shape, with a test that pins the no-op.
+
+The general rule, which is the reason this is written down: **a migration onto
+a capability must be provably inert at the thing it manages.** If adopting the
+derivation changes the deployed artifact at all, the capability is not yet
+describing what the product actually has, and the difference is a gap in the
+declaration rather than an acceptable cost of adoption.
 
 ## Consequences
 

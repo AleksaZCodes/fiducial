@@ -1003,7 +1003,18 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
         DeployShape::Worker => None,
     };
 
-    let mut vars: Vec<(String, String)> = vec![("FIDUCIAL_PRODUCT".into(), product.clone())];
+    // `FIDUCIAL_PRODUCT` names the product a running Worker belongs to — and
+    // only a standalone Worker needs telling. Under the SvelteKit shape the
+    // Worker *is* the product's own web app: it already imports the generated
+    // brand module, which carries the name and everything around it. Injecting
+    // the var there restates in the environment what the bundle already holds,
+    // and it does so as a live change to a deploy target that was otherwise
+    // untouched — which is exactly the cost that stops a product adopting this
+    // capability at all.
+    let mut vars: Vec<(String, String)> = match shape {
+        DeployShape::Worker => vec![("FIDUCIAL_PRODUCT".into(), product.clone())],
+        DeployShape::SvelteKit => Vec::new(),
+    };
     for (k, v) in &d.vars {
         // A product's own var wins over the derived one rather than appearing
         // twice — `wrangler` takes the last of a duplicate key silently.
