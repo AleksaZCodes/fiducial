@@ -97,12 +97,18 @@
 <style>
   /* Scoped, unlike the picker and the sheet: nothing here is portalled, so
      Svelte's own scoping reaches all of it. */
+  /* A radius token is the PRODUCT's decision and may legitimately be 999px —
+     a pill design system. On a small control that is the intent; on a large
+     surface the same token turns a card into a circle, which is exactly what
+     shipped on a press page. So a large surface follows the product's scale
+     only up to a cap, and small controls (buttons, menu rows) still take it
+     whole. */
   .fid-cover,
   .fid-card {
     display: block;
     padding: 1.5rem;
     border: 1px solid var(--border, currentColor);
-    border-radius: var(--radius-md, 4px);
+    border-radius: min(var(--radius-md, 6px), 12px);
     color: inherit;
     text-decoration: none;
     height: 100%;

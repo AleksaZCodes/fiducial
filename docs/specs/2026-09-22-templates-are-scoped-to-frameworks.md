@@ -171,6 +171,38 @@ built for.
 A regression test asserts all three: the CSP exists, it is not in the headers
 file, and `fid doctor` accepts the result.
 
+## Decision 6 — a shared component must not borrow a token across scales
+
+Found by looking at the rendered page rather than at the test output, and
+worth recording because the test could not have caught it.
+
+The Svelte components style themselves from the design tokens with a fallback
+on every one (`var(--border, currentColor)`), so they render plainly rather
+than invisibly in a product without the `design` capability. That is right.
+Reading `--radius-md` for a *large* surface was not: `upoznaj-biznis` declares
+`--radius: 999px`, because it is a pill design system, and the press room's
+logo frames rendered as **circles**.
+
+The token was not wrong and the component was not wrong; the assumption that a
+radius means the same thing at every size was. So:
+
+- **Small controls** — buttons, menu rows — take the product's radius whole.
+  A pill button in a pill design system is the intent.
+- **Large surfaces** — cards, menus, image frames — take it capped:
+  `min(var(--radius-md, 6px), 12px)`. A product with a 4px scale is unaffected;
+  a product with a 999px scale gets a rounded rectangle instead of a circle.
+
+The same pass fixed a second invisible-to-tests bug: `PressKit` used bare
+`h1`/`h2`/`h3`, and a product whose stylesheet resets heading sizes — normal
+when a design system supplies `.type-h2` classes instead — rendered the entire
+press room at body size. The component now sets its own hierarchy in `em`, so
+the scale is the component's and the typeface is the product's.
+
+**The general rule:** a template that inherits a product's tokens inherits its
+*decisions*, including ones it was not designed against. Check a shared
+component against a product whose design system is nothing like the one you
+wrote it in, and look at it.
+
 ## Consequences
 
 - A capability can ship the same idea for two frameworks without either
