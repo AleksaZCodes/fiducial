@@ -7,6 +7,16 @@ outputs  = [
   "apps/web/public/sitemap.xml",
 ]
 
+# These three paths are the declaration, not a restatement of one: the deriver
+# reads them out of this file and writes exactly what is listed here. So a
+# framework whose static assets live somewhere else is a one-line edit —
+# `public` → `static` for SvelteKit — with no matching change in the script.
+#
+# The script used to hard-code the Next.js paths as well. Editing this list was
+# then necessary and insufficient: the pipeline declared `static/sitemap.xml`,
+# the script wrote `public/sitemap.xml`, and `fid derive --check` failed on an
+# artifact that was missing rather than wrong.
+
 # Routes → the sitemap, and the metadata every page renders.
 #
 # ## The declaration `fid-brand` said was missing
