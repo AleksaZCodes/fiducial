@@ -44,6 +44,12 @@ serde      = { version = "1", default-features = false }
 serde_json = { version = "1" }
 postcard   = { version = "1", default-features = false }
 toml       = { version = "0.8" }
+# `toml_edit` is the SAME parse `toml` 0.8 already uses underneath, exposed as a
+# format-preserving document. It is a direct dependency because `fid add` edits
+# a file a human wrote: a typed round-trip through `toml` discards every comment
+# and reflows every table, which silently deleted 27 lines of authored prose
+# from a product's `fiducial.toml`.
+toml_edit  = { version = "0.22" }
 
 # Cryptography — OTA manifest signing and image digests.
 sha2          = { version = "0.10", default-features = false }
