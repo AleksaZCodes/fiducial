@@ -115,15 +115,22 @@ pub fn render_sitemap(domain: &str) -> String {
 /// So the brand declaration derives a module too, and application code imports
 /// it. That is principle 1 applied to the one fact every web product needs in
 /// both worlds at once.
-pub fn render_brand_ts(
-    legal_name: &str,
-    trading_name: &str,
-    short_name: &str,
-    domain: &str,
-    contact_email: &str,
-    primary_color: &str,
-    background_color: &str,
-) -> String {
+/// Takes the declaration itself rather than its fields one by one. The
+/// parameter list had reached eight and every new brand fact made it longer,
+/// with the call site matching them up positionally — which is the shape of
+/// bug where two `&str` arguments swap places and everything still compiles.
+/// `Brand` is a plain struct, so this stays testable without a scaffolded
+/// product, which is the property the split was for.
+pub fn render_brand_ts(brand: &crate::config::Brand) -> String {
+    let legal_name = &brand.legal_name;
+    let trading_name = &brand.trading_name;
+    let short_name = brand.short_name.as_deref().unwrap_or(&brand.trading_name);
+    let domain = &brand.domain;
+    let contact_email = &brand.contact_email;
+    let primary_color = brand.primary_color();
+    let background_color = brand.background_color();
+    let platform_credit = brand.platform_credit;
+
     // Built line by line rather than as one continued string literal. A
     // multi-line literal with `\` continuations carries this file's own
     // indentation into the generated output unless every continuation is
@@ -145,6 +152,15 @@ pub fn render_brand_ts(
         format!("export const contactEmail = {contact_email:?} as const"),
         format!("export const primaryColor = {primary_color:?} as const"),
         format!("export const backgroundColor = {background_color:?} as const"),
+        String::new(),
+        "/**".to_string(),
+        " * Whether this product's footer credits the platform it was built on.".to_string(),
+        " *".to_string(),
+        " * Declared by `[brand] platform_credit` and false unless a product".to_string(),
+        " * turns it on. A layout reads this constant; it does not keep a local".to_string(),
+        " * one of its own, which is what every framework template here does.".to_string(),
+        " */".to_string(),
+        format!("export const platformCredit = {platform_credit} as const"),
         String::new(),
         "/** The canonical origin, scheme included. */".to_string(),
         "export const siteUrl = `https://${domain}` as const".to_string(),

@@ -170,3 +170,24 @@ A hosted CMS with its own database would become the source of truth instead,
 which breaks the property everything here rests on — that the declaration is a file
 in the repository and `fid derive --check` can prove the artifact matches it.
 A database cannot be checked by CI.
+
+## Rendering a collection
+
+`EntryCards` (`.svelte` under `web-svelte`, `entry-cards.tsx` under
+`web-next`) renders a collection as **one cover story and a grid of the
+rest** — the most recent or pinned entry gets a card with room for its
+summary, the others get a grid below.
+
+A list of identical cards says every entry is equally worth reading, which is
+never true and least true on a blog's front page. With a single entry there is
+no grid: a divider with nothing under it reads as a loading failure.
+
+**The whole card is one link.** Not the title with the card inert around it —
+a card that responds on one line only is one people click on the wrong part
+of, and they conclude the site is broken rather than that the hit target is
+small. This is why the "read more" line is a `<span>`: a second link inside
+the first would be invalid and would also break the big target.
+
+`entries` and `href` come in from the product. Which collection it is, where
+it lives and what the section is called are product facts; the shape of a card
+is not.

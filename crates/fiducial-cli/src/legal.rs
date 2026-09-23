@@ -793,6 +793,7 @@ mod tests {
             background_color: String::new(),
             short_name: None,
             favicon: None,
+            platform_credit: false,
         }
     }
 

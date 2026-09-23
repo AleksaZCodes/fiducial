@@ -85,3 +85,21 @@ changes via 3-way merge (same mechanism as all other template files).
   and re-run `fid upgrade`.
 - **Do not commit `node_modules/`** or `.next/`.
 - **Do not hand-write database migrations** — use the migration pipeline.
+
+## `mobile-menu.tsx`
+
+The nav links on a narrow screen, as a native `<dialog>` with `showModal()`.
+The browser owns the top layer, the backdrop, the inert page behind it,
+Escape, and returning focus to the trigger — five behaviours a hand-rolled
+menu has to reimplement and usually does not.
+
+Deliberately not a shadcn `Sheet`: a shadcn component is *copied into* a
+product, so a template importing one resolves only where that copy happened,
+and the failure is a build error in a file the product never wrote. A
+capability template may depend on a package, never on another capability's
+copied file.
+
+`links`, `openLabel` and `closeLabel` come in. There is deliberately **no
+`SiteNav`** in the platform: arranging a wordmark, links, a language picker
+and a call to action is the decision each product makes differently, and
+keeping the pieces separate is what lets it.

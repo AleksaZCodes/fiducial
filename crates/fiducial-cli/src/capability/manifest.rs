@@ -17,8 +17,24 @@
 //! ├── capability.toml   optional — the facts a layout cannot carry
 //! ├── declarations/…    typed facts, installed at the path *below* declarations/
 //! ├── pipelines/*.toml  derivations, gated by `fid derive --check`
+//! ├── for/<cap>/…       templates installed only when `<cap>` is also installed
 //! └── anything else     templates, installed at their own path
 //! ```
+//!
+//! `for/<cap>/` is the answer to a bug that shipped: the `design` capability
+//! wrote four React `.tsx` stubs into `apps/web/src/components/ui/` of every
+//! product, including SvelteKit ones, where nothing can import them. They were
+//! recorded in `fiducial.lock` as platform-owned, so `fid doctor` then
+//! *required* dead files the product could not use. The capability had no way
+//! to say "this file is for the React app" because a template's only metadata
+//! was its path.
+//!
+//! Now it is. A file under `for/web-next/` installs when `web-next` is
+//! installed and not otherwise, at the path below `for/web-next/`. Order does
+//! not matter: installing `web-next` later back-fills the conditional templates
+//! of everything already installed. The same capability can therefore ship a
+//! React component and a Svelte one for the same idea without either product
+//! carrying the other's.
 //!
 //! `pipelines/` needs no convention invented for it: that is already where
 //! `pipeline::discover` looks inside a product, so a capability's pipeline
@@ -161,6 +177,14 @@ pub struct Capability {
     pub requires_capabilities: Vec<String>,
     pub guard_rules: Vec<String>,
     pub templates: Vec<FileEntry>,
+    /// Templates that install only alongside another capability.
+    ///
+    /// Keyed by the capability id that has to be present, from `for/<id>/`.
+    /// The `FileEntry` paths are already the product-relative install paths,
+    /// with the `for/<id>/` prefix stripped — so everything downstream treats
+    /// them exactly as it treats a plain template, and the condition lives in
+    /// one place.
+    pub conditional_templates: BTreeMap<String, Vec<FileEntry>>,
     pub skill_md: String,
     pub source: Source,
 }
@@ -216,6 +240,8 @@ pub const MANIFEST_FILE: &str = "capability.toml";
 pub const DECLARATIONS_DIR: &str = "declarations/";
 /// Files under here are pipelines.
 pub const PIPELINES_DIR: &str = "pipelines/";
+/// Files under `for/<capability-id>/` install only alongside that capability.
+pub const FOR_DIR: &str = "for/";
 
 /// Files a capability directory carries that are *about* it rather than part of
 /// what it installs.
@@ -257,12 +283,29 @@ pub fn derive(id: &str, files: &BTreeMap<String, String>, source: Source) -> Res
     );
     let mut pipelines = Vec::new();
     let mut templates = Vec::new();
+    let mut conditional_templates: BTreeMap<String, Vec<FileEntry>> = BTreeMap::new();
 
     for (path, content) in files {
         if NOT_INSTALLED.contains(&path.as_str()) {
             continue;
         }
-        if let Some(rest) = path.strip_prefix(DECLARATIONS_DIR) {
+        if let Some(rest) = path.strip_prefix(FOR_DIR) {
+            let (target, install_path) = rest.split_once('/').unwrap_or((rest, ""));
+            if target.is_empty() || install_path.is_empty() {
+                bail!(
+                    "capability `{id}` has `{path}` under `{FOR_DIR}`, which names no \
+                     capability to install alongside. The layout is \
+                     `{FOR_DIR}<capability-id>/<path in the product>`."
+                );
+            }
+            conditional_templates
+                .entry(target.to_string())
+                .or_default()
+                .push(FileEntry {
+                    path: install_path.to_string(),
+                    content: content.clone(),
+                });
+        } else if let Some(rest) = path.strip_prefix(DECLARATIONS_DIR) {
             if rest.is_empty() {
                 continue;
             }
@@ -300,6 +343,7 @@ pub fn derive(id: &str, files: &BTreeMap<String, String>, source: Source) -> Res
         requires_capabilities: manifest.requires_capabilities,
         guard_rules: manifest.guard_rules,
         templates,
+        conditional_templates,
         skill_md,
         source,
     };
@@ -336,7 +380,17 @@ fn validate_paths(cap: &Capability) -> Result<()> {
             Declaration::ConfigBlock { .. } => None,
         })
         .chain(cap.pipelines.iter().map(|f| &f.path))
-        .chain(cap.templates.iter().map(|f| &f.path));
+        .chain(cap.templates.iter().map(|f| &f.path))
+        // A conditional template is written into the product by the same
+        // installer, so it is checked by the same rule. Stripping `for/<id>/`
+        // is exactly the kind of step that would otherwise let
+        // `for/web-next/../../.ssh/authorized_keys` through.
+        .chain(
+            cap.conditional_templates
+                .values()
+                .flatten()
+                .map(|f| &f.path),
+        );
 
     for path in all {
         if path.starts_with('/') || path.starts_with('\\') || path.contains(':') {
@@ -469,6 +523,70 @@ mod tests {
         assert_eq!(cap.templates[0].path, "apps/thing/config.toml");
         // README is about the capability, not part of what it installs.
         assert!(!cap.templates.iter().any(|f| f.path == "README.md"));
+    }
+
+    /// `for/<cap>/` files are templates with a condition, and the condition is
+    /// the directory name.
+    ///
+    /// The bug this exists for: `design` wrote React `.tsx` stubs into every
+    /// product, SvelteKit ones included, where nothing could import them — and
+    /// `fid doctor` then required their continued presence.
+    #[test]
+    fn a_for_directory_scopes_a_template_to_another_capability() {
+        let cap = derive(
+            "x",
+            &files(&[
+                ("SKILL.md", SKILL),
+                ("for/web-next/apps/web/src/picker.tsx", "react"),
+                ("for/web-svelte/apps/web/src/Picker.svelte", "svelte"),
+                ("apps/web/src/always.ts", "both"),
+            ]),
+            Source::Builtin,
+        )
+        .unwrap();
+
+        // The unconditional one is still a plain template.
+        assert_eq!(cap.templates.len(), 1);
+        assert_eq!(cap.templates[0].path, "apps/web/src/always.ts");
+
+        // The condition is the key; the path is where it lands in the product,
+        // with `for/<id>/` gone — so nothing downstream has to know about it.
+        let next = &cap.conditional_templates["web-next"];
+        assert_eq!(next.len(), 1);
+        assert_eq!(next[0].path, "apps/web/src/picker.tsx");
+        assert_eq!(cap.conditional_templates["web-svelte"][0].content, "svelte");
+    }
+
+    #[test]
+    fn a_for_directory_naming_no_capability_is_an_error() {
+        let err = derive(
+            "x",
+            &files(&[("SKILL.md", SKILL), ("for/web-next", "stray")]),
+            Source::Builtin,
+        )
+        .unwrap_err();
+        assert!(
+            format!("{err:#}").contains("names no capability"),
+            "{err:#}"
+        );
+    }
+
+    /// Stripping `for/<id>/` must not become a way past the path checks.
+    #[test]
+    fn a_conditional_template_cannot_escape_the_product_root() {
+        let err = derive(
+            "x",
+            &files(&[
+                ("SKILL.md", SKILL),
+                ("for/web-next/../../.ssh/authorized_keys", "key"),
+            ]),
+            Source::Path("somewhere".into()),
+        )
+        .unwrap_err();
+        assert!(
+            format!("{err:#}").contains("escapes the product root"),
+            "{err:#}"
+        );
     }
 
     /// A config block is a declaration with no file, expressed as data.

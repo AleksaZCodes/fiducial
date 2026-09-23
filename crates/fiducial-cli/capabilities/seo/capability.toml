@@ -4,7 +4,13 @@ description = "Routes as a declaration: a real sitemap, per-page metadata, and a
 # both. Installed without them it would emit a sitemap of the pages listed in
 # `[seo] pages` and nothing else — which looks like it worked, and is exactly
 # the failure this capability exists to fix.
-requires_capabilities = ["content", "i18n"]
+#
+# `brand` is here because every URL this capability emits starts with
+# `[brand] domain`, and because `scripts/toml-lite.mjs` — the side-effect-free
+# TOML parser the deriver reads its own pipeline with — is a file `brand`
+# ships. Without it the deriver failed on a missing import, one layer away
+# from the declaration that was actually absent.
+requires_capabilities = ["brand", "content", "i18n"]
 
 # The pages that are pages rather than entries.
 #

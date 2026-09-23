@@ -1,0 +1,59 @@
+/* Styles for `entry-cards.tsx`, mirroring the Svelte twin's. Design tokens
+   with a fallback on every one, so this renders plainly rather than
+   invisibly in a product without the `design` capability. */
+
+.cover,
+.card {
+  display: block;
+  padding: 1.5rem;
+  border: 1px solid var(--border, currentColor);
+  border-radius: var(--radius-md, 4px);
+  color: inherit;
+  text-decoration: none;
+  height: 100%;
+  transition: border-color 120ms ease;
+}
+
+.cover:hover,
+.card:hover {
+  border-color: var(--primary, currentColor);
+}
+
+.coverTitle {
+  margin: 0.25rem 0 0;
+  font-size: 1.75rem;
+  line-height: 1.15;
+}
+
+.cardTitle {
+  margin: 0.25rem 0 0;
+  font-size: 1.125rem;
+  line-height: 1.25;
+}
+
+.meta {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground, inherit);
+  opacity: 0.8;
+}
+
+.summary {
+  margin: 0.625rem 0 0;
+  max-width: 60ch;
+  color: var(--muted-foreground, inherit);
+}
+
+.more {
+  display: inline-block;
+  margin-top: 0.75rem;
+  color: var(--primary, inherit);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}

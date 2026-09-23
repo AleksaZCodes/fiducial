@@ -482,3 +482,20 @@ It does not derive the font loading. `fid:type` names the families and the
 weights; wiring them into `next/font` or `@font-face` and binding the
 `--font-*` variables is still yours, and the `var` field on a role is how you
 tell the generator what you called them.
+
+## The React stubs are scoped to React products
+
+`button.tsx`, `card.tsx`, `dropdown-menu.tsx`, `doodle-arrows.tsx` and
+`components.json` install under `for/web-next/`, which means they arrive in a
+Next.js product and **not** in a SvelteKit one.
+
+They used to install unconditionally. A SvelteKit product therefore received
+four `.tsx` files nothing in it could import, recorded in `fiducial.lock` as
+platform-owned — so `fid doctor` then *required* the continued presence of
+dead code, and deleting it failed the gate. The only way out was a documented
+workaround in the product.
+
+A Svelte product gets its primitives from `fid add component <name>
+--framework svelte`, and the platform's Svelte components use `bits-ui`
+directly rather than a copied UI kit — a capability template may depend on a
+package, never on another capability's copied file.

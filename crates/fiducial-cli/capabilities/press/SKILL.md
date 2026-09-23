@@ -193,3 +193,26 @@ moves on and writes the piece without you.
 
 Then write `press/boilerplate.md`, `press/facts.md`, and at least two stories —
 one of which is not a win.
+
+## Rendering the press room
+
+`PressKit` (`.svelte` under `web-svelte`, `press-kit.tsx` under `web-next`)
+renders the whole room. It reads `generated/press.ts` itself; the product
+supplies labels, the logo list, an optional gallery, and three functions —
+where a story lives, how an angle reads, how a date reads.
+
+**The section order is the order a journalist needs things in:** assets, fast
+facts, boilerplate, stories, contact. Both apps this was generalized from
+ordered it the other way round, prose first, which puts the one thing most
+visitors came for below three screens of text. They came for a picture.
+
+**`logos[].background` is not decoration.** A mark drawn in light colours,
+dropped on the ambient page background, is invisible — and that shipped, with
+every mark on the one surface it could not be read against. A mark's file name
+usually names the surface it is drawn *for*, not its own colour:
+`mark-ink.svg` being pale aqua is not a contradiction, it is the mark for an
+ink-coloured field. **Read the fills, not the name.**
+
+**Boilerplate is a read-only `<textarea>`, not a `<p>`.** It selects cleanly on
+click and copies as plain text, which is the whole job; a paragraph copies with
+the page's markup attached.

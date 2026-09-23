@@ -28,7 +28,21 @@
 // one canonical to a crawler and another to a reader.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { parseToml } from "./derive-content.mjs";
+// `toml-lite.mjs`, not `derive-content.mjs`, for `parseToml`.
+//
+// `derive-content.mjs` is a pipeline executor with no main-module guard: its
+// body runs on import. Importing it for one helper therefore re-derived the
+// whole content model as a side effect of running THIS pipeline — an
+// undeclared write to `generated/content.ts` from a pipeline that does not
+// list it as an output, which is the exact class of thing
+// `fid derive --check` exists to catch. It was invisible because content's own
+// pipeline writes the same bytes, so the artifact was never stale; it would
+// have surfaced the first time the two disagreed, as a file changing under a
+// pipeline that never claimed it.
+//
+// `toml-lite.mjs` is a parser and nothing else, and it already handles the
+// arrays-across-several-lines that an `outputs` list is always written as.
+import { parseToml } from "./toml-lite.mjs";
 import { frontmatter } from "./frontmatter.mjs";
 
 const at = (p) => new URL(`../${p}`, import.meta.url);
@@ -46,18 +60,106 @@ const defaultLocale = cfg.i18n?.default ?? locales[0];
 const domain = cfg.brand?.domain ?? fail("[brand] domain is not set");
 const origin = `https://${domain}`;
 const seo = cfg.seo ?? {};
+
 // Routes that are pages rather than entries. Declared, because a page with no
 // collection behind it has nothing else to derive it from.
-const staticPages = seo.pages ?? ["/"];
+//
+// Each entry is either a path, or a table naming the catalogue keys its title
+// and description live under:
+//
+//   pages = [
+//     { path = "/",      title = "meta.title",  description = "meta.description" },
+//     { path = "/blog",  title = "blog.title",  description = "blog.metaDescription" },
+//   ]
+//
+// A bare path keeps working and resolves through `CONVENTIONAL_KEYS` below.
+// The keys are declarable because the script used to hold a table of four
+// paths — `/`, `/press`, `/blog`, `/credits` — with one product's key
+// spellings baked in, and every other product's page set hit
+// "no title is declared for it". That message named the wrong problem: the
+// page HAD a title, in a key this script had never heard of. A product also
+// legitimately declares that copy somewhere other than the catalogue, and then
+// the only way to satisfy a hard-coded key is to write the string a second
+// time — a duplicate of a declared fact, which is the one thing this platform
+// is for preventing.
+const CONVENTIONAL_KEYS = {
+  "/": ["meta.title", "meta.description"],
+  "/press": ["press.title", "press.metaDescription"],
+  "/blog": ["blog.title", "blog.metaDescription"],
+  "/credits": ["credits.title", "credits.intro"],
+};
+
+const staticPages = (seo.pages ?? ["/"]).map((entry) => {
+  if (typeof entry === "string") {
+    const keys = CONVENTIONAL_KEYS[entry];
+    if (!keys) {
+      fail(
+        `[seo] pages lists ${entry}, and this script has no conventional title key for it.\n` +
+          "  Declare the keys with the path instead of listing the path alone:\n" +
+          `    { path = "${entry}", title = "<key>", description = "<key>" }\n` +
+          "  They are message keys, resolved in each locale's catalogue.",
+      );
+    }
+    return { path: entry, title: keys[0], description: keys[1] };
+  }
+  if (!entry.path || !entry.title || !entry.description) {
+    fail(
+      `[seo] pages has an entry missing path, title or description: ${JSON.stringify(entry)}`,
+    );
+  }
+  return entry;
+});
+
+// ── Where the outputs go ─────────────────────────────────────────────────────
+//
+// Read from `pipelines/seo.toml` rather than written here. The pipeline's
+// `outputs` is already the declaration of where these three artifacts land —
+// it is what `fid derive --check` hashes — so a second copy of the paths in
+// this script is a copy that can disagree with it.
+//
+// It did disagree. Both were written for Next.js, where static assets live in
+// `public/`. A SvelteKit product's live at `static/`, and adopting this
+// capability there meant editing the pipeline (the documented one-line change)
+// while the script kept writing `public/sitemap.xml`: the file the pipeline
+// declared was never produced, so `fid derive --check` failed on a missing
+// artifact and pointed at neither the cause nor the fix. Reading the
+// declaration makes that edit sufficient, which is what it was supposed to be.
+const pipeline = existsSync(at("pipelines/seo.toml"))
+  ? parseToml(read("pipelines/seo.toml"))
+  : fail("pipelines/seo.toml is missing — this script is the `seo` pipeline's executor");
+const declaredOutputs = pipeline.outputs ?? [];
+
+/** The declared output ending in `name`, or a failure naming what to add. */
+const output = (name) =>
+  declaredOutputs.find((o) => o.endsWith(`/${name}`) || o === name) ??
+  fail(
+    `pipelines/seo.toml declares no output ending in \`${name}\`.\n` +
+      `  Its outputs are ${JSON.stringify(declaredOutputs)}.\n` +
+      "  This script derives seo.ts, seo.json and sitemap.xml; each one needs a\n" +
+      "  declared path, because that path is what `fid derive --check` guards.",
+  );
+
+const tsOut = output("seo.ts");
+const jsonOut = output("seo.json");
+const xmlOut = output("sitemap.xml");
 
 // The brand pipeline must not also own the sitemap: two pipelines writing one
 // file means the last one to run wins, silently, and which one that is depends
 // on pipeline names. Removing it there is a one-line edit, so this says so
 // rather than fighting over the file.
+//
+// Matched on the file name, not on a full path. The hard-coded
+// `apps/web/public/sitemap.xml` this replaces matched nothing in a SvelteKit
+// product — whose brand pipeline says `apps/web/static/sitemap.xml` — so the
+// race this guard exists to prevent was left in place precisely where the
+// paths differ, which is where it was most likely to happen.
 const brandPipeline = existsSync(at("pipelines/brand.toml")) ? read("pipelines/brand.toml") : "";
-if (/["']apps\/web\/public\/sitemap\.xml["']/.test(brandPipeline)) {
+const brandSitemap = (parseToml(brandPipeline || "outputs = []").outputs ?? []).find((o) =>
+  o.endsWith("/sitemap.xml"),
+);
+if (brandSitemap) {
   fail(
-    "pipelines/brand.toml still lists apps/web/public/sitemap.xml as an output.\n" +
+    `pipelines/brand.toml still lists ${brandSitemap} as an output.\n` +
       "  Remove that line: `seo` owns the sitemap now, because it is the one that\n" +
       "  knows the routes. Two pipelines writing one artifact is a race decided by\n" +
       "  pipeline name order.",
@@ -80,15 +182,7 @@ const add = (r) => routes.push(r);
 // are the other routes with the same key. A page whose translation does not
 // exist simply has no alternate, rather than pointing at a 404.
 for (const locale of locales) {
-  for (const page of staticPages) {
-    const labels = {
-      "/": ["meta.title", "meta.description"],
-      "/press": ["press.title", "press.metaDescription"],
-      "/blog": ["blog.title", "blog.metaDescription"],
-      "/credits": ["credits.title", "credits.intro"],
-    }[page];
-    if (!labels) fail(`[seo] pages lists ${page}, but no title is declared for it`);
-    const [titleKey, descKey] = labels;
+  for (const { path: page, title: titleKey, description: descKey } of staticPages) {
     const title = msg(locale, titleKey);
     const description = msg(locale, descKey);
     if (!title || !description) {
@@ -234,7 +328,6 @@ export function seoFor(path: string): SeoRoute | undefined {
 }
 `;
 
-const tsOut = "apps/web/src/generated/seo.ts";
 mkdirSync(dirname(at(tsOut).pathname), { recursive: true });
 writeFileSync(at(tsOut), ts);
 console.log(`wrote ${tsOut} (${entries.length} route(s), ${locales.length} locale(s))`);
@@ -242,7 +335,6 @@ console.log(`wrote ${tsOut} (${entries.length} route(s), ${locales.length} local
 // The same routes as JSON, for the node scripts that also need them — the
 // social-image renderer runs before the app is built, so it cannot import a
 // TypeScript module. Same rule as the logo pipeline: two readers, one source.
-const jsonOut = "apps/web/src/generated/seo.json";
 writeFileSync(at(jsonOut), `${JSON.stringify({ origin, defaultLocale, routes: entries }, null, 2)}\n`);
 console.log(`wrote ${jsonOut}`);
 
@@ -275,7 +367,6 @@ for (const r of entries) {
 }
 xml.push("</urlset>", "");
 
-const xmlOut = "apps/web/public/sitemap.xml";
 mkdirSync(dirname(at(xmlOut).pathname), { recursive: true });
 writeFileSync(at(xmlOut), xml.join("\n"));
 console.log(`wrote ${xmlOut} (${entries.length} url(s))`);

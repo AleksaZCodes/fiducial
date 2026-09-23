@@ -268,6 +268,17 @@ fn check_tools(cfg: &Config, reports: &mut Vec<String>, ok: &mut Vec<String>) {
 /// per platform and a subprocess to answer "does this file exist" is a
 /// subprocess per tool per run.
 fn which(tool: &str) -> Option<std::path::PathBuf> {
+    // A JavaScript product installs its tools into `node_modules/.bin`, not
+    // onto `PATH` — `wrangler` is a devDependency and is run as `npx wrangler`
+    // or through a package script. Looking only at `PATH` reports a tool the
+    // product demonstrably has as missing, and a check that cries wolf is one
+    // people learn to scroll past, which costs more than the check is worth.
+    for root in ["node_modules/.bin", "apps/web/node_modules/.bin"] {
+        let candidate = std::path::Path::new(root).join(tool);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
     let path = env::var_os("PATH")?;
     env::split_paths(&path).find_map(|dir| {
         let candidate = dir.join(tool);
@@ -581,7 +592,7 @@ fn check_security_headers(root: &Path, issues: &mut Vec<String>, ok: &mut Vec<St
         checked += 1;
 
         let config = root.join(shape.config);
-        let Ok(source) = std::fs::read_to_string(&config) else {
+        let Ok(primary) = std::fs::read_to_string(&config) else {
             issues.push(format!(
                 "{} app has no `{}`, so nothing sets its response headers.\n      \
                  Every request it serves goes out without HSTS, CSP, or any of the rest.",
@@ -589,6 +600,20 @@ fn check_security_headers(root: &Path, issues: &mut Vec<String>, ok: &mut Vec<St
             ));
             continue;
         };
+
+        // A header may be declared in the framework's own config rather than
+        // in the headers file — for SvelteKit, `Content-Security-Policy`
+        // *belongs* in `svelte.config.js`, because only SvelteKit can hash the
+        // inline bootstrap script it emits. Reading both means the check still
+        // fails when a header is absent everywhere, and stops failing a
+        // product for putting it where it works.
+        let source = shape.also.iter().fold(primary, |mut acc, extra| {
+            if let Ok(more) = std::fs::read_to_string(root.join(extra)) {
+                acc.push('\n');
+                acc.push_str(&more);
+            }
+            acc
+        });
 
         let missing = missing_headers(&source);
         if missing.is_empty() {

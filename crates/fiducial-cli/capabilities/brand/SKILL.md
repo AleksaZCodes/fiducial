@@ -142,11 +142,70 @@ extend the pipeline.
 `pipelines/brand.toml`'s `outputs` to point at `apps/web/static/…` instead —
 the declaration does not move, only where the derivation lands.
 
+## Rasters: `pipelines/raster.toml`
+
+PNG versions of the brand marks — avatars, OG images, link previews — are
+derived, not committed by hand. Before this existed, every product that needed
+an OG image grew a one-off script, committed its output, and had no way to
+tell whether the PNG still matched the SVG it came from.
+
+Declare the rasters you want as pipeline outputs, and the source in
+`fiducial.toml`:
+
+```toml
+# pipelines/raster.toml
+outputs = [
+  "apps/web/static/brand/mark-ink-2048.png",      # 2048 × 2048 of mark-ink.svg
+  "apps/web/static/brand/mark-ink-1200x630.png",  # 1200 ×  630 of the same
+]
+```
+
+```toml
+# fiducial.toml
+[raster]
+source_dir = "apps/web/static/brand"
+
+[raster.marks.mark-ink]
+background = "#08221F"              # omit for transparency
+padding    = 0.12                   # fraction of the short edge
+artbox     = "38 78.6 179.9 127.64" # the box to centre, if not the viewBox
+
+# Per output, overriding the per-mark block key by key.
+[raster.marks."mark-ink-1200x630"]
+artbox = "34 21 189 190"
+```
+
+**The output's name is the declaration.** `<mark>-<size>.png` or
+`<mark>-<w>x<h>.png` says which SVG and how big; there is no second list to
+keep in step with this one.
+
+**`artbox` is the one that is not obvious.** Centring a logo's full drawing is
+usually wrong — a mark with an ascender rising out of the letterforms sits
+visibly low, because the ascender counts as part of what is being centred.
+Declare the cap box instead and the rest hangs outside it. Framing is
+per-output for the same reason: what hangs outside the box on a square avatar
+is simply cropped off a 1200×630 banner.
+
+**What it renders:** paths, groups, flat `#rgb`/`#rrggbb` fills, affine
+transforms. Everything else — text, gradients, filters, images, arcs — is a
+hard error. A mark that renders *wrong* is the failure that ships, because
+nobody reviews the OG image of a page they did not change. Text especially:
+it needs a font, fonts are not pinned by anything here, and two machines would
+produce different pixels. Convert text to paths in the source SVG.
+
+**Nothing declared is not an error.** With no outputs, the pipeline is a no-op.
+
+**Why the renderer is written in the capability** rather than `sharp`/`resvg`/
+a headless browser: `fid derive --check` compares bytes, so the renderer has
+to be deterministic and needs to run where nothing is installed. Native
+renderers fail both. The geometry here is plain IEEE-754; the PNG container is
+zlib-compressed, so the script decodes an existing output and **leaves it
+untouched when the pixels already match** — a Node upgrade cannot fail the
+gate on a mark nobody edited.
+
 ## What this capability does not do yet
 
-Raster favicons (`.ico`, PNG sizes), OG/Twitter card images, a press kit,
-social post templates, and email themes rendered in the product's theme are
-all named in `ROADMAP.md` § Brand and are not derived here. Each needs a
-rendering step — fonts, rasterization — this pipeline does not carry. Adding
-one is a new output name in `pipelines/brand.toml` and a new branch in
-`fid-brand`, not a redesign of the declaration.
+`.ico` favicons, social post templates, and email themes rendered in the
+product's theme are named in `ROADMAP.md` § Brand and are not derived here.
+Adding one is a new output name and a new branch, not a redesign of the
+declaration.

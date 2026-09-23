@@ -103,6 +103,15 @@ pub struct WebAppShape {
     pub config: &'static str,
     /// Present only when this shape is actually installed.
     pub marker: &'static str,
+    /// Other files that may legitimately carry some of the headers.
+    ///
+    /// A framework sometimes owns a header itself, and owning it is better
+    /// than restating it: a header declared where the framework can complete
+    /// it beats the same header hand-written where the framework cannot. The
+    /// check reads these alongside `config` so doing the correct thing does
+    /// not fail the gate — see the SvelteKit entry for the case this exists
+    /// for.
+    pub also: &'static [&'static str],
 }
 
 pub static WEB_APP_SHAPES: &[WebAppShape] = &[
@@ -110,16 +119,33 @@ pub static WEB_APP_SHAPES: &[WebAppShape] = &[
         name: "Next.js",
         config: "apps/web/next.config.ts",
         marker: "apps/web/next.config.ts",
+        also: &[],
     },
     WebAppShape {
         name: "SvelteKit",
         config: "apps/web/src/hooks.server.ts",
         marker: "apps/web/svelte.config.js",
+        // `svelte.config.js` counts too, and for CSP it is the **right**
+        // place rather than an alternative one.
+        //
+        // SvelteKit boots the client from an inline `<script>` it generates.
+        // A `Content-Security-Policy` written by hand in `hooks.server.ts`
+        // cannot know that script's hash, so `script-src 'self'` blocks it and
+        // the app never hydrates — SSR output still looks perfect, and every
+        // interactive component is silently dead. That shipped: a countdown
+        // frozen at 00:00:00 and a language picker that would not open, on a
+        // product whose build, typecheck and this very check were all green.
+        //
+        // `kit.csp` in `svelte.config.js` is the declaration SvelteKit can
+        // derive the hashes into. Looking here as well is what lets a product
+        // do the correct thing without failing the gate for it.
+        also: &["apps/web/svelte.config.js"],
     },
     WebAppShape {
         name: "Cloudflare Worker",
         config: "src/index.ts",
         marker: "wrangler.jsonc",
+        also: &[],
     },
 ];
 

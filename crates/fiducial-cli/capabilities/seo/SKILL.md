@@ -39,9 +39,14 @@ Outputs:
   canonical, alternates, social image, and the date for articles.
 - **`generated/seo.json`** — the same, for scripts that cannot import
   TypeScript (the image renderer runs before the app is built).
-- **`public/sitemap.xml`** — every route, with `xhtml:link` alternates and
+- **`sitemap.xml`** — every route, with `xhtml:link` alternates and
   `x-default`, which is what tells a crawler two URLs are one page in two
   languages rather than duplicates competing with each other.
+
+All three land wherever `pipelines/seo.toml` says. The seeded paths are
+Next.js's (`apps/web/public/…`); on SvelteKit, change `public` to `static`
+there and nothing else — the deriver reads its own output paths out of that
+pipeline rather than carrying a second copy of them.
 
 Add a post: it is in the sitemap. Add a locale: every route doubles. Neither is
 a list anyone maintains.
@@ -66,9 +71,11 @@ missing OG tag is not worth a 500.
 
 ## The sitemap moves off `brand`
 
-Remove `apps/web/public/sitemap.xml` from `pipelines/brand.toml`'s outputs.
-Two pipelines writing one artifact is a race decided by pipeline name order,
-silently. The deriver refuses to run while both own it, and says so.
+Remove the `sitemap.xml` line from `pipelines/brand.toml`'s outputs. Two
+pipelines writing one artifact is a race decided by pipeline name order,
+silently. The deriver refuses to run while both own it, and says so — matching
+on the file name, so it catches the collision whatever directory the two
+pipelines spell.
 
 ## Social images
 

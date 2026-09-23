@@ -122,6 +122,13 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
 
     let mut lock = load_or_new_lock(root)?;
 
+    // Which capabilities are already here decides which `for/<id>/` templates
+    // this one contributes. Read before the config is patched, so `cap.id` is
+    // not yet in the set and a capability cannot condition on itself.
+    let already_installed: Vec<String> = Config::load(&root.join(CONFIG_FILE))
+        .map(|c| c.capabilities.enabled)
+        .unwrap_or_default();
+
     // 1. Declarations, pipelines, then templates.
     //
     // Declarations first: a pipeline whose declaration is not yet on disk
@@ -135,6 +142,18 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
     }
     files.extend(cap.pipelines.iter());
     files.extend(cap.templates.iter());
+
+    // `for/<id>/` templates for the capabilities this product already has.
+    for (target, entries) in &cap.conditional_templates {
+        if already_installed.iter().any(|id| id == target) {
+            files.extend(entries.iter());
+        } else {
+            println!(
+                "  · skipped {} file(s) for `{target}` (not installed)",
+                entries.len()
+            );
+        }
+    }
 
     // A declared directory is created empty. The product fills it — that is
     // what makes it a declaration of the product's rather than the
@@ -161,6 +180,14 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
             PLATFORM_VERSION,
         );
     }
+
+    // The other direction: capabilities already installed may have been
+    // holding `for/<cap.id>/` templates back, waiting for this one. Without
+    // this pass the result would depend on the order somebody ran `fid add`
+    // in, which is the kind of state nobody can reason about later — install
+    // `i18n` then `web-svelte` and you get the picker; the other order and you
+    // silently do not.
+    backfill_conditional_templates(root, &cap.id, &already_installed, &mut lock, product_name)?;
 
     // 2. SKILL.md → a vendor-neutral path, plus a pointer for Claude Code.
     //
@@ -242,6 +269,55 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
         "  ✓ instructions → .fiducial/skills/{}.md (any agent; see AGENTS.md)",
         cap.id
     );
+    Ok(())
+}
+
+/// Install the `for/<new_id>/` templates of capabilities already present.
+///
+/// Only built-in definitions can be re-read here: an external capability was
+/// resolved from a path or a git revision this function does not have, and
+/// guessing one would install bytes nobody asked for. Those are named instead,
+/// with the command that re-runs them — honest about the gap rather than
+/// silently leaving a product half-wired.
+fn backfill_conditional_templates(
+    root: &Path,
+    new_id: &str,
+    already_installed: &[String],
+    lock: &mut Lock,
+    product_name: &str,
+) -> Result<()> {
+    let mut unresolvable: Vec<&str> = Vec::new();
+    for installed_id in already_installed {
+        let Some(other) = find(installed_id) else {
+            unresolvable.push(installed_id);
+            continue;
+        };
+        let Some(entries) = other.conditional_templates.get(new_id) else {
+            continue;
+        };
+        println!(
+            "  · {installed_id} contributes {} file(s) for {new_id}",
+            entries.len()
+        );
+        for FileEntry { path: rel, content } in entries {
+            let expanded = content
+                .replace("{{name}}", product_name)
+                .replace("{{version}}", PLATFORM_VERSION);
+            write_file(root, rel, &expanded)?;
+            lock.record(
+                rel.replace('\\', "/"),
+                expanded.as_bytes(),
+                PLATFORM_VERSION,
+            );
+        }
+    }
+    if !unresolvable.is_empty() {
+        println!(
+            "  ! could not check {} for `{new_id}` templates — \
+             re-run `fid add capability <id> --from <source>` if it ships any",
+            unresolvable.join(", ")
+        );
+    }
     Ok(())
 }
 
@@ -372,65 +448,200 @@ fn write_file(root: &Path, rel: &str, content: &str) -> Result<()> {
     Ok(())
 }
 
-/// Patch `fiducial.toml` to add the capability id and its guard rules.
+/// Patch `fiducial.toml` to add the capability id, its guard rules, and any
+/// declaration block it seeds.
 ///
-/// Uses line-level editing rather than a full TOML rewrite to preserve
-/// comments and formatting. This is safe because the relevant lines have
-/// a predictable shape written by `fid new`.
+/// ## Why this edits the document instead of re-serialising it
+///
+/// `fiducial.toml` is **authored**. It is the one file in a product where a
+/// human writes down the judgments that nothing can derive — which KV id is
+/// load-bearing, why a Worker name matches by declaration rather than
+/// coincidence, what an artbox actually measures. Principle 1b is that a
+/// judgment which cannot be derived is still declared, and in practice those
+/// declarations live in the comments around the values.
+///
+/// This function used to read the file into the typed `Config`, mutate it, and
+/// write `toml::to_string_pretty` back. That round-trip cannot preserve a
+/// comment — `toml::Value` has nowhere to put one — so **every `fid add` silently
+/// deleted the entire authored commentary** and reflowed the tables besides
+/// (`vars = { … }` became `[deploy.vars]`, blocks re-sorted alphabetically).
+/// On 2026-09-23 a single `fid add seo` destroyed 27 comment lines in
+/// upoznaj-biznis. Nothing failed, the values all survived, and the loss is
+/// invisible in review unless you happen to diff a file you did not expect to
+/// change.
+///
+/// `toml_edit` is the same parser `toml` already uses underneath, exposed as a
+/// format-preserving document: untouched bytes stay byte-identical, and only
+/// the arrays and tables named below are rewritten.
+///
+/// The typed `Config` is still loaded first, because it validates — an invalid
+/// `fiducial.toml` should fail here rather than be edited into a worse one.
 fn patch_config(root: &Path, cap: &Capability) -> Result<()> {
     let config_path = root.join(CONFIG_FILE);
-    let mut cfg = Config::load(&config_path)?;
 
-    // Add capability id if not already present.
-    if !cfg.capabilities.enabled.contains(&cap.id.to_string()) {
-        cfg.capabilities.enabled.push(cap.id.to_string());
-    }
+    // Validation only. The edit below is applied to the document, not to this.
+    let cfg = Config::load(&config_path)?;
 
-    // Add guard rules that aren't already present.
-    for rule in &cap.guard_rules {
-        if !cfg.guard.rules.contains(rule) {
-            cfg.guard.rules.push(rule.clone());
-        }
-    }
+    let raw = std::fs::read_to_string(&config_path)
+        .with_context(|| format!("reading {}", config_path.display()))?;
+    let mut doc: toml_edit::DocumentMut = raw
+        .parse()
+        .with_context(|| format!("parsing {}", config_path.display()))?;
 
-    // Serialise back. We use a structured round-trip here rather than line
-    // editing because the config schema is small and comments are at the top.
-    let mut value = toml::Value::try_from(&cfg).context("serialising fiducial.toml")?;
+    push_unique(
+        &mut doc,
+        "capabilities",
+        "enabled",
+        std::slice::from_ref(&cap.id),
+    );
+    push_unique(&mut doc, "guard", "rules", &cap.guard_rules);
 
     // A capability that introduces a DECLARATION must seed it, or the pipeline
     // it also installs fails on the next `fid derive` with an empty block.
     //
-    // Merged at the `toml::Value` level rather than through the typed `Config`,
-    // because the seed comes from a manifest a third party wrote: it names a
-    // block this binary may know nothing about. Typing it would mean only
-    // blocks compiled into `fid` could be declared, which is the limitation
-    // this phase exists to remove.
+    // Merged as a document item rather than through the typed `Config`, because
+    // the seed comes from a manifest a third party wrote: it names a block this
+    // binary may know nothing about. Typing it would mean only blocks compiled
+    // into `fid` could be declared, which is the limitation this phase exists
+    // to remove.
+    //
+    // `cfg` answers "is it already declared?" because `is_empty_block` reasons
+    // over `toml::Value`, and a seeded-but-empty block must still be replaced.
+    let existing: toml::Value =
+        toml::Value::try_from(&cfg).unwrap_or(toml::Value::Table(toml::map::Map::new()));
     for decl in &cap.declarations {
         let Declaration::ConfigBlock { name, seed } = decl else {
             continue;
         };
-        let Some(table) = value.as_table_mut() else {
-            break;
-        };
-        let already_declared = table
+        let Some(seed) = seed else { continue };
+
+        let already_declared = existing
             .get(name)
-            .is_some_and(|existing| !is_empty_block(existing));
-        if !already_declared {
-            if let Some(seed) = seed {
-                table.insert(name.clone(), seed.clone());
+            .is_some_and(|block| !is_empty_block(block))
+            || doc
+                .get(name)
+                .and_then(|item| item.as_table())
+                .is_some_and(|t| !t.is_empty());
+        if already_declared {
+            continue;
+        }
+
+        // `toml::Value` → `toml_edit::Item` through a one-key document. There is
+        // no direct conversion between the two crates' trees, and rendering the
+        // seed as text is the conversion both of them already agree on.
+        let mut wrapper = toml::map::Map::new();
+        wrapper.insert(name.clone(), seed.clone());
+        let rendered = toml::to_string_pretty(&toml::Value::Table(wrapper))
+            .with_context(|| format!("rendering the `{name}` seed"))?;
+        let seeded: toml_edit::DocumentMut = rendered
+            .parse()
+            .with_context(|| format!("re-reading the `{name}` seed"))?;
+        if let Some(item) = seeded.get(name) {
+            let mut item = item.clone();
+            // A blank line before the block. Without it a seeded table opens
+            // flush against the previous one's last value, which reads as a
+            // continuation of it.
+            if let Some(table) = item.as_table_mut() {
+                table.decor_mut().set_prefix("\n");
+            }
+            doc.insert(name, item);
+        }
+    }
+
+    let rendered = stamp_header(&doc.to_string(), &cap.id);
+    std::fs::write(&config_path, rendered).context("writing fiducial.toml")?;
+
+    println!("  patched fiducial.toml");
+    Ok(())
+}
+
+/// Append values to `[table] key`, skipping any already present, creating the
+/// table and the array if the product has neither.
+///
+/// Multi-line arrays stay multi-line. `toml_edit` appends a new entry with the
+/// decor of the previous one, which for `enabled = [\n    "design",\n]` is the
+/// leading newline and indent — so the result keeps the one-per-line shape a
+/// human wrote instead of collapsing it onto a single line.
+fn push_unique(doc: &mut toml_edit::DocumentMut, table: &str, key: &str, values: &[String]) {
+    if values.is_empty() {
+        return;
+    }
+
+    let entry = doc
+        .entry(table)
+        .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()));
+    let Some(table) = entry.as_table_mut() else {
+        return;
+    };
+    let item = table
+        .entry(key)
+        .or_insert_with(|| toml_edit::value(toml_edit::Array::new()));
+    let Some(array) = item.as_array_mut() else {
+        return;
+    };
+
+    // An array a human wrote one-per-line stays that way. An EMPTY array adopts
+    // that shape too: `fid new` scaffolds `enabled = []`, every filled-in
+    // `fiducial.toml` in the wild is one-per-line, and the serialiser this
+    // replaces produced one-per-line — so growing an empty array inline would
+    // be a gratuitous style change on the first `fid add`.
+    let multiline = array.is_empty() || array.to_string().contains('\n');
+
+    for value in values {
+        if array.iter().any(|v| v.as_str() == Some(value.as_str())) {
+            continue;
+        }
+        array.push(value.as_str());
+    }
+
+    // Re-apply the one-per-line shape when that is what the file used. Doing it
+    // for every element (not just the appended one) keeps the block uniform
+    // rather than leaving the newcomer indented differently from its
+    // neighbours.
+    if multiline {
+        for element in array.iter_mut() {
+            element.decor_mut().set_prefix("\n    ");
+            element.decor_mut().set_suffix("");
+        }
+        array.set_trailing_comma(true);
+        array.set_trailing("\n");
+    }
+}
+
+/// Replace the generated header line, or add one when the file has no header.
+///
+/// The header names the command and version that last touched the file, so it
+/// is rewritten rather than prepended — prepending produced a growing stack of
+/// stale headers, each claiming to describe the file.
+///
+/// Done on the rendered text rather than through the document's decor, and the
+/// reason is the bug this replaces: leading trivia in a TOML document does not
+/// belong to the root table. It attaches to the first *item* — here the first
+/// table header — so reading the root's prefix found nothing and every `fid
+/// add` prepended a fresh header above the last one. The rendered form is the
+/// one place the header is unambiguously the first line.
+///
+/// Only a line this tool wrote is removed. A product whose file opens with its
+/// own comment keeps it, and the header goes above it.
+fn stamp_header(rendered: &str, id: &str) -> String {
+    let header =
+        format!("# fiducial.toml — updated by `fid add {id}` (fiducial {PLATFORM_VERSION})\n");
+
+    let mut rest = rendered;
+    loop {
+        let trimmed = rest.trim_start_matches('\n');
+        match trimmed.strip_prefix("# fiducial.toml — updated by") {
+            Some(after) => {
+                rest = after.split_once('\n').map(|(_, tail)| tail).unwrap_or("");
+            }
+            None => {
+                rest = trimmed;
+                break;
             }
         }
     }
 
-    let raw = toml::to_string_pretty(&value).context("serialising fiducial.toml")?;
-    let header = format!(
-        "# fiducial.toml — updated by `fid add {}` (fiducial {})\n\n",
-        cap.id, PLATFORM_VERSION
-    );
-    std::fs::write(&config_path, format!("{header}{raw}")).context("writing fiducial.toml")?;
-
-    println!("  patched fiducial.toml");
-    Ok(())
+    format!("{header}\n{rest}")
 }
 
 /// A hash over everything a capability installs.
@@ -457,6 +668,17 @@ fn content_hash(cap: &Capability) -> String {
     }
     for f in &cap.templates {
         parts.push(format!("tmpl\u{1f}{}\u{1f}{}", f.path, f.content));
+    }
+    // Keyed by target, because the same path shipped for two frameworks is two
+    // different files and a hash that could not tell them apart would call two
+    // different capabilities identical.
+    for (target, entries) in &cap.conditional_templates {
+        for f in entries {
+            parts.push(format!(
+                "tmpl-for\u{1f}{target}\u{1f}{}\u{1f}{}",
+                f.path, f.content
+            ));
+        }
     }
     parts.sort();
     crate::lock::sha256_hex(parts.join("\u{1e}").as_bytes())
@@ -539,6 +761,27 @@ pub fn check_capability(cap: &Capability) -> Vec<String> {
         }
     }
 
+    // A `for/<id>/` directory naming nothing real installs nothing, forever,
+    // and says so nowhere. Only built-in ids can be checked — a third-party
+    // capability may legitimately target another third-party one.
+    for target in cap.conditional_templates.keys() {
+        if find(target).is_none() {
+            errors.push(format!(
+                "[{}] ships templates under `for/{target}/`, but `{target}` is not a \
+                 known capability — those files would never install. Check the spelling \
+                 against `fid capability list --all`",
+                cap.id
+            ));
+        }
+        if target == &cap.id {
+            errors.push(format!(
+                "[{}] conditions templates on itself via `for/{target}/` — \
+                 they are plain templates; move them out of `for/`",
+                cap.id
+            ));
+        }
+    }
+
     // A capability that derives something must say what it derives it *from*.
     // Without this the taxonomy is decoration: a pipeline with no declared
     // input reads a fact nothing is responsible for putting there.
@@ -602,6 +845,29 @@ mod tests {
             }
             paths.extend(cap.pipelines.iter().map(|f| f.path.as_str()));
             paths.extend(cap.templates.iter().map(|f| f.path.as_str()));
+            // A conditional template sharing a path with an unconditional one
+            // is written twice with whichever content the loop reached last.
+            // Two conditional templates for *different* targets may share a
+            // path — that is the feature — so they are checked per target.
+            for entries in cap.conditional_templates.values() {
+                let mut per_target: Vec<&str> = entries.iter().map(|f| f.path.as_str()).collect();
+                per_target.sort_unstable();
+                let n = per_target.len();
+                per_target.dedup();
+                assert_eq!(
+                    n,
+                    per_target.len(),
+                    "capability `{}` ships a path twice under one `for/` target",
+                    cap.id
+                );
+                for p in per_target {
+                    assert!(
+                        !paths.contains(&p),
+                        "capability `{}` installs `{p}` both conditionally and unconditionally",
+                        cap.id
+                    );
+                }
+            }
 
             let mut seen = paths.clone();
             seen.sort_unstable();
@@ -699,6 +965,11 @@ mod tests {
             assert_eq!(from_disk.declarations, cap.declarations, "[{}]", cap.id);
             assert_eq!(from_disk.pipelines, cap.pipelines, "[{}]", cap.id);
             assert_eq!(from_disk.templates, cap.templates, "[{}]", cap.id);
+            assert_eq!(
+                from_disk.conditional_templates, cap.conditional_templates,
+                "[{}]",
+                cap.id
+            );
             assert_eq!(from_disk.guard_rules, cap.guard_rules, "[{}]", cap.id);
             assert_eq!(
                 from_disk.requires_adapters, cap.requires_adapters,
