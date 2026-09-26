@@ -1,6 +1,6 @@
 {
   "name": "@fiducial/cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "fid \u2014 the Fiducial platform CLI",
   "license": "MIT",
   "author": "Aleksa Zdravkovic",
