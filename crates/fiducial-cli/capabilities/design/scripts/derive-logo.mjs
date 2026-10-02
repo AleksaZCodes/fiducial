@@ -5,11 +5,18 @@
 // `apps/web/src/generated/logo.ts` so React renders the same paths the SVG
 // files carry, rather than a second copy typed into a component.
 //
-// It exists because the copy was real and it was wrong: `brand/favicon.svg`
-// held the flame from before it was redrawn, and its own comment said the
-// duplication was cheaper than deriving it. It was not — the site shipped the
-// old mark at 16px while the wordmark on the page showed the new one, and
-// nothing could have told anyone.
+// It exists because the copy was real and it was wrong: a favicon held the
+// mark from before it was redrawn, and its own comment said the duplication
+// was cheaper than deriving it. It was not — the site shipped the old mark at
+// 16px while the wordmark on the page showed the new one, and nothing could
+// have told anyone.
+//
+// The primitives name their parts with `data-layer` groups:
+//
+//   brand/icon.svg      `mark`     the mark — paths, filled evenodd
+//   brand/wordmark.svg  `letters`  the name — paths, in the ink colour
+//                       `accent`   optional — paths or polygons in the
+//                                  primary colour beside the letters
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
@@ -73,33 +80,37 @@ export function logoGeometry() {
   const icon = parse(iconSvg);
   const word = parse(wordSvg);
 
-  const flame = icon.layer("flame");
+  const mark = icon.layer("mark");
   const letters = word.layer("letters");
-  const device = word.layer("device");
-  if (!flame || !letters || !device) {
-    throw new Error("a primitive is missing a data-layer group (flame/letters/device)");
-  }
+  const accent = word.layer("accent") ?? { paths: [], polygons: [] };
+  if (!mark) throw new Error('brand/icon.svg has no <g data-layer="mark"> group');
+  if (!letters) throw new Error('brand/wordmark.svg has no <g data-layer="letters"> group');
   return {
     iconViewBox: icon.viewBox,
-    flameViewBox: flameBox(flame.paths.join(" ")),
+    markViewBox: markBox(mark.paths.join(" ")),
     wordmarkViewBox: word.viewBox,
-    FLAME: flame.paths.join(" "),
+    MARK: mark.paths.join(" "),
     LETTERS: letters.paths,
-    DEVICE: device.polygons,
+    ACCENT: accent,
   };
 }
 
-const g = logoGeometry();
-const icon = { viewBox: g.iconViewBox };
-const word = { viewBox: g.wordmarkViewBox };
-const flame = { paths: [g.FLAME] };
-const letters = { paths: g.LETTERS };
-const device = { polygons: g.DEVICE };
+/** The accent, as SVG elements in one colour. */
+export function accentSvg(accent, fill) {
+  return (
+    `<g fill="${fill}">` +
+    accent.paths.map((d) => `<path d="${d}"/>`).join("") +
+    accent.polygons.map((pts) => `<polygon points="${pts}"/>`).join("") +
+    "</g>"
+  );
+}
 
-// A square box tight to the flame and centred on its own width, for the places
+const g = logoGeometry();
+
+// A square box tight to the mark and centred on its own width, for the places
 // the mark is used bare (an app icon slot, a bullet, a favicon caption). Derived
-// from the path rather than typed, so it follows the drawing if the flame moves.
-function flameBox(d) {
+// from the path rather than typed, so it follows the drawing if the mark moves.
+function markBox(d) {
   const n = d.match(/-?\d+(?:\.\d+)?/g).map(Number);
   const xs = n.filter((_, i) => i % 2 === 0);
   const ys = n.filter((_, i) => i % 2 === 1);
@@ -119,20 +130,20 @@ const lines = [
   "// the mark on a slide. A component that types out its own path data is a",
   "// third logo that nobody will remember to update.",
   "",
-  `export const iconViewBox = ${JSON.stringify(icon.viewBox)} as const`,
+  `export const iconViewBox = ${JSON.stringify(g.iconViewBox)} as const`,
   "",
-  "/** Square and tight to the flame, in wordmark coordinates. */",
-  `export const flameViewBox = ${JSON.stringify(flameBox(flame.paths.join(" ")))} as const`,
-  `export const wordmarkViewBox = ${JSON.stringify(word.viewBox)} as const`,
+  "/** Square and tight to the mark, in its own coordinates. */",
+  `export const markViewBox = ${JSON.stringify(g.markViewBox)} as const`,
+  `export const wordmarkViewBox = ${JSON.stringify(g.wordmarkViewBox)} as const`,
   "",
-  "/** The flame. Outer contour then counter — fill-rule evenodd. */",
-  `export const FLAME = ${JSON.stringify(flame.paths.join(" "))}`,
+  "/** The mark. Fill-rule evenodd, in `--primary`. */",
+  `export const MARK = ${JSON.stringify(g.MARK)}`,
   "",
-  "/** `utreach` from the Outreach wordmark; the transmitter core is merged into the `h`. */",
-  `export const LETTERS = ${JSON.stringify(letters.paths, null, 2)} as const`,
+  "/** The wordmark's letters, in the ink colour. */",
+  `export const LETTERS = ${JSON.stringify(g.LETTERS, null, 2)} as const`,
   "",
-  "/** The four signal brackets beside the `h`. Drawn in `--primary`, like the flame. */",
-  `export const DEVICE = ${JSON.stringify(device.polygons, null, 2)} as const`,
+  "/** The wordmark's accent, if it has one, in `--primary`. */",
+  `export const ACCENT = ${JSON.stringify(g.ACCENT, null, 2)} as const`,
   "",
 ];
 // JSON as well as TS. The TS module is for the React components; the JSON is
@@ -166,7 +177,7 @@ console.log(`wrote ${pub}`);
 //   · **Transparent.** An asset with a baked background can only be used on
 //     that background. The first thing a journalist or a partner does is put
 //     the mark on their own surface.
-//   · **Two variants, not one plus an instruction.** The flame at `--primary`
+//   · **Two variants, not one plus an instruction.** The mark at `--primary`
 //     is legible on light and muddy on dark, and the letters invert outright.
 //     "Use the other colour" is a rule nobody reads; two files is not.
 //   · **Colours from the tokens, not typed here.** The light variant is the
@@ -189,22 +200,23 @@ const tokensCss = read("apps/web/src/app/tokens.css");
 //
 // Both variants are the mark in colour; what changes between them is the ink
 // the letters take, because black letters on a dark ground are not letters.
-// The flame and the signal stay `--primary` — the dark theme's value of it,
-// which is the lighter one, because the light theme's ember goes muddy on
-// near black.
+// The mark and the accent stay `--primary` — the dark theme's value of it,
+// which is the lighter one, because a light theme's primary often goes muddy
+// on near black.
 //
 // This is allowed and declared (design-system.md § 3). The product has no dark
 // *theme*, which is a decision about the site's surfaces; it was never a
 // statement that the mark may not appear on a dark one. A logo that loses its
 // accent on half the surfaces it lands on is a logo with two identities.
+// Undeclared tokens fall back to neutral greys: never another product's palette.
 const THEMES = {
   light: {
-    ink: tokenColour(tokensCss, "foreground", "light") ?? "#150F0C",
-    ember: tokenColour(tokensCss, "primary", "light") ?? "#B85207",
+    ink: tokenColour(tokensCss, "foreground", "light") ?? "#111111",
+    primary: tokenColour(tokensCss, "primary", "light") ?? "#333333",
   },
   dark: {
-    ink: tokenColour(tokensCss, "foreground", "dark") ?? "#F6F3EF",
-    ember: tokenColour(tokensCss, "primary", "dark") ?? "#F4741E",
+    ink: tokenColour(tokensCss, "foreground", "dark") ?? "#F5F5F5",
+    primary: tokenColour(tokensCss, "primary", "dark") ?? "#CCCCCC",
   },
 };
 
@@ -215,18 +227,18 @@ const asset = (name, body) => {
   console.log(`wrote ${dest}`);
 };
 
-for (const [theme, { ink, ember }] of Object.entries(THEMES)) {
+for (const [theme, { ink, primary }] of Object.entries(THEMES)) {
   asset(
     `wordmark-${theme}`,
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${g.wordmarkViewBox}" fill="none">\n` +
       `  <g fill="${ink}">${g.LETTERS.map((d) => `<path d="${d}"/>`).join("")}</g>\n` +
-      `  <g fill="${ember}">${g.DEVICE.map((pts) => `<polygon points="${pts}"/>`).join("")}</g>\n` +
-      `  <path fill-rule="evenodd" d="${g.FLAME}" fill="${ember}"/>\n</svg>\n`,
+      `  ${accentSvg(g.ACCENT, primary)}\n` +
+      `  <path fill-rule="evenodd" d="${g.MARK}" fill="${primary}"/>\n</svg>\n`,
   );
   asset(
     `icon-${theme}`,
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${g.flameViewBox}" fill="none">\n` +
-      `  <path fill-rule="evenodd" d="${g.FLAME}" fill="${ember}"/>\n</svg>\n`,
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${g.markViewBox}" fill="none">\n` +
+      `  <path fill-rule="evenodd" d="${g.MARK}" fill="${primary}"/>\n</svg>\n`,
   );
 }
 

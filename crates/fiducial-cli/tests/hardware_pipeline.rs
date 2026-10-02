@@ -1720,3 +1720,78 @@ fn a_resolved_upgrade_conflict_is_recorded_and_not_written_again() {
         .unwrap()
         .contains("set -euxo pipefail"));
 }
+
+#[test]
+fn a_symbol_that_extends_another_is_vendored_whole() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    // A library laid out as KiCad's is: a variant that `extends` its parent.
+    let lib = tmp.path().join("symbols");
+    std::fs::create_dir(&lib).unwrap();
+    std::fs::write(
+        lib.join("Reg.kicad_sym"),
+        r#"(kicad_symbol_lib (version 20220914)
+  (symbol "BASE" (in_bom yes) (on_board yes)
+    (property "Reference" "U" (at 0 0 0))
+    (property "Value" "BASE" (at 0 0 0))
+    (symbol "BASE_0_1" (rectangle (start -5 5) (end 5 -5)))
+    (symbol "BASE_1_1"
+      (pin power_in line (at -7.62 0 0) (length 2.54) (name "VI" (effects)) (number "3" (effects)))
+      (pin power_out line (at 7.62 0 180) (length 2.54) (name "VO" (effects)) (number "2" (effects)))))
+  (symbol "VARIANT-3.3" (extends "BASE")
+    (property "Reference" "U" (at 0 0 0))
+    (property "Value" "VARIANT-3.3" (at 0 0 0)))
+)
+"#,
+    )
+    .unwrap();
+    edit(
+        &root,
+        "hardware/product.toml",
+        "body_mm = [18.0, 18.0, 3.0]",
+        "body_mm = [18.0, 18.0, 3.0]\nsymbol  = \"Reg:VARIANT-3.3\"",
+    );
+    let out = Command::new("python3")
+        .args(["hardware/parts.py", "sync"])
+        .current_dir(&root)
+        .env("KICAD7_SYMBOL_DIR", &lib)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(!text(&out).contains("extends"), "{}", text(&out));
+    let syms = std::fs::read_to_string(root.join("hardware/lib/symbols.kicad_sym")).unwrap();
+    assert!(!syms.contains("(extends"), "{syms}");
+    assert!(syms.contains("(symbol \"Reg:VARIANT-3.3\""), "{syms}");
+    assert!(
+        syms.contains("(symbol \"VARIANT-3.3_1_1\"") && syms.contains("(name \"VO\""),
+        "{syms}"
+    );
+    assert!(
+        syms.contains("(property \"Value\" \"VARIANT-3.3\""),
+        "{syms}"
+    );
+}
+
+#[test]
+fn the_case_colour_is_declared_and_checked() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    edit(
+        &root,
+        "hardware/product.toml",
+        "process  = \"fdm\"",
+        "process  = \"fdm\"\ncolour   = \"#1d4ed8\"",
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert_eq!(layout(&root)["case"]["colour"], "#1d4ed8");
+    edit(
+        &root,
+        "hardware/product.toml",
+        "colour   = \"#1d4ed8\"",
+        "colour   = \"blue\"",
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(!out.status.success());
+    assert!(text(&out).contains("`#rrggbb`"), "{}", text(&out));
+}

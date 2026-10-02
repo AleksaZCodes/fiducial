@@ -98,6 +98,10 @@ the highest point instead.
 | `cover` | it meets the part less the window overlap — the part hides it | `window` |
 | `inside` | the part fits inside it | `pocket` |
 
+**The case's colour** — `case.colour = "#1d4ed8"`, the filament. The
+renders and the viewer draw it, with the lid a shade lighter. Unset, it is a
+neutral grey: no product's colour is anyone else's default.
+
 **How the lid is held** — `case.fasteners.closure`:
 
 | `closure` | Is |
@@ -131,7 +135,12 @@ Wires are drawn, not interference-checked: a real wire bends.
 into `hardware/lib/` (hash-checked by `parts.py check`, tracked as derive
 inputs). The part's size is then read from the courtyard (`dims_from =
 "footprint"`), its pads land in `layout.json` where they are on the board, and
-the render draws the manufacturer's model on its copper. With no KiCad
+the render draws the manufacturer's model on its copper. A KiCad symbol that
+`extends` another (most regulator variants do) is vendored whole: the
+parent's pins and drawing under the variant's name and properties. When
+KiCad's 3D library has no model for a footprint, the part renders as a box
+built from its outline. `parts.py fetch <LCSC>` vendors the part's symbol,
+footprint and model together from LCSC's library, made for one another. With no KiCad
 component, declare `body_mm` and say where it came from: `dims_from`
 (`datasheet`, `distributor`, `search`, `assumed`) and `source_url`. A
 `decided` part whose size is not from a footprint, datasheet or distributor is

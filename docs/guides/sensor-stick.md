@@ -1,157 +1,197 @@
-# How the sensor stick was made
+# The sensor stick, from scratch
 
 [`examples/sensor-stick/`](../../examples/sensor-stick) is a complete product:
 a USB-C stick that reports temperature and humidity to a web page, with a
-printed case, a routed board, firmware and a page. This is how it was made, in
-the order it happened: what a person typed, what an agent did, and each time a
-gate said no. It was made by one person and one agent in an afternoon. It has
-not been built on a bench, and nothing here claims it works in your hand.
+printed case, a routed board, firmware and a page. Part 1 builds it again
+from nothing, on the current platform, step by step. Each step either writes
+a fact once or derives from one. Part 2 is the case study: what happened
+when it was built the first time, and what the platform learnt from it.
 
-The point is not the stick. It is that every step either wrote a fact once
-or derived from one. Each mistake was refused at the step that made it, with
-its name, before it could reach the next discipline.
+It has not been built on a bench. Nothing here claims it works in your hand:
+it is designed, checked and orderable.
 
-## 1. The product, empty
+## Part 1 · Build it
+
+You need `fid` (`cargo install fiducial-cli`), Python 3.11+, KiCad 7 or later
+(for `kicad-cli` and its libraries), Java 21 (Freerouting, fetched and
+pinned by the build), Rust with the `thumbv6m-none-eabi` target, and Node.
+
+### 1. An empty product
 
 ```sh
 fid new sensor-stick && cd sensor-stick
-fid add capability hardware
-fid add firmware rp2040
+fid add capability hardware          # hardware/product.toml → case, board, schematic, BOM, interface
+fid add firmware rp2040              # an Embassy firmware workspace
+pip install -r hardware/requirements.txt easyeda2kicad
 ```
 
-`fid new` writes the scaffold. The two `add`s install the hardware pipeline
-(`hardware/product.toml` → case, board, schematic, BOM, interface) and an
-RP2040 firmware workspace. Nothing is drawn yet; the seed declaration is a
-placeholder.
+### 2. Choose the parts, and make them real
 
-## 2. The parts, real ones
+What the stick is, chosen by a person:
+- an RP2040 with its crystal and QSPI flash;
+- a 3.3 V regulator from USB's 5 V;
+- an AHT20 temperature and humidity sensor;
+- a WS2812B LED;
+- a USB-C socket;
+- the passives each of those needs.
 
-**The person** chose what the stick is: an RP2040, a temperature and humidity
-sensor, an addressable LED, USB-C. **The agent** found each part's LCSC number,
-and checked every number against LCSC's own record before writing it down.
-Two candidates were wrong: a sensor number that LCSC does not have, and an LED
-with no stock. Both were replaced before they reached the declaration.
-
-The components come from KiCad's own libraries where KiCad has them (the
-RP2040, the flash, the crystal, the USB-C socket, the LED). Two do not:
+Each part names a KiCad symbol and footprint, and an LCSC number. KiCad's own
+libraries cover the RP2040, the regulator, the crystal, the LED and the
+passives, with 3D models. The rest come from LCSC's library, which has a
+symbol, a footprint and a model made for one another:
 
 ```sh
-python3 hardware/parts.py fetch C2757850 C6186
+python3 hardware/parts.py fetch C2757850 C165948 C179173   # AHT20, USB-C socket, flash
 ```
 
-That pulled the AHT20 sensor's and the regulator's symbol and footprint from
-LCSC's library (easyeda2kicad) into `hardware/vendor/lcsc.*`. The agent
-recorded where each came from in `hardware/vendor/SOURCES.md`. KiCad does have
-the regulator, but its symbol `extends` another symbol, and `parts.py` refuses
-one: it names the parent to vendor rather than inventing the pins.
+It lists the library ids to declare (`lcsc:AHT20_C2757850`, …). KiCad has no
+AHT20. For the socket and the flash, KiCad's footprints exist but its 3D
+library has no model for them, so they would render as boxes. Write down
+where each came from in `hardware/vendor/SOURCES.md`.
 
-Then:
+### 3. Declare it
+
+Two files, copied from the example or written by an agent from the choices
+above:
+- `hardware/outline.svg`: the stick seen from above, a chamfered bar;
+- `hardware/product.toml`: every part, and what each pin connects to.
+
+Excerpts:
+
+```toml
+[outline]
+svg      = "hardware/outline.svg"
+layer    = "outline"
+width_mm = 36.0
+
+[case]
+colour = "#1d4ed8"           # translucent blue PETG: the LED shows through
+
+[case.fasteners]
+closure = "press-fit"        # no screws
+
+[[part]]
+id        = "mcu"
+symbol    = "MCU_RaspberryPi:RP2040"
+footprint = "Package_DFN_QFN:QFN-56-1EP_7x7mm_P0.4mm_EP3.2x3.2mm"
+lcsc      = "C2040"
+pins      = { GPIO4 = "SENSOR_SDA", GPIO5 = "SENSOR_SCL", GPIO16 = "LED_DIN", ... }
+
+[[part]]
+id       = "vent"
+mount    = "vent"
+seals_to = "sensor"          # a chimney from the lid down to a ring round the sensor
+
+[firmware]
+mcu = "mcu"
+```
+
+The sensor sits at the far end from the regulator, in its own sealed chimney,
+so it reads room air rather than the board's heat. The plug's window is cut
+for a USB-C plug's moulded body.
+
+### 4. Vendor, verify, derive
 
 ```sh
-python3 hardware/parts.py sync      # vendor every symbol, footprint, model
-python3 hardware/parts.py resolve   # verify every LCSC number → parts.lock
+python3 hardware/parts.py sync       # every symbol, footprint, 3D model → hardware/lib/
+python3 hardware/parts.py resolve    # every LCSC number checked against LCSC's record → parts.lock
+fid derive                           # case, placed board, schematic, BOM, interface.ts, board.rs
 ```
 
-`resolve` reported all 21 numbers verified, each with the MPN and package
-LCSC gives it.
+`resolve` reports each number verified, with the MPN and package LCSC gives
+it. `fid derive` solves the case around the parts and places the board with
+a constraint solver. `layout.json → why` says what set each size and
+position. `fid derive --check` fails from then on whenever an artifact no
+longer matches the declaration.
 
-## 3. The declaration
-
-**The agent** wrote `hardware/product.toml`: 21 board parts, each with its
-symbol, footprint, LCSC number and `pins`, mapping each pin to a net. The
-regulator's output is `3V3`, the sensor's data line `SENSOR_SDA` on the
-RP2040's `GPIO4`, and so on. It also wrote a vent over the sensor that
-`seals_to` it, and `[firmware] mcu = "mcu"`. **The person** reviewed the
-choices that are design, not wiring: the sensor at the far end from the
-regulator's heat, in its own sealed chimney, and the plug at the other end.
-
-## 4. Derive, and what it refused
-
-```sh
-fid derive
-```
-
-It did not work the first time. Each refusal named what was wrong:
-
-| `fid derive` said | What it meant | Fixed where |
-|---|---|---|
-| `[case.seal]` is missing `groove_mm` | a case with no seal still had to describe a gasket | **platform**: seal and fastener fields now default; `kind = "none"` needs nothing else |
-| no `outline.width_mm` and no part in a region, so nothing sets the size | the stick has no window or panel to size the case from | product: `width_mm` declared |
-| the board is 42 × 42 mm, over `board.max_mm` | a derived board was always square | **platform**: one side is held at its ceiling, the other carries the area |
-| the chimney's ring and the vent's lean cannot hold together | the vent sat at the very tip, too close to the wall for the ring to land on the board | **platform**: a sealed vent is placed by its chimney's footprint, not its membrane's |
-| the USB socket's mouth is 26 mm behind the outer face | the socket was not held against the board's edge, and the board did not reach the wall | product: `faces = "top"` (the mouth, as KiCad draws it), `board.near` includes the plug's wall, and a window sized for the plug's body |
-
-Three of the five were the platform's, not the product's. They were fixed in
-the platform, where every product gets the fix, and the decision record says
-so (`docs/specs/2026-10-02-making-the-thesis-true.md`).
-
-When it passed, `hardware/generated/` held the case and board layout (`why`
-lists what set each size and position), the board with every footprint
-placed by the constraint solver and every pad on its net, the schematic, the
-BOM, `interface.ts` and `board.rs`.
-
-## 5. Build, route, check
+### 5. Build, route, check, fab
 
 ```sh
 hardware/build.sh
 ```
 
-Freerouting routed the board. The first try left connections open: the
-RP2040's 0.4 mm-pitch pins do not escape at 0.2 mm tracks with 0.15 mm
-clearance. The product moved to 0.15 / 0.127 mm, which JLCPCB's standard
-two-layer process holds, and a slightly larger board. KiCad's DRC then
-passed.
+What it does:
+- **Routes** the board (Freerouting) and checks it with KiCad's DRC.
+- **Builds** the case and checks it: nothing interferes, the board snaps in,
+  the lid closes, and the sensor's chimney holds only the sensor.
+- **Writes** `hardware/build/fab/`: Gerbers, the assembly BOM and the
+  placement file. Its README says whether every part can be ordered for
+  assembly.
+- **Renders** the review images.
 
-`cad.py` built the case and checked it, and refused it: the press-fit lid's
-skirt, hanging 5 mm into the base just inside the wall, cut through the
-board's edge and its snap hooks. Derive should have known, so the fix went
-into the platform. The base now grows until the skirt clears the board and
-its hooks, and `why` says by how much. Rebuilt, every check passed: nothing
-interferes, the lid closes, and the sensor's chimney holds only the sensor.
+### 6. Firmware and page, from the same facts
 
-## 6. Firmware and page, from the same facts
+The firmware includes the derived pin map and takes every pin through it.
+`board::sensor_sda!(p)` is `p.PIN_4`:
 
-**The agent** wrote the firmware and the page. The firmware takes every pin
-from the derived `board.rs`: `board::sensor_sda!(p)` is `p.PIN_4` today. The
-page imports the nets and the socket from the derived `interface.ts`. The
-sensor's arithmetic and the reading's wire format sit in `firmware/shared`,
-tested on the host. The page's decoder has its own test, against the same
-bytes.
+```rust
+#[path = "../../../hardware/generated/board.rs"]
+mod board;
+let i2c = I2c::new_async(p.I2C0, board::sensor_scl!(p), board::sensor_sda!(p), Irqs, config);
+```
 
-Writing the firmware surfaced two more platform bugs:
-- the firmware templates pinned `fiducial-protocol = "0.1"`, eight releases
-  behind;
-- their build profiles sat where cargo ignores them.
+The sensor's arithmetic and the reading's wire format live in
+`firmware/shared`, tested on the host. The page imports the nets and the
+socket from the derived `interface.ts`, and its decoder is tested against
+the same bytes.
 
-Both were fixed in the templates. Taking those fixes into the stick with
-`fid upgrade` surfaced two more:
-- **The upgrade looped.** It conflicted, correctly, on the stick's own edits
-  to the same lines. But once the conflict was resolved, every later
-  upgrade wrote the same conflict back, because the merge base never moved.
-  Now the base moves to the version merged toward, and a file still holding
-  markers is refused.
-- **Build output was not ignored.** Nothing kept `hardware/build/` and
-  `firmware/target/` out of git. Each capability now ships its own
-  `.gitignore`.
+```sh
+(cd firmware && cargo build --release && cargo test -p firmware-shared --target x86_64-unknown-linux-gnu)
+node --experimental-strip-types --test web/src/reading.test.ts
+npx esbuild web/src/main.ts --bundle --format=esm --outfile=web/dist/main.js --tsconfig=web/tsconfig.json
+```
 
-## 7. Change one thing
-
-This is the claim, run on the stick:
+### 7. Change one thing
 
 - **Swap two pins in `product.toml`.** `fid derive --check` fails until
   derived. After `fid derive`, the copper, the schematic and `board.rs` have
   moved, and the firmware compiles unchanged.
-- **Move SDA to a pin I²C0 cannot use.** The firmware fails to compile,
-  because Embassy's types know which pins I²C0 can use.
-- **Rename the net.** Every line of firmware or page code still using the
+- **Move SDA to GPIO6.** The firmware fails to compile:
+  `PIN_6: SdaPin<I2C0>` is not satisfied, because GPIO6 is not one of I2C0's
+  pins. Move it to GPIO8 and it compiles again with no edit.
+- **Rename the net.** Every line of firmware or page code that still uses the
   old name fails to compile.
 
 The test
 `a_moved_pin_reaches_the_firmware_and_a_renamed_net_breaks_code_still_using_it`
-in `crates/fiducial-cli/tests/hardware_pipeline.rs` runs the same sequence on
-every commit.
+runs the same sequence on every commit. The example's CI job runs every step
+above.
 
-## Who did what
+## Part 2 · The case study: building it the first time
+
+The stick was first built by one person and one agent in an afternoon:
+- **The person** chose what it is and judged the design choices: the
+  sensor's isolation, where the plug goes, the colour.
+- **The agent** found and verified the parts, wrote the declaration, the
+  firmware and the page, and ran the gates.
+
+Each mistake was refused at the step that made it, by name.
+
+### What the gates refused
+
+| Step | The refusal | The cause | Fixed in |
+|---|---|---|---|
+| parts | two candidate LCSC numbers did not verify | one does not exist; one had no stock | product: other parts |
+| parts | the regulator's KiCad symbol `extends` another | `parts.py` refused rather than guess its pins | **platform**: `extends` is flattened |
+| parts | the socket, flash and sensor had no 3D model | KiCad's 3D library lacks them | product: fetched from LCSC's library |
+| route | 64 connections open after fetching from LCSC's library | easyeda2kicad writes KiCad 5 footprints, which lose their nets in a current board | **platform**: `fetch` converts them with `kicad-cli fp upgrade`; a KiCad 5 footprint is refused by name |
+| route | still dozens open, pads too close for DRC | the fetched footprints' courtyards miss their own pads, so neighbours were placed on that copper | **platform**: a footprint's size covers every pad plus KiCad's 0.25 mm margin |
+| derive | `[case.seal]` is missing `groove_mm` | a case with no seal still had to describe a gasket | **platform**: seal and fastener fields default |
+| derive | the board is 42 × 42 mm, over `board.max_mm` | a derived board was always square | **platform**: one side held at its ceiling, the other carries the area |
+| derive | the chimney's ring and the vent's lean cannot hold together | the vent sat too close to the wall for its ring | **platform**: a sealed vent is placed by its chimney's footprint |
+| derive | the socket's mouth is 26 mm behind the wall | the socket was not held to the board's edge | product: `faces`, `board.near`, a window for the plug's body |
+| route | connections left open | 0.4 mm-pitch pins at 0.2 / 0.15 mm rules | product: 0.15 / 0.127 mm, JLCPCB's standard process |
+| checks | the lid's skirt cuts the board and its snap hooks | derive did not know about the skirt | **platform**: the base grows until the skirt clears |
+| firmware | `fiducial-protocol = "0.1"`, profiles ignored | stale firmware templates | **platform**: templates on the platform's version |
+| upgrade | the same conflict, written back after it was resolved | the merge base never moved | **platform**: the base moves; markers are refused |
+| doctor | the declaration and the firmware reported as drift | they were classed as platform-owned | **platform**: product-owned |
+| render | the case was another product's orange | a platform default copied from a product | **platform**: `case.colour`, a neutral default |
+
+Twelve of the fifteen were the platform's. Each was fixed in the platform,
+where every later product gets the fix, with a test. The decision record is
+`docs/specs/2026-10-02-making-the-thesis-true.md`.
+
+### Who did what
 
 | | The person | The agent | The gates |
 |---|---|---|---|

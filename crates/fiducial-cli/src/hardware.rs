@@ -123,6 +123,10 @@ pub struct Shape {
 pub struct Case {
     #[serde(default = "d_process")]
     pub process: String,
+    /// The printed case's colour, `#rrggbb` — the filament. The renders and
+    /// the viewer draw it; the lid a shade lighter. Unset: a neutral grey.
+    #[serde(default)]
+    pub colour: Option<String>,
     pub wall_mm: f64,
     pub floor_mm: f64,
     pub lid_mm: f64,
@@ -1384,6 +1388,12 @@ pub struct BomLine {
 
 pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
     let case = &p.case;
+    if let Some(c) = &case.colour {
+        let hex = c.strip_prefix('#').unwrap_or("");
+        if hex.len() != 6 || !hex.chars().all(|ch| ch.is_ascii_hexdigit()) {
+            bail!("case.colour = \"{c}\" — a colour is `#rrggbb`, e.g. \"#2563eb\"");
+        }
+    }
     let clr = case.clearance_mm;
     let seal = &case.seal;
     let mut why: Vec<String> = Vec::new();
@@ -5133,6 +5143,7 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
         "why": why,
         "case": {
             "process": case.process,
+            "colour": case.colour,
             "outline_mm": pts(&outline),
             "wall_mm": case.wall_mm,
             "floor_mm": case.floor_mm,

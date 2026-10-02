@@ -225,6 +225,14 @@ pub fn read_footprint(root: &Path, id: &str) -> Result<Footprint> {
     let text = std::fs::read_to_string(root.join(&rel))
         .with_context(|| format!("footprint {id} is declared but not vendored at {rel} — run `python3 hardware/parts.py sync`"))?;
     let tree = parse(&text).with_context(|| format!("parsing {rel}"))?;
+    // KiCad 5's `(module …)`: embedded in a current board it loses its pads'
+    // nets, and the board cannot be routed. Refused by name, with the fix.
+    if tree.head() == Some("module") {
+        bail!(
+            "footprint {id} ({rel}) is in KiCad 5's format — convert its library with \
+             `kicad-cli fp upgrade --force <lib>.pretty` and sync again"
+        );
+    }
     let mut pts: Vec<(f64, f64)> = Vec::new();
     let mut fab: Vec<(f64, f64)> = Vec::new();
     for g in tree.items() {
@@ -282,13 +290,7 @@ pub fn read_footprint(root: &Path, id: &str) -> Result<Footprint> {
     if pts.is_empty() {
         bail!("footprint {id} has no courtyard (F.CrtYd), so its size cannot be read");
     }
-    let lo = pts
-        .iter()
-        .fold((f64::MAX, f64::MAX), |a, p| (a.0.min(p.0), a.1.min(p.1)));
-    let hi = pts
-        .iter()
-        .fold((f64::MIN, f64::MIN), |a, p| (a.0.max(p.0), a.1.max(p.1)));
-    let pads = tree
+    let pads: Vec<Pad> = tree
         .children("pad")
         .filter_map(|p| {
             let number = p.items().get(1)?.atom()?.to_string();
@@ -301,6 +303,33 @@ pub fn read_footprint(root: &Path, id: &str) -> Result<Footprint> {
             })
         })
         .collect();
+    // The courtyard, and every pad with KiCad's 0.25 mm courtyard margin round
+    // it: a courtyard that misses its own pads (libraries converted from other
+    // tools have them) would let the placer put a neighbour on that copper.
+    // A turned pad is taken at its larger side both ways.
+    for (pad, node) in pads.iter().zip(tree.children("pad")) {
+        let turned = node
+            .child("at")
+            .map(|a| a.nums())
+            .and_then(|n| n.get(2).copied())
+            .unwrap_or(0.0)
+            % 180.0
+            != 0.0;
+        let (hw, hh) = if turned {
+            let m = pad.size.0.max(pad.size.1) / 2.0;
+            (m, m)
+        } else {
+            (pad.size.0 / 2.0, pad.size.1 / 2.0)
+        };
+        pts.push((pad.at.0 - hw - 0.25, pad.at.1 - hh - 0.25));
+        pts.push((pad.at.0 + hw + 0.25, pad.at.1 + hh + 0.25));
+    }
+    let lo = pts
+        .iter()
+        .fold((f64::MAX, f64::MAX), |a, p| (a.0.min(p.0), a.1.min(p.1)));
+    let hi = pts
+        .iter()
+        .fold((f64::MIN, f64::MIN), |a, p| (a.0.max(p.0), a.1.max(p.1)));
     let model = tree.child("model").and_then(|m| {
         let path = m.items().get(1)?.atom()?;
         let stem = Path::new(path).file_stem()?.to_str()?.to_string();
@@ -635,6 +664,46 @@ mod tests {
             "{placed}"
         );
         assert!(!placed.contains("version"));
+    }
+
+    #[test]
+    fn a_courtyard_that_misses_its_pads_is_grown_to_cover_them() {
+        let dir = tempfile::tempdir().unwrap();
+        let lib = dir.path().join("hardware/lib/footprints");
+        std::fs::create_dir_all(&lib).unwrap();
+        // A courtyard 4 × 3 mm, a pad reaching 3 mm right of centre: as
+        // libraries converted from other tools draw them.
+        std::fs::write(
+            lib.join("Short.kicad_mod"),
+            FP.replace("(footprint Test", "(footprint Short").replace(
+                "(pad ANT smd rect (at 1.5 0) (size 0.5 1)",
+                "(pad ANT smd rect (at 2.5 0) (size 1 1)",
+            ),
+        )
+        .unwrap();
+        let fp = read_footprint(dir.path(), "Lib:Short").unwrap();
+        // Right edge: the pad's 3.0 plus KiCad's 0.25 mm margin; left: the courtyard's -2.
+        assert!((fp.size().0 - 5.25).abs() < 1e-9, "{:?}", fp.size());
+        assert_eq!(fp.size().1, 3.0);
+    }
+
+    #[test]
+    fn a_kicad_5_footprint_is_refused_with_its_fix() {
+        let dir = tempfile::tempdir().unwrap();
+        let lib = dir.path().join("hardware/lib/footprints");
+        std::fs::create_dir_all(&lib).unwrap();
+        std::fs::write(
+            lib.join("Old.kicad_mod"),
+            FP.replace("(footprint Test", "(module Old"),
+        )
+        .unwrap();
+        let e = read_footprint(dir.path(), "Lib:Old")
+            .unwrap_err()
+            .to_string();
+        assert!(
+            e.contains("KiCad 5") && e.contains("kicad-cli fp upgrade"),
+            "{e}"
+        );
     }
 
     #[test]

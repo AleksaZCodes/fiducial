@@ -9,7 +9,7 @@
 // An OG image is a *picture of a declaration*. The title in it is the title in
 // `generated/seo.ts`; the mark in it is `brand/wordmark.svg`. Committing the
 // PNGs would put a copy of both in git — a copy that goes stale silently the
-// first time a post is retitled or the flame is redrawn, and nothing renders
+// first time a post is retitled or the mark is redrawn, and nothing renders
 // from it so nothing catches it. So they are rebuilt before every web build,
 // from the same source, and `public/og/` is gitignored.
 //
@@ -34,6 +34,12 @@ const read = (p) => readFileSync(at(p), "utf8");
 
 const { routes } = JSON.parse(read("apps/web/src/generated/seo.json"));
 const logo = JSON.parse(read("apps/web/src/generated/logo.json"));
+/** The wordmark's accent (paths and polygons, possibly none) in one colour. */
+const accentSvg = (accent, fill) =>
+  `<g fill="${fill}">` +
+  (accent?.paths ?? []).map((d) => `<path d="${d}"/>`).join("") +
+  (accent?.polygons ?? []).map((pts) => `<polygon points="${pts}"/>`).join("") +
+  "</g>";
 
 const display = readFileSync(at("assets/fonts/ChakraPetch.ttf"));
 const body = readFileSync(at("assets/fonts/SourceSerif4.ttf"));
@@ -42,7 +48,8 @@ const body = readFileSync(at("assets/fonts/SourceSerif4.ttf"));
 // rule the rest of the product follows for the domain.
 const brand = read("apps/web/src/generated/brand.ts");
 const pick = (name) => brand.match(new RegExp(`export const ${name} = "([^"]+)"`))?.[1];
-const EMBER = pick("primaryColor") ?? "#b85207";
+// No brand colour declared: a neutral ink, never another product's colour.
+const PRIMARY = pick("primaryColor") ?? "#333333";
 const domain = pick("domain") ?? "";
 const GROUND = "#FDFBF8";
 const INK = "#150F0C";
@@ -52,8 +59,8 @@ const MUTED = "#6D625B";
 const wordmark = () => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${logo.wordmarkViewBox}">
     <g fill="${INK}">${logo.LETTERS.map((d) => `<path d="${d}"/>`).join("")}</g>
-    <g fill="${EMBER}">${logo.DEVICE.map((p) => `<polygon points="${p}"/>`).join("")}</g>
-    <path fill-rule="evenodd" d="${logo.FLAME}" fill="${EMBER}"/>
+    ${accentSvg(logo.ACCENT, PRIMARY)}
+    <path fill-rule="evenodd" d="${logo.MARK}" fill="${PRIMARY}"/>
   </svg>`;
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 };
@@ -85,8 +92,8 @@ function card(route) {
         justifyContent: "space-between",
         background: GROUND,
         padding: "72px 80px",
-        // The ember edge, on the two sides the chamfered surfaces are weighted.
-        borderBottom: `16px solid ${EMBER}`,
+        // The primary-colour edge, on the two sides the chamfered surfaces are weighted.
+        borderBottom: `16px solid ${PRIMARY}`,
       },
       children: [
         {

@@ -168,6 +168,9 @@ covers every claim in its README:
 Departures from the plan:
 - **Sensor:** an AHT20, not an SHT40; no SHT40 number could be verified at
   LCSC that day.
+- **Parts from LCSC's library:** the sensor, the USB-C socket and the flash,
+  with symbol, footprint and model made for one another. KiCad's 3D library
+  has no model for the latter two.
 - **Parts:** pinned and verified, not picked, because the catalogue was
   mid-migration.
 - **Bill:** about $5.14 of parts per board at five boards, LCSC prices with
@@ -184,11 +187,24 @@ Platform bugs the example found, each fixed and tested:
 - LCSC refusing requests without a User-Agent;
 - easyeda2kicad's project-relative paths;
 - a wrong note on press-fit lids without a gasket.
+- KiCad's `extends` symbols refused, now flattened;
+- a footprint's size read from a courtyard that misses its own pads, now
+  grown to cover every pad plus KiCad's 0.25 mm margin;
+- easyeda2kicad's KiCad 5 footprints losing their nets, now converted on
+  `fetch` and refused by name otherwise;
+- one product's orange as every product's case and viewer colour, now
+  `case.colour` with a neutral default;
+- one product's logo structure (`flame`/`letters`/`device`) and colours in
+  the design and SEO scripts, now `mark`/`letters`/optional `accent` with
+  neutral fallbacks. The private reference product renames its SVG layers
+  when it next upgrades.
+
+The guide (`docs/guides/sensor-stick.md`) rebuilds the stick from scratch on
+the current platform, with the first build's refusals kept as its case study.
 
 Not done:
 - the guide's captures still walk through `eda`;
 - a "case wraps the board" sizing mode (the stick declares `width_mm`);
-- flattening KiCad's `extends` symbols.
 
 ### G4 · The renders
 
@@ -199,11 +215,8 @@ when convenient.
 ## Remove or fix
 
 - **`eda` capability:** deprecate (G2).
-- **The `flame` layer name** in the `design` capability's logo scripts (with
-  `letters`/`device`) is one product's brand structure hard-coded in a
-  platform capability. Generalize to declared layer names (`[brand]
-  mark_layer`), defaulting to the current names so existing products keep
-  working.
+- **One product's logo structure in the design capability.** Done (G3):
+  `mark`, `letters` and an optional `accent`, with neutral fallback colours.
 - **Floor placement onto the solver** (engines spec P2). It is the last
   bounded search, and it is why a board could not move under its vent.
 - **Determinism:** CP-SAT placement is deterministic; Freerouting is not.
