@@ -155,9 +155,15 @@ def symbol_block(text: str, name: str) -> str | None:
     return None
 
 
+def open_url(url: str, timeout: float):
+    """GET with a User-Agent: LCSC answers 403 to a request without one."""
+    return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "fiducial-parts"}), timeout=timeout)
+
+
 def fetch(url: str, dest: Path) -> str | None:
     try:
-        with urllib.request.urlopen(url, timeout=60) as r:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with open_url(url, 60) as r:
             dest.write_bytes(r.read())
         return None
     except Exception as e:  # noqa: BLE001 — reported, not raised
@@ -193,7 +199,7 @@ LCSC_DETAIL = os.environ.get("FID_LCSC_DETAIL", "https://wmsc.lcsc.com/ftps/wm/p
 def lcsc_datasheet(code: str) -> tuple[str | None, str | None]:
     """The datasheet URL LCSC lists for a part number: (url, error)."""
     try:
-        with urllib.request.urlopen(LCSC_DETAIL.format(code=code), timeout=30) as r:
+        with open_url(LCSC_DETAIL.format(code=code), 30) as r:
             url = (json.loads(r.read()).get("result") or {}).get("pdfUrl")
         return (url, None) if url else (None, "LCSC lists no datasheet")
     except Exception as e:  # noqa: BLE001 — reported, not raised
@@ -459,8 +465,7 @@ def pick_problem(pick: dict) -> str | None:
 def lcsc_product(code: str) -> dict | None:
     """LCSC's own record of a part number, or None when it has none; raises
     OSError when LCSC cannot be reached."""
-    req = urllib.request.Request(LCSC_DETAIL.format(code=code), headers={"User-Agent": "fiducial-parts"})
-    with urllib.request.urlopen(req, timeout=30) as r:
+    with open_url(LCSC_DETAIL.format(code=code), 30) as r:
         d = (json.load(r) or {}).get("result") or {}
     if not d.get("productCode"):
         return None
@@ -606,8 +611,10 @@ def fetch_lcsc(args: list[str]) -> int:
     VENDOR.mkdir(parents=True, exist_ok=True)
     for code in args:
         try:
-            # Relative output and model paths: nothing machine-specific is committed.
-            subprocess.run(["easyeda2kicad", "--full", f"--lcsc_id={code}", "--output", "hardware/vendor/lcsc",
+            # Model paths relative to the project (${KIPRJMOD}): nothing
+            # machine-specific is committed. easyeda2kicad wants the output
+            # absolute and under the working directory for that.
+            subprocess.run(["easyeda2kicad", "--full", f"--lcsc_id={code}", "--output", str(VENDOR / "lcsc"),
                             "--project-relative", "--overwrite"], check=True, cwd=ROOT)
         except FileNotFoundError:
             print("easyeda2kicad is not installed: pip install easyeda2kicad", file=sys.stderr)
@@ -615,10 +622,13 @@ def fetch_lcsc(args: list[str]) -> int:
         except subprocess.CalledProcessError as e:
             print(f"{code}: easyeda2kicad failed ({e.returncode}) — it needs easyeda.com reachable", file=sys.stderr)
             return 1
-    names = sorted(f.stem for f in (VENDOR / "lcsc.pretty").glob("*.kicad_mod"))
-    print("vendored into hardware/vendor/lcsc.*; declare them as footprint = \"lcsc:<Name>\", symbol = \"lcsc:<Name>\":")
-    for n in names:
-        print(f"  lcsc:{n}")
+    footprints = sorted(f.stem for f in (VENDOR / "lcsc.pretty").glob("*.kicad_mod"))
+    sym_file = VENDOR / "lcsc.kicad_sym"
+    symbols = sorted(set(re.findall(r'^\s*\(symbol "([^"]+?)"', sym_file.read_text(), re.M))) if sym_file.exists() else []
+    symbols = [n for n in symbols if not re.search(r"_\d+_\d+$", n)]
+    print("vendored into hardware/vendor/lcsc.*; declare a part with these:")
+    print("  footprints: " + ", ".join(f'"lcsc:{n}"' for n in footprints))
+    print("  symbols:    " + ", ".join(f'"lcsc:{n}"' for n in symbols))
     print("Then add a SOURCES.md line per part (the LCSC number it came from) and run sync.")
     return 0
 

@@ -449,9 +449,10 @@ fn collect(
         let path = entry.path();
         let name = entry.file_name();
         let name = name.to_string_lossy();
-        if name.starts_with('.') && name != ".cargo" {
+        if name.starts_with('.') && name != ".cargo" && name != ".gitignore" {
             // `.git`, `.DS_Store` and friends are the checkout, not the
-            // capability. `.cargo/config.toml` genuinely is content.
+            // capability. `.cargo/config.toml` genuinely is content, and so
+            // is a `.gitignore` saying what of its own output not to commit.
             continue;
         }
         // Interpreter caches, as in `build.rs`: running a capability's

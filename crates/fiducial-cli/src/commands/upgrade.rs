@@ -414,6 +414,20 @@ fn merge_one_template(
     // the moment the platform moved — and then opened a 3-way merge on a file
     // nobody upstream had touched, which is how a product accumulates
     // conflicts. See `templates::upstream_changed`.
+    // A file still mid-conflict is refused before anything else. Merged
+    // again, `ours` would be the file *containing the markers*, nesting
+    // markers inside markers and losing more of the file each run — a real
+    // product's CI once carried the note that `fid upgrade` "rewrites conflict
+    // markers into fiducial.toml — corrupting it further every time". And
+    // after a conflict the base has moved to upstream, so "no upstream
+    // change" would otherwise hide the markers a person still has to resolve.
+    if std::fs::read_to_string(root.join(rel_path)).is_ok_and(|l| has_conflict_markers(&l)) {
+        return Ok(Some(TemplateOutcome::Conflict(format!(
+            "UNRESOLVED — {rel_path} still contains conflict markers from an \
+             earlier upgrade. Nothing was written. Resolve the markers, then re-run"
+        ))));
+    }
+
     if !templates::upstream_changed(raw, product_name, &record.source_version, &base) {
         return Ok(None); // No upstream change.
     }
@@ -444,30 +458,6 @@ fn merge_one_template(
             return Err(e).with_context(|| format!("reading {rel_path}"));
         }
     };
-
-    // Refuse to merge a file that still has conflict markers in it.
-    //
-    // The conflict branch below writes markers and deliberately leaves the lock
-    // alone, so that a human can resolve them and re-run. That intent is right
-    // and the implementation did not deliver it: on the next run `ours` is the
-    // file *containing the markers*, so the 3-way merge runs again against a
-    // base that never moved and writes markers around markers. Each run
-    // compounds the damage, which is why a real product's CI carries the note
-    // that `fid upgrade` "rewrites conflict markers into fiducial.toml —
-    // corrupting it further every time" and why `fid doctor` is
-    // `continue-on-error` there.
-    //
-    // Detecting the markers is what makes "resolve and re-run" true. A file
-    // mid-conflict is not a file this can reason about, so it says so and
-    // writes nothing.
-    if has_conflict_markers(&local) {
-        return Ok(Some(TemplateOutcome::Conflict(format!(
-            "UNRESOLVED — {rel_path} still contains conflict markers from an \
-             earlier upgrade. Nothing was written: merging it again would nest \
-             markers inside markers and lose more of the file each run. Resolve \
-             the markers, then re-run"
-        ))));
-    }
 
     // 3-way merge: base=what-was-installed, ours=local-file, theirs=upstream.
     let merged = diffy::merge(&base, &local, &upstream);
@@ -520,8 +510,14 @@ fn merge_one_template(
             if !dry_run {
                 std::fs::write(&local_path, &conflict)
                     .with_context(|| format!("writing conflict markers to {rel_path}"))?;
-                // Do NOT update lock — leave base unchanged so next `fid upgrade`
-                // can retry after the human resolves the conflict.
+                // The base moves to upstream; the hash does not. Resolving the
+                // markers is the human merging toward this upstream, so the next
+                // run merges their file against it and upstream again — clean,
+                // and recorded. Left on the old base, that run redid the same
+                // merge and wrote the same conflict over the resolution, every
+                // time. (A file still holding markers is refused above.)
+                let record = lock.templates.get_mut(rel_path).unwrap();
+                record.base_content = Some(upstream.clone());
             }
             Ok(Some(TemplateOutcome::Conflict(
                 "CONFLICT — conflict markers written; resolve and run `fid upgrade` again".into(),

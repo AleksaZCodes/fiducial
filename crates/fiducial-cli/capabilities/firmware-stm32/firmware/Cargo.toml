@@ -14,8 +14,8 @@ edition = "2021"
 license = "MIT"
 
 [workspace.dependencies]
-fiducial-core     = "0.1"
-fiducial-protocol = "0.1"
+fiducial-core     = "{{version}}"
+fiducial-protocol = "{{version}}"
 
 embassy-executor = { version = "0.10", default-features = false }
 embassy-stm32    = { version = "0.6", default-features = false }
@@ -27,3 +27,16 @@ panic-probe = { version = "0.3", features = ["print-defmt"] }
 
 cortex-m    = { version = "0.7", features = ["inline-asm"] }
 cortex-m-rt = "0.7"
+
+# Profiles apply only at the workspace root; in a member they are ignored.
+[profile.dev]
+debug           = 2
+opt-level       = "s"
+overflow-checks = true
+
+[profile.release]
+debug           = 2
+opt-level       = "s"
+lto             = true
+codegen-units   = 1
+overflow-checks = false

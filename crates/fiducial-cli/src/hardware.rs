@@ -288,8 +288,10 @@ fn d_hang_thick() -> f64 {
     4.0
 }
 
+/// Every field defaults (to a 2 mm groove, 2.5 mm deep): `kind = "none"` needs
+/// nothing else, and a gasket declares only what differs from the default.
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, default)]
 pub struct Seal {
     /// `gasket` or `none`.
     pub kind: String,
@@ -342,8 +344,10 @@ impl Default for Seal {
     }
 }
 
+/// Every field defaults (M3, 80 mm apart): a press-fit lid has no screws
+/// to size, and a screwed one declares only what differs.
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, default)]
 pub struct Fasteners {
     /// How the lid is held on:
     ///
@@ -1736,8 +1740,10 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
     } else {
         why.push(format!(
             "press-fit lid: a {} mm skirt, {} mm oversize, grips the inside of the base. No screws — \
-             retention is friction alone, so the gasket's compression must be held by the fit; prove it on a print",
-            case.fasteners.skirt_mm, case.fasteners.interference_mm
+             retention is friction alone{}; prove it on a print",
+            case.fasteners.skirt_mm,
+            case.fasteners.interference_mm,
+            if seal_on { ", so the gasket's compression must be held by the fit" } else { "" }
         ));
     }
     let mut boss_keepouts: Vec<Rect> = screws
@@ -1990,7 +1996,18 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
             None => fit::centroid(&area),
         };
         let vent = part.mount == "vent";
-        let sizes = if vent || part.body_mm[0] == part.body_mm[1] {
+        // A vent sealed to a board part stands over its chimney's ring, and
+        // that ring must land on the board, inside the cavity: placed by the
+        // membrane alone, a vent at the apex leaves no room for the ring.
+        let sealed_ring = part
+            .seals_to
+            .as_deref()
+            .and_then(|t| p.parts.iter().find(|q| q.id == t))
+            .map(|q| 2.0 * (chimney_radii(part, q).1 + p.board.edge_mm + case.clearance_mm));
+        let sizes = if let Some(d) = sealed_ring {
+            let d = d.max(part.body_mm[0]).max(part.body_mm[1]);
+            vec![(d, d)]
+        } else if vent || part.body_mm[0] == part.body_mm[1] {
             vec![(part.body_mm[0], part.body_mm[1])]
         } else {
             vec![
@@ -2224,6 +2241,19 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                     .fold(0.0, f64::max);
                 let margin = 2.0 * (b.hole_inset_mm + b_clear + b.edge_mm);
                 let by_area = ((area / b.fill).sqrt().max(widest + 2.0) + margin).ceil();
+                // Square unless a side would pass its ceiling: then that side
+                // is the ceiling and the other carries the area — a stick's
+                // board is long and narrow, not a square that does not fit.
+                let other = |cap: f64| {
+                    ((area / b.fill / (cap - margin).max(1.0)).max(widest + 2.0) + margin).ceil()
+                };
+                let (start_w, start_h) = if by_area > b.max_mm[0] {
+                    (b.max_mm[0], other(b.max_mm[0]))
+                } else if by_area > b.max_mm[1] {
+                    (other(b.max_mm[1]), b.max_mm[1])
+                } else {
+                    (by_area, by_area)
+                };
                 // A part in an edge zone needs the zone deep enough for its
                 // oriented depth plus its keep-out. Zones grow to their
                 // contents (the fraction is only a floor), so the board grows
@@ -2232,7 +2262,7 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                 let taken = |s: &str| b.zones.values().any(|v| v == s);
                 // Opposite bands, each at least its fraction of the board, and
                 // a sliver of centre left between them when a zone lives there.
-                let dim = |a: &str, c: &str| {
+                let dim = |a: &str, c: &str, start: f64| {
                     let band = |s: &str, side: f64| {
                         if taken(s) {
                             need.get(s)
@@ -2244,19 +2274,19 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                         }
                     };
                     let centre = if taken("centre") { 4.0 } else { 0.0 };
-                    let mut side = by_area;
+                    let mut side = start;
                     for _ in 0..8 {
                         side = side.max((band(a, side) + band(c, side) + centre).ceil());
                     }
                     side
                 };
-                let (w, h) = (dim("left", "right"), dim("top", "bottom"));
+                let (w, h) = (dim("left", "right", start_w), dim("top", "bottom", start_h));
                 let mut note = String::new();
-                for (axis, v, sides) in [
-                    ("wide", w, ["left", "right"]),
-                    ("tall", h, ["top", "bottom"]),
+                for (axis, v, start, sides) in [
+                    ("wide", w, start_w, ["left", "right"]),
+                    ("tall", h, start_h, ["top", "bottom"]),
                 ] {
-                    if v > by_area {
+                    if v > start {
                         let reasons: Vec<String> = sides
                             .iter()
                             .filter_map(|s| need.get(*s).map(|n| n.1.clone()))
@@ -2267,12 +2297,18 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                         ));
                     }
                 }
+                let shape = if start_w == start_h {
+                    format!("{by_area} mm square")
+                } else {
+                    format!(
+                        "{start_w} × {start_h} mm: {by_area} mm square would pass board.max_mm, so one side is held at its ceiling and the other carries the area"
+                    )
+                };
                 why.push(format!(
-                    "board sized from its parts: {} mm² of footprint at fill {} plus {} mm of mounting margin → {by_area} mm{}",
+                    "board sized from its parts: {} mm² of footprint at fill {} plus {} mm of mounting margin → {shape}{note}",
                     r3(area),
                     b.fill,
                     r3(margin),
-                    if note.is_empty() { " square".into() } else { note }
                 ));
                 (w, h)
             }
@@ -3886,6 +3922,29 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                 ));
                 base_h = need;
             }
+        }
+    }
+    // A press-fit lid's skirt hangs `skirt_mm` into the base, just inside the
+    // wall — where the board's edge and its snap hooks are. The base grows
+    // until the skirt's lower edge clears them: the only fix, so derived.
+    if has_board && closure == "press-fit" {
+        let z_top =
+            case.floor_mm + board_json["standoff_mm"].as_f64().unwrap_or(0.0) + b.thickness_mm;
+        let hooks = if b.mount == "snap" { 1.4 } else { 0.0 };
+        let need = z_top + hooks + 0.5 + case.fasteners.skirt_mm;
+        if need > base_h + 1e-9 {
+            why.push(format!(
+                "base raised {} mm to {} mm so the lid's {} mm skirt clears the board{}",
+                r3(need - base_h),
+                r3(need),
+                case.fasteners.skirt_mm,
+                if hooks > 0.0 {
+                    " and its snap hooks"
+                } else {
+                    ""
+                }
+            ));
+            base_h = need;
         }
     }
     // Screw length, and how much plastic its thread bites: at least 1.5 × d.

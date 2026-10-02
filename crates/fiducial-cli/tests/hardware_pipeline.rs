@@ -1581,3 +1581,142 @@ fn a_moved_pin_reaches_the_firmware_and_a_renamed_net_breaks_code_still_using_it
         .status
         .success());
 }
+
+#[test]
+fn a_board_too_wide_for_its_ceiling_holds_that_width_and_grows_long() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    edit(
+        &root,
+        "hardware/product.toml",
+        "max_mm = [100.0, 100.0]",
+        "max_mm = [34.0, 100.0]",
+    );
+    for i in 0..6 {
+        add_board_part(
+            &root,
+            &format!("id = \"p{i}\"\nname = \"P\"\nbody_mm = [6.0, 6.0, 1.0]"),
+        );
+    }
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let l = layout(&root);
+    let size = &l["board"]["body"]["size_mm"];
+    assert_eq!(size[0].as_f64().unwrap(), 34.0, "{size}");
+    assert!(size[1].as_f64().unwrap() > 34.0, "{size}");
+    assert!(
+        l["why"].to_string().contains("held at its ceiling"),
+        "{}",
+        l["why"]
+    );
+}
+
+#[test]
+fn a_press_fit_lid_over_a_snap_board_raises_the_base_so_its_skirt_clears() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    // A seal of kind "none" needs no gasket dimensions.
+    let p = root.join("hardware/product.toml");
+    let s = std::fs::read_to_string(&p).unwrap();
+    let start = s.find("[case.seal]").unwrap();
+    let end = start + s[start..].find("\n\n").unwrap();
+    std::fs::write(
+        &p,
+        format!("{}[case.seal]\nkind = \"none\"{}", &s[..start], &s[end..]),
+    )
+    .unwrap();
+    edit(
+        &root,
+        "hardware/product.toml",
+        "max_spacing_mm = 80.0",
+        "max_spacing_mm = 80.0\nclosure = \"press-fit\"",
+    );
+    edit(
+        &root,
+        "hardware/product.toml",
+        "max_mm = [100.0, 100.0]",
+        "max_mm = [100.0, 100.0]\nmount = \"snap\"",
+    );
+    // A low cavity, so the skirt is what sets the base: the seed's cell is tall.
+    edit(
+        &root,
+        "hardware/product.toml",
+        "body_mm = [70.0, 21.0, 21.0]",
+        "body_mm = [30.0, 8.0, 4.0]",
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let l = layout(&root);
+    let why = l["why"].to_string();
+    assert!(
+        why.contains("skirt clears the board and its snap hooks"),
+        "{why}"
+    );
+    // The skirt's lower edge is above the hooks' top: board top + 1.4 mm.
+    let base = l["case"]["base_height_mm"].as_f64().unwrap();
+    let z_top =
+        l["board"]["z_bottom_mm"].as_f64().unwrap() + l["board"]["thickness_mm"].as_f64().unwrap();
+    let skirt = l["case"]["press_fit"]["skirt_mm"].as_f64().unwrap();
+    assert!(
+        base - skirt >= z_top + 1.4,
+        "base {base}, skirt {skirt}, board top {z_top}"
+    );
+}
+
+#[test]
+fn a_resolved_upgrade_conflict_is_recorded_and_not_written_again() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    let lock_path = root.join("fiducial.lock");
+    let file = "hardware/build.sh";
+    // Installed from an older template whose `set` line differs from today's,
+    // and changed here on that same line: a true conflict.
+    let lock = std::fs::read_to_string(&lock_path).unwrap();
+    let start = lock.find("[templates.\"hardware/build.sh\"]").unwrap();
+    let end = lock[start + 1..]
+        .find("\n[")
+        .map_or(lock.len(), |i| start + 1 + i);
+    let record = lock[start..end].replacen("set -euo pipefail", "set -eu", 1);
+    assert_ne!(record, lock[start..end], "the base carries the line");
+    std::fs::write(
+        &lock_path,
+        format!("{}{}{}", &lock[..start], record, &lock[end..]),
+    )
+    .unwrap();
+    edit(&root, file, "set -euo pipefail", "set -eux");
+
+    let out = fid(&root, &["upgrade", "--capability", "hardware"]);
+    assert!(
+        text(&out).contains("hardware/build.sh: CONFLICT"),
+        "{}",
+        text(&out)
+    );
+    assert!(std::fs::read_to_string(root.join(file))
+        .unwrap()
+        .contains("<<<<<<<"));
+
+    // Unresolved, a second run refuses rather than nesting markers.
+    let out = fid(&root, &["upgrade", "--capability", "hardware"]);
+    assert!(text(&out).contains("UNRESOLVED"), "{}", text(&out));
+
+    // Resolved by hand: the next run accepts it, and the one after has nothing to do.
+    let s = std::fs::read_to_string(root.join(file)).unwrap();
+    let start = s.find("<<<<<<<").unwrap();
+    let end = s.find(">>>>>>>").unwrap() + s[s.find(">>>>>>>").unwrap()..].find('\n').unwrap() + 1;
+    std::fs::write(
+        root.join(file),
+        format!("{}set -euxo pipefail\n{}", &s[..start], &s[end..]),
+    )
+    .unwrap();
+    let out = fid(&root, &["upgrade", "--capability", "hardware"]);
+    assert!(!text(&out).contains("CONFLICT"), "{}", text(&out));
+    let out = fid(&root, &["upgrade", "--capability", "hardware"]);
+    assert!(
+        text(&out).contains("hardware/build.sh: no upstream change"),
+        "{}",
+        text(&out)
+    );
+    assert!(std::fs::read_to_string(root.join(file))
+        .unwrap()
+        .contains("set -euxo pipefail"));
+}

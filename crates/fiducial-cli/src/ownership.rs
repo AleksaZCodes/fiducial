@@ -125,6 +125,18 @@ const PRODUCT_OWNED: &[Rule] = &[
     // The exception below this list is `apps/web/src/generated/`, which is
     // derived rather than scaffolded and is guarded by `fid derive --check`.
     Rule::Prefix("apps/"),
+    // The same for firmware: `fid add firmware` scaffolds a blink so that you
+    // replace it with the product's firmware, manifest and all.
+    Rule::Prefix("firmware/"),
+    //
+    // ── The hardware declaration ──
+    //
+    // `hardware/product.toml` is the product, physically — its header says
+    // every value in it is a seed to replace — and the outline is its shape.
+    // The scripts beside them (`build.sh`, `cad.py`, `parts.py`, …) are the
+    // platform's and stay so.
+    Rule::Exact("hardware/product.toml"),
+    Rule::Exact("hardware/outline.svg"),
 ];
 
 /// Paths that stay platform-owned even though a broader rule above claims them.
