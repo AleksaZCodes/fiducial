@@ -92,6 +92,30 @@ pub fn upstream_changed(
     expand(raw, product_name, installed_version) != base
 }
 
+/// The merge base a lock records for `rel_path`, repaired where `fid add`
+/// once wrote the wrong one.
+///
+/// `fid add` patches `fiducial.toml` (its capability, its config blocks) and
+/// used to record the *patched* file as the base. The base is what the
+/// platform shipped; the patch is the product's. With the patch in the base,
+/// the template's `enabled = []` read as an upstream change, and the next
+/// `fid upgrade` merged it over the product's capabilities and called the
+/// result clean. Such a base carries the header only `fid add` writes, so it
+/// is recognisable: it is replaced by the template at the recorded version.
+pub fn merge_base(
+    rel_path: &str,
+    base: &str,
+    raw: &str,
+    product_name: &str,
+    installed_version: &str,
+) -> String {
+    if rel_path == "fiducial.toml" && base.starts_with("# fiducial.toml — updated by `fid add") {
+        expand(raw, product_name, installed_version)
+    } else {
+        base.to_string()
+    }
+}
+
 /// Templates written only by `fid new --full`.
 ///
 /// A roadmap for a product that has not decided what it claims is a form to

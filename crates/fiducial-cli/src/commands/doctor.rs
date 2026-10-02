@@ -513,7 +513,14 @@ fn check_upstream_templates(
         // otherwise every template carrying a `{{version}}` stamp reads as
         // drift the moment the platform version moves. See
         // `templates::upstream_changed`.
-        if templates::upstream_changed(raw, &cfg.product.name, &record.source_version, base) {
+        let base = templates::merge_base(
+            rel_path,
+            base,
+            raw,
+            &cfg.product.name,
+            &record.source_version,
+        );
+        if templates::upstream_changed(raw, &cfg.product.name, &record.source_version, &base) {
             warnings.push(format!(
                 "{rel_path}: upstream template updated (installed: {}, current: {}) — run `fid upgrade`",
                 record.source_version, PLATFORM_VERSION

@@ -231,10 +231,16 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
     // 3 + 4. Update fiducial.toml.
     patch_config(root, cap)?;
 
-    // Re-record fiducial.toml in the lock — its hash changed after the patch.
+    // Re-hash fiducial.toml in the lock — the patch changed it. The merge
+    // base stays the template as shipped: the patch is the product's, and a
+    // base that held it made `fid upgrade` merge the template's empty
+    // `enabled` over the product's capabilities (`templates::merge_base`).
     let new_config_content = std::fs::read(root.join(crate::config::CONFIG_FILE))
         .context("reading updated fiducial.toml")?;
-    lock.record("fiducial.toml", &new_config_content, PLATFORM_VERSION);
+    match lock.templates.get_mut("fiducial.toml") {
+        Some(record) => record.hash = crate::lock::sha256_hex(&new_config_content),
+        None => lock.record("fiducial.toml", &new_config_content, PLATFORM_VERSION),
+    }
 
     // Record what was installed, and from where. Without this a capability
     // resolved from outside the binary is invisible to every command that

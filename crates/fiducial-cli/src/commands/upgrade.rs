@@ -399,7 +399,7 @@ fn merge_one_template(
 
     // Base content from lock (what was installed).
     let base = match &record.base_content {
-        Some(b) => b.clone(),
+        Some(b) => templates::merge_base(rel_path, b, raw, product_name, &record.source_version),
         None => {
             // Pre-Phase-4 lock: no base stored. Treat as "cannot merge, skip".
             return Ok(None);
