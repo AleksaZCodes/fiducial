@@ -102,7 +102,7 @@ fn adding_a_migration_without_deriving_fails_the_check() {
         "a migration added without deriving must fail: {}",
         text(&out)
     );
-    assert!(text(&out).contains("inputs changed"), "{}", text(&out));
+    assert!(text(&out).contains("not what this fid"), "{}", text(&out));
 }
 
 #[test]

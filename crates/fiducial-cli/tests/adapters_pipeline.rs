@@ -389,5 +389,5 @@ fn changing_only_a_vendor_makes_the_factory_stale() {
 
     let out = run(&root, &["derive", "--check"]);
     assert!(!out.status.success(), "{}", text(&out));
-    assert!(text(&out).contains("inputs changed"), "{}", text(&out));
+    assert!(text(&out).contains("not what this fid"), "{}", text(&out));
 }
