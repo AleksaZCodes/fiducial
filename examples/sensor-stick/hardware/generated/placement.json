@@ -1,0 +1,182 @@
+{
+  "items": {
+    "c-1v1": {
+      "centre_mm": [
+        14.35,
+        53.7
+      ],
+      "rotation_deg": 270.0
+    },
+    "c-3v3": {
+      "centre_mm": [
+        21.6,
+        38.45
+      ],
+      "rotation_deg": 0.0
+    },
+    "c-dec#1": {
+      "centre_mm": [
+        23.7,
+        51.25
+      ],
+      "rotation_deg": 0.0
+    },
+    "c-dec#2": {
+      "centre_mm": [
+        26.9,
+        57.05
+      ],
+      "rotation_deg": 0.0
+    },
+    "c-dec#3": {
+      "centre_mm": [
+        26.9,
+        59.55
+      ],
+      "rotation_deg": 0.0
+    },
+    "c-dec#4": {
+      "centre_mm": [
+        26.9,
+        54.55
+      ],
+      "rotation_deg": 0.0
+    },
+    "c-dec#5": {
+      "centre_mm": [
+        27.7,
+        52.05
+      ],
+      "rotation_deg": 0.0
+    },
+    "c-led": {
+      "centre_mm": [
+        12.4,
+        41.75
+      ],
+      "rotation_deg": 180.0
+    },
+    "c-vbus": {
+      "centre_mm": [
+        19.3,
+        44.25
+      ],
+      "rotation_deg": 0.0
+    },
+    "c-xin": {
+      "centre_mm": [
+        13.6,
+        57.15
+      ],
+      "rotation_deg": 180.0
+    },
+    "c-xout": {
+      "centre_mm": [
+        9.95,
+        62.1
+      ],
+      "rotation_deg": 270.0
+    },
+    "flash": {
+      "centre_mm": [
+        24.65,
+        44.85
+      ],
+      "rotation_deg": 270.0
+    },
+    "ldo": {
+      "centre_mm": [
+        17.35,
+        39.25
+      ],
+      "rotation_deg": 0.0
+    },
+    "led": {
+      "centre_mm": [
+        14.05,
+        46.95
+      ],
+      "rotation_deg": 90.0
+    },
+    "mcu": {
+      "centre_mm": [
+        20.25,
+        57.15
+      ],
+      "rotation_deg": 180.0
+    },
+    "r-cc1": {
+      "centre_mm": [
+        27.3,
+        6.95
+      ],
+      "rotation_deg": 0.0
+    },
+    "r-cc2": {
+      "centre_mm": [
+        12.45,
+        7.3
+      ],
+      "rotation_deg": 90.0
+    },
+    "r-dm": {
+      "centre_mm": [
+        19.3,
+        51.25
+      ],
+      "rotation_deg": 180.0
+    },
+    "r-dp": {
+      "centre_mm": [
+        19.25,
+        48.0
+      ],
+      "rotation_deg": 90.0
+    },
+    "r-scl": {
+      "centre_mm": [
+        23.7,
+        63.05
+      ],
+      "rotation_deg": 0.0
+    },
+    "r-sda": {
+      "centre_mm": [
+        23.7,
+        65.55
+      ],
+      "rotation_deg": 0.0
+    },
+    "r-xout": {
+      "centre_mm": [
+        19.7,
+        63.05
+      ],
+      "rotation_deg": 180.0
+    },
+    "sensor": {
+      "centre_mm": [
+        18.0,
+        75.0
+      ],
+      "rotation_deg": 270.0
+    },
+    "usb": {
+      "centre_mm": [
+        19.5,
+        10.5
+      ],
+      "rotation_deg": 180.0
+    },
+    "xtal": {
+      "centre_mm": [
+        13.4,
+        61.0
+      ],
+      "rotation_deg": 90.0
+    }
+  },
+  "model_sha256": "0adda314869894ce500ae5180626b539ce41014969af2ab4732853ae9522d263",
+  "objective": 116801,
+  "status": "feasible"
+}

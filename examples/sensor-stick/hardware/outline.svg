@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 70">
+  <!-- The stick, seen from above: a long, chamfered bar. The USB-C end is
+       the bottom edge. Straight segments only; derive scales it to fit. -->
+  <g data-layer="outline"><path d="M4,0 H26 L30,4 V66 L26,70 H4 L0,66 V4 Z"/></g>
+</svg>

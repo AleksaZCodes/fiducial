@@ -1,0 +1,692 @@
+{
+  "board_mm": {
+    "size": [
+      26.0,
+      76.0
+    ],
+    "thickness": 1.6
+  },
+  "connectors": [
+    {
+      "opening_mm": [
+        12.5,
+        6.5
+      ],
+      "part": "usb",
+      "side": "bottom"
+    }
+  ],
+  "firmware": {
+    "mcu": "mcu",
+    "pins": {
+      "LED_DIN": "GPIO16",
+      "SENSOR_SCL": "GPIO5",
+      "SENSOR_SDA": "GPIO4"
+    }
+  },
+  "generated_by": "fid-hardware from hardware/product.toml — do not edit",
+  "nets": {
+    "1V1": [
+      "U1.DVDD",
+      "U1.VREG_VOUT",
+      "C1.~"
+    ],
+    "3V3": [
+      "U1.IOVDD",
+      "U1.ADC_AVDD",
+      "U1.VREG_IN",
+      "U1.USB_VDD",
+      "U2.VCC",
+      "U3.VOUT",
+      "U4.VDD",
+      "C2.~",
+      "C3.~",
+      "C4.~",
+      "C5.~",
+      "C6.~",
+      "C7.~",
+      "R5.~",
+      "R6.~"
+    ],
+    "CC1": [
+      "J1.CC1",
+      "R1.~"
+    ],
+    "CC2": [
+      "J1.CC2",
+      "R2.~"
+    ],
+    "GND": [
+      "J1.GND",
+      "J1.SHIELD",
+      "U1.TESTEN",
+      "U1.GND",
+      "U2.GND",
+      "D1.VSS",
+      "U3.GND",
+      "Y1.2",
+      "Y1.4",
+      "U4.GND",
+      "C1.~",
+      "C2.~",
+      "C3.~",
+      "C4.~",
+      "C5.~",
+      "C6.~",
+      "C7.~",
+      "C8.~",
+      "C9.~",
+      "C10.~",
+      "C11.~",
+      "R1.~",
+      "R2.~"
+    ],
+    "LED_DIN": [
+      "U1.GPIO16",
+      "D1.DIN"
+    ],
+    "QSPI_SCLK": [
+      "U1.QSPI_SCLK",
+      "U2.CLK"
+    ],
+    "QSPI_SD0": [
+      "U1.QSPI_SD0",
+      "U2.DI(IO0)"
+    ],
+    "QSPI_SD1": [
+      "U1.QSPI_SD1",
+      "U2.DO(IO1)"
+    ],
+    "QSPI_SD2": [
+      "U1.QSPI_SD2",
+      "U2.IO2"
+    ],
+    "QSPI_SD3": [
+      "U1.QSPI_SD3",
+      "U2.IO3"
+    ],
+    "QSPI_SS": [
+      "U1.QSPI_SS",
+      "U2.~{CS}"
+    ],
+    "SENSOR_SCL": [
+      "U1.GPIO5",
+      "U4.SCL",
+      "R5.~"
+    ],
+    "SENSOR_SDA": [
+      "U1.GPIO4",
+      "U4.SDA",
+      "R6.~"
+    ],
+    "USB_DM": [
+      "J1.D-",
+      "R3.~"
+    ],
+    "USB_DM_MCU": [
+      "U1.USB_DM",
+      "R3.~"
+    ],
+    "USB_DP": [
+      "J1.D+",
+      "R4.~"
+    ],
+    "USB_DP_MCU": [
+      "U1.USB_DP",
+      "R4.~"
+    ],
+    "VBUS": [
+      "J1.VBUS",
+      "D1.VDD",
+      "U3.VIN",
+      "C8.~",
+      "C9.~"
+    ],
+    "XIN": [
+      "U1.XIN",
+      "Y1.1",
+      "C10.~"
+    ],
+    "XOUT": [
+      "U1.XOUT",
+      "R7.~"
+    ],
+    "XOUT_X": [
+      "Y1.3",
+      "C11.~",
+      "R7.~"
+    ]
+  },
+  "parts": {
+    "C1": {
+      "part": "c-1v1",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "1V1"
+        },
+        "2": {
+          "name": "~",
+          "net": "GND"
+        }
+      }
+    },
+    "C10": {
+      "part": "c-xin",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "XIN"
+        },
+        "2": {
+          "name": "~",
+          "net": "GND"
+        }
+      }
+    },
+    "C11": {
+      "part": "c-xout",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "XOUT_X"
+        },
+        "2": {
+          "name": "~",
+          "net": "GND"
+        }
+      }
+    },
+    "C2": {
+      "part": "c-3v3",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "3V3"
+        },
+        "2": {
+          "name": "~",
+          "net": "GND"
+        }
+      }
+    },
+    "C3": {
+      "part": "c-dec",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "3V3"
+        },
+        "2": {
+          "name": "~",
+          "net": "GND"
+        }
+      }
+    },
+    "C4": {
+      "part": "c-dec",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "3V3"
+        },
+        "2": {
+          "name": "~",
+          "net": "GND"
+        }
+      }
+    },
+    "C5": {
+      "part": "c-dec",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "3V3"
+        },
+        "2": {
+          "name": "~",
+          "net": "GND"
+        }
+      }
+    },
+    "C6": {
+      "part": "c-dec",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "3V3"
+        },
+        "2": {
+          "name": "~",
+          "net": "GND"
+        }
+      }
+    },
+    "C7": {
+      "part": "c-dec",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "3V3"
+        },
+        "2": {
+          "name": "~",
+          "net": "GND"
+        }
+      }
+    },
+    "C8": {
+      "part": "c-led",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "VBUS"
+        },
+        "2": {
+          "name": "~",
+          "net": "GND"
+        }
+      }
+    },
+    "C9": {
+      "part": "c-vbus",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "VBUS"
+        },
+        "2": {
+          "name": "~",
+          "net": "GND"
+        }
+      }
+    },
+    "D1": {
+      "part": "led",
+      "pins": {
+        "1": {
+          "name": "VDD",
+          "net": "VBUS"
+        },
+        "3": {
+          "name": "VSS",
+          "net": "GND"
+        },
+        "4": {
+          "name": "DIN",
+          "net": "LED_DIN"
+        }
+      }
+    },
+    "J1": {
+      "part": "usb",
+      "pins": {
+        "A1": {
+          "name": "GND",
+          "net": "GND"
+        },
+        "A12": {
+          "name": "GND",
+          "net": "GND"
+        },
+        "A4": {
+          "name": "VBUS",
+          "net": "VBUS"
+        },
+        "A5": {
+          "name": "CC1",
+          "net": "CC1"
+        },
+        "A6": {
+          "name": "D+",
+          "net": "USB_DP"
+        },
+        "A7": {
+          "name": "D-",
+          "net": "USB_DM"
+        },
+        "A9": {
+          "name": "VBUS",
+          "net": "VBUS"
+        },
+        "B1": {
+          "name": "GND",
+          "net": "GND"
+        },
+        "B12": {
+          "name": "GND",
+          "net": "GND"
+        },
+        "B4": {
+          "name": "VBUS",
+          "net": "VBUS"
+        },
+        "B5": {
+          "name": "CC2",
+          "net": "CC2"
+        },
+        "B6": {
+          "name": "D+",
+          "net": "USB_DP"
+        },
+        "B7": {
+          "name": "D-",
+          "net": "USB_DM"
+        },
+        "B9": {
+          "name": "VBUS",
+          "net": "VBUS"
+        },
+        "S1": {
+          "name": "SHIELD",
+          "net": "GND"
+        }
+      }
+    },
+    "R1": {
+      "part": "r-cc1",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "CC1"
+        },
+        "2": {
+          "name": "~",
+          "net": "GND"
+        }
+      }
+    },
+    "R2": {
+      "part": "r-cc2",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "CC2"
+        },
+        "2": {
+          "name": "~",
+          "net": "GND"
+        }
+      }
+    },
+    "R3": {
+      "part": "r-dm",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "USB_DM"
+        },
+        "2": {
+          "name": "~",
+          "net": "USB_DM_MCU"
+        }
+      }
+    },
+    "R4": {
+      "part": "r-dp",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "USB_DP"
+        },
+        "2": {
+          "name": "~",
+          "net": "USB_DP_MCU"
+        }
+      }
+    },
+    "R5": {
+      "part": "r-scl",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "SENSOR_SCL"
+        },
+        "2": {
+          "name": "~",
+          "net": "3V3"
+        }
+      }
+    },
+    "R6": {
+      "part": "r-sda",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "SENSOR_SDA"
+        },
+        "2": {
+          "name": "~",
+          "net": "3V3"
+        }
+      }
+    },
+    "R7": {
+      "part": "r-xout",
+      "pins": {
+        "1": {
+          "name": "~",
+          "net": "XOUT"
+        },
+        "2": {
+          "name": "~",
+          "net": "XOUT_X"
+        }
+      }
+    },
+    "U1": {
+      "part": "mcu",
+      "pins": {
+        "1": {
+          "name": "IOVDD",
+          "net": "3V3"
+        },
+        "10": {
+          "name": "IOVDD",
+          "net": "3V3"
+        },
+        "19": {
+          "name": "TESTEN",
+          "net": "GND"
+        },
+        "20": {
+          "name": "XIN",
+          "net": "XIN"
+        },
+        "21": {
+          "name": "XOUT",
+          "net": "XOUT"
+        },
+        "22": {
+          "name": "IOVDD",
+          "net": "3V3"
+        },
+        "23": {
+          "name": "DVDD",
+          "net": "1V1"
+        },
+        "27": {
+          "name": "GPIO16",
+          "net": "LED_DIN"
+        },
+        "33": {
+          "name": "IOVDD",
+          "net": "3V3"
+        },
+        "42": {
+          "name": "IOVDD",
+          "net": "3V3"
+        },
+        "43": {
+          "name": "ADC_AVDD",
+          "net": "3V3"
+        },
+        "44": {
+          "name": "VREG_IN",
+          "net": "3V3"
+        },
+        "45": {
+          "name": "VREG_VOUT",
+          "net": "1V1"
+        },
+        "46": {
+          "name": "USB_DM",
+          "net": "USB_DM_MCU"
+        },
+        "47": {
+          "name": "USB_DP",
+          "net": "USB_DP_MCU"
+        },
+        "48": {
+          "name": "USB_VDD",
+          "net": "3V3"
+        },
+        "49": {
+          "name": "IOVDD",
+          "net": "3V3"
+        },
+        "50": {
+          "name": "DVDD",
+          "net": "1V1"
+        },
+        "51": {
+          "name": "QSPI_SD3",
+          "net": "QSPI_SD3"
+        },
+        "52": {
+          "name": "QSPI_SCLK",
+          "net": "QSPI_SCLK"
+        },
+        "53": {
+          "name": "QSPI_SD0",
+          "net": "QSPI_SD0"
+        },
+        "54": {
+          "name": "QSPI_SD2",
+          "net": "QSPI_SD2"
+        },
+        "55": {
+          "name": "QSPI_SD1",
+          "net": "QSPI_SD1"
+        },
+        "56": {
+          "name": "QSPI_SS",
+          "net": "QSPI_SS"
+        },
+        "57": {
+          "name": "GND",
+          "net": "GND"
+        },
+        "6": {
+          "name": "GPIO4",
+          "net": "SENSOR_SDA"
+        },
+        "7": {
+          "name": "GPIO5",
+          "net": "SENSOR_SCL"
+        }
+      }
+    },
+    "U2": {
+      "part": "flash",
+      "pins": {
+        "1": {
+          "name": "~{CS}",
+          "net": "QSPI_SS"
+        },
+        "2": {
+          "name": "DO(IO1)",
+          "net": "QSPI_SD1"
+        },
+        "3": {
+          "name": "IO2",
+          "net": "QSPI_SD2"
+        },
+        "4": {
+          "name": "GND",
+          "net": "GND"
+        },
+        "5": {
+          "name": "DI(IO0)",
+          "net": "QSPI_SD0"
+        },
+        "6": {
+          "name": "CLK",
+          "net": "QSPI_SCLK"
+        },
+        "7": {
+          "name": "IO3",
+          "net": "QSPI_SD3"
+        },
+        "8": {
+          "name": "VCC",
+          "net": "3V3"
+        }
+      }
+    },
+    "U3": {
+      "part": "ldo",
+      "pins": {
+        "1": {
+          "name": "GND",
+          "net": "GND"
+        },
+        "2": {
+          "name": "VOUT",
+          "net": "3V3"
+        },
+        "3": {
+          "name": "VIN",
+          "net": "VBUS"
+        },
+        "4": {
+          "name": "VOUT",
+          "net": "3V3"
+        }
+      }
+    },
+    "U4": {
+      "part": "sensor",
+      "pins": {
+        "2": {
+          "name": "VDD",
+          "net": "3V3"
+        },
+        "3": {
+          "name": "SCL",
+          "net": "SENSOR_SCL"
+        },
+        "4": {
+          "name": "SDA",
+          "net": "SENSOR_SDA"
+        },
+        "5": {
+          "name": "GND",
+          "net": "GND"
+        }
+      }
+    },
+    "Y1": {
+      "part": "xtal",
+      "pins": {
+        "1": {
+          "name": "1",
+          "net": "XIN"
+        },
+        "2": {
+          "name": "2",
+          "net": "GND"
+        },
+        "3": {
+          "name": "3",
+          "net": "XOUT_X"
+        },
+        "4": {
+          "name": "4",
+          "net": "GND"
+        }
+      }
+    }
+  },
+  "product": "sensor-stick"
+}

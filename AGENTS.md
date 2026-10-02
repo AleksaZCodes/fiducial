@@ -371,9 +371,9 @@ The capabilities this platform ships:
 | `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
 | `design` | declares `design-system.md`; 1 pipeline(s); 4 template file(s) | `fid add capability design` |
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
-| `firmware-rp2040` | 10 template file(s); guard rules | `fid add capability firmware-rp2040` |
-| `firmware-stm32` | 9 template file(s); guard rules | `fid add capability firmware-stm32` |
-| `hardware` | declares `hardware/outline.svg`, `hardware/product.toml`; 1 pipeline(s); 10 template file(s) | `fid add capability hardware` |
+| `firmware-rp2040` | 11 template file(s); guard rules | `fid add capability firmware-rp2040` |
+| `firmware-stm32` | 10 template file(s); guard rules | `fid add capability firmware-stm32` |
+| `hardware` | declares `hardware/outline.svg`, `hardware/product.toml`; 1 pipeline(s); 11 template file(s) | `fid add capability hardware` |
 | `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
 | `legal` | declares `legal`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability legal` |

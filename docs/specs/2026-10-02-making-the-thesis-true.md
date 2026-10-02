@@ -158,6 +158,38 @@ fab files: the commands, the files a person writes, what is derived, and
 where an agent's changes land. The same story the deleted private case study
 told, about something anyone can clone.
 
+**Done (G3).** `examples/sensor-stick/` exists and its CI job (`example`)
+covers every claim in its README:
+- derive is fresh and the board routes (0 open, DRC clean);
+- every solid check passes and every part is orderable;
+- the firmware compiles and its host tests pass;
+- the page's test passes and it type-checks.
+
+Departures from the plan:
+- **Sensor:** an AHT20, not an SHT40; no SHT40 number could be verified at
+  LCSC that day.
+- **Parts:** pinned and verified, not picked, because the catalogue was
+  mid-migration.
+- **Bill:** about $5.14 of parts per board at five boards, LCSC prices with
+  minimum order quantities.
+
+Platform bugs the example found, each fixed and tested:
+- seal and fastener fields required when irrelevant;
+- a derived board always square;
+- a sealed vent placed with no room for its ring;
+- a press-fit skirt cutting the board;
+- firmware templates on `fiducial-protocol` 0.1, with ignored profiles;
+- `fid upgrade` re-conflicting forever after a resolved conflict;
+- no capability `.gitignore`;
+- LCSC refusing requests without a User-Agent;
+- easyeda2kicad's project-relative paths;
+- a wrong note on press-fit lids without a gasket.
+
+Not done:
+- the guide's captures still walk through `eda`;
+- a "case wraps the board" sizing mode (the stick declares `width_mm`);
+- flattening KiCad's `extends` symbols.
+
 ### G4 · The renders
 
 Software WebGL takes about 10 s a view; CI skips renders. Not on the paper's

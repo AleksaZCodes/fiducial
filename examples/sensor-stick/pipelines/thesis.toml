@@ -1,0 +1,33 @@
+name     = "thesis"
+executor = "fid-thesis"
+outputs  = [
+  "PITCH.md",
+  "apps/web/src/generated/thesis.ts",
+]
+
+# `thesis.toml` is the declaration. These are what it derives.
+#
+# `PITCH.md` is the arc assembled in the order you would say it out loud —
+# what, for whom, the problem, why now, why us, how, where, then what would
+# prove it wrong and where it actually stands. Sections you have not declared
+# are left out rather than stubbed, so a partial pitch reads as one you are
+# still working out instead of as an unfilled form.
+#
+# `thesis.ts` is the same claim as a typed constant, so a landing page or a
+# metadata export *imports* the sentence instead of retyping it. That is the
+# entire point: the wording lives in one file and everything else points at it.
+#
+# Both outputs wait for what they need. No thesis declared yet → nothing is
+# derived and `fid derive --check` does not ask for either, so a product is
+# never blocked on having thought of its claim. No app at `apps/web` → the
+# TypeScript module is not applicable and `PITCH.md` derives on its own, which
+# is what a product with a thesis and no website should get.
+#
+# `apps/web` is the `fid add app next` convention. A SvelteKit product moves
+# that second path; the declaration does not move.
+#
+# Deliberately NOT derived here: README.md, the i18n catalogs, and the hero
+# copy. Those stay hand-written, and `fid advise` checks them against the claim
+# instead — flagging drift without rewriting. A generated region inside a
+# translated catalog would mean deriving every locale from an English sentence
+# through a pipeline that has no translator.

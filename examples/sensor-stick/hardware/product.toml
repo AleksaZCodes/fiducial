@@ -1,0 +1,382 @@
+# hardware/product.toml — the sensor stick's physical facts, declared once.
+#
+# A USB-C stick that reports temperature and humidity to a web page. `fid
+# derive` solves it: the case, the board placed by a constraint solver, the
+# schematic, the BOM, and the interface firmware and web are built from.
+# `hardware/build.sh` routes the board, builds the solids, checks they fit
+# and go together, and writes the files a board house needs.
+#
+# Every part below is a real part: its LCSC number is verified against
+# LCSC's own record (`python3 hardware/parts.py resolve` → parts.lock), and
+# its symbol and footprint are KiCad's or fetched from LCSC's library
+# (hardware/vendor/SOURCES.md). Not built or tested on a bench.
+
+[product]
+name    = "sensor-stick"
+version = "0.1.0"
+
+[outline]
+svg      = "hardware/outline.svg"
+layer    = "outline"
+width_mm = 36.0          # wide enough for the board inside; the length follows the drawing
+
+[case]
+process      = "fdm"
+wall_mm      = 2.0
+floor_mm     = 2.0
+lid_mm       = 2.0
+clearance_mm = 0.3
+
+[case.seal]
+kind = "none"            # indoors: a printed shell, no gasket
+
+[case.fasteners]
+size    = "M2"
+closure = "press-fit"    # no screws: the lid's skirt is a friction fit
+
+[board]
+max_mm       = [26.0, 80.0]
+thickness_mm = 1.6
+layers       = 2
+fill         = 0.62
+standoff_mm  = 3.0
+mount        = "snap"
+screw        = "M2"
+near         = ["vent", "bottom"]   # under the vent at one end, against the plug's wall at the other
+edge_mm      = 0.8
+power_nets   = ["VBUS", "3V3", "GND"]
+track_mm     = 0.15                 # the RP2040's 0.4 mm-pitch QFN escapes at 0.15 / 0.127
+clearance_mm = 0.127                # JLCPCB's standard two-layer process
+
+# The plug end at the bottom; the sensor at the far end, away from the
+# regulator's and the MCU's heat, under its vent.
+[board.zones]
+usb    = "bottom"
+sensor = "top"
+
+[cost]
+currency = "USD"
+ceiling  = 15.0
+quantity = 5
+
+# ── Power: USB-C in, 3.3 V out ──────────────────────────────────────────────
+
+[[part]]
+id           = "usb"
+name         = "USB-C receptacle, 16 pin, USB 2.0"
+place        = "board"
+mount        = "smd"
+zone         = "usb"
+faces        = "top"           # the socket's mouth, as KiCad draws it: turned to face the zone's edge
+through_wall = true        # the case wall in front of it gets a window for the plug
+opening_mm   = [12.5, 6.5] # sized for a USB-C plug's moulded body, so the plug goes into the wall
+symbol       = "Connector:USB_C_Receptacle_USB2.0_16P"
+footprint    = "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12"
+height_mm    = 3.2
+mpn          = "TYPE-C-31-M-12"
+lcsc         = "C165948"
+pins         = { VBUS = "VBUS", GND = "GND", SHIELD = "GND", CC1 = "CC1", CC2 = "CC2", "D+" = "USB_DP", "D-" = "USB_DM" }
+status       = "decided"
+
+[[part]]
+id        = "r-cc1"
+name      = "CC1 pull-down: tells the host this is a device (5.1 kΩ)"
+place     = "board"
+mount     = "smd"
+symbol    = "Device:R"
+footprint = "Resistor_SMD:R_0603_1608Metric"
+height_mm = 0.5
+value     = "5.1k"
+lcsc      = "C23186"
+near      = "usb.CC1"
+pins      = { 1 = "CC1", 2 = "GND" }
+status    = "decided"
+
+[[part]]
+id        = "r-cc2"
+name      = "CC2 pull-down (5.1 kΩ)"
+place     = "board"
+mount     = "smd"
+symbol    = "Device:R"
+footprint = "Resistor_SMD:R_0603_1608Metric"
+height_mm = 0.5
+value     = "5.1k"
+lcsc      = "C23186"
+near      = "usb.CC2"
+pins      = { 1 = "CC2", 2 = "GND" }
+status    = "decided"
+
+[[part]]
+id        = "ldo"
+name      = "3.3 V regulator, 1 A"
+place     = "board"
+mount     = "smd"
+symbol    = "lcsc:AMS1117-3.3"
+footprint = "lcsc:SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR"
+height_mm = 1.8
+mpn       = "AMS1117-3.3"
+lcsc      = "C6186"
+pins      = { VIN = "VBUS", VOUT = "3V3", GND = "GND" }
+status    = "decided"
+
+[[part]]
+id        = "c-vbus"
+name      = "Regulator input capacitor (10 µF)"
+place     = "board"
+mount     = "smd"
+symbol    = "Device:C"
+footprint = "Capacitor_SMD:C_0603_1608Metric"
+height_mm = 0.9
+value     = "10uF 10V X5R"
+lcsc      = "C19702"
+near      = "ldo.VIN"
+pins      = { 1 = "VBUS", 2 = "GND" }
+status    = "decided"
+
+[[part]]
+id        = "c-3v3"
+name      = "Regulator output capacitor (10 µF)"
+place     = "board"
+mount     = "smd"
+symbol    = "Device:C"
+footprint = "Capacitor_SMD:C_0603_1608Metric"
+height_mm = 0.9
+value     = "10uF 10V X5R"
+lcsc      = "C19702"
+near      = "ldo.VOUT"
+pins      = { 1 = "3V3", 2 = "GND" }
+status    = "decided"
+
+# ── The microcontroller, its clock and its flash ────────────────────────────
+
+[[part]]
+id        = "mcu"
+name      = "RP2040 microcontroller"
+place     = "board"
+mount     = "smd"
+symbol    = "MCU_RaspberryPi:RP2040"
+footprint = "Package_DFN_QFN:QFN-56-1EP_7x7mm_P0.4mm_EP3.2x3.2mm"
+height_mm = 0.9
+mpn       = "RP2040"
+lcsc      = "C2040"
+datasheet = "https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf"
+pins      = { IOVDD = "3V3", USB_VDD = "3V3", ADC_AVDD = "3V3", VREG_IN = "3V3", VREG_VOUT = "1V1", DVDD = "1V1", GND = "GND", TESTEN = "GND", USB_DP = "USB_DP_MCU", USB_DM = "USB_DM_MCU", XIN = "XIN", XOUT = "XOUT", QSPI_SS = "QSPI_SS", QSPI_SCLK = "QSPI_SCLK", QSPI_SD0 = "QSPI_SD0", QSPI_SD1 = "QSPI_SD1", QSPI_SD2 = "QSPI_SD2", QSPI_SD3 = "QSPI_SD3", GPIO4 = "SENSOR_SDA", GPIO5 = "SENSOR_SCL", GPIO16 = "LED_DIN" }
+status    = "decided"
+
+[[part]]
+id        = "c-dec"
+name      = "Decoupling, one per RP2040 and flash supply pin (100 nF)"
+place     = "board"
+mount     = "smd"
+qty       = 5
+symbol    = "Device:C"
+footprint = "Capacitor_SMD:C_0603_1608Metric"
+height_mm = 0.9
+value     = "100nF 50V X7R"
+lcsc      = "C14663"
+near      = "mcu.IOVDD"
+pins      = { 1 = "3V3", 2 = "GND" }
+status    = "decided"
+
+[[part]]
+id        = "c-1v1"
+name      = "Core regulator output capacitor (1 µF)"
+place     = "board"
+mount     = "smd"
+symbol    = "Device:C"
+footprint = "Capacitor_SMD:C_0603_1608Metric"
+height_mm = 0.9
+value     = "1uF 50V X5R"
+lcsc      = "C15849"
+near      = "mcu.VREG_VOUT"
+pins      = { 1 = "1V1", 2 = "GND" }
+status    = "decided"
+
+[[part]]
+id        = "r-dp"
+name      = "USB D+ series resistor (27 Ω)"
+place     = "board"
+mount     = "smd"
+symbol    = "Device:R"
+footprint = "Resistor_SMD:R_0603_1608Metric"
+height_mm = 0.5
+value     = "27R"
+lcsc      = "C25190"
+near      = "mcu.USB_DP"
+pins      = { 1 = "USB_DP", 2 = "USB_DP_MCU" }
+status    = "decided"
+
+[[part]]
+id        = "r-dm"
+name      = "USB D− series resistor (27 Ω)"
+place     = "board"
+mount     = "smd"
+symbol    = "Device:R"
+footprint = "Resistor_SMD:R_0603_1608Metric"
+height_mm = 0.5
+value     = "27R"
+lcsc      = "C25190"
+near      = "mcu.USB_DM"
+pins      = { 1 = "USB_DM", 2 = "USB_DM_MCU" }
+status    = "decided"
+
+[[part]]
+id        = "xtal"
+name      = "12 MHz crystal, 20 pF load"
+place     = "board"
+mount     = "smd"
+symbol    = "Device:Crystal_GND24"
+footprint = "Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm"
+height_mm = 0.8
+mpn       = "X322512MSB4SI"
+lcsc      = "C9002"
+near      = "mcu.XIN"
+pins      = { 1 = "XIN", 3 = "XOUT_X", 2 = "GND", 4 = "GND" }
+status    = "decided"
+
+[[part]]
+id        = "r-xout"
+name      = "Crystal drive resistor (1 kΩ)"
+place     = "board"
+mount     = "smd"
+symbol    = "Device:R"
+footprint = "Resistor_SMD:R_0603_1608Metric"
+height_mm = 0.5
+value     = "1k"
+lcsc      = "C21190"
+near      = "mcu.XOUT"
+pins      = { 1 = "XOUT", 2 = "XOUT_X" }
+status    = "decided"
+
+[[part]]
+id        = "c-xin"
+name      = "Crystal load capacitor (33 pF: 2 × (20 pF − ~4 pF stray))"
+place     = "board"
+mount     = "smd"
+symbol    = "Device:C"
+footprint = "Capacitor_SMD:C_0603_1608Metric"
+height_mm = 0.9
+value     = "33pF 50V C0G"
+lcsc      = "C1663"
+near      = "xtal.1"
+pins      = { 1 = "XIN", 2 = "GND" }
+status    = "decided"
+
+[[part]]
+id        = "c-xout"
+name      = "Crystal load capacitor (33 pF)"
+place     = "board"
+mount     = "smd"
+symbol    = "Device:C"
+footprint = "Capacitor_SMD:C_0603_1608Metric"
+height_mm = 0.9
+value     = "33pF 50V C0G"
+lcsc      = "C1663"
+near      = "xtal.3"
+pins      = { 1 = "XOUT_X", 2 = "GND" }
+status    = "decided"
+
+[[part]]
+id        = "flash"
+name      = "32 Mbit QSPI flash: the firmware lives here"
+place     = "board"
+mount     = "smd"
+symbol    = "Memory_Flash:W25Q32JVSS"
+footprint = "Package_SO:SOIC-8_5.23x5.23mm_P1.27mm"
+height_mm = 2.0
+mpn       = "W25Q32JVSSIQ"
+lcsc      = "C179173"
+near      = "mcu.QSPI_SCLK"
+pins      = { "~{CS}" = "QSPI_SS", CLK = "QSPI_SCLK", "DI(IO0)" = "QSPI_SD0", "DO(IO1)" = "QSPI_SD1", IO2 = "QSPI_SD2", IO3 = "QSPI_SD3", VCC = "3V3", GND = "GND" }
+status    = "decided"
+
+# ── The sensor, in its own air ──────────────────────────────────────────────
+
+[[part]]
+id              = "vent"
+name            = "Membrane vent: adhesive ePTFE patch over a hole in the lid"
+place           = "lid"
+mount           = "vent"
+near            = "apex"     # the far end from the plug, away from the regulator's heat
+seals_to        = "sensor"   # a tube down to a ring round the sensor: it reads room air, not the board's heat
+membrane        = "outside"
+body_mm         = [8.0, 8.0, 0.3]
+pass_through_mm = 2.5
+status          = "assumed"
+dims_from       = "assumed"
+settle_by       = "Choose the patch (any adhesive ePTFE vent about 8 mm across); its size sets the hole."
+
+[[part]]
+id        = "sensor"
+name      = "Temperature and humidity sensor, I²C"
+place     = "board"
+mount     = "smd"
+zone      = "sensor"
+near      = "vent"
+symbol    = "lcsc:AHT20_C2757850"
+footprint = "lcsc:SENSOR-SMD_L3.0-W3.0-P1.00-BR"
+height_mm = 1.0
+mpn       = "AHT20"
+lcsc      = "C2757850"
+pins      = { VDD = "3V3", GND = "GND", SDA = "SENSOR_SDA", SCL = "SENSOR_SCL" }
+status    = "decided"
+
+[[part]]
+id        = "r-sda"
+name      = "I²C SDA pull-up (4.7 kΩ)"
+place     = "board"
+mount     = "smd"
+symbol    = "Device:R"
+footprint = "Resistor_SMD:R_0603_1608Metric"
+height_mm = 0.5
+value     = "4.7k"
+lcsc      = "C23162"
+near      = "mcu.GPIO4"
+pins      = { 1 = "SENSOR_SDA", 2 = "3V3" }
+status    = "decided"
+
+[[part]]
+id        = "r-scl"
+name      = "I²C SCL pull-up (4.7 kΩ)"
+place     = "board"
+mount     = "smd"
+symbol    = "Device:R"
+footprint = "Resistor_SMD:R_0603_1608Metric"
+height_mm = 0.5
+value     = "4.7k"
+lcsc      = "C23162"
+near      = "mcu.GPIO5"
+pins      = { 1 = "SENSOR_SCL", 2 = "3V3" }
+status    = "decided"
+
+# ── The light ───────────────────────────────────────────────────────────────
+
+[[part]]
+id        = "led"
+name      = "RGB status LED, addressable (shows through a lid printed in translucent filament)"
+place     = "board"
+mount     = "smd"
+symbol    = "LED:WS2812B"
+footprint = "LED_SMD:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
+height_mm = 1.6
+mpn       = "WS2812B-B/T"
+lcsc      = "C2761795"
+pins      = { VDD = "VBUS", VSS = "GND", DIN = "LED_DIN" }
+status    = "decided"
+
+[[part]]
+id        = "c-led"
+name      = "LED supply decoupling (100 nF)"
+place     = "board"
+mount     = "smd"
+symbol    = "Device:C"
+footprint = "Capacitor_SMD:C_0603_1608Metric"
+height_mm = 0.9
+value     = "100nF 50V X7R"
+lcsc      = "C14663"
+near      = "led.VDD"
+pins      = { 1 = "VBUS", 2 = "GND" }
+status    = "decided"
+
+[firmware]
+mcu = "mcu"

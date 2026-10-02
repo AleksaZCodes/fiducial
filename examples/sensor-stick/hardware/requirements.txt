@@ -1,0 +1,7 @@
+# The solid model. The derive gate needs none of this.
+build123d==0.13.0
+# Datasheet text copies for agents (parts.py sync).
+pypdf==5.1.0
+# Board placement (place.py): the constraint solver. The derive gate needs it
+# only when the placement model changes; the answer is committed.
+ortools==9.15.6755

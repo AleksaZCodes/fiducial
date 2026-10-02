@@ -38,6 +38,31 @@ the system grows by declarations, not by rules.*
 - A public example product built in this repository (`examples/sensor-stick/`,
   G3 of the plan) — the paper's worked example.
 
+## Discussion: judgment stays human; fiducial bounds the randomness
+
+The author's position, for the discussion section:
+
+- **Better models move the line, not the need.** Even with the best models,
+  a person still questions the output, applies judgment and tests it. As
+  frontier models improve, more is offloaded and the checking gets lighter,
+  but a probabilistic system cannot be guaranteed correct. Its output also
+  cannot be guaranteed to match the product's constraints and wants. Even a
+  deterministic tool is only right about what it was told.
+- **What fiducial is for.** It is the layer that reduces that randomness. It
+  is a deterministic way to build every part of a product in one place, with
+  one shared context. Declarations are the constraints, derivations are
+  repeatable, and gates refuse drift.
+- **Product-oriented, not codebase-oriented.** Scattered codebases, each
+  with an agent that knows only its own corner, give incoherent products.
+  One declaration read by every agent, across software, hardware and
+  everything between, makes a product designed as a whole.
+- **Evidence from this work.** A gate caught every disagreement, and the
+  person still had to judge what the gates could not:
+  - a catalogue that changed format overnight;
+  - a substring match that took "±0.1 %" for "1 %";
+  - a sensor isolated from the board's heat;
+  - a case its board did not fit.
+
 ## Limits to state
 
 N = 1 product; floor placement still a bounded search; autorouting not
