@@ -2,7 +2,7 @@
   "board_mm": {
     "size": [
       26.0,
-      76.0
+      79.0
     ],
     "thickness": 1.6
   },
@@ -36,8 +36,8 @@
       "U1.ADC_AVDD",
       "U1.VREG_IN",
       "U1.USB_VDD",
-      "U2.VCC",
-      "U3.VOUT",
+      "U2.VO",
+      "U3.VCC",
       "U4.VDD",
       "C2.~",
       "C3.~",
@@ -62,8 +62,8 @@
       "U1.TESTEN",
       "U1.GND",
       "U2.GND",
-      "D1.VSS",
       "U3.GND",
+      "D1.VSS",
       "Y1.2",
       "Y1.4",
       "U4.GND",
@@ -87,27 +87,27 @@
     ],
     "QSPI_SCLK": [
       "U1.QSPI_SCLK",
-      "U2.CLK"
+      "U3.CLK"
     ],
     "QSPI_SD0": [
       "U1.QSPI_SD0",
-      "U2.DI(IO0)"
+      "U3.DI(IO0)"
     ],
     "QSPI_SD1": [
       "U1.QSPI_SD1",
-      "U2.DO(IO1)"
+      "U3.DO(IO1)"
     ],
     "QSPI_SD2": [
       "U1.QSPI_SD2",
-      "U2.IO2"
+      "U3.WP#(IO2)"
     ],
     "QSPI_SD3": [
       "U1.QSPI_SD3",
-      "U2.IO3"
+      "U3.HOLD#orRESET#(IO3)"
     ],
     "QSPI_SS": [
       "U1.QSPI_SS",
-      "U2.~{CS}"
+      "U3.~{CS}"
     ],
     "SENSOR_SCL": [
       "U1.GPIO5",
@@ -137,8 +137,8 @@
     ],
     "VBUS": [
       "J1.VBUS",
+      "U2.VI",
       "D1.VDD",
-      "U3.VIN",
       "C8.~",
       "C9.~"
     ],
@@ -588,6 +588,23 @@
       }
     },
     "U2": {
+      "part": "ldo",
+      "pins": {
+        "1": {
+          "name": "GND",
+          "net": "GND"
+        },
+        "2": {
+          "name": "VO",
+          "net": "3V3"
+        },
+        "3": {
+          "name": "VI",
+          "net": "VBUS"
+        }
+      }
+    },
+    "U3": {
       "part": "flash",
       "pins": {
         "1": {
@@ -599,7 +616,7 @@
           "net": "QSPI_SD1"
         },
         "3": {
-          "name": "IO2",
+          "name": "WP#(IO2)",
           "net": "QSPI_SD2"
         },
         "4": {
@@ -615,32 +632,11 @@
           "net": "QSPI_SCLK"
         },
         "7": {
-          "name": "IO3",
+          "name": "HOLD#orRESET#(IO3)",
           "net": "QSPI_SD3"
         },
         "8": {
           "name": "VCC",
-          "net": "3V3"
-        }
-      }
-    },
-    "U3": {
-      "part": "ldo",
-      "pins": {
-        "1": {
-          "name": "GND",
-          "net": "GND"
-        },
-        "2": {
-          "name": "VOUT",
-          "net": "3V3"
-        },
-        "3": {
-          "name": "VIN",
-          "net": "VBUS"
-        },
-        "4": {
-          "name": "VOUT",
           "net": "3V3"
         }
       }

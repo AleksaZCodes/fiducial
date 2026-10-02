@@ -38,6 +38,7 @@ Paths are relative to `hardware/lib/`. Search a datasheet's `.txt` before readin
 - **dimensions from:** footprint
 - **symbol:** `Connector:USB_C_Receptacle_USB2.0_16P` (in [symbols.kicad_sym](symbols.kicad_sym))
 - **footprint:** `Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12` → [footprints/USB_C_Receptacle_HRO_TYPE-C-31-M-12.kicad_mod](footprints/USB_C_Receptacle_HRO_TYPE-C-31-M-12.kicad_mod)
+- **3D model:** [3d/USB_C_Receptacle_HRO_TYPE-C-31-M-12.step](3d/USB_C_Receptacle_HRO_TYPE-C-31-M-12.step)
 - **datasheet:** not yet fetched — https://datasheet.lcsc.com/datasheet/pdf/9e56b777c022540fcce7c7f67825f55e.pdf?productCode=C165948; see `problems` in manifest.json
 - **pins → nets:** `VBUS` → `VBUS`, `GND` → `GND`, `SHIELD` → `GND`, `CC1` → `CC1`, `CC2` → `CC2`, `D+` → `USB_DP`, `D-` → `USB_DM`
 
@@ -76,10 +77,11 @@ Paths are relative to `hardware/lib/`. Search a datasheet's `.txt` before readin
 - **LCSC:** C6186
 - **status:** decided
 - **dimensions from:** footprint
-- **symbol:** `lcsc:AMS1117-3.3` (in [symbols.kicad_sym](symbols.kicad_sym))
-- **footprint:** `lcsc:SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR` → [footprints/SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR.kicad_mod](footprints/SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR.kicad_mod)
+- **symbol:** `Regulator_Linear:AMS1117-3.3` (in [symbols.kicad_sym](symbols.kicad_sym))
+- **footprint:** `Package_TO_SOT_SMD:SOT-223-3_TabPin2` → [footprints/SOT-223-3_TabPin2.kicad_mod](footprints/SOT-223-3_TabPin2.kicad_mod)
+- **3D model:** [3d/SOT-223.step](3d/SOT-223.step)
 - **datasheet:** not yet fetched — https://datasheet.lcsc.com/datasheet/pdf/e6935943fc6b1bbf350a1a0f3e90dc4a.pdf?productCode=C6186; see `problems` in manifest.json
-- **pins → nets:** `VIN` → `VBUS`, `VOUT` → `3V3`, `GND` → `GND`
+- **pins → nets:** `VI` → `VBUS`, `VO` → `3V3`, `GND` → `GND`
 
 ## `c-vbus` — Regulator input capacitor (10 µF)
 
@@ -93,7 +95,7 @@ Paths are relative to `hardware/lib/`. Search a datasheet's `.txt` before readin
 - **3D model:** [3d/C_0603_1608Metric.step](3d/C_0603_1608Metric.step)
 - **datasheet:** not yet fetched — https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C19702; see `problems` in manifest.json
 - **pins → nets:** `1` → `VBUS`, `2` → `GND`
-- **placed near:** `ldo.VIN`
+- **placed near:** `ldo.VI`
 
 ## `c-3v3` — Regulator output capacitor (10 µF)
 
@@ -107,7 +109,7 @@ Paths are relative to `hardware/lib/`. Search a datasheet's `.txt` before readin
 - **3D model:** [3d/C_0603_1608Metric.step](3d/C_0603_1608Metric.step)
 - **datasheet:** not yet fetched — https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C19702; see `problems` in manifest.json
 - **pins → nets:** `1` → `3V3`, `2` → `GND`
-- **placed near:** `ldo.VOUT`
+- **placed near:** `ldo.VO`
 
 ## `mcu` — RP2040 microcontroller
 
@@ -242,10 +244,11 @@ Paths are relative to `hardware/lib/`. Search a datasheet's `.txt` before readin
 - **LCSC:** C179173
 - **status:** decided
 - **dimensions from:** footprint
-- **symbol:** `Memory_Flash:W25Q32JVSS` (in [symbols.kicad_sym](symbols.kicad_sym))
-- **footprint:** `Package_SO:SOIC-8_5.23x5.23mm_P1.27mm` → [footprints/SOIC-8_5.23x5.23mm_P1.27mm.kicad_mod](footprints/SOIC-8_5.23x5.23mm_P1.27mm.kicad_mod)
+- **symbol:** `lcsc:W25Q32JVSSIQ_C179173` (in [symbols.kicad_sym](symbols.kicad_sym))
+- **footprint:** `lcsc:SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL` → [footprints/SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL.kicad_mod](footprints/SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL.kicad_mod)
+- **3D model:** [3d/SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL.step](3d/SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL.step)
 - **datasheet:** not yet fetched — https://datasheet.lcsc.com/datasheet/pdf/5e9d1528bd9ff612cdac1a3e34dc8d43.pdf?productCode=C179173; see `problems` in manifest.json
-- **pins → nets:** `~{CS}` → `QSPI_SS`, `CLK` → `QSPI_SCLK`, `DI(IO0)` → `QSPI_SD0`, `DO(IO1)` → `QSPI_SD1`, `IO2` → `QSPI_SD2`, `IO3` → `QSPI_SD3`, `VCC` → `3V3`, `GND` → `GND`
+- **pins → nets:** `~{CS}` → `QSPI_SS`, `CLK` → `QSPI_SCLK`, `DI(IO0)` → `QSPI_SD0`, `DO(IO1)` → `QSPI_SD1`, `WP#(IO2)` → `QSPI_SD2`, `HOLD#orRESET#(IO3)` → `QSPI_SD3`, `VCC` → `3V3`, `GND` → `GND`
 - **placed near:** `mcu.QSPI_SCLK`
 
 ## `vent` — Membrane vent: adhesive ePTFE patch over a hole in the lid
@@ -265,6 +268,7 @@ Paths are relative to `hardware/lib/`. Search a datasheet's `.txt` before readin
 - **dimensions from:** footprint
 - **symbol:** `lcsc:AHT20_C2757850` (in [symbols.kicad_sym](symbols.kicad_sym))
 - **footprint:** `lcsc:SENSOR-SMD_L3.0-W3.0-P1.00-BR` → [footprints/SENSOR-SMD_L3.0-W3.0-P1.00-BR.kicad_mod](footprints/SENSOR-SMD_L3.0-W3.0-P1.00-BR.kicad_mod)
+- **3D model:** [3d/SENSOR-SMD_L3.0-W3.0-P1.00-BR.step](3d/SENSOR-SMD_L3.0-W3.0-P1.00-BR.step)
 - **datasheet:** not yet fetched — https://datasheet.lcsc.com/datasheet/pdf/4041f814f74dc23f80e16d036fbdeb72.pdf?productCode=C2757850; see `problems` in manifest.json
 - **pins → nets:** `VDD` → `3V3`, `GND` → `GND`, `SDA` → `SENSOR_SDA`, `SCL` → `SENSOR_SCL`
 - **placed near:** `vent`

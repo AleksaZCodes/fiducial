@@ -18,7 +18,7 @@ plugged it in. What would be learnt on the bench is not claimed here.
 | | | |
 |---|---|---|
 | ![The stick, assembled](hardware/showcase/assembled.png) | ![The routed board in the case](hardware/showcase/board.png) | ![Exploded: lid, board, base](hardware/showcase/exploded.png) |
-| assembled: 36 × 84 × 15.8 mm, the USB-C window at one end, the sensor's vent at the other | the routed board in the base: the sensor alone at the far end, under its chimney | lid, board, base |
+| assembled: 36 × 88.8 × 15.5 mm, the USB-C window at one end, the sensor's vent at the other | the routed board in the base: the sensor alone at the far end, under its chimney | lid, board, base |
 
 Renders from `hardware/build.sh`, copied to `hardware/showcase/`.
 
@@ -28,7 +28,7 @@ Renders from `hardware/build.sh`, copied to `hardware/showcase/`.
 |---|---|
 | [`hardware/product.toml`](hardware/product.toml) | the product: its outline, its case, every part (an LCSC number, a KiCad symbol and footprint) and what each pin connects to |
 | [`hardware/outline.svg`](hardware/outline.svg) | the stick's shape, seen from above |
-| [`hardware/vendor/`](hardware/vendor) | two parts KiCad has no library entry for, fetched from LCSC's (`parts.py fetch`), with where each came from |
+| [`hardware/vendor/`](hardware/vendor) | parts KiCad has no entry or no 3D model for, from LCSC's library (`parts.py fetch`), and the USB-C socket: KiCad's land pattern with LCSC's model on it, with where each came from |
 | [`firmware/rp2040/src/main.rs`](firmware/rp2040/src/main.rs), [`firmware/shared/src/lib.rs`](firmware/shared/src/lib.rs) | the firmware: read the sensor once a second, send the reading as a fiducial-protocol frame over USB serial, colour the LED |
 | [`web/src/`](web/src) | the page: connect over Web Serial, show the reading |
 

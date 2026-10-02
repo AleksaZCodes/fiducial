@@ -36,18 +36,28 @@ What the stick is, chosen by a person:
 - the passives each of those needs.
 
 Each part names a KiCad symbol and footprint, and an LCSC number. KiCad's own
-libraries cover the RP2040, the regulator, the crystal, the LED and the
-passives, with 3D models. The rest come from LCSC's library, which has a
-symbol, a footprint and a model made for one another:
+libraries cover the RP2040, the regulator, the crystal, the LED, the USB-C
+socket's land pattern and the passives. KiCad has no AHT20 at all, and no 3D
+model for the flash's package or for the socket. LCSC's library has all
+three, each with a symbol, a footprint and a model made for one another:
 
 ```sh
-python3 hardware/parts.py fetch C2757850 C165948 C179173   # AHT20, USB-C socket, flash
+python3 hardware/parts.py fetch C2757850 C179173 C165948   # AHT20, flash, USB-C socket
 ```
 
-It lists the library ids to declare (`lcsc:AHT20_C2757850`, …). KiCad has no
-AHT20. For the socket and the flash, KiCad's footprints exist but its 3D
-library has no model for them, so they would render as boxes. Write down
-where each came from in `hardware/vendor/SOURCES.md`.
+It lists the library ids to declare (`lcsc:AHT20_C2757850`, …), converted to
+the current KiCad format.
+
+The sensor and the flash use LCSC's entries whole. The socket does not:
+- **LCSC's footprint fails DRC.** Its pads sit 0.10 mm apart, and its
+  locating pegs are plated holes with no ring.
+- **So the socket is KiCad's footprint with LCSC's model.** A copy of the
+  footprint in `hardware/vendor/Connector_USB.pretty/` (the vendor folder
+  overrides KiCad's library) names the model, offset 1.05 mm. That offset
+  centres the model's legs and pegs in KiCad's drilled holes, which
+  `cad.py` drills and checks.
+
+Write down where each came from in `hardware/vendor/SOURCES.md`.
 
 ### 3. Declare it
 
@@ -176,6 +186,8 @@ Each mistake was refused at the step that made it, by name.
 | parts | the socket, flash and sensor had no 3D model | KiCad's 3D library lacks them | product: fetched from LCSC's library |
 | route | 64 connections open after fetching from LCSC's library | easyeda2kicad writes KiCad 5 footprints, which lose their nets in a current board | **platform**: `fetch` converts them with `kicad-cli fp upgrade`; a KiCad 5 footprint is refused by name |
 | route | still dozens open, pads too close for DRC | the fetched footprints' courtyards miss their own pads, so neighbours were placed on that copper | **platform**: a footprint's size covers every pad plus KiCad's 0.25 mm margin |
+| review | none: the USB-C socket faced into the case | `faces = "top"` read KiCad's drawing backwards; the window was cut wherever the socket's front was declared | product: `faces = "bottom"`, found by comparing two drawings of the part. No gate checks a socket's mouth against its model |
+| DRC | LCSC's socket footprint: pads 0.10 mm apart, ringless plated pegs | a library land pattern that fails the board's own rules | product: KiCad's land pattern, LCSC's model on it |
 | derive | `[case.seal]` is missing `groove_mm` | a case with no seal still had to describe a gasket | **platform**: seal and fastener fields default |
 | derive | the board is 42 × 42 mm, over `board.max_mm` | a derived board was always square | **platform**: one side held at its ceiling, the other carries the area |
 | derive | the chimney's ring and the vent's lean cannot hold together | the vent sat too close to the wall for its ring | **platform**: a sealed vent is placed by its chimney's footprint |
@@ -187,7 +199,7 @@ Each mistake was refused at the step that made it, by name.
 | doctor | the declaration and the firmware reported as drift | they were classed as platform-owned | **platform**: product-owned |
 | render | the case was another product's orange | a platform default copied from a product | **platform**: `case.colour`, a neutral default |
 
-Twelve of the fifteen were the platform's. Each was fixed in the platform,
+Twelve of the seventeen were the platform's, and one (the socket facing inward) no gate caught: a person, or an agent asked to look, has to. Each was fixed in the platform,
 where every later product gets the fix, with a test. The decision record is
 `docs/specs/2026-10-02-making-the-thesis-true.md`.
 

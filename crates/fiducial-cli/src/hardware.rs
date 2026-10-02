@@ -2836,6 +2836,8 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
         let mut keepouts: Vec<Value> = Vec::new();
         // Where each placed part's pads are, and its pin names → pad numbers.
         let mut pads_by_id: BTreeMap<String, Vec<(String, P)>> = BTreeMap::new();
+        // Each footprint pad's drill, in `pads_by_id`'s order: what cad.py drills.
+        let mut drills_by_id: BTreeMap<String, Vec<Value>> = BTreeMap::new();
         let mut pin_names: BTreeMap<String, BTreeMap<String, Vec<String>>> = BTreeMap::new();
         // Every net and who is on it, for the one-ended check below.
         let mut members: BTreeMap<String, Vec<(String, bool)>> = BTreeMap::new();
@@ -3535,9 +3537,17 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                                 "at_mm": [r3(origin.0 + c * px - s * py), r3(origin.1 + s * px + c * py)],
                                 // Its extent on the board, turned with the part.
                                 "size_mm": if (rot.rem_euclid(180.0) - 90.0).abs() < 1e-6 { [pd.size.1, pd.size.0] } else { [pd.size.0, pd.size.1] },
+                                // A through-hole pad's drill, turned the same way:
+                                // cad.py drills it, so a lead or peg is not read
+                                // as the part colliding with its own board.
+                                "drill_mm": pd.drill.map(|d| if (rot.rem_euclid(180.0) - 90.0).abs() < 1e-6 { [d.1, d.0] } else { [d.0, d.1] }),
                             })
                         })
                         .collect();
+                    drills_by_id.insert(
+                        q.id.clone(),
+                        pads.iter().map(|p| p["drill_mm"].clone()).collect(),
+                    );
                     pads_by_id.insert(
                         q.id.clone(),
                         pads.iter()
@@ -3678,7 +3688,13 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                     "pin_names": sym.map(|s| pin_nets.keys().filter_map(|pad| {
                         s.pins.iter().find(|sp| &sp.number == pad).map(|sp| (pad.clone(), sp.name.clone()))
                     }).collect::<BTreeMap<_, _>>()),
-                    "pads_at": pads_by_id.get(&q.id).map(|v| v.iter().map(|(n, p)| json!({"pin": n, "at_mm": [p.0, p.1]})).collect::<Vec<_>>()),
+                    "pads_at": pads_by_id.get(&q.id).map(|v| v.iter().enumerate().map(|(i, (n, p))| {
+                        let mut pad = json!({"pin": n, "at_mm": [p.0, p.1]});
+                        if let Some(d) = drills_by_id.get(&q.id).and_then(|d| d.get(i)).filter(|d| !d.is_null()) {
+                            pad["drill_mm"] = d.clone();
+                        }
+                        pad
+                    }).collect::<Vec<_>>()),
                     "value": q.value,
                     "follows": q.follows,
                     "drill_mm": q.drill_mm,

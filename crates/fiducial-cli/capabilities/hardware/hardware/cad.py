@@ -625,6 +625,21 @@ def build(L):
             if q.get("drill_mm"):
                 for pd in q.get("pads_at") or []:
                     pcb -= cyl(pd["at_mm"], q["drill_mm"] / 2, z - 1, b["thickness_mm"] + 2)
+            # And every hole a footprint drills: a connector's shell legs and
+            # locating pegs go into the board, which is not a collision.
+            for pd in q.get("pads_at") or []:
+                if dr := pd.get("drill_mm"):
+                    w, h = dr
+                    if abs(w - h) < 1e-6:
+                        pcb -= cyl(pd["at_mm"], w / 2, z - 1, b["thickness_mm"] + 2)
+                    else:  # an oval drill, as a slot: a box and its two round ends
+                        r = min(w, h) / 2
+                        (px, py), along_x = pd["at_mm"], w > h
+                        d = (max(w, h) - min(w, h)) / 2
+                        ends = [(px - d, py), (px + d, py)] if along_x else [(px, py - d), (px, py + d)]
+                        pcb -= box((px, py), (max(w, h) - 2 * r if along_x else w, h - 2 * r if not along_x else h), z - 1, b["thickness_mm"] + 2)
+                        for e in ends:
+                            pcb -= cyl(e, r, z - 1, b["thickness_mm"] + 2)
         solids["board"] = (pcb, "pcb", "board")
         top = z + b["thickness_mm"]
         routed = (BUILD / "copper.json").exists()

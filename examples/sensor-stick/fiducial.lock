@@ -882,7 +882,7 @@ echo "done: hardware/build/ (review pack in hardware/build/review/)"
 
 [templates."hardware/cad.py"]
 source_version = "0.9.0"
-hash = "e66d2ae4c9ecedd269e82adbfc81772a3d8add385fbb652510e6aa693add4543"
+hash = "b2f7ff3794f5edee5b5e0361c6f80f5720228cf5c5477b69e1f3879805053a30"
 base_content = '''
 #!/usr/bin/env python3
 """hardware/generated/layout.json -> a functional, assemblable model.
@@ -1511,6 +1511,21 @@ def build(L):
             if q.get("drill_mm"):
                 for pd in q.get("pads_at") or []:
                     pcb -= cyl(pd["at_mm"], q["drill_mm"] / 2, z - 1, b["thickness_mm"] + 2)
+            # And every hole a footprint drills: a connector's shell legs and
+            # locating pegs go into the board, which is not a collision.
+            for pd in q.get("pads_at") or []:
+                if dr := pd.get("drill_mm"):
+                    w, h = dr
+                    if abs(w - h) < 1e-6:
+                        pcb -= cyl(pd["at_mm"], w / 2, z - 1, b["thickness_mm"] + 2)
+                    else:  # an oval drill, as a slot: a box and its two round ends
+                        r = min(w, h) / 2
+                        (px, py), along_x = pd["at_mm"], w > h
+                        d = (max(w, h) - min(w, h)) / 2
+                        ends = [(px - d, py), (px + d, py)] if along_x else [(px, py - d), (px, py + d)]
+                        pcb -= box((px, py), (max(w, h) - 2 * r if along_x else w, h - 2 * r if not along_x else h), z - 1, b["thickness_mm"] + 2)
+                        for e in ends:
+                            pcb -= cyl(e, r, z - 1, b["thickness_mm"] + 2)
         solids["board"] = (pcb, "pcb", "board")
         top = z + b["thickness_mm"]
         routed = (BUILD / "copper.json").exists()
@@ -1784,8 +1799,9 @@ def fit_perimeter(pts):
 EXPLODE = {"base": 0, "socket": 25, "board": 45, "wall": 0, "lid": 110, "top": 145, "screws": 150, "wires": 0}
 
 LOOK = {  # colour, metalness, roughness, opacity — the renderer reads these
-    "plastic": ["#b85207", 0.0, 0.55, 1.0],
-    "plastic-lid": ["#c9661a", 0.0, 0.5, 1.0],
+    # The case: `case.colour` when declared (see main), else a neutral grey.
+    "plastic": ["#9a9c9f", 0.0, 0.55, 1.0],
+    "plastic-lid": ["#aeb0b3", 0.0, 0.5, 1.0],
     "tpu": ["#1b1b1f", 0.0, 0.9, 1.0],
     "panel": ["#1c2a4a", 0.3, 0.2, 1.0],
     "pcb": ["#0f4a28", 0.0, 0.5, 1.0],
@@ -1808,8 +1824,17 @@ LOOK = {  # colour, metalness, roughness, opacity — the renderer reads these
 }
 
 
+def lighter(hex_colour: str, by: float) -> str:
+    """The same colour, `by` of the way to white: the lid, a shade off the base."""
+    rgb = [int(hex_colour[k:k + 2], 16) for k in (1, 3, 5)]
+    return "#" + "".join(f"{round(v + (255 - v) * by):02x}" for v in rgb)
+
+
 def main() -> int:
     L = json.loads(LAYOUT.read_text())
+    if colour := L["case"].get("colour"):
+        LOOK["plastic"][0] = colour
+        LOOK["plastic-lid"][0] = lighter(colour, 0.12)
     BUILD.mkdir(parents=True, exist_ok=True)
     # A part that is no longer declared must not linger as a solid from an
     # earlier build: the viewer and a reviewer would both believe it.
@@ -2048,7 +2073,7 @@ base_content = """
 
 [templates."hardware/parts.py"]
 source_version = "0.9.0"
-hash = "f729746d909553b1142178020ed94998f4a13b701c6e42028cfd9e7310def7e3"
+hash = "6abd88405124cb320979d342df0dabc38e31143dba8544ebc50f6cc6003b40d2"
 base_content = '''
 #!/usr/bin/env python3
 """Vendor every declared part's KiCad component into hardware/lib/.
@@ -2205,6 +2230,45 @@ def symbol_block(text: str, name: str) -> str | None:
                 if depth == 0:
                     return text[i : j + 1]
     return None
+
+
+def children(block: str) -> list[str]:
+    """The s-expressions directly inside a block, in order."""
+    out, depth, in_str, start = [], 0, False, 0
+    for j, c in enumerate(block):
+        if c == '"' and block[j - 1] != "\\":
+            in_str = not in_str
+        elif not in_str and c == "(":
+            depth += 1
+            if depth == 2:
+                start = j
+        elif not in_str and c == ")":
+            if depth == 2:
+                out.append(block[start : j + 1])
+            depth -= 1
+    return out
+
+
+def flatten(text: str, block: str, name: str) -> str | None:
+    """A symbol that `extends` another, made whole: the parent's pins and
+    drawing under this symbol's own name and properties. KiCad's libraries
+    derive most variants this way (AMS1117-3.3 extends AP1117-15), and a
+    schematic needs the whole symbol. None when the parent is not in `text`."""
+    m = re.search(r'\(extends "([^"]+)"\)', block[:400])
+    if not m:
+        return block
+    parent_name = m.group(1)
+    parent = symbol_block(text, parent_name)
+    parent = parent and flatten(text, parent, parent_name)
+    if parent is None:
+        return None
+    own = [c for c in children(block) if c.startswith("(property")]
+    kept = [
+        c.replace(f'(symbol "{parent_name}_', f'(symbol "{name}_', 1) if c.startswith("(symbol") else c
+        for c in children(parent)
+        if not c.startswith("(property")
+    ]
+    return f'(symbol "{name}"\n    ' + "\n    ".join(own + kept) + ")"
 
 
 def open_url(url: str, timeout: float):
@@ -2674,6 +2738,16 @@ def fetch_lcsc(args: list[str]) -> int:
         except subprocess.CalledProcessError as e:
             print(f"{code}: easyeda2kicad failed ({e.returncode}) — it needs easyeda.com reachable", file=sys.stderr)
             return 1
+    # easyeda2kicad writes footprints in KiCad 5's `(module …)` format. A board
+    # that embeds one loses its pads' nets and cannot be routed, so KiCad's own
+    # converter brings the library to the current format, once, here.
+    try:
+        subprocess.run(["kicad-cli", "fp", "upgrade", "--force", str(VENDOR / "lcsc.pretty")],
+                       check=True, capture_output=True)
+    except (FileNotFoundError, subprocess.CalledProcessError) as e:
+        print(f"could not upgrade hardware/vendor/lcsc.pretty to the current KiCad format ({e}); "
+              "run `kicad-cli fp upgrade --force hardware/vendor/lcsc.pretty`", file=sys.stderr)
+        return 1
     footprints = sorted(f.stem for f in (VENDOR / "lcsc.pretty").glob("*.kicad_mod"))
     sym_file = VENDOR / "lcsc.kicad_sym"
     symbols = sorted(set(re.findall(r'^\s*\(symbol "([^"]+?)"', sym_file.read_text(), re.M))) if sym_file.exists() else []
@@ -2748,8 +2822,10 @@ def sync() -> int:
             src = own if own.exists() and symbol_block(own.read_text(), name) else SYM_DIR / f"{lib}.kicad_sym"
             block = symbol_block(src.read_text(), name) if src.exists() else None
             if block:
-                if "(extends " in block[:400]:
-                    problems.append(f"{part['id']}: symbol {sym_id} extends another symbol; vendor its parent too")
+                whole = flatten(src.read_text(), block, name)
+                if whole is None:
+                    problems.append(f"{part['id']}: symbol {sym_id} extends a symbol not in {src.name}")
+                block = whole or block
                 # One library entry per symbol, however many parts use it;
                 # named by the full id, so Device:R and a vendor R never collide.
                 if sym_id not in seen:
@@ -3898,7 +3974,7 @@ if __name__ == "__main__":
 
 [templates."hardware/viewer.html"]
 source_version = "0.9.0"
-hash = "2346e53051a45a68e2ad6743af898a4692b509f0e0f618d2d99df67dcd254a70"
+hash = "d4b03d05d687f317342bc1becef8e1fcdf1cb1e6cacc720ed4012ab847eb6a0d"
 base_content = """
 <!doctype html>
 <!--
@@ -3930,7 +4006,7 @@ base_content = """
   #checks b.ok { color: #2e8b57; } #checks b.bad { color: #c0392b; }
   #ui { bottom: 16px; right: 16px; display: flex; gap: 6px; flex-wrap: wrap; }
   #ui button { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
-  #ui button[aria-pressed="true"] { background: #b85207; color: #fff; border-color: #b85207; }
+  #ui button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
   body.shot #ui { display: none; }
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}</script>
@@ -4288,17 +4364,17 @@ base_content = """
 [artifacts."hardware/generated/assembly.md"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "a9ed8bad62280d1fcf5c741dc71d835b0f3b8f9d46631d09f0596f229aac2c27"
+hash = "0cfe12af0087768791da36dd6a7265efcb73e7893246601fcfac35e05346b7f5"
 
 [artifacts."hardware/generated/board.kicad_pcb"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "dfc64ca9d9c37a9dd1d73cf4f0a3e123b36ae8e3bbbaa668892d41819c3bcd9b"
+hash = "a0c21541ef5d9723ad0e575e90654c2ff760158661f58fe01289095ed7adc006"
 
 [artifacts."hardware/generated/board.kicad_sch"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "5bf225c2e32da2ba7b846de4cb8d1e95c73509a1f75f5f9ea71ab4dc465853ef"
+hash = "d7002215eae3b407a74b94896359e92a39051b97e0dca33a1ea35500543103cb"
 
 [artifacts."hardware/generated/board.rs"]
 pipeline = "hardware"
@@ -4308,32 +4384,32 @@ hash = "bf7afda3e9e69a60c7bcf51ef7e89fb7ebcbe1783706436ff7809e9f8bc6d7c1"
 [artifacts."hardware/generated/bom.csv"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "5cc25cdfbe5651bdda5a43bb2bc9360fd864d3a89d63359ce5f4f0d7ac85c4c2"
+hash = "3639fb7cf7cb75f9d2a59cce41be2ecbf80fb9f9717b79d9c306d0ee63569467"
 
 [artifacts."hardware/generated/interface.json"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "24910ebfddf1887414e6704c7c905d1f926c18fc39c95ea6c39296dad84fa0d2"
+hash = "3b982a34ce06153e93576c672e852d05c4dca406a108e27347690da7773ee1f2"
 
 [artifacts."hardware/generated/interface.ts"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "cc5531092dc82fbc98f6531584435bb52dbb233ae255e19c6212ba82c8d7d794"
+hash = "36a3cf49a0cef6137089adbd84a47a7c17c792d85d587c7fb5ddd6ed1e954d57"
 
 [artifacts."hardware/generated/layout.json"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "9a6a8cc6f0d572d1164cf692bb899e08855b6e1a9e2de9ba4440757420636bed"
+hash = "750db76032dd8901920e3bf013072616fc7b66178525fa3b74e7314a5c6955ac"
 
 [artifacts."hardware/generated/placement-model.json"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "0adda314869894ce500ae5180626b539ce41014969af2ab4732853ae9522d263"
+hash = "a238f7eadbb7e0b70b9c70645f2ce34e6bc03af1565f7a0e69513fdf10716ebb"
 
 [artifacts."hardware/generated/placement.json"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "d2e56736f059b501c2668f0a60659f90af58344d871899becdd937e85a200dae"
+hash = "501212db9cf16ebba4af9da0b4b72aa192cc97981c6b9343fb645e85f27b43e8"
 
 [capabilities.firmware-rp2040]
 source = "built-in"
@@ -4377,25 +4453,37 @@ hash = "c9cacb54994c0aa1d42dfe9c3fb385868f53f5a8d826a51a7f08056f34d871b4"
 pipelines = ["hardware"]
 
 [inputs."hardware/lib/footprints/SENSOR-SMD_L3.0-W3.0-P1.00-BR.kicad_mod"]
-hash = "7093935b434594533161fbb037df16b52b36827c9a25baacf0ec396c72afd9ce"
+hash = "a42198dbbf55cfdd2f434919256d14353ebf093d86e923d14c72c361f5f21237"
 pipelines = ["hardware"]
 
 [inputs."hardware/lib/footprints/SOIC-8_5.23x5.23mm_P1.27mm.kicad_mod"]
 hash = "d3e82662bb5a80f51f9d1bbf3f48c13b0eecc326171a0886c75d9ed5b7ae1d6f"
 pipelines = ["hardware"]
 
+[inputs."hardware/lib/footprints/SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL.kicad_mod"]
+hash = "e0003a02e2b727d04a5cd43de353aef71722ec2906fbb0a8c7ae56c10625855a"
+pipelines = ["hardware"]
+
 [inputs."hardware/lib/footprints/SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR.kicad_mod"]
 hash = "7f88aef56f1c91611235493bb6c3441c593b766db60482e3a635491606e07e38"
 pipelines = ["hardware"]
 
+[inputs."hardware/lib/footprints/SOT-223-3_TabPin2.kicad_mod"]
+hash = "becb00034848d4e5adc1105530a9fd64d9f4378deecea5d6bf66ff45521ebe00"
+pipelines = ["hardware"]
+
+[inputs."hardware/lib/footprints/USB-C_SMD-TYPE-C-31-M-12_1.kicad_mod"]
+hash = "23f0330aa064caa45ec3fb10cabf2e57691cf355c1c692a32e2d7d1f54ab0a49"
+pipelines = ["hardware"]
+
 [inputs."hardware/lib/footprints/USB_C_Receptacle_HRO_TYPE-C-31-M-12.kicad_mod"]
-hash = "ce599c14f9985fb5ec52e871848719aab420d4378c4bd79b8538e270b641b688"
+hash = "b262a7083e277ed417c399a56dc25386b7948daa7d9729ec76dc5839ce6b626a"
 pipelines = ["hardware"]
 
 [inputs."hardware/outline.svg"]
-hash = "76ebe44ca54c0d58d650d0b3d76bab5a77c0ad309d3467c6701b35643cb884b2"
+hash = "972bf03777173a41052a57b29cab05844971adbb5a38229a90ef9cdaaec9886f"
 pipelines = ["hardware"]
 
 [inputs."hardware/product.toml"]
-hash = "7041a6c022bbac1676c3cdc4969354f435dba27daf6fbe6f29b31c3110c14541"
+hash = "ea74dcfd7146e302cd082dbc0fb726d09bf65f889c18187fd5f8e5e7b3b3cd75"
 pipelines = ["hardware"]

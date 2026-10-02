@@ -625,6 +625,21 @@ def build(L):
             if q.get("drill_mm"):
                 for pd in q.get("pads_at") or []:
                     pcb -= cyl(pd["at_mm"], q["drill_mm"] / 2, z - 1, b["thickness_mm"] + 2)
+            # And every hole a footprint drills: a connector's shell legs and
+            # locating pegs go into the board, which is not a collision.
+            for pd in q.get("pads_at") or []:
+                if dr := pd.get("drill_mm"):
+                    w, h = dr
+                    if abs(w - h) < 1e-6:
+                        pcb -= cyl(pd["at_mm"], w / 2, z - 1, b["thickness_mm"] + 2)
+                    else:  # an oval drill, as a slot: a box and its two round ends
+                        r = min(w, h) / 2
+                        (px, py), along_x = pd["at_mm"], w > h
+                        d = (max(w, h) - min(w, h)) / 2
+                        ends = [(px - d, py), (px + d, py)] if along_x else [(px, py - d), (px, py + d)]
+                        pcb -= box((px, py), (max(w, h) - 2 * r if along_x else w, h - 2 * r if not along_x else h), z - 1, b["thickness_mm"] + 2)
+                        for e in ends:
+                            pcb -= cyl(e, r, z - 1, b["thickness_mm"] + 2)
         solids["board"] = (pcb, "pcb", "board")
         top = z + b["thickness_mm"]
         routed = (BUILD / "copper.json").exists()
@@ -898,8 +913,9 @@ def fit_perimeter(pts):
 EXPLODE = {"base": 0, "socket": 25, "board": 45, "wall": 0, "lid": 110, "top": 145, "screws": 150, "wires": 0}
 
 LOOK = {  # colour, metalness, roughness, opacity — the renderer reads these
-    "plastic": ["#b85207", 0.0, 0.55, 1.0],
-    "plastic-lid": ["#c9661a", 0.0, 0.5, 1.0],
+    # The case: `case.colour` when declared (see main), else a neutral grey.
+    "plastic": ["#9a9c9f", 0.0, 0.55, 1.0],
+    "plastic-lid": ["#aeb0b3", 0.0, 0.5, 1.0],
     "tpu": ["#1b1b1f", 0.0, 0.9, 1.0],
     "panel": ["#1c2a4a", 0.3, 0.2, 1.0],
     "pcb": ["#0f4a28", 0.0, 0.5, 1.0],
@@ -922,8 +938,17 @@ LOOK = {  # colour, metalness, roughness, opacity — the renderer reads these
 }
 
 
+def lighter(hex_colour: str, by: float) -> str:
+    """The same colour, `by` of the way to white: the lid, a shade off the base."""
+    rgb = [int(hex_colour[k:k + 2], 16) for k in (1, 3, 5)]
+    return "#" + "".join(f"{round(v + (255 - v) * by):02x}" for v in rgb)
+
+
 def main() -> int:
     L = json.loads(LAYOUT.read_text())
+    if colour := L["case"].get("colour"):
+        LOOK["plastic"][0] = colour
+        LOOK["plastic-lid"][0] = lighter(colour, 0.12)
     BUILD.mkdir(parents=True, exist_ok=True)
     # A part that is no longer declared must not linger as a solid from an
     # earlier build: the viewer and a reviewer would both believe it.

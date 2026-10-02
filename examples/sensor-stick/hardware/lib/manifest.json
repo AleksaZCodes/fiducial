@@ -5,8 +5,13 @@
     "usb": {
       "footprint": {
         "id": "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12",
-        "from": "/usr/share/kicad/footprints/Connector_USB.pretty/USB_C_Receptacle_HRO_TYPE-C-31-M-12.kicad_mod",
-        "sha256": "ce599c14f9985fb5ec52e871848719aab420d4378c4bd79b8538e270b641b688"
+        "from": "hardware/vendor/Connector_USB.pretty/USB_C_Receptacle_HRO_TYPE-C-31-M-12.kicad_mod",
+        "sha256": "b262a7083e277ed417c399a56dc25386b7948daa7d9729ec76dc5839ce6b626a"
+      },
+      "model": {
+        "from": "hardware/vendor/Connector_USB.3dshapes/USB_C_Receptacle_HRO_TYPE-C-31-M-12.step",
+        "sha256": "b083e67ce4d06850a2c3835a6366f4012b2def64f8f2781636381ebcaa33e9a0",
+        "file": "3d/USB_C_Receptacle_HRO_TYPE-C-31-M-12.step"
       },
       "symbol": {
         "id": "Connector:USB_C_Receptacle_USB2.0_16P",
@@ -59,13 +64,18 @@
     },
     "ldo": {
       "footprint": {
-        "id": "lcsc:SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR",
-        "from": "hardware/vendor/lcsc.pretty/SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR.kicad_mod",
-        "sha256": "7f88aef56f1c91611235493bb6c3441c593b766db60482e3a635491606e07e38"
+        "id": "Package_TO_SOT_SMD:SOT-223-3_TabPin2",
+        "from": "/usr/share/kicad/footprints/Package_TO_SOT_SMD.pretty/SOT-223-3_TabPin2.kicad_mod",
+        "sha256": "becb00034848d4e5adc1105530a9fd64d9f4378deecea5d6bf66ff45521ebe00"
+      },
+      "model": {
+        "from": "https://gitlab.com/kicad/libraries/kicad-packages3D/-/raw/7.0.11/Package_TO_SOT_SMD.3dshapes/SOT-223.step",
+        "sha256": "0660db668a3a32b983ec7b1527316a990bb26bea8773d43e2522b7f80d0f4a1f",
+        "file": "3d/SOT-223.step"
       },
       "symbol": {
-        "id": "lcsc:AMS1117-3.3",
-        "from": "hardware/vendor/lcsc.kicad_sym"
+        "id": "Regulator_Linear:AMS1117-3.3",
+        "from": "/usr/share/kicad/symbols/Regulator_Linear.kicad_sym"
       },
       "datasheet": {
         "url": "https://datasheet.lcsc.com/datasheet/pdf/e6935943fc6b1bbf350a1a0f3e90dc4a.pdf?productCode=C6186",
@@ -294,13 +304,18 @@
     },
     "flash": {
       "footprint": {
-        "id": "Package_SO:SOIC-8_5.23x5.23mm_P1.27mm",
-        "from": "/usr/share/kicad/footprints/Package_SO.pretty/SOIC-8_5.23x5.23mm_P1.27mm.kicad_mod",
-        "sha256": "d3e82662bb5a80f51f9d1bbf3f48c13b0eecc326171a0886c75d9ed5b7ae1d6f"
+        "id": "lcsc:SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL",
+        "from": "hardware/vendor/lcsc.pretty/SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL.kicad_mod",
+        "sha256": "e0003a02e2b727d04a5cd43de353aef71722ec2906fbb0a8c7ae56c10625855a"
+      },
+      "model": {
+        "from": "hardware/vendor/lcsc.3dshapes/SOIC-8_L5.3-W5.3-H1.9-LS7.9-P1.27.step",
+        "sha256": "9fa02890c7a92d7c26a0182382a0505c3ed2e075ce1ecbf7c6dda419d5ca0ae1",
+        "file": "3d/SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL.step"
       },
       "symbol": {
-        "id": "Memory_Flash:W25Q32JVSS",
-        "from": "/usr/share/kicad/symbols/Memory_Flash.kicad_sym"
+        "id": "lcsc:W25Q32JVSSIQ_C179173",
+        "from": "hardware/vendor/lcsc.kicad_sym"
       },
       "datasheet": {
         "url": "https://datasheet.lcsc.com/datasheet/pdf/5e9d1528bd9ff612cdac1a3e34dc8d43.pdf?productCode=C179173",
@@ -311,7 +326,12 @@
       "footprint": {
         "id": "lcsc:SENSOR-SMD_L3.0-W3.0-P1.00-BR",
         "from": "hardware/vendor/lcsc.pretty/SENSOR-SMD_L3.0-W3.0-P1.00-BR.kicad_mod",
-        "sha256": "7093935b434594533161fbb037df16b52b36827c9a25baacf0ec396c72afd9ce"
+        "sha256": "a42198dbbf55cfdd2f434919256d14353ebf093d86e923d14c72c361f5f21237"
+      },
+      "model": {
+        "from": "hardware/vendor/lcsc.3dshapes/SENSOR-SMD_L3.0-W3.0-P1.00-BL.step",
+        "sha256": "3d0e8d5df91caa54597b0e5522f842b1b98186c4a87aef4f1e4b504e27bd3e44",
+        "file": "3d/SENSOR-SMD_L3.0-W3.0-P1.00-BR.step"
       },
       "symbol": {
         "id": "lcsc:AHT20_C2757850",
@@ -404,7 +424,6 @@
     }
   },
   "problems": [
-    "usb: no 3D model at https://gitlab.com/kicad/libraries/kicad-packages3D/-/raw/7.0.11/Connector_USB.3dshapes/USB_C_Receptacle_HRO_TYPE-C-31-M-12.step (HTTPError: HTTP Error 404: Not Found) \u2014 cad.py builds one from the footprint",
     "usb: datasheet https://datasheet.lcsc.com/datasheet/pdf/9e56b777c022540fcce7c7f67825f55e.pdf?productCode=C165948 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/TYPE-C-31-M-12.pdf",
     "r-cc1: datasheet https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C23186 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/r-cc1.pdf",
     "r-cc2: datasheet https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C23186 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/r-cc2.pdf",
@@ -420,7 +439,6 @@
     "r-xout: datasheet https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C21190 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/r-xout.pdf",
     "c-xin: datasheet https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C1663 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/c-xin.pdf",
     "c-xout: datasheet https://datasheet.lcsc.com/datasheet/pdf/02336ea48ea44ca18c72517dd3cb7b47.pdf?productCode=C1663 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/c-xout.pdf",
-    "flash: no 3D model at https://gitlab.com/kicad/libraries/kicad-packages3D/-/raw/7.0.11/Package_SO.3dshapes/SOIC-8_5.23x5.23mm_P1.27mm.step (HTTPError: HTTP Error 404: Not Found) \u2014 cad.py builds one from the footprint",
     "flash: datasheet https://datasheet.lcsc.com/datasheet/pdf/5e9d1528bd9ff612cdac1a3e34dc8d43.pdf?productCode=C179173 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/W25Q32JVSSIQ.pdf",
     "sensor: datasheet https://datasheet.lcsc.com/datasheet/pdf/4041f814f74dc23f80e16d036fbdeb72.pdf?productCode=C2757850 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/AHT20.pdf",
     "r-sda: datasheet https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C23162 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/r-sda.pdf",

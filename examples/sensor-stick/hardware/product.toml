@@ -22,6 +22,7 @@ width_mm = 36.0          # wide enough for the board inside; the length follows 
 
 [case]
 process      = "fdm"
+colour       = "#1d4ed8"   # translucent blue PETG: the LED shows through the lid
 wall_mm      = 2.0
 floor_mm     = 2.0
 lid_mm       = 2.0
@@ -38,7 +39,7 @@ closure = "press-fit"    # no screws: the lid's skirt is a friction fit
 max_mm       = [26.0, 80.0]
 thickness_mm = 1.6
 layers       = 2
-fill         = 0.62
+fill         = 0.64
 standoff_mm  = 3.0
 mount        = "snap"
 screw        = "M2"
@@ -67,11 +68,11 @@ name         = "USB-C receptacle, 16 pin, USB 2.0"
 place        = "board"
 mount        = "smd"
 zone         = "usb"
-faces        = "top"           # the socket's mouth, as KiCad draws it: turned to face the zone's edge
+faces        = "bottom"        # the socket's mouth, as KiCad draws it (pads at the back, top): turned to face the zone's edge
 through_wall = true        # the case wall in front of it gets a window for the plug
 opening_mm   = [12.5, 6.5] # sized for a USB-C plug's moulded body, so the plug goes into the wall
 symbol       = "Connector:USB_C_Receptacle_USB2.0_16P"
-footprint    = "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12"
+footprint    = "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12"   # KiCad's land pattern, LCSC's model: hardware/vendor/
 height_mm    = 3.2
 mpn          = "TYPE-C-31-M-12"
 lcsc         = "C165948"
@@ -111,12 +112,12 @@ id        = "ldo"
 name      = "3.3 V regulator, 1 A"
 place     = "board"
 mount     = "smd"
-symbol    = "lcsc:AMS1117-3.3"
-footprint = "lcsc:SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR"
+symbol    = "Regulator_Linear:AMS1117-3.3"
+footprint = "Package_TO_SOT_SMD:SOT-223-3_TabPin2"
 height_mm = 1.8
 mpn       = "AMS1117-3.3"
 lcsc      = "C6186"
-pins      = { VIN = "VBUS", VOUT = "3V3", GND = "GND" }
+pins      = { VI = "VBUS", VO = "3V3", GND = "GND" }
 status    = "decided"
 
 [[part]]
@@ -129,7 +130,7 @@ footprint = "Capacitor_SMD:C_0603_1608Metric"
 height_mm = 0.9
 value     = "10uF 10V X5R"
 lcsc      = "C19702"
-near      = "ldo.VIN"
+near      = "ldo.VI"
 pins      = { 1 = "VBUS", 2 = "GND" }
 status    = "decided"
 
@@ -143,7 +144,7 @@ footprint = "Capacitor_SMD:C_0603_1608Metric"
 height_mm = 0.9
 value     = "10uF 10V X5R"
 lcsc      = "C19702"
-near      = "ldo.VOUT"
+near      = "ldo.VO"
 pins      = { 1 = "3V3", 2 = "GND" }
 status    = "decided"
 
@@ -281,13 +282,13 @@ id        = "flash"
 name      = "32 Mbit QSPI flash: the firmware lives here"
 place     = "board"
 mount     = "smd"
-symbol    = "Memory_Flash:W25Q32JVSS"
-footprint = "Package_SO:SOIC-8_5.23x5.23mm_P1.27mm"
+symbol    = "lcsc:W25Q32JVSSIQ_C179173"
+footprint = "lcsc:SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL"
 height_mm = 2.0
 mpn       = "W25Q32JVSSIQ"
 lcsc      = "C179173"
 near      = "mcu.QSPI_SCLK"
-pins      = { "~{CS}" = "QSPI_SS", CLK = "QSPI_SCLK", "DI(IO0)" = "QSPI_SD0", "DO(IO1)" = "QSPI_SD1", IO2 = "QSPI_SD2", IO3 = "QSPI_SD3", VCC = "3V3", GND = "GND" }
+pins      = { "~{CS}" = "QSPI_SS", CLK = "QSPI_SCLK", "DI(IO0)" = "QSPI_SD0", "DO(IO1)" = "QSPI_SD1", "WP#(IO2)" = "QSPI_SD2", "HOLD#orRESET#(IO3)" = "QSPI_SD3", VCC = "3V3", GND = "GND" }
 status    = "decided"
 
 # ── The sensor, in its own air ──────────────────────────────────────────────

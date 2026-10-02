@@ -3,11 +3,11 @@
   "board": {
     "hi_mm": [
       31.0,
-      80.5
+      84.8
     ],
     "lo_mm": [
       5.0,
-      4.5
+      5.8
     ]
   },
   "effort": 10.0,
@@ -16,7 +16,7 @@
   "items": [
     {
       "flush": {
-        "from": "usb: faces = \"top\"",
+        "from": "usb: faces = \"bottom\"",
         "side": "bottom"
       },
       "id": "usb",
@@ -48,104 +48,104 @@
         "from": "usb: zone = \"usb\"",
         "hi_mm": [
           29.7,
-          34.4
+          36.9
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
         {
-          "deg": 180.0,
+          "deg": 0.0,
           "pads_mm": [
             [
-              -2.89,
-              -2.04
-            ],
-            [
               2.89,
-              -2.04
+              2.04
             ],
             [
-              3.25,
-              -3.485
+              -2.89,
+              2.04
             ],
             [
-              2.45,
-              -3.485
+              -3.25,
+              3.485
             ],
             [
-              1.25,
-              -3.485
-            ],
-            [
-              0.25,
-              -3.485
-            ],
-            [
-              -0.25,
-              -3.485
+              -2.45,
+              3.485
             ],
             [
               -1.25,
-              -3.485
+              3.485
             ],
             [
-              -2.45,
-              -3.485
+              -0.25,
+              3.485
             ],
             [
-              -3.25,
-              -3.485
+              0.25,
+              3.485
             ],
             [
-              -3.25,
-              -3.485
-            ],
-            [
-              -2.45,
-              -3.485
-            ],
-            [
-              -1.75,
-              -3.485
-            ],
-            [
-              -0.75,
-              -3.485
-            ],
-            [
-              0.75,
-              -3.485
-            ],
-            [
-              1.75,
-              -3.485
+              1.25,
+              3.485
             ],
             [
               2.45,
-              -3.485
+              3.485
             ],
             [
               3.25,
-              -3.485
+              3.485
             ],
             [
-              4.32,
-              1.61
+              3.25,
+              3.485
             ],
             [
-              4.32,
-              -2.57
+              2.45,
+              3.485
+            ],
+            [
+              1.75,
+              3.485
+            ],
+            [
+              0.75,
+              3.485
+            ],
+            [
+              -0.75,
+              3.485
+            ],
+            [
+              -1.75,
+              3.485
+            ],
+            [
+              -2.45,
+              3.485
+            ],
+            [
+              -3.25,
+              3.485
             ],
             [
               -4.32,
-              -2.57
+              -1.61
             ],
             [
               -4.32,
-              1.61
+              2.57
+            ],
+            [
+              4.32,
+              2.57
+            ],
+            [
+              4.32,
+              -1.61
             ]
           ],
           "size_mm": [
@@ -224,11 +224,11 @@
         "from": "mcu: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -1242,6 +1242,128 @@
           "size_mm": [
             8.26,
             8.26
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ldo",
+      "pad_names": [
+        "1",
+        "2",
+        "2#1",
+        "3"
+      ],
+      "region": {
+        "from": "ldo: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
+        "hi_mm": [
+          29.7,
+          83.5
+        ],
+        "lo_mm": [
+          6.3,
+          7.1
+        ]
+      },
+      "rotations": [
+        {
+          "deg": 0.0,
+          "pads_mm": [
+            [
+              -3.15,
+              2.3
+            ],
+            [
+              -3.15,
+              0.0
+            ],
+            [
+              3.15,
+              0.0
+            ],
+            [
+              -3.15,
+              -2.3
+            ]
+          ],
+          "size_mm": [
+            8.8,
+            7.2
+          ]
+        },
+        {
+          "deg": 90.0,
+          "pads_mm": [
+            [
+              -2.3,
+              -3.15
+            ],
+            [
+              0.0,
+              -3.15
+            ],
+            [
+              0.0,
+              3.15
+            ],
+            [
+              2.3,
+              -3.15
+            ]
+          ],
+          "size_mm": [
+            7.2,
+            8.8
+          ]
+        },
+        {
+          "deg": 180.0,
+          "pads_mm": [
+            [
+              3.15,
+              -2.3
+            ],
+            [
+              3.15,
+              0.0
+            ],
+            [
+              -3.15,
+              0.0
+            ],
+            [
+              3.15,
+              2.3
+            ]
+          ],
+          "size_mm": [
+            8.8,
+            7.2
+          ]
+        },
+        {
+          "deg": 270.0,
+          "pads_mm": [
+            [
+              2.3,
+              3.15
+            ],
+            [
+              0.0,
+              3.15
+            ],
+            [
+              0.0,
+              -3.15
+            ],
+            [
+              -2.3,
+              3.15
+            ]
+          ],
+          "size_mm": [
+            7.2,
+            8.8
           ]
         }
       ]
@@ -1262,11 +1384,11 @@
         "from": "flash: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -1274,164 +1396,164 @@
           "deg": 0.0,
           "pads_mm": [
             [
-              -3.6,
-              1.905
+              -1.9,
+              -3.53
             ],
             [
-              -3.6,
-              0.635
+              -0.63,
+              -3.53
             ],
             [
-              -3.6,
-              -0.635
+              0.63,
+              -3.53
             ],
             [
-              -3.6,
-              -1.905
+              1.9,
+              -3.53
             ],
             [
-              3.6,
-              -1.905
+              1.9,
+              3.53
             ],
             [
-              3.6,
-              -0.635
+              0.63,
+              3.53
             ],
             [
-              3.6,
-              0.635
+              -0.63,
+              3.53
             ],
             [
-              3.6,
-              1.905
+              -1.9,
+              3.53
             ]
           ],
           "size_mm": [
-            9.3,
-            5.72
+            5.24,
+            9.81
           ]
         },
         {
           "deg": 90.0,
           "pads_mm": [
             [
-              -1.905,
-              -3.6
+              3.53,
+              -1.9
             ],
             [
-              -0.635,
-              -3.6
+              3.53,
+              -0.63
             ],
             [
-              0.635,
-              -3.6
+              3.53,
+              0.63
             ],
             [
-              1.905,
-              -3.6
+              3.53,
+              1.9
             ],
             [
-              1.905,
-              3.6
+              -3.53,
+              1.9
             ],
             [
-              0.635,
-              3.6
+              -3.53,
+              0.63
             ],
             [
-              -0.635,
-              3.6
+              -3.53,
+              -0.63
             ],
             [
-              -1.905,
-              3.6
+              -3.53,
+              -1.9
             ]
           ],
           "size_mm": [
-            5.72,
-            9.3
+            9.81,
+            5.24
           ]
         },
         {
           "deg": 180.0,
           "pads_mm": [
             [
-              3.6,
-              -1.905
+              1.9,
+              3.53
             ],
             [
-              3.6,
-              -0.635
+              0.63,
+              3.53
             ],
             [
-              3.6,
-              0.635
+              -0.63,
+              3.53
             ],
             [
-              3.6,
-              1.905
+              -1.9,
+              3.53
             ],
             [
-              -3.6,
-              1.905
+              -1.9,
+              -3.53
             ],
             [
-              -3.6,
-              0.635
+              -0.63,
+              -3.53
             ],
             [
-              -3.6,
-              -0.635
+              0.63,
+              -3.53
             ],
             [
-              -3.6,
-              -1.905
+              1.9,
+              -3.53
             ]
           ],
           "size_mm": [
-            9.3,
-            5.72
+            5.24,
+            9.81
           ]
         },
         {
           "deg": 270.0,
           "pads_mm": [
             [
-              1.905,
-              3.6
+              -3.53,
+              1.9
             ],
             [
-              0.635,
-              3.6
+              -3.53,
+              0.63
             ],
             [
-              -0.635,
-              3.6
+              -3.53,
+              -0.63
             ],
             [
-              -1.905,
-              3.6
+              -3.53,
+              -1.9
             ],
             [
-              -1.905,
-              -3.6
+              3.53,
+              -1.9
             ],
             [
-              -0.635,
-              -3.6
+              3.53,
+              -0.63
             ],
             [
-              0.635,
-              -3.6
+              3.53,
+              0.63
             ],
             [
-              1.905,
-              -3.6
+              3.53,
+              1.9
             ]
           ],
           "size_mm": [
-            5.72,
-            9.3
+            9.81,
+            5.24
           ]
         }
       ]
@@ -1448,11 +1570,11 @@
         "from": "led: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -1554,128 +1676,6 @@
           "size_mm": [
             5.5,
             6.9
-          ]
-        }
-      ]
-    },
-    {
-      "id": "ldo",
-      "pad_names": [
-        "1",
-        "2",
-        "3",
-        "4"
-      ],
-      "region": {
-        "from": "ldo: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
-        "hi_mm": [
-          29.7,
-          79.2
-        ],
-        "lo_mm": [
-          6.3,
-          5.8
-        ]
-      },
-      "rotations": [
-        {
-          "deg": 0.0,
-          "pads_mm": [
-            [
-              3.07,
-              -2.3
-            ],
-            [
-              3.07,
-              0.0
-            ],
-            [
-              3.07,
-              2.3
-            ],
-            [
-              -2.87,
-              0.0
-            ]
-          ],
-          "size_mm": [
-            3.5,
-            6.5
-          ]
-        },
-        {
-          "deg": 90.0,
-          "pads_mm": [
-            [
-              2.3,
-              3.07
-            ],
-            [
-              0.0,
-              3.07
-            ],
-            [
-              -2.3,
-              3.07
-            ],
-            [
-              0.0,
-              -2.87
-            ]
-          ],
-          "size_mm": [
-            6.5,
-            3.5
-          ]
-        },
-        {
-          "deg": 180.0,
-          "pads_mm": [
-            [
-              -3.07,
-              2.3
-            ],
-            [
-              -3.07,
-              0.0
-            ],
-            [
-              -3.07,
-              -2.3
-            ],
-            [
-              2.87,
-              0.0
-            ]
-          ],
-          "size_mm": [
-            3.5,
-            6.5
-          ]
-        },
-        {
-          "deg": 270.0,
-          "pads_mm": [
-            [
-              -2.3,
-              -3.07
-            ],
-            [
-              0.0,
-              -3.07
-            ],
-            [
-              2.3,
-              -3.07
-            ],
-            [
-              0.0,
-              2.87
-            ]
-          ],
-          "size_mm": [
-            6.5,
-            3.5
           ]
         }
       ]
@@ -1692,11 +1692,11 @@
         "from": "xtal: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -1805,10 +1805,10 @@
     {
       "id": "sensor",
       "keepout_mm": [
-        3.221,
-        3.221,
-        3.221,
-        3.221
+        3.33,
+        3.33,
+        3.33,
+        3.33
       ],
       "pad_names": [
         "1",
@@ -1821,12 +1821,12 @@
       "region": {
         "from": "sensor: its chimney's ring, wholly on the board (sensor: zone = \"sensor\", board.edge_mm)",
         "hi_mm": [
-          26.979,
-          76.479
+          26.87,
+          80.67
         ],
         "lo_mm": [
-          9.021,
-          50.6
+          9.13,
+          53.7
         ]
       },
       "rotations": [
@@ -1859,7 +1859,7 @@
             ]
           ],
           "size_mm": [
-            3.0,
+            3.3,
             3.0
           ]
         },
@@ -1893,7 +1893,7 @@
           ],
           "size_mm": [
             3.0,
-            3.0
+            3.3
           ]
         },
         {
@@ -1925,7 +1925,7 @@
             ]
           ],
           "size_mm": [
-            3.0,
+            3.3,
             3.0
           ]
         },
@@ -1959,7 +1959,7 @@
           ],
           "size_mm": [
             3.0,
-            3.0
+            3.3
           ]
         }
       ],
@@ -1967,7 +1967,7 @@
         {
           "at_mm": [
             18.0,
-            75.5
+            80.3
           ],
           "from": "vent: seals_to = \"sensor\" (under the vent's tube, leaning at most 3 mm)",
           "mm": 3.0
@@ -1984,11 +1984,11 @@
         "from": "c-1v1: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -2072,11 +2072,11 @@
         "from": "c-3v3: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -2160,11 +2160,11 @@
         "from": "c-dec: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -2248,11 +2248,11 @@
         "from": "c-dec: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -2336,11 +2336,11 @@
         "from": "c-dec: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -2424,11 +2424,11 @@
         "from": "c-dec: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -2512,11 +2512,11 @@
         "from": "c-dec: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -2600,11 +2600,11 @@
         "from": "c-led: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -2688,11 +2688,11 @@
         "from": "c-vbus: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -2776,11 +2776,11 @@
         "from": "c-xin: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -2864,11 +2864,11 @@
         "from": "c-xout: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -2952,11 +2952,11 @@
         "from": "r-cc1: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -3040,11 +3040,11 @@
         "from": "r-cc2: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -3128,11 +3128,11 @@
         "from": "r-dm: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -3216,11 +3216,11 @@
         "from": "r-dp: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -3304,11 +3304,11 @@
         "from": "r-scl: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -3392,11 +3392,11 @@
         "from": "r-sda: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -3480,11 +3480,11 @@
         "from": "r-xout: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.2
+          83.5
         ],
         "lo_mm": [
           6.3,
-          5.8
+          7.1
         ]
       },
       "rotations": [
@@ -3565,7 +3565,7 @@
       "to": {
         "at_mm": [
           18.0,
-          5.3
+          6.6
         ]
       },
       "weight": 1
@@ -3575,17 +3575,7 @@
       "to": {
         "at_mm": [
           18.0,
-          42.5
-        ]
-      },
-      "weight": 1
-    },
-    {
-      "item": "led",
-      "to": {
-        "at_mm": [
-          18.0,
-          42.5
+          45.3
         ]
       },
       "weight": 1
@@ -3595,7 +3585,17 @@
       "to": {
         "at_mm": [
           18.0,
-          42.5
+          45.3
+        ]
+      },
+      "weight": 1
+    },
+    {
+      "item": "led",
+      "to": {
+        "at_mm": [
+          18.0,
+          45.3
         ]
       },
       "weight": 1
@@ -3605,7 +3605,7 @@
       "to": {
         "at_mm": [
           18.0,
-          75.5
+          80.3
         ]
       },
       "weight": 20
@@ -3631,7 +3631,7 @@
       "to": {
         "at_mm": [
           18.0,
-          75.5
+          80.3
         ]
       },
       "weight": 20
@@ -3844,16 +3844,16 @@
           "pad": "49"
         },
         {
-          "item": "flash",
-          "pad": "8"
-        },
-        {
           "item": "ldo",
           "pad": "2"
         },
         {
           "item": "ldo",
-          "pad": "4"
+          "pad": "2#1"
+        },
+        {
+          "item": "flash",
+          "pad": "8"
         },
         {
           "item": "sensor",
@@ -4140,12 +4140,12 @@
           "pad": "B9"
         },
         {
-          "item": "led",
-          "pad": "1"
-        },
-        {
           "item": "ldo",
           "pad": "3"
+        },
+        {
+          "item": "led",
+          "pad": "1"
         },
         {
           "item": "c-led",
@@ -4214,44 +4214,44 @@
       "from": "the board's hole at (3.5, 3.5) and its clearance (board.holes_mm, board.mount)",
       "hi_mm": [
         10.7,
-        10.2
+        11.5
       ],
       "lo_mm": [
         6.3,
-        5.8
+        7.1
       ]
     },
     {
-      "from": "the board's hole at (22.5, 72.5) and its clearance (board.holes_mm, board.mount)",
+      "from": "the board's hole at (22.5, 75.5) and its clearance (board.holes_mm, board.mount)",
       "hi_mm": [
         29.7,
-        79.2
+        83.5
       ],
       "lo_mm": [
         25.3,
-        74.8
+        79.1
       ]
     },
     {
       "from": "a snap hook's lip over the board edge (board.mount = \"snap\")",
       "hi_mm": [
         7.5,
-        46.5
+        49.3
       ],
       "lo_mm": [
         5.0,
-        38.5
+        41.3
       ]
     },
     {
       "from": "a snap hook's lip over the board edge (board.mount = \"snap\")",
       "hi_mm": [
         31.0,
-        46.5
+        49.3
       ],
       "lo_mm": [
         28.5,
-        38.5
+        41.3
       ]
     }
   ],

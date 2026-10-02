@@ -149,6 +149,9 @@ pub struct Pad {
     pub number: String,
     pub at: (f64, f64),
     pub size: (f64, f64),
+    /// A through-hole pad's drill, width × height (a round drill is square):
+    /// the hole the part's lead or peg goes into.
+    pub drill: Option<(f64, f64)>,
 }
 
 /// What `fid-hardware` needs from a footprint.
@@ -296,10 +299,20 @@ pub fn read_footprint(root: &Path, id: &str) -> Result<Footprint> {
             let number = p.items().get(1)?.atom()?.to_string();
             let at = p.child("at")?.nums();
             let size = p.child("size")?.nums();
+            // `(drill 0.65)` or `(drill oval 0.6 1.2)`.
+            let drill = p
+                .child("drill")
+                .map(|d| d.nums())
+                .and_then(|n| match n.as_slice() {
+                    [d] => Some((*d, *d)),
+                    [w, h, ..] => Some((*w, *h)),
+                    _ => None,
+                });
             Some(Pad {
                 number,
                 at: (at[0], at[1]),
                 size: (size[0], size[1]),
+                drill,
             })
         })
         .collect();
@@ -685,6 +698,26 @@ mod tests {
         // Right edge: the pad's 3.0 plus KiCad's 0.25 mm margin; left: the courtyard's -2.
         assert!((fp.size().0 - 5.25).abs() < 1e-9, "{:?}", fp.size());
         assert_eq!(fp.size().1, 3.0);
+    }
+
+    #[test]
+    fn a_through_hole_pad_carries_its_drill_round_or_oval() {
+        let dir = tempfile::tempdir().unwrap();
+        let lib = dir.path().join("hardware/lib/footprints");
+        std::fs::create_dir_all(&lib).unwrap();
+        std::fs::write(
+            lib.join("Holes.kicad_mod"),
+            FP.replace("(footprint Test", "(footprint Holes").replace(
+                "(pad ANT smd rect (at 1.5 0) (size 0.5 1) (layers F.Cu F.Mask))",
+                "(pad S1 thru_hole oval (at 1.5 0) (size 1 2.1) (drill oval 0.6 1.7) (layers *.Cu))\n  (pad \"\" np_thru_hole circle (at 0 0) (size 0.65 0.65) (drill 0.65) (layers *.Cu))",
+            ),
+        )
+        .unwrap();
+        let fp = read_footprint(dir.path(), "Lib:Holes").unwrap();
+        let drill = |n: &str| fp.pads.iter().find(|p| p.number == n).unwrap().drill;
+        assert_eq!(drill("S1"), Some((0.6, 1.7)));
+        assert_eq!(drill(""), Some((0.65, 0.65)));
+        assert_eq!(drill("1"), None);
     }
 
     #[test]

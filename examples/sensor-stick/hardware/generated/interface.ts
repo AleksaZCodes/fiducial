@@ -10,4 +10,4 @@ export const MCU_PINS = {"LED_DIN":"GPIO16","SENSOR_SCL":"GPIO5","SENSOR_SDA":"G
 /** Sockets reached through the case: the part, the wall, the window. */
 export const CONNECTORS = [{"opening_mm":[12.5,6.5],"part":"usb","side":"bottom"}] as const;
 
-export const BOARD_MM = {"size":[26.0,76.0],"thickness":1.6} as const;
+export const BOARD_MM = {"size":[26.0,79.0],"thickness":1.6} as const;

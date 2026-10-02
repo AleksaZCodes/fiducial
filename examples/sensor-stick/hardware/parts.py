@@ -155,6 +155,45 @@ def symbol_block(text: str, name: str) -> str | None:
     return None
 
 
+def children(block: str) -> list[str]:
+    """The s-expressions directly inside a block, in order."""
+    out, depth, in_str, start = [], 0, False, 0
+    for j, c in enumerate(block):
+        if c == '"' and block[j - 1] != "\\":
+            in_str = not in_str
+        elif not in_str and c == "(":
+            depth += 1
+            if depth == 2:
+                start = j
+        elif not in_str and c == ")":
+            if depth == 2:
+                out.append(block[start : j + 1])
+            depth -= 1
+    return out
+
+
+def flatten(text: str, block: str, name: str) -> str | None:
+    """A symbol that `extends` another, made whole: the parent's pins and
+    drawing under this symbol's own name and properties. KiCad's libraries
+    derive most variants this way (AMS1117-3.3 extends AP1117-15), and a
+    schematic needs the whole symbol. None when the parent is not in `text`."""
+    m = re.search(r'\(extends "([^"]+)"\)', block[:400])
+    if not m:
+        return block
+    parent_name = m.group(1)
+    parent = symbol_block(text, parent_name)
+    parent = parent and flatten(text, parent, parent_name)
+    if parent is None:
+        return None
+    own = [c for c in children(block) if c.startswith("(property")]
+    kept = [
+        c.replace(f'(symbol "{parent_name}_', f'(symbol "{name}_', 1) if c.startswith("(symbol") else c
+        for c in children(parent)
+        if not c.startswith("(property")
+    ]
+    return f'(symbol "{name}"\n    ' + "\n    ".join(own + kept) + ")"
+
+
 def open_url(url: str, timeout: float):
     """GET with a User-Agent: LCSC answers 403 to a request without one."""
     return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "fiducial-parts"}), timeout=timeout)
@@ -622,6 +661,16 @@ def fetch_lcsc(args: list[str]) -> int:
         except subprocess.CalledProcessError as e:
             print(f"{code}: easyeda2kicad failed ({e.returncode}) — it needs easyeda.com reachable", file=sys.stderr)
             return 1
+    # easyeda2kicad writes footprints in KiCad 5's `(module …)` format. A board
+    # that embeds one loses its pads' nets and cannot be routed, so KiCad's own
+    # converter brings the library to the current format, once, here.
+    try:
+        subprocess.run(["kicad-cli", "fp", "upgrade", "--force", str(VENDOR / "lcsc.pretty")],
+                       check=True, capture_output=True)
+    except (FileNotFoundError, subprocess.CalledProcessError) as e:
+        print(f"could not upgrade hardware/vendor/lcsc.pretty to the current KiCad format ({e}); "
+              "run `kicad-cli fp upgrade --force hardware/vendor/lcsc.pretty`", file=sys.stderr)
+        return 1
     footprints = sorted(f.stem for f in (VENDOR / "lcsc.pretty").glob("*.kicad_mod"))
     sym_file = VENDOR / "lcsc.kicad_sym"
     symbols = sorted(set(re.findall(r'^\s*\(symbol "([^"]+?)"', sym_file.read_text(), re.M))) if sym_file.exists() else []
@@ -696,8 +745,10 @@ def sync() -> int:
             src = own if own.exists() and symbol_block(own.read_text(), name) else SYM_DIR / f"{lib}.kicad_sym"
             block = symbol_block(src.read_text(), name) if src.exists() else None
             if block:
-                if "(extends " in block[:400]:
-                    problems.append(f"{part['id']}: symbol {sym_id} extends another symbol; vendor its parent too")
+                whole = flatten(src.read_text(), block, name)
+                if whole is None:
+                    problems.append(f"{part['id']}: symbol {sym_id} extends a symbol not in {src.name}")
+                block = whole or block
                 # One library entry per symbol, however many parts use it;
                 # named by the full id, so Device:R and a vendor R never collide.
                 if sym_id not in seen:
