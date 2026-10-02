@@ -22,7 +22,7 @@ hardware/build.sh                  # route, solids, checks, fab files, review pa
 | `build/board-routed.kicad_pcb` | the board to fabricate: routed by Freerouting, ground-poured both sides, DRC'd by KiCad (`route.json`, `drc.rpt`) — fails the build if anything is unconnected or an error | built |
 | `build/*.step`, `*.stl`, `assembly.step` | every solid, for a manufacturer and a slicer | built |
 | `build/checks.json` | interference (keep-outs included), insertion, lid, screw engagement, seal squeeze | built, fails the build |
-| `build/fab/`, `schematic.pdf` | Gerbers and drill from the routed board; the schematic | built |
+| `build/fab/`, `schematic.pdf` | `gerbers.zip` (Gerbers and drill of the routed board), `bom-assembly.csv` and `cpl.csv` (an assembly service's BOM and placement), and `README.md` listing every placed part without an `lcsc` number — what cannot be ordered assembled yet; the schematic | built |
 | `build/review/*.png`, `viewer.html` | assembled, exploded, section, inside, underside, board; an interactive viewer — real part models in their own colours, the routed copper on the board | built |
 
 ## Show a person, every time the geometry changes

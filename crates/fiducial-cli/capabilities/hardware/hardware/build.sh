@@ -5,7 +5,8 @@
 #   python3 hardware/ratsnest.py         the placement and its ratsnest → build/review/ratsnest.svg
 #   /usr/bin/python3 hardware/route.py   route, pour and DRC the board (KiCad's own Python)
 #   python3 hardware/cad.py              solids + fit/assembly checks → hardware/build/
-#   kicad-cli                            Gerbers, drill, STEP and the schematic PDF
+#   python3 hardware/fab.py              Gerbers + zip, assembly BOM, CPL → build/fab/
+#   kicad-cli                            board STEP and the schematic PDF
 #   node hardware/render.mjs             review pack → hardware/build/review/
 #
 # Platform-owned. Set SKIP_RENDER=1 where there is no browser (CI), and
@@ -26,9 +27,9 @@ fi
 python3 hardware/cad.py
 
 if [ -f "$pcb" ]; then
-  mkdir -p hardware/build/fab
-  kicad-cli pcb export gerbers -o hardware/build/fab/ "$pcb"
-  kicad-cli pcb export drill -o hardware/build/fab/ "$pcb"
+  # Gerbers, drill, gerbers.zip, assembly BOM and placement (CPL), and the
+  # list of parts an assembly service cannot source yet: hardware/build/fab/.
+  python3 hardware/fab.py
   kicad-cli pcb export step --subst-models -f -o hardware/build/board.step "$pcb"
 fi
 sch=hardware/generated/board.kicad_sch
