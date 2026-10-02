@@ -1,0 +1,43 @@
+# thesis.toml — Fiducial's own thesis: the one claim the platform is built to
+# test, declared once. Append-only: a sharper claim is a new [[thesis]] that
+# supersedes an older one and says `because`; no entry is edited in place.
+# `fid thesis` shows the current claim, `fid thesis log` how it moved.
+#
+# It is the platform's thesis, not one session's or one paper's: every change
+# to Fiducial is measured against it, and MISSION.md, README.md and the specs
+# restate it inside `fid:describes thesis.toml` blocks, so a change here fails
+# `fid docs --check` until each restatement is reread.
+
+[[thesis]]
+date  = "2026-09-06"
+claim = "Declare each fact once. Derive every artifact from it."
+
+[[thesis]]
+date       = "2026-10-02"
+claim      = "Build any robust multidisciplinary product with AI agents."
+supersedes = 1
+because    = "\"Declare each fact once\" is how, not what for: it says nothing of who builds the product, what comes out, or how it can be judged. The claim is the product — whole, every discipline, made by one person with agents, buildable and checked. Declaring once and deriving the rest is the mechanism, and stays the first principle in MISSION.md."
+
+[thesis.arc]
+what     = "A platform in which a product — case, board, firmware, web, content — is one repository of typed declarations, every artifact derived from them and gated."
+for_whom = "One person, or a small team, building a physical and digital product with AI agents."
+problem  = "Agents are fast inside one codebase and blind across them: each discipline's copy of a fact drifts, and the drift is found when a board comes back or a case does not close."
+why_now  = "Agents now write most of each discipline's work; what they lack is one shared, checked context across all of them."
+how      = "Declare each fact once; derive every artifact from it; gate the result, so drift cannot ship. Hard problems go to proven engines (CP-SAT, OpenCascade, KiCad) behind contracts the platform owns."
+
+[thesis.test]
+falsified_by = "A product built on Fiducial that ships drift between disciplines its gates passed, or a class of product whose rules cannot be declared as data and need per-product code."
+disagrees    = "A discipline expert who holds that each domain needs its own tool and its own specialist, and that one declaration across all of them flattens the judgment each one needs."
+
+[thesis.evidence]
+proven = [
+  "examples/sensor-stick: a USB-C sensor stick — real, verified parts, a routed DRC-clean board, a checked case, firmware and a web page — derived from one declaration and built end to end in CI.",
+  "One pin change reaches the board, the schematic, the firmware's pin map and the web types in one derive; code using a renamed net stops compiling.",
+  "Every placement rule is an instance of eight generic constraint kinds; contradictions fail naming the declarations that conflict.",
+]
+not_yet = [
+  "Nothing built on it has been manufactured and tested on a bench.",
+  "Two products end to end, one public; \"any\" is a claim about the method, not a measurement over many.",
+  "Autorouting is not deterministic; floor placement is still a bounded search; the board is always a rectangle.",
+  "Power circuits are computed, not simulated.",
+]

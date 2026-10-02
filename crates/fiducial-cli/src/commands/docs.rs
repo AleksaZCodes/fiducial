@@ -29,6 +29,9 @@ use crate::{
 /// expensive to have wrong.
 fn documents(root: &std::path::Path) -> Vec<String> {
     let mut out: Vec<String> = CONTEXT_FILES.iter().map(|s| s.to_string()).collect();
+    // MISSION.md restates the platform's thesis (`thesis.toml`): the one
+    // paragraph here most expensive to have wrong.
+    out.push("MISSION.md".to_string());
     out.push("ROADMAP.md".to_string());
     out.push("ARCHITECTURE.md".to_string());
     out.push("STACK.md".to_string());

@@ -1,6 +1,11 @@
 # Fiducial
 
-> **Declare each fact once. Derive every artifact from it.**
+<!-- fid:describes thesis.toml -->
+> **Build any robust multidisciplinary product with AI agents.**
+
+That is the platform's thesis ([`thesis.toml`](thesis.toml), `fid thesis`). How:
+**declare each fact once, derive every artifact from it**, and gate the result.
+<!-- fid:end-describes -->
 
 Fiducial is a cross-domain build system for products that span **web, firmware,
 electronics, mechanical, simulation and content** — built at the quality and pace

@@ -1,6 +1,7 @@
 # Fiducial — Agent context
 
-> One declaration, many derivations. See `MISSION.md` for the why.
+> The thesis every change here is measured against is declared in `thesis.toml`
+> (`fid thesis`). How it is met — one declaration, many derivations — is `MISSION.md`.
 
 This file covers the same ground as `CLAUDE.md` for agent runtimes that read
 `AGENTS.md` (Codex, Copilot Workspace, etc.). The authoritative design is in

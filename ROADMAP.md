@@ -27,9 +27,9 @@
 
 ---
 
-## The thesis, restated at product scale
+## The rule, applied at product scale
 
-The platform's rule is *declare each fact once, derive every artifact from it*.
+The platform's first principle is *declare each fact once, derive every artifact from it*.
 Phases 0–21 applied that to engineering facts: a pin, a board dimension, a
 protocol message.
 

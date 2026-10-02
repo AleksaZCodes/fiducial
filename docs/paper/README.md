@@ -5,12 +5,16 @@ AI agents*
 
 **Author:** Aleksa Zdravković (ORCID 0009-0004-1535-1839)
 
-The title is the thesis; what must be true for it, and the plan that makes
-it true, is `docs/specs/2026-10-02-making-the-thesis-true.md`.
+<!-- fid:describes thesis.toml -->
+The title is Fiducial's thesis — the platform's standing claim, declared in
+`thesis.toml`, which the paper argues; it is not the paper's own. What must
+be true for it, and the plan that made it true, is
+`docs/specs/2026-10-02-making-the-thesis-true.md`.
+<!-- fid:end-describes -->
 
-## Thesis
+## Mechanism
 
-Fiducial's own (`MISSION.md`): **declare each fact once; derive every
+How the thesis is met (`MISSION.md`): **declare each fact once; derive every
 artifact from it.** In a cross-domain product the same fact is written down
 many times, the copies drift, and drift is found late. One typed
 declaration, derived artifacts and a gate that fails on disagreement remove

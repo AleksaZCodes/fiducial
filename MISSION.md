@@ -25,7 +25,23 @@ don't talk to each other.
 
 ## The thesis
 
-> **Declare each fact once. Derive every artifact from it.**
+<!-- fid:describes thesis.toml -->
+> **Build any robust multidisciplinary product with AI agents.**
+
+That is Fiducial's thesis: the one claim the whole platform is built to test, declared in
+[`thesis.toml`](thesis.toml) and shown by `fid thesis`. It is not one session's goal or one
+paper's title. Every change to the platform is measured against it, word by word:
+
+- **Build** — the output is something a manufacturer can make: real parts, fab files.
+- **any** — the method is general: rules are declared as data, not written per product.
+- **robust** — drift cannot ship: every artifact is gated, contradictions are named.
+- **multidisciplinary** — one fact feeds every discipline it touches.
+- **with AI agents** — agents do the work inside the gates, and the record shows it.
+
+What may honestly be claimed today, and what not yet, is in `thesis.toml` under `evidence`.
+<!-- fid:end-describes -->
+
+### How: declare each fact once, derive every artifact from it
 
 In a cross-domain product the same fact is normally written down many times — a pin assignment
 in the schematic, the firmware, the test rig and the docs; a protocol message in the firmware
@@ -34,7 +50,9 @@ marketing render. Every duplicate is a place where reality drifts from itself, a
 discovered late, in the field, expensively.
 
 So: one declaration, many derivations. The declaration is typed, machine-readable, and lives in
-git. Everything downstream is generated and never hand-edited.
+git. Everything downstream is generated and never hand-edited. This was the thesis until
+2026-10-02 (`fid thesis log`); it is the mechanism the thesis rests on, and the first principle
+below.
 
 **The consumer of this rule** is anyone — human or agent — who changes a fact and needs every
 consequence to follow automatically instead of by memory.

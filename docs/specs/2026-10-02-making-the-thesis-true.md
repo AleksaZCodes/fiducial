@@ -1,24 +1,33 @@
 # Making the thesis true
 
 **Date:** 2026-10-02
-**Status:** accepted — the work plan until the paper is written
+**Status:** accepted — the plan that closed the gaps found on 2026-10-02
 **Owner's instruction:** fill every gap identified (except slicing), make one
 change propagate across domains, build a public example product, remove
-what is not needed, fix the bugs — so the paper's premise is *true*.
+what is not needed, fix the bugs — so the thesis is *true*.
 
 ---
 
 ## The premise
 
-The paper is titled **"Fiducial: Build any robust multidisciplinary product
-with AI agents."** The title is the thesis and the abstract is built on it.
-It must be literally true of the platform at the release the paper cites
-(`v0.9.x`, version DOI via Zenodo — `2026-10-02-one-release-per-platform-version.md`).
+<!-- fid:describes thesis.toml -->
+**"Build any robust multidisciplinary product with AI agents"** is
+Fiducial's thesis: the platform's standing claim, declared in `thesis.toml`
+(`fid thesis`), not this plan's or one paper's. This spec is one audit of
+the platform against it, on 2026-10-02, and the plan that closed what the
+audit found. The table below is the standing test: every later change is
+measured against the same five words, and `thesis.toml`'s `evidence` says
+what may be claimed today.
+<!-- fid:end-describes -->
 
-Read word by word, the title commits to five things; each needs evidence
+The paper argues the same claim and cites a release (`v0.9.x`, version DOI
+via Zenodo — `2026-10-02-one-release-per-platform-version.md`), so the
+thesis must be literally true of the platform at that release.
+
+Read word by word, the thesis commits to five things; each needs evidence
 in this repository, not in a private one:
 
-| The title says | So this must be true | Today |
+| The thesis says | So this must be true | On 2026-10-02 |
 |---|---|---|
 | **Build** | the output is something a manufacturer can make: orderable files, real parts | board Gerbers yes; assembly needs an LCSC number on every part — not automatic (G1) |
 | **any** | the method is general, not one product's special cases | rules are generic constraint kinds (P1 done); but the only end-to-end product is private (G3) |
@@ -27,8 +36,8 @@ in this repository, not in a private one:
 | **with AI agents** | agents do the work inside the gates, and the record shows it | true; needs a public, reproducible account (G3) |
 
 The abstract states only what the table shows as true at the cited release.
-Anything still "Today: no" is either done before the release or stated as a
-limit.
+Anything not yet true is either done before the release or stated as a
+limit — in the paper and in `thesis.toml`'s `evidence.not_yet`.
 
 ## Gaps, and how each is closed
 
