@@ -230,11 +230,15 @@ Platform bugs the example found, each fixed and tested:
   different boards, all DRC-clean: `route.json` now records the placed
   board's hash and the routed copper's, so that difference is visible.
 
+- the first-product guide's captures walked through the deprecated `eda`;
+  they are the hardware capability's now (still generated and CI-checked),
+  and a false line about `process` tightening the fit is gone: it only
+  labels the BOM.
+
 The guide (`docs/guides/sensor-stick.md`) rebuilds the stick from scratch on
 the current platform, with the first build's refusals kept as its case study.
 
 Not done:
-- the guide's captures still walk through `eda`;
 - a "case wraps the board" sizing mode (the stick declares `width_mm`);
 - **a board cut to its case.** The board is always a rectangle. At the
   stick's plug end its corners met the case's chamfer and held the socket
@@ -266,8 +270,12 @@ when convenient.
   every solid, as parts are.
 - **Per-package GitHub releases** that exist stay as history; new ones are
   off.
-- **Unexplained:** the dev `fid` reports a product's `adapters.generated.ts`
-  stale where `0.2.1` does not. Reproduce in a fixture; fix or explain.
+- **Explained:** the dev `fid` reports a product's `adapters.generated.ts`
+  stale where `0.2.1` does not. `--check` regenerates with the running
+  `fid`; the generator's text moved between the two, so the file is stale
+  against it with no input touched. The verdict was right, the message
+  ("its inputs changed") was not: it now names the `fid` version and says
+  an input *or the generator* changed.
 - **Python only where an engine requires it.** `cad.py` (build123d on
   OpenCascade), `place.py` (OR-Tools CP-SAT) and `route.py` (KiCad's
   `pcbnew` API, Freerouting) use those engines' maintained interfaces,
