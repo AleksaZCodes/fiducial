@@ -1722,6 +1722,56 @@ fn a_resolved_upgrade_conflict_is_recorded_and_not_written_again() {
 }
 
 #[test]
+fn a_conflict_resolved_to_the_platforms_version_is_not_drift() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    let lock_path = root.join("fiducial.lock");
+    let file = "hardware/build.sh";
+    let lock = std::fs::read_to_string(&lock_path).unwrap();
+    let start = lock.find("[templates.\"hardware/build.sh\"]").unwrap();
+    let end = lock[start + 1..]
+        .find("\n[")
+        .map_or(lock.len(), |i| start + 1 + i);
+    // Installed from an older template: its base and its hash both differ.
+    let mut record = lock[start..end].replacen("set -euo pipefail", "set -eu", 1);
+    let h = record.find("hash = \"").unwrap() + 8;
+    record.replace_range(h..h + 64, &"0".repeat(64));
+    std::fs::write(
+        &lock_path,
+        format!("{}{}{}", &lock[..start], record, &lock[end..]),
+    )
+    .unwrap();
+    edit(&root, file, "set -euo pipefail", "set -eux");
+    let out = fid(&root, &["upgrade", "--capability", "hardware"]);
+    assert!(text(&out).contains("CONFLICT"), "{}", text(&out));
+
+    // Take the platform's side, as a person does for a file they never meant
+    // to change: the file is now exactly what the platform ships.
+    let s = std::fs::read_to_string(root.join(file)).unwrap();
+    let ours = s.find("<<<<<<<").unwrap();
+    let theirs = s.find("=======").unwrap();
+    let close = s.find(">>>>>>>").unwrap();
+    let after = close + s[close..].find('\n').unwrap() + 1;
+    let line_after = |i: usize| i + s[i..].find('\n').unwrap() + 1;
+    std::fs::write(
+        root.join(file),
+        format!(
+            "{}{}{}",
+            &s[..ours],
+            &s[line_after(theirs)..close],
+            &s[after..]
+        ),
+    )
+    .unwrap();
+    let out = fid(&root, &["doctor"]);
+    assert!(
+        !text(&out).contains("hardware/build.sh: modified"),
+        "{}",
+        text(&out)
+    );
+}
+
+#[test]
 fn a_symbol_that_extends_another_is_vendored_whole() {
     let tmp = tempfile::tempdir().unwrap();
     let root = scaffold(tmp.path());
@@ -1794,4 +1844,107 @@ fn the_case_colour_is_declared_and_checked() {
     let out = fid(&root, &["derive", "--pipeline", "hardware"]);
     assert!(!out.status.success());
     assert!(text(&out).contains("`#rrggbb`"), "{}", text(&out));
+}
+
+/// A socket's land pattern: courtyard 10 × 8 mm, its metal (fab) 9 mm wide
+/// with its face 0.2 mm inside the courtyard's bottom, and every pad 2 mm
+/// or more behind that face. KiCad's y points down.
+const SOCKET_FP: &str = r#"(footprint "Sock" (version 20221018) (generator x)
+  (layer F.Cu)
+  (fp_rect (start -5 -4) (end 5 4) (stroke (width 0.05) (type solid)) (layer F.CrtYd))
+  (fp_rect (start -4.5 -3.5) (end 4.5 3.8) (stroke (width 0.1) (type solid)) (layer F.Fab))
+  (pad 1 smd rect (at -2 1) (size 1 1) (layers F.Cu F.Mask))
+  (pad 2 smd rect (at 2 1) (size 1 1) (layers F.Cu F.Mask)))"#;
+
+fn socket_product(root: &Path) {
+    std::fs::create_dir_all(root.join("hardware/lib/footprints")).unwrap();
+    std::fs::write(
+        root.join("hardware/lib/footprints/Sock.kicad_mod"),
+        SOCKET_FP,
+    )
+    .unwrap();
+    edit(
+        root,
+        "hardware/product.toml",
+        "wall_mm  = 5.0",
+        "wall_mm  = 5.0\ngrid_mm  = 0.5",
+    );
+    edit(
+        root,
+        "hardware/product.toml",
+        "max_mm = [100.0, 100.0]",
+        "max_mm = [100.0, 100.0]\nzones  = { usb = \"bottom\" }\nnear   = \"bottom\"",
+    );
+    add_board_part(
+        root,
+        "id = \"usb\"\nname = \"Socket\"\nbody_mm = [10.0, 8.0, 3.2]\nfootprint = \"Lib:Sock\"\n\
+         zone = \"usb\"\nfaces = \"bottom\"\nthrough_wall = true",
+    );
+}
+
+#[test]
+fn a_socket_through_the_wall_stands_flush_in_a_notch_its_own_size() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    socket_product(&root);
+    edit(
+        &root,
+        "hardware/product.toml",
+        "kind              = \"gasket\"",
+        "kind              = \"none\"",
+    );
+    edit(
+        &root,
+        "hardware/product.toml",
+        "wall_mm  = 5.0",
+        "wall_mm  = 1.6",
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let l = layout(&root);
+    let op = &l["case"]["openings"][0];
+    // The window is the socket's metal plus 1 mm, not its courtyard.
+    assert_eq!(op["size_mm"][0].as_f64().unwrap(), 10.0, "{op}");
+    // Its mouth within 1 mm of the case's face, inside the wall: a notch the
+    // board drops into from above.
+    let recess = op["recess_mm"].as_f64().unwrap();
+    assert!(recess <= 1.0, "{op}");
+    assert_eq!(op["notch"], true, "{op}");
+    // The socket may hang past the board edge as far as its pads allow: 2.5
+    // mm from its courtyard's face to its pads, less 0.5 mm of copper to
+    // edge and a margin, down to a tenth.
+    let m: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(root.join("hardware/generated/placement-model.json")).unwrap(),
+    )
+    .unwrap();
+    let usb = m["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["id"] == "usb")
+        .unwrap();
+    let past =
+        m["board"]["lo_mm"][1].as_f64().unwrap() - usb["region"]["lo_mm"][1].as_f64().unwrap();
+    assert!((past - 1.9).abs() < 1e-6, "{}", usb["region"]);
+}
+
+#[test]
+fn a_sealed_case_keeps_a_socket_behind_its_wall_rather_than_notch_the_gasket() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    socket_product(&root);
+    // Its mouth may sit deep: only the gasket is in question.
+    edit(
+        &root,
+        "hardware/product.toml",
+        "through_wall = true",
+        "through_wall = true\nrecess_mm = 5.0",
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(!out.status.success());
+    assert!(
+        text(&out).contains("a sealed case cannot have a notch"),
+        "{}",
+        text(&out)
+    );
 }

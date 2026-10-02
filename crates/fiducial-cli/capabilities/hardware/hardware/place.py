@@ -73,7 +73,13 @@ def build(m: dict, explain: bool):
         return lit
 
     (bx0, by0), (bx1, by1) = (0.0, 0.0), (m["board"]["hi_mm"][0] - ox, m["board"]["hi_mm"][1] - oy)
-    span = (units(bx0) - 1, units(bx1) + 1, units(by0) - 1, units(by1) + 1)
+    # The board, and any region reaching past it (a socket through the wall).
+    regs = [it["region"] for it in m["items"] if it.get("region")]
+    lo_x = min([bx0] + [r["lo_mm"][0] - ox for r in regs])
+    hi_x = max([bx1] + [r["hi_mm"][0] - ox for r in regs])
+    lo_y = min([by0] + [r["lo_mm"][1] - oy for r in regs])
+    hi_y = max([by1] + [r["hi_mm"][1] - oy for r in regs])
+    span = (units(lo_x) - 1, units(hi_x) + 1, units(lo_y) - 1, units(hi_y) + 1)
     # Bound on any doubled coordinate or distance, pads past the board included.
     big = 8 * max(abs(v) for v in span) + 1000
     xs, ys = [], []

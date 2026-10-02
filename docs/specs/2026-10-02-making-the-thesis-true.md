@@ -198,6 +198,20 @@ Platform bugs the example found, each fixed and tested:
   the design and SEO scripts, now `mark`/`letters`/optional `accent` with
   neutral fallbacks. The private reference product renames its SVG layers
   when it next upgrades.
+- a through-wall socket held wholly on the board, its mouth read from its
+  courtyard's margin and its window sized for a plug's body: the plug's
+  socket stood back from the case's face. Now it hangs past the board edge
+  as far as its pads allow (KiCad's 0.5 mm rule, with a margin), its mouth
+  is its fab outline's face, and it must be flush within 1 mm, in a window
+  of its face plus 1 mm. Inside the wall, that window is a notch open to
+  the base's top; the lid's skirt is cut to match, a plug on the lid fills
+  the notch down to the window, and `cad.py`'s insertion
+  check passes through it. A sealed case refuses the notch. The notch first
+  began 0.5 mm inside the mouth, leaving a lip of wall over the socket; it
+  now runs through the whole wall.
+- an upgrade conflict moved the merge base to upstream but left the
+  recorded hash, so a file resolved to exactly the platform's version was
+  reported as drift. Both move now.
 
 The guide (`docs/guides/sensor-stick.md`) rebuilds the stick from scratch on
 the current platform, with the first build's refusals kept as its case study.
@@ -205,6 +219,15 @@ the current platform, with the first build's refusals kept as its case study.
 Not done:
 - the guide's captures still walk through `eda`;
 - a "case wraps the board" sizing mode (the stick declares `width_mm`);
+- **a board cut to its case.** The board is always a rectangle. At the
+  stick's plug end its corners met the case's chamfer and held the socket
+  back, so the example's chamfer was made smaller. A board should stay
+  rectangular where it can, and be cut (a chamfer, a notch) where the case
+  needs it: the outline offset inward by wall + clearance, intersected with
+  the rectangle, written to `Edge.Cuts` and checked like the rest;
+- the floor search's 1 mm step (`case.grid_mm`) also held the board back;
+  the example sets 0.5. Floor placement on the solver (P2) makes it
+  continuous.
 
 ### G4 · The renders
 

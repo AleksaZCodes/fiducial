@@ -160,11 +160,19 @@ listed under `unverified_dimensions`.
   `at_mm` on each part — positions are facts there, not choices. Parts that
   hang past the board's edge take that room on the floor too.
 - A socket that must be reached from outside: `through_wall = true` on a
-  board part that `faces` an edge (or names `side`). The wall in front of it
-  gets a window — `opening_mm`, sized for the plug's body — and derive fails
-  if a plug cannot reach the mouth (`recess_mm`), if the mouth would sit in
-  the wall, or if the window would cut a boss; the base rises so the window
-  clears the lid seal. The window is not sealed, and `why` says so.
+  board part that `faces` an edge (or names `side`). It hangs past the board
+  edge as far as its own pads allow (KiCad's 0.5 mm copper-to-edge, with a
+  margin), and its mouth is its drawn body's face (F.Fab), so it comes flush
+  with the case: derive fails if the mouth is more than 1 mm behind the
+  outer face (`recess_mm` to allow more), naming the fixes. The window is
+  the socket's face plus 1 mm each way; `opening_mm` sizes it for a plug's
+  body instead and allows a 10 mm recess. A mouth inside the wall gets a
+  notch open to the base's top, so the board drops in with the socket in
+  it, and a plug on the lid fills the notch down to the window's top. A
+  sealed case refuses the notch and keeps the socket behind the wall. Derive also fails if the window would cut a
+  boss; the base rises so the window clears the lid seal. The window is not
+  sealed, and `why` says so. The floor search steps by `case.grid_mm`
+  (1 mm): set 0.5 when the board must stand closer to that wall.
 
 **Wires are dressed, not drawn.** Each `[[wire]]` is routed by a grid search
 at its height: inside the cavity, round every boss, socket and part that

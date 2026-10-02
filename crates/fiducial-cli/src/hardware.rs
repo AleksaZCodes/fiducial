@@ -3218,6 +3218,24 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                     if let (Some(f), Some(e)) = (&q.faces, edge) {
                         it["flush"] =
                             json!({ "side": e, "from": format!("{}: faces = \"{f}\"", q.id) });
+                        // A socket reached through the wall: its face goes to
+                        // the board edge and past it, as far as its own pads
+                        // and holes allow, so its mouth meets the case's face.
+                        if q.through_wall {
+                            let over = fp.as_ref().map_or(0.0, |fp| overhang_allowed(fp, f));
+                            let (k, sign, edge_at) = match e {
+                                "top" => (1, 1.0, y0 + size.1),
+                                "bottom" => (1, -1.0, y0),
+                                "left" => (0, -1.0, x0),
+                                _ => (0, 1.0, x0 + size.0),
+                            };
+                            let key = if sign > 0.0 { "hi_mm" } else { "lo_mm" };
+                            it["region"][key][k] = json!(r3(edge_at + sign * over));
+                            it["region"]["from"] = json!(format!(
+                                "{region_why}, its face {} mm past the board edge (through_wall: as far as its pads allow)",
+                                r3(over)
+                            ));
+                        }
                         // Its keep-out runs from the body to the board edge.
                         if ko > 0.0 {
                             let reach = |inner: f64, outer: f64| r3((outer - inner).abs());
@@ -4195,9 +4213,31 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
             placed["body"]["size_mm"][0].as_f64().unwrap_or(0.0),
             placed["body"]["size_mm"][1].as_f64().unwrap_or(0.0),
         );
-        // The mouth: the middle of the face toward the wall.
-        let mouth = (c.0 + dir.0 * sz.0 / 2.0, c.1 + dir.1 * sz.1 / 2.0);
-        let face_w = if dir.0 != 0.0 { sz.1 } else { sz.0 };
+        // The mouth: the middle of the face toward the wall — the part's own
+        // face as its footprint draws the body (fab layer), not the
+        // courtyard's margin in front of it: that is the metal a plug meets.
+        // And its width across that face, for the window.
+        let (inset, fab_w) = match (&q.footprint, &q.faces) {
+            (Some(fid), Some(f)) => crate::kicad::read_footprint(root, fid)
+                .ok()
+                .and_then(|fp| {
+                    let ((cx0, cy0), (cx1, cy1)) = fp.courtyard;
+                    let ((fx0, fy0), (fx1, fy1)) = fp.fab?;
+                    Some(match f.as_str() {
+                        "bottom" => (cy1 - fy1, fx1 - fx0),
+                        "top" => (fy0 - cy0, fx1 - fx0),
+                        "left" => (fx0 - cx0, fy1 - fy0),
+                        _ => (cx1 - fx1, fy1 - fy0),
+                    })
+                })
+                .map_or((0.0, None), |(i, w)| (i.max(0.0), Some(w))),
+            _ => (0.0, None),
+        };
+        let mouth = (
+            c.0 + dir.0 * (sz.0 / 2.0 - inset),
+            c.1 + dir.1 * (sz.1 / 2.0 - inset),
+        );
+        let face_w = fab_w.unwrap_or(if dir.0 != 0.0 { sz.1 } else { sz.0 });
         let (ow, oh) = match q.opening_mm {
             Some(o) => (o[0], o[1]),
             None => (face_w + 1.0, q.body_mm[2] + 1.0),
@@ -4223,25 +4263,32 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
         }
         let reach = reach
             .ok_or_else(|| anyhow!("part `{}`: no wall of the outline lies {side} of it", q.id))?;
-        // A window the plug's body fits (`opening_mm`) lets the whole plug
-        // into the wall; one the size of the socket's face lets in only its
-        // metal shell, which seats about 3 mm.
+        // A window the size of the socket's face (the default) wants the
+        // socket flush with the case's face: within 1 mm, so a plug's body
+        // meets the case and its shell seats fully. A window the plug's body
+        // fits (`opening_mm`) lets the plug into the wall instead.
         let most = q
             .recess_mm
-            .unwrap_or(if q.opening_mm.is_some() { 10.0 } else { 3.0 });
+            .unwrap_or(if q.opening_mm.is_some() { 10.0 } else { 1.0 });
         if reach > most + 1e-9 {
             bail!(
                 "part `{}`: its mouth is {} mm behind the case's outer face, and a plug seats at most {most} mm deep — \
-                 add \"{side}\" to board.near so the board reaches that wall, size opening_mm for the plug's body \
-                 so the plug goes into the wall, or declare recess_mm",
+                 add \"{side}\" to board.near (first) so the board reaches that wall, a finer case.grid_mm ({}) so it \
+                 can stand closer, size opening_mm for the plug's body so the plug goes into the wall, or declare recess_mm",
                 q.id,
-                r3(reach)
+                r3(reach),
+                case.grid_mm
             );
         }
-        if reach < case.wall_mm - 1e-9 {
+        // Its mouth inside the wall, flush with the face: the window is then a
+        // notch open to the base's top edge, so the board drops in with the
+        // socket already in it, and the lid closes it. A gasket cannot cross
+        // an open notch, so a sealed case keeps the socket behind the wall.
+        let notch = reach < case.wall_mm - 1e-9 && !seal_on;
+        if reach < case.wall_mm - 1e-9 && seal_on {
             bail!(
-                "part `{}`: its mouth is inside the {} mm wall ({} mm from the outer face) — the board could not drop in past it; \
-                 move the board {} mm back from that wall",
+                "part `{}`: its mouth is inside the {} mm wall ({} mm from the outer face) — the board could not drop in past it, \
+                 and a sealed case cannot have a notch for it; move the board {} mm back from that wall",
                 q.id,
                 case.wall_mm,
                 r3(reach),
@@ -4273,10 +4320,15 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
             }
         }
         why.push(format!(
-            "`{}` opens through the {side} wall: a {} × {} mm window, its mouth {} mm from the outer face — not sealed: an IP-rated socket or a plug keeps water out",
+            "`{}` opens through the {side} wall: a {} × {} mm {}, its mouth {} mm from the outer face — not sealed: an IP-rated socket or a plug keeps water out",
             q.id,
             r3(ow),
             r3(oh),
+            if notch {
+                "notch open to the base's top (the board drops in with the socket in it; the lid closes it)"
+            } else {
+                "window"
+            },
             r3(reach)
         ));
         openings.push(json!({
@@ -4289,6 +4341,10 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
             // From just inside the mouth to past the outer face.
             "length_mm": r3(reach.max(0.0) + 2.0),
             "sealed": false,
+            // Open to the base's top edge, base_h up; cad.py cuts the lid's
+            // skirt to match.
+            "notch": notch,
+            "top_mm": r3(base_h),
         }));
     }
 
@@ -6097,6 +6153,39 @@ fn render_board_rs(p: &Product, i: &Value) -> Result<String> {
         );
     }
     Ok(out)
+}
+
+/// KiCad's default copper-to-board-edge clearance: the routed board's DRC
+/// refuses copper closer to the edge than this.
+const COPPER_TO_EDGE_MM: f64 = 0.5;
+
+/// How far a part may hang past the board edge its `faces` side is turned
+/// to: from its body's face to its nearest pad or hole on that side, less
+/// KiCad's 0.5 mm copper-to-edge clearance, which the board's DRC holds. A USB socket's shell reaches out into the
+/// case wall this far, so its mouth comes flush with the case's face.
+/// `faces` is as drawn at 0° with y up; KiCad's footprint y points down.
+fn overhang_allowed(fp: &crate::kicad::Footprint, faces: &str) -> f64 {
+    let ((x0, y0), (x1, y1)) = fp.courtyard;
+    let gap = fp
+        .pads
+        .iter()
+        .map(|p| {
+            let (hw, hh) = (p.size.0 / 2.0, p.size.1 / 2.0);
+            match faces {
+                "bottom" => y1 - (p.at.1 + hh),
+                "top" => (p.at.1 - hh) - y0,
+                "left" => (p.at.0 - hw) - x0,
+                _ => x1 - (p.at.0 + hw),
+            }
+        })
+        .fold(f64::INFINITY, f64::min);
+    if gap.is_finite() {
+        // 0.05 mm under the rule, then down to a tenth: placement rounds
+        // to the micron, and DRC measures an oval pad's end exactly.
+        ((gap - COPPER_TO_EDGE_MM - 0.05) * 10.0).floor().max(0.0) / 10.0
+    } else {
+        0.0
+    }
 }
 
 /// What `fid-hardware` writes for one output path, chosen by file name.

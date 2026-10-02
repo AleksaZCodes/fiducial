@@ -257,13 +257,34 @@ def board_part(solids, nm, q, top, look, routed):
 
 
 
-def opening(op):
-    """The window through the wall in front of a board part's mouth: from just
-    inside the mouth, out past the outer face, its long side horizontal."""
+def opening(op, inward=0.5):
+    """The window through the wall in front of a board part's mouth: from
+    `inward` inside the mouth, out past the outer face, its long side
+    horizontal. A notch (`notch`) runs on up to the base's top edge, so the
+    board drops in with the socket already in it."""
     (x, y, z), (nx, ny) = op["mouth_mm"], op["normal"]
     w, h = op["size_mm"]
-    pl = Plane(origin=(x - nx * 0.5, y - ny * 0.5, z), x_dir=(-ny, nx, 0), z_dir=(nx, ny, 0))
-    return pl * Box(w, h, op["length_mm"] + 0.5, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    lo = z - h / 2
+    hi = op["top_mm"] + 0.01 if op.get("notch") else z + h / 2
+    if op.get("notch"):
+        # Through the whole wall above the socket, or a lip of it would stand
+        # over the socket's body and stop the board dropping in.
+        inward = max(inward, op["length_mm"])
+    pl = Plane(origin=(x - nx * inward, y - ny * inward, (lo + hi) / 2), x_dir=(-ny, nx, 0), z_dir=(nx, ny, 0))
+    return pl * Box(w, hi - lo, op["length_mm"] + inward, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+
+def notch_plug(op, wall, gap=0.1):
+    """The lid's share of a notch: the wall's thickness, from the window's top
+    up to the lid, `gap` narrower each side so it drops in. With it in, what
+    is left open is the window alone."""
+    (x, y, z), (nx, ny) = op["mouth_mm"], op["normal"]
+    w, h = op["size_mm"]
+    lo, hi = z + h / 2, op["top_mm"] + 0.01
+    # The wall's inner face: the mouth is `recess_mm` in from the outer one.
+    back = op["recess_mm"] - wall
+    pl = Plane(origin=(x + nx * back, y + ny * back, (lo + hi) / 2), x_dir=(-ny, nx, 0), z_dir=(nx, ny, 0))
+    return pl * Box(w - 2 * gap, hi - lo, wall, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
 
 def apply_models(L, solids, out):
@@ -494,6 +515,14 @@ def build(L):
             cavity, amount=-1.6, kind=Kind.ARC
         )
         lid += slab(skirt, H - pf["skirt_mm"], pf["skirt_mm"])
+        # The skirt stops where a socket's notch is: the socket stands in it.
+        for op in c.get("openings", []):
+            if op.get("notch"):
+                lid -= opening(op, inward=wall + 2.0)
+    # A notch is closed from above, whatever holds the lid on.
+    for op in c.get("openings", []):
+        if op.get("notch"):
+            lid += notch_plug(op, wall)
 
     for rp in L["region_parts"]:
         body = rp["body"]

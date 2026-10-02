@@ -518,6 +518,10 @@ fn merge_one_template(
                 // time. (A file still holding markers is refused above.)
                 let record = lock.templates.get_mut(rel_path).unwrap();
                 record.base_content = Some(upstream.clone());
+                // And the hash with it: what the platform now ships is the
+                // reference. A file resolved to exactly that is no drift; one
+                // still holding markers, or a local edit, still is.
+                record.hash = crate::lock::sha256_hex(upstream.as_bytes());
             }
             Ok(Some(TemplateOutcome::Conflict(
                 "CONFLICT — conflict markers written; resolve and run `fid upgrade` again".into(),
