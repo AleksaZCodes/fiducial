@@ -223,8 +223,30 @@ pub(crate) fn outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<St
             .filter(|o| !app_root_exists(root, o))
             .cloned()
             .collect(),
+        // The firmware's pin map waits for a firmware: a board with no MCU
+        // declared has nothing to name.
+        "fid-hardware" if !hardware_declares_firmware(pipeline, root) => pipeline
+            .outputs
+            .iter()
+            .filter(|o| o.ends_with("board.rs"))
+            .cloned()
+            .collect(),
         _ => Vec::new(),
     }
+}
+
+/// Does the hardware declaration name the MCU the firmware drives? An
+/// unreadable one counts as yes: `fid-hardware` reports the parse error.
+fn hardware_declares_firmware(pipeline: &Pipeline, root: &Path) -> bool {
+    let decl = pipeline
+        .args
+        .first()
+        .cloned()
+        .unwrap_or_else(|| crate::hardware::DECLARATION.to_string());
+    std::fs::read_to_string(root.join(decl))
+        .ok()
+        .and_then(|raw| raw.parse::<toml::Table>().ok())
+        .is_none_or(|t| t.contains_key("firmware"))
 }
 
 /// Is there a real app at the root the output lives under?
@@ -258,6 +280,7 @@ fn not_applicable_reason(pipeline: &Pipeline, output: &str, root: &Path) -> Stri
         "fid-design" | "fid-thesis" if !app_root_exists(root, output) => {
             "there is no app at that path".to_string()
         }
+        "fid-hardware" => "hardware/product.toml declares no `[firmware] mcu`".to_string(),
         other => format!("`{other}` does not derive it in this configuration"),
     }
 }
@@ -497,9 +520,11 @@ fn run_fid_hardware(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         .map(|s| s.as_str())
         .unwrap_or(crate::hardware::DECLARATION);
     let (product, solved) = crate::hardware::load(working_dir, decl)?;
+    let skip = outputs_not_applicable(pipeline, working_dir);
     let rendered = pipeline
         .outputs
         .iter()
+        .filter(|out| !skip.contains(out))
         .map(|out| {
             Ok((
                 out,

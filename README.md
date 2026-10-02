@@ -63,45 +63,52 @@ outlives every framework above it.
 cargo install fiducial-cli
 
 fid new my-product && cd my-product
-fid add eda                # board pipeline + enclosure generation
-fid derive                 # run every pipeline, hash every output
-fid dash                   # roadmap, decisions, CI, pipelines, freshness
+fid add capability hardware   # one declaration → case, board, schematic, BOM, interface
+fid add capability firmware-rp2040
+fid derive                    # run every pipeline, hash every output
+fid dash                      # roadmap, decisions, CI, pipelines, freshness
 ```
 
-Declare the board once, in `board/board.interface.json`:
+Declare the product once, in `hardware/product.toml`: its outline, its parts,
+and what each pin connects to (an excerpt):
 
-```json
-{
-  "outline": { "width_mm": 100.0, "height_mm": 60.0, "tolerance": "fdm" },
-  "connectors": [
-    { "id": "J1", "type": "usb-c", "mount": { "side": "south", "offset_mm": 20.0 } }
-  ]
-}
+```toml
+[[part]]
+id     = "mcu"
+symbol = "MCU_RaspberryPi:RP2040"
+pins   = { GPIO4 = "SENSOR_SDA", GPIO5 = "SENSOR_SCL", GND = "GND" }
+
+[[part]]
+id   = "r-sda"
+pick = { category = "Resistors", package = "0603", value = "4k7", has = ["1%"] }  # resolved to a real LCSC part, locked
+pins = { 1 = "SENSOR_SDA", 2 = "3V3" }
+
+[firmware]
+mcu = "mcu"
 ```
 
-Then `fid derive` produces — with nobody modelling anything —
+Then `fid derive` produces — with nobody modelling, drawing or copying anything —
 
-- a **gasket-sealed enclosure**, with the USB-C opening already punched, sized
-  from the connector family and the printing process
-- a printable **STL** and a web-ready **GLB**
-- **TypeScript types** for the same board, for the app that talks to it
+- the **case** around the parts, with every socket's window cut, and the
+  **board** inside it: placed by a constraint solver, every pad on its net;
+- the **schematic**, and the **BOM**, each part's LCSC number taken from
+  `hardware/parts.lock`;
+- `interface.ts` — the nets as a **TypeScript type**, for the app that talks
+  to the device;
+- `board.rs` — the **firmware's pin map**: `board::sensor_sda!(p)` is
+  `p.PIN_4`.
 
-Change `width_mm` to `120.0` and every one of those moves. Until they do,
-`fid derive --check` says so and exits non-zero:
+`hardware/build.sh` then routes the board, builds every solid, checks that
+it all fits and goes together, and writes the files a board house needs to
+make and assemble it.
 
-<!-- capture: fid-derive-check-stale.txt -->
-
-```text
-$ fid derive --check
-✗ fid derive --check failed:
-  board/board.interface.json: stale (lock:9d241d22 file:867aeb34) — run `fid derive`
-Error: stale artifacts detected
-```
-
-<!-- /capture -->
-
-That is the whole contract. `fid derive --check` runs in CI, so an artifact that
-did not follow its declaration fails the build instead of shipping.
+Move `SENSOR_SDA` to `GPIO6` and the copper, the schematic and the firmware
+move with it — the firmware with no edit. Rename it, and firmware or web code
+still using the old name stops compiling. Until `fid derive` has run,
+`fid derive --check` names every artifact that no longer matches the
+declaration and exits non-zero. It runs in CI, so an artifact that did not
+follow its declaration fails the build instead of shipping. That is the whole
+contract.
 
 ## What you can add to it
 

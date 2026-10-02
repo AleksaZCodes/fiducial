@@ -49,6 +49,19 @@ pub struct Product {
     pub parts: Vec<Part>,
     #[serde(default, rename = "wire")]
     pub wires: Vec<Wire>,
+    /// The microcontroller the firmware runs on. Its pins' nets become
+    /// `hardware/generated/board.rs`: one macro per net, naming the pin.
+    #[serde(default)]
+    pub firmware: Option<Firmware>,
+}
+
+/// `[firmware] mcu = "<part id>"` — the board part whose pins the firmware
+/// drives. Its symbol's pin names say which peripheral each net is on
+/// (`GPIO4` on an RP2040, `PA5` on an STM32).
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Firmware {
+    pub mcu: String,
 }
 
 /// A wire between two parts. Routed, drawn, and its length — path plus
@@ -3637,6 +3650,11 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                     "height_mm": q.body_mm[2],
                     "nets": q.nets,
                     "pin_nets": pin_nets,
+                    // The symbol's name for each connected pad: what the
+                    // firmware calls the pin (`GPIO4`), for interface.json.
+                    "pin_names": sym.map(|s| pin_nets.keys().filter_map(|pad| {
+                        s.pins.iter().find(|sp| &sp.number == pad).map(|sp| (pad.clone(), sp.name.clone()))
+                    }).collect::<BTreeMap<_, _>>()),
                     "pads_at": pads_by_id.get(&q.id).map(|v| v.iter().map(|(n, p)| json!({"pin": n, "at_mm": [p.0, p.1]})).collect::<Vec<_>>()),
                     "value": q.value,
                     "follows": q.follows,
@@ -5831,6 +5849,193 @@ pub fn load(root: &Path, decl: &str) -> Result<(Product, Solved)> {
     Ok((product, solved))
 }
 
+// ── The interface: what the other disciplines read from the hardware ─────────
+
+/// A net's name as a Rust or TypeScript identifier: `SENSOR_SDA` stays,
+/// `+3V3` becomes `NET_3V3`.
+fn net_ident(net: &str) -> String {
+    let mut out = String::new();
+    for c in net.chars() {
+        if c.is_ascii_alphanumeric() {
+            out.push(c.to_ascii_uppercase());
+        } else if !out.ends_with('_') {
+            out.push('_');
+        }
+    }
+    let out = out.trim_matches('_').to_string();
+    if out.is_empty() || out.starts_with(|c: char| c.is_ascii_digit()) {
+        format!("NET_{out}")
+    } else {
+        out
+    }
+}
+
+/// The field of an Embassy `Peripherals` a pin name is: `GPIO4` → `PIN_4`
+/// (RP2040), `PA5` → `PA5` (STM32). None for a pin that is not an I/O.
+fn peripheral(pin: &str) -> Option<String> {
+    let digits = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit());
+    if let Some(n) = pin.strip_prefix("GPIO").filter(|n| digits(n)) {
+        return Some(format!("PIN_{n}"));
+    }
+    let mut c = pin.chars();
+    match (c.next(), c.next()) {
+        (Some('P'), Some(port)) if ('A'..='K').contains(&port) && digits(c.as_str()) => {
+            Some(pin.to_string())
+        }
+        _ => None,
+    }
+}
+
+/// What firmware and web need from the hardware, and nothing else: the
+/// board's size, the sockets reached through the case, every net and the
+/// pins on it, and — with `[firmware]` — which I/O pin of the MCU each net is
+/// on. Derived from the solved layout, so a renamed net or a moved pin
+/// reaches firmware and web in the same `fid derive` that moves the copper.
+pub fn interface(p: &Product, solved: &Solved) -> Result<Value> {
+    let l = &solved.layout;
+    let placed = l["board"]["illustrative_placement"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let mut nets: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut parts = serde_json::Map::new();
+    for it in &placed {
+        let Some(pin_nets) = it["pin_nets"].as_object().filter(|m| !m.is_empty()) else {
+            continue;
+        };
+        let reference = it["ref"].as_str().unwrap_or_default().to_string();
+        let mut pins = serde_json::Map::new();
+        for (pad, net) in pin_nets {
+            let net = net.as_str().unwrap_or_default();
+            let name = it["pin_names"]
+                .get(pad)
+                .and_then(Value::as_str)
+                .unwrap_or(pad);
+            pins.insert(pad.clone(), json!({ "name": name, "net": net }));
+            let member = format!("{reference}.{name}");
+            let on = nets.entry(net.to_string()).or_default();
+            if !on.contains(&member) {
+                on.push(member);
+            }
+        }
+        parts.insert(reference, json!({ "part": it["part"], "pins": pins }));
+    }
+    let firmware = match &p.firmware {
+        None => Value::Null,
+        Some(f) => {
+            let mcu = placed
+                .iter()
+                .find(|it| it["part"] == f.mcu.as_str())
+                .ok_or_else(|| anyhow!("[firmware] mcu = \"{}\" is not a board part", f.mcu))?;
+            if mcu["pin_names"].is_null() {
+                bail!("[firmware] mcu = \"{}\": the part has no symbol, so its pins have no names to drive", f.mcu);
+            }
+            let mut pins: BTreeMap<String, String> = BTreeMap::new();
+            let mut idents: BTreeMap<String, String> = BTreeMap::new();
+            for (pad, net) in mcu["pin_nets"].as_object().into_iter().flatten() {
+                let (Some(net), Some(name)) = (net.as_str(), mcu["pin_names"][pad].as_str()) else {
+                    continue;
+                };
+                if peripheral(name).is_none() {
+                    continue;
+                }
+                if let Some(other) = pins.insert(net.to_string(), name.to_string()) {
+                    if other != name {
+                        bail!("[firmware] net `{net}` is on two pins of `{}` ({other}, {name}) — firmware drives a net from one", f.mcu);
+                    }
+                }
+                if let Some(other) = idents.insert(net_ident(net), net.to_string()) {
+                    if other != net {
+                        bail!("[firmware] nets `{other}` and `{net}` are both `{}` in code — rename one", net_ident(net));
+                    }
+                }
+            }
+            json!({ "mcu": f.mcu, "pins": pins })
+        }
+    };
+    let connectors: Vec<Value> = l["case"]["openings"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|o| json!({ "part": o["part"], "side": o["side"], "opening_mm": o["size_mm"] }))
+        .collect();
+    Ok(json!({
+        "generated_by": "fid-hardware from hardware/product.toml — do not edit",
+        "product": p.product.name,
+        "board_mm": {
+            "size": l["board"]["body"]["size_mm"],
+            "thickness": l["board"]["thickness_mm"],
+        },
+        "connectors": connectors,
+        "nets": nets,
+        "parts": parts,
+        "firmware": firmware,
+    }))
+}
+
+/// The interface as TypeScript: a web app imports the nets as a type, so a
+/// renamed net fails its typecheck where it is still used.
+fn render_interface_ts(i: &Value) -> String {
+    let lit = |v: &Value| serde_json::to_string(v).unwrap_or_else(|_| "null".into());
+    let nets: Vec<String> = i["nets"]
+        .as_object()
+        .map(|m| m.keys().cloned().collect())
+        .unwrap_or_default();
+    let mut out = String::from(
+        "// Derived by fid-hardware from hardware/product.toml — do not edit.\n\
+         // A renamed net or a moved pin changes this file in the same `fid derive`.\n\n",
+    );
+    out += &format!("export const NETS = {} as const;\n", lit(&json!(nets)));
+    out += "export type Net = (typeof NETS)[number];\n\n";
+    out += "/** The MCU pin each net is on, for nets the firmware drives. */\n";
+    out += &format!(
+        "export const MCU_PINS = {} as const;\n\n",
+        lit(i["firmware"].get("pins").unwrap_or(&json!({})))
+    );
+    out += "/** Sockets reached through the case: the part, the wall, the window. */\n";
+    out += &format!(
+        "export const CONNECTORS = {} as const;\n\n",
+        lit(&i["connectors"])
+    );
+    out += &format!(
+        "export const BOARD_MM = {} as const;\n",
+        lit(&i["board_mm"])
+    );
+    out
+}
+
+/// The interface as Rust, for the firmware: per net on an MCU I/O pin, a
+/// constant naming the pin and a macro taking it from Embassy's peripherals
+/// — `board::sensor_sda!(p)` is `p.PIN_4`. Moving the net to another pin
+/// changes the macro and the firmware follows with no edit; renaming the net
+/// removes the old macro, so code still using it stops compiling.
+fn render_board_rs(p: &Product, i: &Value) -> Result<String> {
+    let Some(f) = &p.firmware else {
+        bail!("board.rs needs `[firmware] mcu = \"<part id>\"` in hardware/product.toml");
+    };
+    let mut out = format!(
+        "//! Derived by fid-hardware from hardware/product.toml — do not edit.\n\
+         //!\n\
+         //! The I/O pins of `{}`, by the net each is on. Include it from the\n\
+         //! firmware with `#[path = \"…/hardware/generated/board.rs\"] mod board;`\n\
+         //! and take a pin with `board::sensor_sda!(p)`.\n\
+         #![allow(unused_macros, unused_imports, dead_code)]\n",
+        f.mcu
+    );
+    for (net, pin) in i["firmware"]["pins"].as_object().into_iter().flatten() {
+        let pin = pin.as_str().unwrap_or_default();
+        let field = peripheral(pin).unwrap_or_default();
+        let id = net_ident(net);
+        let mac = id.to_ascii_lowercase();
+        out += &format!(
+            "\n/// `{net}` — {pin}.\npub const {id}: &str = \"{pin}\";\n\
+             macro_rules! {mac} {{\n    ($p:expr) => {{\n        $p.{field}\n    }};\n}}\n\
+             pub(crate) use {mac};\n"
+        );
+    }
+    Ok(out)
+}
+
 /// What `fid-hardware` writes for one output path, chosen by file name.
 pub fn render_output(out: &str, product: &Product, solved: &Solved, root: &Path) -> Result<String> {
     let file = Path::new(out)
@@ -5844,10 +6049,13 @@ pub fn render_output(out: &str, product: &Product, solved: &Solved, root: &Path)
             None => "{}\n".to_string(),
         },
         "bom.csv" => render_bom(solved),
+        "interface.json" => serde_json::to_string_pretty(&interface(product, solved)?)? + "\n",
+        "interface.ts" => render_interface_ts(&interface(product, solved)?),
+        "board.rs" => render_board_rs(product, &interface(product, solved)?)?,
         "assembly.md" => render_assembly(solved, &product.product.name),
         f if f.ends_with(".kicad_pcb") => render_kicad(solved, root)?,
         f if f.ends_with(".kicad_sch") => render_schematic(solved, root, &product.product.name)?,
-        other => bail!("fid-hardware: unknown output `{other}` (layout.json, placement-model.json, placement.json, bom.csv, assembly.md, *.kicad_pcb, *.kicad_sch)"),
+        other => bail!("fid-hardware: unknown output `{other}` (layout.json, placement-model.json, placement.json, bom.csv, assembly.md, interface.json, interface.ts, board.rs, *.kicad_pcb, *.kicad_sch)"),
     })
 }
 

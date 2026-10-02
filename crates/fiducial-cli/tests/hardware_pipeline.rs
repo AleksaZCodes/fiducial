@@ -1452,3 +1452,132 @@ fn a_pinned_lcsc_number_is_verified_against_what_it_names() {
     assert!(!out.status.success());
     assert!(text(&out).contains("LCSC has no part C1"), "{}", text(&out));
 }
+
+/// An MCU whose pins have I/O names, as an RP2040's do.
+const MCU_SYMBOLS: &str = r#"(kicad_symbol_lib (version 20220914)
+  (symbol "Device:R" (property "Reference" "R" (at 0 0 0))
+    (symbol "R_0_1" (rectangle (start -1 2.5) (end 1 -2.5)))
+    (symbol "R_1_1"
+      (pin passive line (at 0 3.81 270) (length 1.27) (name "~" (effects)) (number "1" (effects)))
+      (pin passive line (at 0 -3.81 90) (length 1.27) (name "~" (effects)) (number "2" (effects)))))
+  (symbol "Lib:MCU" (property "Reference" "U" (at 0 0 0))
+    (symbol "MCU_0_1" (rectangle (start -5 5) (end 5 -5)))
+    (symbol "MCU_1_1"
+      (pin power_in line (at -7.62 2.54 0) (length 2.54) (name "VDD" (effects)) (number "1" (effects)))
+      (pin power_in line (at -7.62 0 0) (length 2.54) (name "GND" (effects)) (number "2" (effects)))
+      (pin bidirectional line (at 7.62 2.54 180) (length 2.54) (name "GPIO4" (effects)) (number "3" (effects)))
+      (pin bidirectional line (at 7.62 0 180) (length 2.54) (name "GPIO5" (effects)) (number "4" (effects))))))
+"#;
+
+/// Compile a firmware stub against the derived `board.rs`, as the firmware
+/// would: the pin comes from the peripherals by the macro's name.
+fn firmware_compiles(root: &Path, tmp: &Path, net_macro: &str) -> std::process::Output {
+    let src = tmp.join("firmware.rs");
+    std::fs::write(
+        &src,
+        format!(
+            "#[path = \"{}\"]\nmod board;\n#[allow(non_snake_case)]\npub struct Peripherals {{ pub PIN_4: u8, pub PIN_5: u8 }}\n\
+             pub fn pin(p: Peripherals) -> u8 {{ board::{net_macro}!(p) }}\n",
+            root.join("hardware/generated/board.rs").display()
+        ),
+    )
+    .unwrap();
+    Command::new(std::env::var("RUSTC").unwrap_or_else(|_| "rustc".into()))
+        .args(["--edition", "2021", "--crate-type", "lib", "--out-dir"])
+        .arg(tmp)
+        .arg(&src)
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn a_moved_pin_reaches_the_firmware_and_a_renamed_net_breaks_code_still_using_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    std::fs::create_dir_all(root.join("hardware/lib")).unwrap();
+    std::fs::write(root.join("hardware/lib/symbols.kicad_sym"), MCU_SYMBOLS).unwrap();
+    edit(
+        &root,
+        "hardware/product.toml",
+        "body_mm = [18.0, 18.0, 3.0]",
+        "body_mm = [18.0, 18.0, 3.0]\nsymbol  = \"Lib:MCU\"\npins    = { VDD = \"VCC\", GND = \"GND\", GPIO4 = \"SENSOR_SDA\", GPIO5 = \"LED\" }",
+    );
+    let p = root.join("hardware/product.toml");
+    let s = std::fs::read_to_string(&p).unwrap();
+    std::fs::write(
+        &p,
+        s + "\n[[part]]\nid = \"r-sda\"\nname = \"SDA pull-up\"\nplace = \"board\"\nmount = \"smd\"\nbody_mm = [1.6, 0.8, 0.45]\nsymbol = \"Device:R\"\npins = { 1 = \"SENSOR_SDA\", 2 = \"VCC\" }\n\
+             \n[[part]]\nid = \"r-led\"\nname = \"LED resistor\"\nplace = \"board\"\nmount = \"smd\"\nbody_mm = [1.6, 0.8, 0.45]\nsymbol = \"Device:R\"\npins = { 1 = \"LED\", 2 = \"GND\" }\n",
+    )
+    .unwrap();
+
+    // No [firmware] yet: the interface is derived, the pin map is not asked for.
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(!root.join("hardware/generated/board.rs").exists());
+    let ts = std::fs::read_to_string(root.join("hardware/generated/interface.ts")).unwrap();
+    assert!(
+        ts.contains("\"SENSOR_SDA\"") && ts.contains("export type Net"),
+        "{ts}"
+    );
+
+    let s = std::fs::read_to_string(&p).unwrap();
+    std::fs::write(&p, s + "\n[firmware]\nmcu = \"mcu\"\n").unwrap();
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let iface: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(root.join("hardware/generated/interface.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(iface["firmware"]["pins"]["SENSOR_SDA"], "GPIO4");
+    assert!(iface["nets"]["SENSOR_SDA"]
+        .as_array()
+        .unwrap()
+        .contains(&serde_json::json!("U1.GPIO4")));
+    let rs = std::fs::read_to_string(root.join("hardware/generated/board.rs")).unwrap();
+    assert!(
+        rs.contains("macro_rules! sensor_sda") && rs.contains("$p.PIN_4"),
+        "{rs}"
+    );
+    let out = firmware_compiles(&root, tmp.path(), "sensor_sda");
+    assert!(out.status.success(), "{}", text(&out));
+
+    // Swap the two pins in the declaration: the firmware follows, unedited.
+    edit(
+        &root,
+        "hardware/product.toml",
+        "GPIO4 = \"SENSOR_SDA\", GPIO5 = \"LED\"",
+        "GPIO4 = \"LED\", GPIO5 = \"SENSOR_SDA\"",
+    );
+    let out = fid(&root, &["derive", "--check", "--pipeline", "hardware"]);
+    assert!(!out.status.success(), "a moved pin is drift until derived");
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let rs = std::fs::read_to_string(root.join("hardware/generated/board.rs")).unwrap();
+    assert!(rs.contains("/// `SENSOR_SDA` — GPIO5.\npub const SENSOR_SDA: &str = \"GPIO5\";\nmacro_rules! sensor_sda {\n    ($p:expr) => {\n        $p.PIN_5"), "{rs}");
+    assert!(firmware_compiles(&root, tmp.path(), "sensor_sda")
+        .status
+        .success());
+
+    // Rename the net: board, schematic and firmware change together, and
+    // firmware still using the old name no longer compiles.
+    let s = std::fs::read_to_string(&p)
+        .unwrap()
+        .replace("SENSOR_SDA", "I2C_SDA");
+    std::fs::write(&p, s).unwrap();
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let sch = std::fs::read_to_string(root.join("hardware/generated/board.kicad_sch")).unwrap();
+    assert!(sch.contains("\"I2C_SDA\"") && !sch.contains("SENSOR_SDA"));
+    let ts = std::fs::read_to_string(root.join("hardware/generated/interface.ts")).unwrap();
+    assert!(
+        ts.contains("\"I2C_SDA\"") && !ts.contains("SENSOR_SDA"),
+        "{ts}"
+    );
+    let out = firmware_compiles(&root, tmp.path(), "sensor_sda");
+    assert!(!out.status.success());
+    assert!(text(&out).contains("sensor_sda"), "{}", text(&out));
+    assert!(firmware_compiles(&root, tmp.path(), "i2c_sda")
+        .status
+        .success());
+}

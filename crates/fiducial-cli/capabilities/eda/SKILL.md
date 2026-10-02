@@ -1,5 +1,12 @@
 # fiducial:eda — EDA Pipeline Skill
 
+> **Deprecated.** The `hardware` capability declares the board and its case
+> once, in `hardware/product.toml`, and derives
+> `hardware/generated/interface.json` — what `board.interface.json` was for.
+> Two ways to make an enclosure contradict declaring it once. Use `hardware`
+> for a new product; `eda` keeps working here and is removed in a later
+> release.
+
 This product has the `eda` capability installed. The EDA pipeline links hardware
 schematic/layout to the rest of the Fiducial platform via a machine-readable
 `board/board.interface.json` file.

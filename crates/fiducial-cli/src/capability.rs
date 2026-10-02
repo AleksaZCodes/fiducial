@@ -117,6 +117,9 @@ pub fn find(id: &str) -> Option<&'static Capability> {
 /// 4. Merge capability guard rules into `fiducial.toml [guard]`.
 pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> {
     println!("✦ fid add {} — installing into {}", cap.id, root.display());
+    if let Some(why) = &cap.deprecated {
+        eprintln!("  ⚠ `{}` is deprecated: {why}", cap.id);
+    }
 
     require_capabilities(cap, root)?;
 

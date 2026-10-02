@@ -1,1 +1,2 @@
 description = "EDA pipeline: atopile → KiCad → board.interface.json tracked by fid derive"
+deprecated = "the `hardware` capability declares the board and its case once (hardware/product.toml) and derives hardware/generated/interface.json, which is what board.interface.json was for. Two ways to make an enclosure contradict declaring it once; `eda` is removed in a later release."

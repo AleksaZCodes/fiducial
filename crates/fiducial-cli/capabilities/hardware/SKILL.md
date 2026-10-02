@@ -20,6 +20,8 @@ hardware/build.sh                  # route, solids, checks, fab files, review pa
 | `generated/assembly.md` | the order it goes together in, from each part's mount | yes |
 | `generated/board.kicad_pcb` | outline, mounting holes, every board part's real footprint placed and turned, every pad on its net, keep-out zones | yes |
 | `generated/board.kicad_sch` | the schematic: each part's KiCad symbol, a net label on every connected pin, a no-connect on every other — one row per circuit | yes |
+| `generated/interface.json`, `interface.ts` | what firmware and web read from the hardware: board size, sockets and their windows, every net and the pins on it — `interface.ts` makes the nets a TypeScript type | yes |
+| `generated/board.rs` | with `[firmware] mcu = "<part id>"`: per net on an MCU I/O pin, a macro taking that pin from Embassy's peripherals (`board::sensor_sda!(p)` → `p.PIN_4`) | yes |
 | `build/board-routed.kicad_pcb` | the board to fabricate: routed by Freerouting, ground-poured both sides, DRC'd by KiCad (`route.json`, `drc.rpt`) — fails the build if anything is unconnected or an error | built |
 | `build/*.step`, `*.stl`, `assembly.step` | every solid, for a manufacturer and a slicer | built |
 | `build/checks.json` | interference (keep-outs included), insertion, lid, screw engagement, seal squeeze | built, fails the build |
@@ -164,6 +166,17 @@ pad, approached square to the row, carrying that pad's net
 (`layout.json → wires[].cores_mm`). A pad row nobody turned turns square to
 its wire; a declared `rotate_deg` is followed and the route adapts. A
 cylinder's free end is the end facing the other end of its cable.
+
+**One change, every discipline.** A net is declared once, on the pins of the
+parts it joins. The same derive that puts it on the copper and in the
+schematic writes it into `interface.ts` and, with `[firmware] mcu`, into
+`board.rs`. The firmware includes that file (`#[path =
+"../../../hardware/generated/board.rs"] mod board;`) and takes pins only
+through it — never `p.PIN_4` by hand. Then moving a net to another pin moves
+the firmware with no edit, and renaming a net breaks every line of firmware or
+web code still using the old name, at compile time. Agents: when asked to
+change a pin, change `pins` in `hardware/product.toml` and derive; do not
+edit firmware pin numbers.
 
 **Parts are packages: declare what a part must be, lock what it resolved to.**
 A commodity part needs no catalogue number looked up by hand:

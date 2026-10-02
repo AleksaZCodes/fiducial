@@ -109,6 +109,23 @@ pointer, then removed. The README's worked example moves to the example
 product (G3). `fiducial-mesh` stays as a library: it is what writes
 STL/GLB.
 
+**Done (G2).** `fid-hardware` writes `interface.json`, `interface.ts` and,
+with `[firmware] mcu`, `board.rs`: per net on an MCU I/O pin, a macro taking
+that pin from Embassy's peripherals (`board::sensor_sda!(p)` → `p.PIN_4`).
+Macros, not numeric constants, because Embassy's pins are typed singletons —
+a number cannot select one. The test
+`a_moved_pin_reaches_the_firmware_and_a_renamed_net_breaks_code_still_using_it`
+is the demonstration:
+- swapping two pins fails `--check` until derived, after which a firmware stub
+  compiles unedited against the new pins;
+- renaming the net changes the schematic and the TypeScript, and the stub
+  still using the old name fails `rustc` naming it.
+
+`eda` carries a `deprecated` note (new in `capability.toml`): `fid add`
+warns, and `fid capability list --all` marks it. The README's worked example
+is now the hardware one. `docs/guides/first-product.md` and its captures
+still walk through `eda`; they move to the example product with G3.
+
 ### G3 · A public example product, built in this repository
 
 The private reference product cannot be shown. The paper's worked example

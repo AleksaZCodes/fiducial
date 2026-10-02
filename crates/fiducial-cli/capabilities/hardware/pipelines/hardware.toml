@@ -9,6 +9,9 @@ outputs  = [
   "hardware/generated/assembly.md",
   "hardware/generated/board.kicad_pcb",
   "hardware/generated/board.kicad_sch",
+  "hardware/generated/interface.json",
+  "hardware/generated/interface.ts",
+  "hardware/generated/board.rs",
 ]
 
 # hardware/product.toml → the solved product, by output file name:
@@ -21,6 +24,12 @@ outputs  = [
 #   assembly.md      the order it goes together in, derived from each part's mount
 #   *.kicad_pcb      the board: outline, holes, real footprints placed, pads on their nets
 #   *.kicad_sch      the schematic: every part's KiCad symbol, pins labelled with their nets
+#   interface.json   what firmware and web read: board size, sockets, every net and its pins
+#   interface.ts     the nets as a TypeScript type, for a web app to import
+#   board.rs         with `[firmware] mcu`: a macro per net naming the MCU pin it is on
+#                    (`board::sensor_sda!(p)` → `p.PIN_4`) — move a pin and the
+#                    firmware follows; rename a net and code using the old name
+#                    stops compiling
 #
 # Inputs are tracked as well as outputs: the declaration and every SVG it
 # addresses are hashed into fiducial.lock, so a redrawn logo fails

@@ -153,6 +153,10 @@ impl Source {
 pub struct Capability {
     pub id: String,
     pub description: String,
+    /// Why not to install this one, and what to use instead. A deprecated
+    /// capability still installs — products that have it keep working — but
+    /// `fid add` says so, and `fid capability list` marks it.
+    pub deprecated: Option<String>,
     pub declarations: Vec<Declaration>,
     pub pipelines: Vec<FileEntry>,
     pub requires_adapters: Vec<String>,
@@ -195,6 +199,8 @@ pub struct Capability {
 struct Manifest {
     #[serde(default)]
     description: Option<String>,
+    #[serde(default)]
+    deprecated: Option<String>,
     #[serde(default)]
     guard_rules: Vec<String>,
     #[serde(default)]
@@ -336,6 +342,7 @@ pub fn derive(id: &str, files: &BTreeMap<String, String>, source: Source) -> Res
     let cap = Capability {
         id: id.to_string(),
         description,
+        deprecated: manifest.deprecated,
         declarations,
         pipelines,
         requires_adapters: manifest.requires_adapters,
