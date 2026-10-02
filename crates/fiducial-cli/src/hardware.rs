@@ -672,26 +672,11 @@ pub struct Part {
     pub look: Option<String>,
 }
 
-/// A part declared by requirement, resolved like a dependency (see
-/// `hardware/parts.py`). Compared field by field with the pick its lock
-/// entry answered: a changed pick is an unanswered one.
-#[derive(Debug, Deserialize, Clone, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct Pick {
-    #[serde(default)]
-    pub category: Option<String>,
-    #[serde(default)]
-    pub package: Option<String>,
-    #[serde(default)]
-    pub value: Option<String>,
-    #[serde(default)]
-    pub has: Vec<String>,
-    #[serde(default)]
-    pub mpn: Option<String>,
-    /// `basic`, `preferred` or `extended`: the highest catalogue tier allowed.
-    #[serde(default)]
-    pub tier: Option<String>,
-}
+/// A part declared by requirement, resolved like a dependency. Opaque here:
+/// its fields, and what they match, are `hardware/parts.py`'s, declared once
+/// there. Derive asks only whether the lock answered this exact pick — a
+/// changed pick is an unanswered one.
+pub type Pick = toml::Table;
 
 /// `hardware/parts.lock`, as derive reads it: only what reaches the BOM.
 #[derive(Debug, Deserialize, Default)]
@@ -737,14 +722,6 @@ fn resolve_picks(root: &Path, p: &mut Product) -> Result<()> {
                 "part `{}`: declares both `lcsc` and `pick` — a part is pinned or picked, not both",
                 q.id
             );
-        }
-        if let Some(t) = &pick.tier {
-            if !["basic", "preferred", "extended"].contains(&t.as_str()) {
-                bail!(
-                    "part `{}`: pick tier = \"{t}\" — one of basic, preferred, extended",
-                    q.id
-                );
-            }
         }
         let Some(hit) = lock
             .part
