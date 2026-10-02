@@ -640,6 +640,11 @@ pub struct Part {
     pub mpn: Option<String>,
     #[serde(default)]
     pub lcsc: Option<String>,
+    /// What the part must be, instead of an `lcsc` number looked up by hand:
+    /// `hardware/parts.py resolve` answers it from the JLCPCB catalogue into
+    /// `hardware/parts.lock`, and derive takes the LCSC number from there.
+    #[serde(default)]
+    pub pick: Option<Pick>,
     #[serde(default)]
     pub second_source: Option<String>,
     #[serde(default)]
@@ -652,6 +657,104 @@ pub struct Part {
     /// Rendering hint: `pcb`, `panel`, `metal`, `cell`, `plastic`, `tpu`.
     #[serde(default)]
     pub look: Option<String>,
+}
+
+/// A part declared by requirement, resolved like a dependency (see
+/// `hardware/parts.py`). Compared field by field with the pick its lock
+/// entry answered: a changed pick is an unanswered one.
+#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Pick {
+    #[serde(default)]
+    pub category: Option<String>,
+    #[serde(default)]
+    pub package: Option<String>,
+    #[serde(default)]
+    pub value: Option<String>,
+    #[serde(default)]
+    pub has: Vec<String>,
+    #[serde(default)]
+    pub mpn: Option<String>,
+    /// `basic`, `preferred` or `extended`: the highest catalogue tier allowed.
+    #[serde(default)]
+    pub tier: Option<String>,
+}
+
+/// `hardware/parts.lock`, as derive reads it: only what reaches the BOM.
+#[derive(Debug, Deserialize, Default)]
+struct PartsLock {
+    #[serde(default)]
+    part: Vec<LockedPart>,
+}
+
+#[derive(Debug, Deserialize)]
+struct LockedPart {
+    id: String,
+    /// None for a pinned part `resolve` only verified.
+    #[serde(default)]
+    pick: Option<Pick>,
+    lcsc: String,
+    #[serde(default)]
+    mpn: Option<String>,
+    #[serde(default)]
+    manufacturer: Option<String>,
+    #[serde(default)]
+    unit_price: Option<f64>,
+    #[serde(default)]
+    currency: Option<String>,
+}
+
+pub const PARTS_LOCK: &str = "hardware/parts.lock";
+
+/// Every `pick`, answered from the lock: its LCSC number, MPN and maker, and
+/// its price when the lock's currency is the cost's. An unanswered pick
+/// stops derive — a BOM line without a part number is not orderable.
+fn resolve_picks(root: &Path, p: &mut Product) -> Result<()> {
+    if p.parts.iter().all(|q| q.pick.is_none()) {
+        return Ok(());
+    }
+    let lock: PartsLock = match std::fs::read_to_string(root.join(PARTS_LOCK)) {
+        Ok(raw) => toml::from_str(&raw).map_err(|e| anyhow!("{PARTS_LOCK}: {e}"))?,
+        Err(_) => PartsLock::default(),
+    };
+    for q in &mut p.parts {
+        let Some(pick) = &q.pick else { continue };
+        if q.lcsc.is_some() {
+            bail!(
+                "part `{}`: declares both `lcsc` and `pick` — a part is pinned or picked, not both",
+                q.id
+            );
+        }
+        if let Some(t) = &pick.tier {
+            if !["basic", "preferred", "extended"].contains(&t.as_str()) {
+                bail!(
+                    "part `{}`: pick tier = \"{t}\" — one of basic, preferred, extended",
+                    q.id
+                );
+            }
+        }
+        let Some(hit) = lock
+            .part
+            .iter()
+            .find(|e| e.id == q.id && e.pick.as_ref() == Some(pick))
+        else {
+            bail!(
+                "part `{}`: its pick is not answered in {PARTS_LOCK} — run `python3 hardware/parts.py resolve`",
+                q.id
+            );
+        };
+        q.lcsc = Some(hit.lcsc.clone());
+        if q.mpn.is_none() {
+            q.mpn = hit.mpn.clone();
+        }
+        if q.manufacturer.is_none() {
+            q.manufacturer = hit.manufacturer.clone();
+        }
+        if q.unit_cost.is_none() && hit.currency.as_deref() == Some(p.cost.currency.as_str()) {
+            q.unit_cost = hit.unit_price;
+        }
+    }
+    Ok(())
 }
 
 fn d_process() -> String {
@@ -5641,6 +5744,10 @@ pub fn inputs(root: &Path, decl: &str) -> Vec<String> {
         );
         // So is a part's own solid model: a changed STEP is a changed part.
         out.extend(p.parts.iter().filter_map(|q| q.model.clone()));
+        // And the lock that answers its picks: a re-pick changes the BOM.
+        if p.parts.iter().any(|q| q.pick.is_some()) {
+            out.push(PARTS_LOCK.to_string());
+        }
     }
     out.sort();
     out.dedup();
@@ -5719,6 +5826,7 @@ pub fn load(root: &Path, decl: &str) -> Result<(Product, Solved)> {
     // outermost message, and "hardware/product.toml" alone says nothing.
     let mut product: Product = toml::from_str(&raw).map_err(|e| anyhow!("{decl}: {e}"))?;
     resolve_components(root, &mut product).map_err(|e| anyhow!("{decl}: {e:#}"))?;
+    resolve_picks(root, &mut product).map_err(|e| anyhow!("{decl}: {e:#}"))?;
     let solved = solve(root, &product).map_err(|e| anyhow!("{decl}: {e:#}"))?;
     Ok((product, solved))
 }

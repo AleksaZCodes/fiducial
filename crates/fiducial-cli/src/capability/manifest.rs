@@ -447,6 +447,11 @@ fn collect(
             // capability. `.cargo/config.toml` genuinely is content.
             continue;
         }
+        // Interpreter caches, as in `build.rs`: running a capability's
+        // Python in place leaves bytecode that is not the capability.
+        if name == "__pycache__" || name.ends_with(".pyc") {
+            continue;
+        }
         if path.is_dir() {
             collect(root, &path, out)?;
             continue;

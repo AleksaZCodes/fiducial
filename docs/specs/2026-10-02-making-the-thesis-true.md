@@ -63,6 +63,21 @@ limit.
 - Offline or blocked: the lock is committed, so CI never needs the network.
   Only `resolve` does — like `cargo update`.
 
+**Done (G1).** `parts.py resolve` answers every `pick` into `parts.lock`;
+derive takes the LCSC number from the lock and fails on an unanswered or
+changed pick; `resolve` also verifies every pinned `lcsc` against LCSC's own
+record (a mistyped C-number, or one naming another MPN, is refused);
+`parts.py fetch` vendors an LCSC part through easyeda2kicad with
+project-relative paths. Findings:
+- The published catalogue was mid-migration on the day it was first read
+  (CSV: 453 rows; SQLite: one basic part in 53 012). A committed, sticky
+  lock is what keeps a product buildable through a day like that; `resolve`
+  is the only step that sees it.
+- `has = ["1%"]` first matched "±0.1%" (substring). Description words are
+  now matched as whole tokens, and the test catalogue carries that decoy.
+- A capability directory read at runtime embedded `__pycache__`, as
+  `build.rs` once did; both skip it now.
+
 ### G2 · One change propagates across domains
 
 The thesis's flagship example is a pin. Today a pin is declared in

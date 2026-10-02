@@ -1267,3 +1267,188 @@ fn a_vent_sealed_to_a_board_part_gets_a_chimney_and_the_part_sits_under_it() {
     assert!(!out.status.success());
     assert!(text(&out).contains("not a board part"), "{}", text(&out));
 }
+
+/// A catalogue in jlcparts' columns, small enough to read: one right answer
+/// for a 10 kΩ 0603 1 % basic resistor, and a decoy for each rule.
+const CATALOGUE: &str = r#"lcsc,category,subcategory,mfr,package,manufacturer,basic,preferred,description,stock,price
+25804,Resistors,Chip Resistor - Surface Mount,0603WAF1002T5E,0603,UNI-ROYAL,1,0,100mW Thick Film Resistors 75V ±1% ±100ppm/℃ 10kΩ 0603 Chip Resistor - Surface Mount ROHS,30000000,"[{""qFrom"": 1, ""qTo"": 99, ""price"": 0.0007}, {""qFrom"": 100, ""price"": 0.0005}]"
+98220,Resistors,Chip Resistor - Surface Mount,EXT-10K,0603,Other,0,0,±1% 10kΩ 0603 Chip Resistor,500000,"[{""qFrom"": 1, ""price"": 0.0001}]"
+25805,Resistors,Chip Resistor - Surface Mount,0603WAF1103T5E,0603,UNI-ROYAL,1,0,±1% 110kΩ 0603 Chip Resistor,900000,"[{""qFrom"": 1, ""price"": 0.0002}]"
+99999,Resistors,Chip Resistor - Surface Mount,LOW-STOCK,0603,Other,1,0,±1% 10kΩ 0603 Chip Resistor,3,"[{""qFrom"": 1, ""price"": 0.0001}]"
+25744,Resistors,Chip Resistor - Surface Mount,0402WGF1002TCE,0402,UNI-ROYAL,1,0,±1% 10kΩ 0402 Chip Resistor,900000,"[{""qFrom"": 1, ""price"": 0.0001}]"
+25806,Resistors,Chip Resistor - Surface Mount,PRECISE-10K,0603,Other,1,0,±0.1% 10kΩ 0603 Chip Resistor,900000,"[{""qFrom"": 1, ""price"": 0.0001}]"
+23162,Resistors,Chip Resistor - Surface Mount,0603WAF4701T5E,0603,UNI-ROYAL,1,0,±1% 4.7kΩ 0603 Chip Resistor,900000,"[{""qFrom"": 1, ""price"": 0.0006}]"
+"#;
+
+fn resolve_parts(root: &Path, args: &[&str]) -> std::process::Output {
+    Command::new("python3")
+        .arg("hardware/parts.py")
+        .arg("resolve")
+        .args(args)
+        .current_dir(root)
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn a_picked_part_resolves_to_a_locked_lcsc_number_that_reaches_the_bom() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    let cat = tmp.path().join("catalogue.csv");
+    std::fs::write(&cat, CATALOGUE).unwrap();
+    let cat = cat.to_str().unwrap();
+    add_board_part(
+        &root,
+        "id = \"pull\"\nname = \"Pull-up\"\nbody_mm = [1.6, 0.8, 0.5]\npick = { category = \"Resistors\", package = \"0603\", value = \"10k\", has = [\"1%\"] }",
+    );
+
+    // Unanswered, derive refuses: a BOM line without a part number is not orderable.
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(!out.status.success());
+    assert!(text(&out).contains("parts.py resolve"), "{}", text(&out));
+
+    // Basic before extended, the value and the tolerance matched as tokens
+    // (not 110k, not ±0.1 %), the package exact, enough in stock: one answer.
+    let out = resolve_parts(&root, &["--catalogue", cat]);
+    assert!(out.status.success(), "{}", text(&out));
+    let lock = std::fs::read_to_string(root.join("hardware/parts.lock")).unwrap();
+    assert!(lock.contains("lcsc = \"C25804\""), "{lock}");
+    assert!(lock.contains("mpn = \"0603WAF1002T5E\""), "{lock}");
+
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let bom = std::fs::read_to_string(root.join("hardware/generated/bom.csv")).unwrap();
+    let line = bom.lines().find(|l| l.starts_with("pull,")).unwrap();
+    assert!(
+        line.contains("C25804") && line.contains("0603WAF1002T5E"),
+        "{line}"
+    );
+
+    // Locked: a cheaper basic part appearing later does not move it.
+    std::fs::write(
+        tmp.path().join("catalogue.csv"),
+        format!("{CATALOGUE}11111,Resistors,Chip,CHEAPER,0603,X,1,0,±1% 10kΩ 0603,9000000,\"[{{\"\"qFrom\"\": 1, \"\"price\"\": 0.00001}}]\"\n"),
+    )
+    .unwrap();
+    let out = resolve_parts(&root, &["--catalogue", cat]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert_eq!(
+        std::fs::read_to_string(root.join("hardware/parts.lock")).unwrap(),
+        lock
+    );
+
+    // A changed pick is an unanswered one, in derive and in --check.
+    edit(
+        &root,
+        "hardware/product.toml",
+        "value = \"10k\"",
+        "value = \"4k7\"",
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(!out.status.success());
+    assert!(text(&out).contains("`pull`"), "{}", text(&out));
+    let out = resolve_parts(&root, &["--catalogue", cat]);
+    assert!(out.status.success(), "{}", text(&out));
+    let lock = std::fs::read_to_string(root.join("hardware/parts.lock")).unwrap();
+    assert!(lock.contains("lcsc = \"C23162\""), "{lock}");
+
+    // Nothing matches: named, and the lock is not invented.
+    edit(
+        &root,
+        "hardware/product.toml",
+        "value = \"4k7\"",
+        "value = \"33k\"",
+    );
+    let out = resolve_parts(&root, &["--catalogue", cat]);
+    assert!(!out.status.success());
+    assert!(
+        text(&out).contains("pull: nothing in stock"),
+        "{}",
+        text(&out)
+    );
+}
+
+#[test]
+fn a_part_both_pinned_and_picked_is_refused() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    add_board_part(
+        &root,
+        "id = \"r\"\nname = \"R\"\nbody_mm = [1.6, 0.8, 0.5]\nlcsc = \"C25804\"\npick = { package = \"0603\", value = \"10k\" }",
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(!out.status.success());
+    assert!(text(&out).contains("pinned or picked"), "{}", text(&out));
+}
+
+#[test]
+fn a_pinned_lcsc_number_is_verified_against_what_it_names() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    // LCSC's product record, served from a file: the shape its API answers in.
+    let lcsc = tmp.path().join("lcsc");
+    std::fs::create_dir(&lcsc).unwrap();
+    std::fs::write(
+        lcsc.join("C25804.json"),
+        r#"{"result": {"productCode": "C25804", "productModel": "0603WAF1002T5E", "brandNameEn": "UNI-ROYAL", "encapStandard": "0603", "productDescEn": "10kΩ ±1% 100mW 0603 Thick Film Resistor"}}"#,
+    )
+    .unwrap();
+    std::fs::write(lcsc.join("C1.json"), r#"{"result": null}"#).unwrap();
+    let detail = format!("file://{}/{{code}}.json", lcsc.display());
+    let resolve = |root: &Path| {
+        Command::new("python3")
+            .args(["hardware/parts.py", "resolve"])
+            .current_dir(root)
+            .env("FID_LCSC_DETAIL", &detail)
+            .output()
+            .unwrap()
+    };
+    add_board_part(
+        &root,
+        "id = \"r\"\nname = \"R\"\nbody_mm = [1.6, 0.8, 0.5]\nlcsc = \"C25804\"\nmpn = \"0603WAF1002T5E\"",
+    );
+    let out = resolve(&root);
+    assert!(out.status.success(), "{}", text(&out));
+    let lock = std::fs::read_to_string(root.join("hardware/parts.lock")).unwrap();
+    assert!(lock.contains("verified = "), "{lock}");
+    // A verified pin in the lock is not a pick: derive reads it without complaint.
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+
+    // The number names another part than the one declared: refused, named.
+    edit(
+        &root,
+        "hardware/product.toml",
+        "mpn = \"0603WAF1002T5E\"",
+        "mpn = \"RC0603FR-0710KL\"",
+    );
+    let out = resolve(&root);
+    assert!(
+        out.status.success(),
+        "a locked pin is not re-checked: {}",
+        text(&out)
+    );
+    let out = Command::new("python3")
+        .args(["hardware/parts.py", "resolve", "--update"])
+        .current_dir(&root)
+        .env("FID_LCSC_DETAIL", &detail)
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert!(
+        text(&out).contains("not the declared mpn RC0603FR-0710KL"),
+        "{}",
+        text(&out)
+    );
+
+    // A number LCSC does not have.
+    edit(
+        &root,
+        "hardware/product.toml",
+        "lcsc = \"C25804\"",
+        "lcsc = \"C1\"",
+    );
+    let out = resolve(&root);
+    assert!(!out.status.success());
+    assert!(text(&out).contains("LCSC has no part C1"), "{}", text(&out));
+}

@@ -8,6 +8,7 @@ materials and assembly order are **derived** from one file,
 
 ```sh
 fid derive --pipeline hardware     # solve → hardware/generated/  (gated by --check)
+python3 hardware/parts.py resolve  # answer every `pick` from the JLCPCB catalogue → hardware/parts.lock
 python3 hardware/parts.py sync     # vendor KiCad symbols, footprints, models → hardware/lib/
 hardware/build.sh                  # route, solids, checks, fab files, review pack → hardware/build/
 ```
@@ -41,7 +42,7 @@ placement, a look — and carry on when it was purely mechanical. A green
 |---|---|
 | **Outline** | any closed straight-edged SVG shape, by file, `layer` (`data-layer`), `path` index, `subpath` — convex or not |
 | **Region** | another shape, in the same SVG coordinates |
-| **Part** | a body (`body_mm`), a source (`mpn`, `lcsc`, `second_source`), a price, a `status`, a `place` and a `mount` |
+| **Part** | a body (`body_mm`), a source (`mpn`, `lcsc` or a `pick`, `second_source`), a price, a `status`, a `place` and a `mount` |
 | **Mount** | how the case holds it — the case features follow from it |
 
 | `mount` | `place` | What the case gets |
@@ -163,6 +164,24 @@ pad, approached square to the row, carrying that pad's net
 (`layout.json → wires[].cores_mm`). A pad row nobody turned turns square to
 its wire; a declared `rotate_deg` is followed and the route adapts. A
 cylinder's free end is the end facing the other end of its cable.
+
+**Parts are packages: declare what a part must be, lock what it resolved to.**
+A commodity part needs no catalogue number looked up by hand:
+`pick = { category = "Resistors", package = "0603", value = "10k", has = ["1%"] }`
+(also `mpn`, and `tier` = `basic` (default), `preferred` or `extended`, the
+highest JLCPCB assembly tier allowed). `python3 hardware/parts.py resolve`
+answers each pick from the JLCPCB catalogue (jlcparts): in stock for the
+quantity built, lowest tier, then cheapest, then most stocked, and writes the
+LCSC number, MPN, stock and price to `hardware/parts.lock`. Like a
+`Cargo.lock`, it is committed and sticky: a locked pick is re-picked only when
+the pick changes or `resolve --update` is run, so derive and CI never need
+the network. `fid derive` fails while a pick is unanswered, and takes the
+LCSC number from the lock into `bom.csv` and the fab files. A part is pinned
+(`lcsc`) or picked, never both. An LCSC part that no KiCad library has —
+most ICs — is vendored by `python3 hardware/parts.py fetch C2040`
+(easyeda2kicad) into `hardware/vendor/lcsc.*`, then declared as
+`footprint = "lcsc:<Name>"`. Goal: `build/fab/README.md` lists no unsourced
+part, so the BOM is orderable as it stands.
 
 **Every part carries its documents.** `datasheet = "<pdf url>"` on a part —
 or, with none declared, the datasheet LCSC lists for its `lcsc` number — is

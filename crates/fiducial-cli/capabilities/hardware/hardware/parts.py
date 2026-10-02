@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Vendor every declared part's KiCad component into hardware/lib/.
 
+    python3 hardware/parts.py resolve    answer every `pick` from the catalogue; write hardware/parts.lock
     python3 hardware/parts.py sync       resolve, copy, fetch; write manifest.json
-    python3 hardware/parts.py check      fail if hardware/lib/ does not match the declaration
+    python3 hardware/parts.py check      fail if hardware/lib/ or parts.lock does not match the declaration
+    python3 hardware/parts.py fetch C2040   an LCSC part's symbol, footprint and model → hardware/vendor/lcsc
 
 Platform-owned (installed by `fid add capability hardware`).
 
@@ -51,6 +53,38 @@ Sources, in order:
 3. the KiCad 3D-model repository for the model, at the tag matching the
    footprints.
 
+Parts are packages. A commodity part — a resistor, a capacitor — is declared
+by what it must be, not by a catalogue number someone looked up:
+
+    pick = { category = "Resistors", package = "0603", value = "10k", has = ["1%"], tier = "basic" }
+
+`resolve` answers it from the JLCPCB catalogue (yaqwsx/jlcparts, as
+published by CDFER/jlcpcb-parts-database): the in-stock part that matches,
+lowest tier first (basic, then preferred, then extended — what JLCPCB's
+assembly charges no loading fee for comes first), then cheapest at the
+quantity built, then most stocked. The answer is written to
+hardware/parts.lock, with its LCSC number, MPN, stock and price, and kept
+there: like a Cargo.lock, a locked pick is not re-picked until the pick
+changes or `resolve --update` is asked for. The lock is committed, so derive
+and CI never need the network; only `resolve` does. `fid derive` fails while
+any pick is unanswered, and takes the LCSC number from the lock into the
+BOM and the assembly files.
+
+    pick fields:  category  matched against the catalogue's category or subcategory
+                  package   the catalogue's package, exactly ("0603", "SOT-23-5")
+                  value     a value token in the description: "10k", "100nF", "4k7"
+                  has       further words the description must contain: ["1%", "X7R"]
+                  mpn       the manufacturer part number, exactly
+                  tier      basic (default) | preferred | extended — the highest allowed
+
+The catalogue: FID_PARTS_CATALOGUE or `--catalogue` (a CSV, or the full
+in-stock SQLite database for extended parts), else the basic/preferred CSV
+downloaded once into ~/.cache/fiducial/.
+
+A part with an LCSC number that no KiCad library has (most ICs) is fetched by
+`fetch`, through easyeda2kicad, into hardware/vendor/lcsc.{kicad_sym,pretty,
+3dshapes} — the vendor layout below — and declared as `lcsc:<Name>`.
+
 What cannot be resolved is reported, not invented. A footprint whose model
 no library ships is built by cad.py from the footprint itself — its fab
 outline, its pads, the declared height — and the build says so.
@@ -58,6 +92,7 @@ outline, its pads, the declared height — and the build says so.
 
 from __future__ import annotations
 
+import csv
 import datetime
 import hashlib
 import json
@@ -65,6 +100,8 @@ import os
 import re
 import shutil
 import sys
+import sqlite3
+import subprocess
 import tomllib
 import urllib.request
 from pathlib import Path
@@ -77,6 +114,12 @@ FP_DIR = Path(os.environ.get("KICAD7_FOOTPRINT_DIR", "/usr/share/kicad/footprint
 SYM_DIR = Path(os.environ.get("KICAD7_SYMBOL_DIR", "/usr/share/kicad/symbols"))
 MODEL_TAG = os.environ.get("KICAD_LIB_TAG", "7.0.11")
 MODEL_URL = "https://gitlab.com/kicad/libraries/kicad-packages3D/-/raw/{tag}/{lib}.3dshapes/{name}.step"
+
+
+LOCK = ROOT / "hardware" / "parts.lock"
+CATALOGUE_URL = "https://cdfer.github.io/jlcpcb-parts-database/jlcpcb-components-basic-preferred.csv"
+TIERS = ("basic", "preferred", "extended")
+PICK_KEYS = ("category", "package", "value", "has", "mpn", "tier")
 
 
 def sha(p: Path) -> str:
@@ -144,7 +187,7 @@ def pdf_text(pdf: Path, txt: Path) -> str | None:
         return f"{type(e).__name__}: {e}"
 
 
-LCSC_DETAIL = "https://wmsc.lcsc.com/ftps/wm/product/detail?productCode={code}"
+LCSC_DETAIL = os.environ.get("FID_LCSC_DETAIL", "https://wmsc.lcsc.com/ftps/wm/product/detail?productCode={code}")
 
 
 def lcsc_datasheet(code: str) -> tuple[str | None, str | None]:
@@ -273,8 +316,315 @@ def parts_md(decl: dict, manifest: dict) -> str:
     return "\n".join(out) + "\n"
 
 
-def sync() -> int:
+# --- Parts as packages: a pick → an LCSC number, locked -----------------------
+
+
+def norm(text: str) -> str:
+    """One spelling for what catalogues spell many ways: Ω/ohm, µ/μ/u, case."""
+    t = text.lower().replace("µ", "u").replace("μ", "u").replace("ohms", "ω").replace("ohm", "ω")
+    return re.sub(r"\s+", " ", t)
+
+
+def value_token(v: str) -> str:
+    """`4k7` → `4.7k`, `10kΩ` → `10k`, `100nF` → `100n`: the value without its unit."""
+    v = norm(v).replace(" ", "")
+    m = re.fullmatch(r"(\d+)([pnumkr])(\d+)([ωfh]?)", v)
+    if m:
+        v = f"{m.group(1)}.{m.group(3)}{'' if m.group(2) == 'r' else m.group(2)}"
+    v = v.rstrip("ωfh")
+    return v[:-1] if re.fullmatch(r"[\d.]+r", v) else v
+
+
+def has_value(description: str, value: str) -> bool:
+    want = value_token(value)
+    return any(value_token(tok) == want for tok in re.split(r"[\s,;/()]+", norm(description)) if tok)
+
+
+def has_words(description: str, words: str) -> bool:
+    """`words` in the description as whole tokens: "1%" is not in "±0.1%"."""
+    return re.search(r"(?<![\w.])" + re.escape(norm(words)) + r"(?!\w)", norm(description)) is not None
+
+
+def price_at(price: str, qty: int) -> float | None:
+    """The unit price at `qty`, from jlcparts' JSON tiers or JLCPCB's `1-9:0.01,10-:0.008`."""
+    tiers: list[tuple[int, float]] = []
+    try:
+        for t in json.loads(price or "[]"):
+            tiers.append((int(t.get("qFrom") or 1), float(t["price"])))
+    except (ValueError, TypeError, KeyError, AttributeError):
+        for t in (price or "").split(","):
+            m = re.match(r"\s*(\d+)\s*-\s*\d*\s*:\s*([\d.]+)", t)
+            if m:
+                tiers.append((int(m.group(1)), float(m.group(2))))
+    best = None
+    for q, p in sorted(tiers):
+        if q <= max(qty, 1) or best is None:
+            best = p
+    return best
+
+
+def col(row: dict, *names: str) -> str:
+    for n in names:
+        if n in row and row[n] not in (None, ""):
+            return str(row[n])
+    return ""
+
+
+def item(row: dict) -> dict:
+    """A catalogue row, whichever export it came from, in one shape."""
+    lcsc = col(row, "lcsc", "LCSC Part", "LCSC")
+    flags = {col(row, k).lower() for k in ("library_type", "Library Type", "Component Library Type")}
+    tier = (
+        "basic" if col(row, "basic").lower() in ("1", "true") or flags & {"base", "basic"}
+        else "preferred" if col(row, "preferred").lower() in ("1", "true") or "preferred" in flags
+        else "extended"
+    )
+    return {
+        "lcsc": lcsc if lcsc.upper().startswith("C") else f"C{lcsc}",
+        "mpn": col(row, "mfr", "MFR.Part", "mpn"),
+        "manufacturer": col(row, "manufacturer", "Manufacturer"),
+        "package": col(row, "package", "Package"),
+        "category": " / ".join(x for x in (col(row, "category", "First Category"), col(row, "subcategory", "Second Category")) if x),
+        "description": col(row, "description", "Description"),
+        "stock": int(float(col(row, "stock", "Stock") or 0)),
+        "price": col(row, "price", "Price"),
+        "tier": tier,
+    }
+
+
+def catalogue_path(given: str | None) -> Path:
+    given = given or os.environ.get("FID_PARTS_CATALOGUE")
+    if given:
+        return Path(given)
+    cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "fiducial" / "jlcpcb-basic-preferred.csv"
+    if not cache.exists():
+        print(f"downloading the parts catalogue: {CATALOGUE_URL}", file=sys.stderr)
+        err = fetch(CATALOGUE_URL, cache)
+        if err:
+            raise SystemExit(
+                f"cannot reach the parts catalogue ({err}). Download {CATALOGUE_URL} by hand and pass "
+                "--catalogue <file>, or set FID_PARTS_CATALOGUE."
+            )
+    return cache
+
+
+def candidates(cat: Path, pick: dict) -> list[dict]:
+    """Every catalogue row the pick could mean, before ranking."""
+    if cat.suffix in (".sqlite3", ".sqlite", ".db"):
+        con = sqlite3.connect(f"file:{cat}?mode=ro", uri=True)
+        con.row_factory = sqlite3.Row
+        table = "jlc_components" if con.execute(
+            "SELECT 1 FROM sqlite_master WHERE name = 'jlc_components'").fetchone() else "components"
+        where, args = [], []
+        if pick.get("mpn"):
+            where.append("mfr = ?")
+            args.append(pick["mpn"])
+        if pick.get("package"):
+            where.append("package = ? COLLATE NOCASE")
+            args.append(pick["package"])
+        sql = f"SELECT * FROM {table}" + (" WHERE " + " AND ".join(where) if where else "")
+        rows = [dict(r) for r in con.execute(sql, args)]
+        con.close()
+    else:
+        with cat.open(newline="", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+    return [item(r) for r in rows]
+
+
+def matches(it: dict, pick: dict) -> bool:
+    if pick.get("mpn") and it["mpn"] != pick["mpn"]:
+        return False
+    if pick.get("package") and it["package"].lower() != pick["package"].lower():
+        return False
+    if pick.get("category") and norm(pick["category"]) not in norm(it["category"]):
+        return False
+    if pick.get("value") and not has_value(it["description"], pick["value"]):
+        return False
+    if not all(has_words(it["description"], h) for h in pick.get("has", [])):
+        return False
+    return TIERS.index(it["tier"]) <= TIERS.index(pick.get("tier", "basic"))
+
+
+def pick_problem(pick: dict) -> str | None:
+    unknown = set(pick) - set(PICK_KEYS)
+    if unknown:
+        return f"unknown pick field(s) {sorted(unknown)} — known: {', '.join(PICK_KEYS)}"
+    if pick.get("tier", "basic") not in TIERS:
+        return f"tier = \"{pick['tier']}\" — one of {', '.join(TIERS)}"
+    if not (pick.get("mpn") or pick.get("package")):
+        return "a pick names at least a package or an mpn"
+    return None
+
+
+def lcsc_product(code: str) -> dict | None:
+    """LCSC's own record of a part number, or None when it has none; raises
+    OSError when LCSC cannot be reached."""
+    req = urllib.request.Request(LCSC_DETAIL.format(code=code), headers={"User-Agent": "fiducial-parts"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        d = (json.load(r) or {}).get("result") or {}
+    if not d.get("productCode"):
+        return None
+    return {
+        "mpn": d.get("productModel", ""), "manufacturer": d.get("brandNameEn", ""),
+        "package": d.get("encapStandard", ""), "description": d.get("productDescEn", ""),
+    }
+
+
+def read_lock() -> dict[str, dict]:
+    if not LOCK.exists():
+        return {}
+    return {e["id"]: e for e in tomllib.loads(LOCK.read_text()).get("part", [])}
+
+
+def toml_value(v) -> str:
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return repr(v)
+    if isinstance(v, list):
+        return "[" + ", ".join(toml_value(x) for x in v) + "]"
+    if isinstance(v, dict):
+        return "{ " + ", ".join(f"{k} = {toml_value(x)}" for k, x in v.items()) + " }"
+    return json.dumps(str(v), ensure_ascii=False)
+
+
+def write_lock(entries: list[dict]) -> None:
+    out = [
+        "# Written by `python3 hardware/parts.py resolve` — do not edit.",
+        "# Every `pick` in hardware/product.toml, answered: the exact part it resolved to;",
+        "# every pinned `lcsc`, as LCSC itself describes it.",
+        "# Re-pick with `resolve --update`; a changed pick is re-picked on the next resolve.",
+        "version = 1",
+    ]
+    for e in entries:
+        out.append("")
+        out.append("[[part]]")
+        out += [f"{k} = {toml_value(v)}" for k, v in e.items() if v not in (None, "")]
+    LOCK.write_text("\n".join(out) + "\n")
+
+
+def build_qty(decl: dict, part: dict) -> int:
+    return int(part.get("qty", 1)) * int(decl.get("cost", {}).get("quantity", 10))
+
+
+def resolve(args: list[str]) -> int:
     decl = tomllib.loads(DECL.read_text())
+    update = "--update" in args
+    given = args[args.index("--catalogue") + 1] if "--catalogue" in args else None
+    locked = read_lock()
+    entries, problems, cat, today = [], [], None, datetime.date.today().isoformat()
+    for part in decl.get("part", []):
+        pick = part.get("pick")
+        if not pick and part.get("lcsc"):
+            # Pinned: confirm the number is a real part, and the one meant —
+            # a mistyped C-number orders the wrong part without complaint.
+            old = locked.get(part["id"])
+            if old and old.get("lcsc") == part["lcsc"] and not old.get("pick") and not update:
+                entries.append(old)
+                continue
+            try:
+                found = lcsc_product(part["lcsc"])
+            except (OSError, ValueError) as e:
+                print(f"note: {part['id']}: LCSC unreachable, {part['lcsc']} not verified ({e})", file=sys.stderr)
+                continue
+            if not found:
+                problems.append(f"{part['id']}: LCSC has no part {part['lcsc']}")
+                continue
+            if part.get("mpn") and found["mpn"] and part["mpn"].lower() != found["mpn"].lower():
+                problems.append(f"{part['id']}: {part['lcsc']} is {found['mpn']} at LCSC, not the declared mpn {part['mpn']}")
+                continue
+            entries.append({"id": part["id"], "lcsc": part["lcsc"], **found, "verified": today})
+            print(f"{part['id']}: {part['lcsc']} is {found['mpn']} ({found['package']}) — verified")
+            continue
+        if not pick:
+            continue
+        if part.get("lcsc"):
+            problems.append(f"{part['id']}: declares both lcsc and pick — a part is pinned or picked, not both")
+            continue
+        bad = pick_problem(pick)
+        if bad:
+            problems.append(f"{part['id']}: {bad}")
+            continue
+        old = locked.get(part["id"])
+        if old and old.get("pick") == pick and not update:
+            entries.append(old)
+            continue
+        cat = cat or catalogue_path(given)
+        qty = build_qty(decl, part)
+        found = [it for it in candidates(cat, pick) if matches(it, pick) and it["stock"] >= qty]
+        if not found:
+            problems.append(f"{part['id']}: nothing in stock ({qty}+) in {cat.name} matches pick {toml_value(pick)}"
+                            + ("" if pick.get("tier") == "extended" else " — try tier = \"extended\" with the full catalogue"))
+            continue
+
+        def rank(it: dict):
+            p = price_at(it["price"], qty)
+            return (TIERS.index(it["tier"]), p if p is not None else float("inf"), -it["stock"], int(it["lcsc"][1:] or 0))
+
+        best = min(found, key=rank)
+        price = price_at(best["price"], qty)
+        entries.append({
+            "id": part["id"], "pick": pick, "lcsc": best["lcsc"], "mpn": best["mpn"],
+            "manufacturer": best["manufacturer"], "package": best["package"], "description": best["description"],
+            "tier": best["tier"], "stock": best["stock"], "unit_price": price, "currency": "USD" if price is not None else None,
+            "at_qty": qty, "candidates": len(found), "resolved": today,
+        })
+        print(f"{part['id']}: {best['lcsc']} {best['mpn']} ({best['tier']}, {len(found)} candidate(s))")
+    write_lock(entries)
+    for p in problems:
+        print(f"unresolved: {p}", file=sys.stderr)
+    picks = sum(1 for e in entries if e.get("pick"))
+    print(f"locked {picks} pick(s) and {len(entries) - picks} verified pin(s) in hardware/parts.lock; {len(problems)} unresolved")
+    return 1 if problems else 0
+
+
+def locked_decl(decl: dict) -> dict:
+    """The declaration with each pick's answer filled in, as the BOM sees it."""
+    locked = read_lock()
+    for part in decl.get("part", []):
+        e = locked.get(part["id"])
+        if part.get("pick") and e and e.get("pick") == part["pick"]:
+            for k in ("lcsc", "mpn", "manufacturer"):
+                part.setdefault(k, e.get(k))
+    return decl
+
+
+def lock_problems(decl: dict) -> list[str]:
+    locked = read_lock()
+    return [
+        f"{p['id']}: its pick is not answered in hardware/parts.lock — run python3 hardware/parts.py resolve"
+        for p in decl.get("part", [])
+        if p.get("pick") and (locked.get(p["id"]) or {}).get("pick") != p["pick"]
+    ]
+
+
+def fetch_lcsc(args: list[str]) -> int:
+    """An LCSC part's KiCad symbol, footprint and 3D model, through easyeda2kicad."""
+    if not args:
+        print("usage: parts.py fetch C2040 [C…]", file=sys.stderr)
+        return 2
+    VENDOR.mkdir(parents=True, exist_ok=True)
+    for code in args:
+        try:
+            # Relative output and model paths: nothing machine-specific is committed.
+            subprocess.run(["easyeda2kicad", "--full", f"--lcsc_id={code}", "--output", "hardware/vendor/lcsc",
+                            "--project-relative", "--overwrite"], check=True, cwd=ROOT)
+        except FileNotFoundError:
+            print("easyeda2kicad is not installed: pip install easyeda2kicad", file=sys.stderr)
+            return 1
+        except subprocess.CalledProcessError as e:
+            print(f"{code}: easyeda2kicad failed ({e.returncode}) — it needs easyeda.com reachable", file=sys.stderr)
+            return 1
+    names = sorted(f.stem for f in (VENDOR / "lcsc.pretty").glob("*.kicad_mod"))
+    print("vendored into hardware/vendor/lcsc.*; declare them as footprint = \"lcsc:<Name>\", symbol = \"lcsc:<Name>\":")
+    for n in names:
+        print(f"  lcsc:{n}")
+    print("Then add a SOURCES.md line per part (the LCSC number it came from) and run sync.")
+    return 0
+
+
+def sync() -> int:
+    decl = locked_decl(tomllib.loads(DECL.read_text()))
     (LIB / "footprints").mkdir(parents=True, exist_ok=True)
     (LIB / "3d").mkdir(parents=True, exist_ok=True)
     before = json.loads((LIB / "manifest.json").read_text()) if (LIB / "manifest.json").exists() else {"parts": {}}
@@ -291,7 +641,12 @@ def sync() -> int:
             own = VENDOR / f"{lib}.pretty" / f"{name}.kicad_mod"
             src = own if own.exists() else FP_DIR / f"{lib}.pretty" / f"{name}.kicad_mod"
             dest = LIB / "footprints" / f"{name}.kicad_mod"
-            own_model = VENDOR / f"{lib}.3dshapes" / f"{name}.step"
+            # The model the footprint names (easyeda2kicad's differs from the
+            # footprint's own name), else one named after the footprint.
+            named = re.search(r"\(model\s+\"?[^\"\s)]*?([^/\"\s)]+)\.(?:wrl|step)", own.read_text()) if own.exists() else None
+            own_model = VENDOR / f"{lib}.3dshapes" / f"{named.group(1) if named else name}.step"
+            if not own_model.exists():
+                own_model = VENDOR / f"{lib}.3dshapes" / f"{name}.step"
             if own.exists():
                 shutil.copyfile(own, dest)
                 entry["footprint"] = {"id": fp_id, "from": str(own.relative_to(ROOT)), "sha256": sha(dest)}
@@ -318,9 +673,8 @@ def sync() -> int:
                 problems.append(f"{part['id']}: footprint {fp_id} is not in {FP_DIR} (install kicad-footprints, or set KICAD7_FOOTPRINT_DIR)")
         elif part.get("lcsc") and part.get("place") == "board":
             problems.append(
-                f"{part['id']}: no footprint declared; LCSC {part['lcsc']} could come from easyeda2kicad "
-                f"(`pip install easyeda2kicad; easyeda2kicad --full --lcsc_id={part['lcsc']} --output hardware/lib/lcsc`), "
-                "which needs easyeda.com reachable"
+                f"{part['id']}: no footprint declared; LCSC {part['lcsc']} can be vendored with "
+                f"`python3 hardware/parts.py fetch {part['lcsc']}` (easyeda2kicad; needs easyeda.com reachable)"
             )
         sym_id = part.get("symbol")
         if not sym_id and part.get("mount") == "pads" and part.get("nets"):
@@ -373,9 +727,9 @@ def sync() -> int:
 
 
 def check() -> int:
-    decl = tomllib.loads(DECL.read_text())
+    decl = locked_decl(tomllib.loads(DECL.read_text()))
     man = json.loads((LIB / "manifest.json").read_text()) if (LIB / "manifest.json").exists() else {"parts": {}}
-    bad = []
+    bad = lock_problems(decl)
     for part in decl.get("part", []):
         fp = part.get("footprint")
         if fp:
@@ -402,5 +756,6 @@ def check() -> int:
 
 
 if __name__ == "__main__":
-    cmd = sys.argv[1] if len(sys.argv) > 1 else "sync"
-    sys.exit({"sync": sync, "check": check}.get(cmd, lambda: (print(__doc__), 2)[1])())
+    cmd, rest = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("sync", [])
+    commands = {"sync": lambda: sync(), "check": lambda: check(), "resolve": lambda: resolve(rest), "fetch": lambda: fetch_lcsc(rest)}
+    sys.exit(commands.get(cmd, lambda: (print(__doc__), 2)[1])())

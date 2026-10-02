@@ -128,7 +128,8 @@ def main() -> int:
         readme += [
             f"## Not orderable for assembly yet: {len(unsourced)} part(s) without an `lcsc` number",
             "",
-            "Declare `lcsc` on each in `hardware/product.toml` (or fit them by hand):",
+            "Give each a `pick` (then `python3 hardware/parts.py resolve`) or an `lcsc` number in",
+            "`hardware/product.toml` — or fit them by hand:",
             "",
             *[f"- {u}" for u in unsourced],
             "",
