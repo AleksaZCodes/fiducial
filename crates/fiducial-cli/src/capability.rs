@@ -169,7 +169,27 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
         }
     }
 
+    let declared_files: Vec<&str> = cap
+        .declarations
+        .iter()
+        .filter_map(|d| match d {
+            Declaration::File(f) => Some(f.path.as_str()),
+            _ => None,
+        })
+        .collect();
     for FileEntry { path: rel, content } in files {
+        // A declaration is the product's, not the capability's: the seed is
+        // there so a fresh install derives, and nothing more. When the product
+        // already declared it — written before the capability was added, or
+        // kept across a remove and re-add — overwriting it with the seed
+        // destroys authored facts without a word. It happened: `fid add
+        // capability hardware` replaced a product's `hardware/product.toml`
+        // with the seed. So an existing declaration is kept, and it is not
+        // recorded as platform-owned, because it is not.
+        if declared_files.contains(&rel.as_str()) && root.join(rel).exists() {
+            println!("  kept   {rel} (already declared by this product)");
+            continue;
+        }
         let expanded = content
             .replace("{{name}}", product_name)
             .replace("{{version}}", PLATFORM_VERSION);
@@ -201,29 +221,7 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
     // discovery still works. The pointer carries no instructions of its own —
     // two copies of the content would be the duplication this platform exists
     // to delete.
-    let skill_content = cap
-        .skill_md
-        .replace("{{name}}", product_name)
-        .replace("{{version}}", PLATFORM_VERSION);
-    write_file(
-        root,
-        &format!(".fiducial/skills/{}.md", cap.id),
-        &skill_content,
-    )?;
-
-    write_file(
-        root,
-        &format!(".claude/skills/{}.md", cap.id),
-        &format!(
-            "---\n\
-             name: fiducial-{id}\n\
-             description: How to use the `{id}` capability in this product.\n\
-             ---\n\n\
-             Read `.fiducial/skills/{id}.md` — the instructions live there so that \
-             every agent can find them, not only Claude Code.\n",
-            id = cap.id
-        ),
-    )?;
+    write_skill(root, cap, product_name)?;
     // Skills are not tracked in the lock — they are platform-owned and rewritten
     // on every `fid upgrade`, not merged.
 
@@ -429,6 +427,103 @@ pub fn reconcile_i18n_catalogs(root: &Path, locales: &[String], default: &str) -
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/// A capability's instructions, where every agent finds them: the content at
+/// `.fiducial/skills/<id>.md`, and a pointer at `.claude/skills/<id>.md` for
+/// Claude Code's discovery.
+///
+/// One function for install and upgrade. Upgrade used to write the whole
+/// SKILL.md to the `.claude/` path instead, so after the first `fid upgrade`
+/// the vendor-neutral copy went stale and every non-Claude agent read the old
+/// instructions — the duplication the pointer exists to prevent, re-created by
+/// the command meant to keep things current.
+pub(crate) fn write_skill(root: &Path, cap: &Capability, product_name: &str) -> Result<()> {
+    let skill_content = cap
+        .skill_md
+        .replace("{{name}}", product_name)
+        .replace("{{version}}", PLATFORM_VERSION);
+    write_file(
+        root,
+        &format!(".fiducial/skills/{}.md", cap.id),
+        &skill_content,
+    )?;
+    write_file(
+        root,
+        &format!(".claude/skills/{}.md", cap.id),
+        &format!(
+            "---\n\
+             name: fiducial-{id}\n\
+             description: How to use the `{id}` capability in this product.\n\
+             ---\n\n\
+             Read `.fiducial/skills/{id}.md` — the instructions live there so that \
+             every agent can find them, not only Claude Code.\n",
+            id = cap.id
+        ),
+    )
+}
+
+/// Every file path a built-in capability installs, for scoping an upgrade to it.
+pub(crate) fn owned_paths(cap: &Capability, enabled: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = cap
+        .declarations
+        .iter()
+        .filter_map(|d| match d {
+            Declaration::File(f) => Some(f.path.clone()),
+            _ => None,
+        })
+        .collect();
+    out.extend(cap.pipelines.iter().map(|f| f.path.clone()));
+    out.extend(cap.templates.iter().map(|f| f.path.clone()));
+    for (target, entries) in &cap.conditional_templates {
+        if enabled.iter().any(|e| e == target) {
+            out.extend(entries.iter().map(|f| f.path.clone()));
+        }
+    }
+    out
+}
+
+/// Install the platform-owned files a capability has gained since this product
+/// installed it: pipelines and templates (and `for/<id>/` templates for what is
+/// enabled) that the lock does not know. A three-way merge only updates files
+/// it already tracks, so without this a script added to a capability —
+/// `hardware/parts.py` — reached only products that installed it afterwards.
+/// A file already on disk but untracked is the product's; it is left alone.
+/// Declarations are never added: they are the product's to write.
+pub(crate) fn install_added(
+    root: &Path,
+    cap: &Capability,
+    enabled: &[String],
+    lock: &mut Lock,
+    product_name: &str,
+    dry_run: bool,
+) -> Result<Vec<String>> {
+    let mut files: Vec<&FileEntry> = cap.pipelines.iter().chain(cap.templates.iter()).collect();
+    for (target, entries) in &cap.conditional_templates {
+        if enabled.iter().any(|e| e == target) {
+            files.extend(entries.iter());
+        }
+    }
+    let mut added = Vec::new();
+    for FileEntry { path: rel, content } in files {
+        let key = rel.replace('\\', "/");
+        if lock.templates.contains_key(&key) {
+            continue;
+        }
+        if root.join(rel).exists() {
+            println!("  ⚠ {rel}: exists on disk but is untracked — leaving it alone");
+            continue;
+        }
+        if !dry_run {
+            let expanded = content
+                .replace("{{name}}", product_name)
+                .replace("{{version}}", PLATFORM_VERSION);
+            write_file(root, rel, &expanded)?;
+            lock.record(key.clone(), expanded.as_bytes(), PLATFORM_VERSION);
+        }
+        added.push(key);
+    }
+    Ok(added)
+}
+
 fn load_or_new_lock(root: &Path) -> Result<Lock> {
     let path = root.join("fiducial.lock");
     if path.exists() {
@@ -444,6 +539,16 @@ fn write_file(root: &Path, rel: &str, content: &str) -> Result<()> {
         std::fs::create_dir_all(parent).with_context(|| format!("creating parent for `{rel}`"))?;
     }
     std::fs::write(&dest, content).with_context(|| format!("writing `{rel}`"))?;
+    // Templates are embedded as text, so the executable bit a script had in
+    // the capability does not survive the trip. A file that opens with a
+    // shebang is meant to be run — `hardware/build.sh` arrived unrunnable
+    // before this.
+    #[cfg(unix)]
+    if content.starts_with("#!") {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o755))
+            .with_context(|| format!("making `{rel}` executable"))?;
+    }
     println!("  wrote  {rel}");
     Ok(())
 }

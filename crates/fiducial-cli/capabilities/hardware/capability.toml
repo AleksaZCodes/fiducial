@@ -1,0 +1,9 @@
+description = "A physical product declared once: outline, regions, parts, mounts, cost → layout, BOM, KiCad frame, assembly steps, gated; STEP/STL + review renders built from them"
+
+# The gate (`fid derive --check`) needs none of these while the committed
+# board placement (generated/placement.json) answers its model; a changed
+# model runs hardware/place.py, which needs python3 with ortools.
+# They are what turns the gated layout into things a manufacturer and a person
+# can use — the solid model (build123d, on python3), the board's fab outputs
+# (kicad-cli), and the review renders (node, with `three` and `playwright-core`).
+requires_tools = ["python3", "kicad-cli", "node"]

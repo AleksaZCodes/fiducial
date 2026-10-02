@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 80">
+  <!-- The seed outline: replace it with your own shape, or point
+       hardware/product.toml at a layer of your logo instead. Straight
+       segments only. -->
+  <g data-layer="outline"><path d="M10,0 H90 L100,10 V70 L90,80 H10 L0,70 V10 Z"/></g>
+  <g data-layer="window"><path d="M30,15 H70 V50 H30 Z"/></g>
+</svg>

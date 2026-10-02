@@ -9,17 +9,21 @@ mod config;
 mod context;
 mod design;
 mod guard;
+mod hardware;
 mod i18n;
+mod kicad;
 mod legal;
 mod lock;
 mod migration;
 mod ownership;
 mod pipeline;
+mod place;
 mod prose;
 mod schema;
 mod security;
 mod templates;
 mod thesis;
+mod wires;
 
 // ── Top-level CLI ────────────────────────────────────────────────────────────
 
@@ -320,6 +324,10 @@ STATUS
         /// Upgrade all products listed in the portfolio manifest
         #[arg(long, default_value_t = false)]
         portfolio: bool,
+        /// Refresh one capability's files and instructions only — no scaffold
+        /// templates, no codemods, no other capability
+        #[arg(long, value_name = "ID")]
+        capability: Option<String>,
     },
 
     /// Emit the facts → pipelines → artifacts dependency graph
@@ -413,7 +421,7 @@ What is derived from it — PITCH.md, a TypeScript module the app imports — co
 from the `fid-thesis` pipeline. `fid advise` argues with the claim itself.",
         after_long_help = "\
 EXAMPLES
-  fid thesis set \"No unverified alert ever reaches a responder.\"
+  fid thesis set \"No estimated reading ever reaches a bill.\"
   fid thesis set \"<sharper>\" --because \"Cheap was never the objection.\"
   fid thesis log
 
@@ -817,7 +825,11 @@ fn main() -> Result<()> {
         Commands::Add { target } => commands::add::run(target),
         Commands::Capability { action } => commands::capability::run(action),
         Commands::Derive { check, pipeline } => commands::derive::run(check, pipeline),
-        Commands::Upgrade { dry_run, portfolio } => commands::upgrade::run(dry_run, portfolio),
+        Commands::Upgrade {
+            dry_run,
+            portfolio,
+            capability,
+        } => commands::upgrade::run(dry_run, portfolio, capability),
         Commands::Graph { format } => commands::graph::run(&format),
         Commands::Release { action } => commands::release::run(action),
         Commands::Thesis { action, json } => commands::thesis::run(action, json),

@@ -70,7 +70,7 @@ pub const SCAFFOLD_FILES: &[(&str, &str)] = &[
 /// by that stamp and nothing else.
 ///
 /// The result was that a product appeared to have drifted from upstream on
-/// files nobody upstream had touched. fon carried 33 such items, its
+/// files nobody upstream had touched. The first product carried 33 such items, its
 /// `fid doctor` is `continue-on-error` because of them, and `fid upgrade` would
 /// open a 3-way merge on each one — which is how a product accumulates
 /// conflicts in files that never changed.
@@ -259,21 +259,21 @@ mod tests {
 
     #[test]
     fn a_version_stamp_alone_is_not_an_upstream_change() {
-        // fon installed at 0.1.0 and the platform is now far past it. Nothing
+        // The first product installed at 0.1.0 and the platform is now far past it. Nothing
         // upstream moved, so nothing should be reported — this is the bug that
         // put 20 phantom items in `fid doctor` and made `fid upgrade` open a
         // 3-way merge on files nobody had touched.
-        let base = expand(STAMPED, "fon", "0.1.0");
-        assert!(!upstream_changed(STAMPED, "fon", "0.1.0", &base));
+        let base = expand(STAMPED, "acme", "0.1.0");
+        assert!(!upstream_changed(STAMPED, "acme", "0.1.0", &base));
     }
 
     #[test]
     fn comparing_at_the_current_version_is_what_produced_the_phantom_drift() {
         // The old comparison, kept as a test so the regression is named: it
         // reports a change where there is none.
-        let base = expand(STAMPED, "fon", "0.1.0");
+        let base = expand(STAMPED, "acme", "0.1.0");
         assert_ne!(
-            expand(STAMPED, "fon", env!("CARGO_PKG_VERSION")),
+            expand(STAMPED, "acme", env!("CARGO_PKG_VERSION")),
             base,
             "the stamp alone differs — which is exactly why it must not be the comparison"
         );
@@ -281,18 +281,18 @@ mod tests {
 
     #[test]
     fn a_real_edit_to_the_template_is_still_reported() {
-        let base = expand(STAMPED, "fon", "0.1.0");
+        let base = expand(STAMPED, "acme", "0.1.0");
         let moved = STAMPED.replace("Body that never changes.", "Body that did change.");
-        assert!(upstream_changed(&moved, "fon", "0.1.0", &base));
+        assert!(upstream_changed(&moved, "acme", "0.1.0", &base));
     }
 
     #[test]
     fn a_template_with_no_stamp_is_unaffected_either_way() {
         let plain = "# {{name}}\n\nNo stamp here.\n";
-        let base = expand(plain, "fon", "0.1.0");
-        assert!(!upstream_changed(plain, "fon", "0.9.9", &base));
+        let base = expand(plain, "acme", "0.1.0");
+        assert!(!upstream_changed(plain, "acme", "0.9.9", &base));
         let moved = plain.replace("No stamp here.", "Changed.");
-        assert!(upstream_changed(&moved, "fon", "0.9.9", &base));
+        assert!(upstream_changed(&moved, "acme", "0.9.9", &base));
     }
 
     #[test]
@@ -300,6 +300,6 @@ mod tests {
         // Ownership of the comparison moved, not its inputs: a base recorded
         // for another product must not read as unchanged.
         let base = expand(STAMPED, "other-product", "0.1.0");
-        assert!(upstream_changed(STAMPED, "fon", "0.1.0", &base));
+        assert!(upstream_changed(STAMPED, "acme", "0.1.0", &base));
     }
 }

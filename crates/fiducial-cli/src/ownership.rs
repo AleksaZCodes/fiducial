@@ -13,7 +13,7 @@
 //! > It is **product-owned** — edit it freely.
 //!
 //! So the platform scaffolds a file, tells you to edit it, and then reports
-//! your edit as drift. fon carries seventeen of these — `MISSION.md`,
+//! your edit as drift. The first product carries seventeen of these — `MISSION.md`,
 //! `README.md`, `messages/*.json`, `content.toml`, `design-system.md`,
 //! `apps/web/src/app/page.tsx` — which is why its `fid doctor` runs
 //! `continue-on-error`. A check that fires on the normal state of a real
@@ -84,12 +84,12 @@ const PRODUCT_OWNED: &[Rule] = &[
     Rule::Exact("design-system.md"),
     Rule::Exact("content.toml"),
     // Per-product agent context, and the template exists so a product can
-    // describe its own layout and rules. fon's is entirely product-specific.
+    // describe its own layout and rules. The first product's is entirely product-specific.
     // Calling it platform-owned would amount to telling every product not to
     // write its own agent instructions, which is the file's whole purpose.
     Rule::Exact("AGENTS.md"),
     // The scaffolded ignores are a starting set — Rust, Node, Fiducial
-    // artifacts. Every real product adds to them: fon ignores `media/`, which
+    // artifacts. Every real product adds to them: the first product ignores `media/`, which
     // is exactly what a product is supposed to do here.
     Rule::Exact(".gitignore"),
     // The declaration file. `fid add` patches it, the product edits it, and
@@ -179,7 +179,7 @@ mod tests {
     #[test]
     fn the_files_a_product_is_told_to_edit_are_its_own() {
         // Each of these is scaffolded with a prompt in it, and each appeared in
-        // fon's `fid doctor` as drift.
+        // the first product's `fid doctor` as drift.
         for p in [
             "MISSION.md",
             "README.md",

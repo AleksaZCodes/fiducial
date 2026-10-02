@@ -8,19 +8,18 @@
 
 ## Context
 
-fon's `MISSION.md` is thirty-three lines of prose. The sentence that actually
+The first product's `MISSION.md` is thirty-three lines of prose. The sentence that actually
 decides things is in the middle of its second paragraph:
 
-> The design commitment that shapes everything else: **no unverified alert ever
-> reaches a responder.**
+> The design commitment that shapes everything else: *(a one-line commitment
+> about trust, which this spec does not repeat — the product is private)*.
 
 That is a good thesis. It is falsifiable, it states a tension between speed and
 trust, and it is the sentence you would sell with. The problem is not the
 writing — it is that nothing downstream can address it.
 
-Count the restatements. `messages/en.json` carries `meta.description`: *"A solar
-LoRa sensor network for early wildfire detection in Serbia. A person confirms
-every event. In development."* `messages/sr.json` carries a Serbian
+Count the restatements. `messages/en.json` carries `meta.description`, a second
+wording of the claim; `messages/sr.json` carries a Serbian
 restatement. `README.md` states it a third way. Four wordings of one claim, none
 of them marked canonical, and no mechanism that could notice a fifth appearing
 or any of them drifting. An editor judging a draft has nothing to judge against.
@@ -32,7 +31,7 @@ rest, gate the derivation — applies here and was not being applied.
 The scaffold made it worse by asking for exactly the wrong thing.
 `MISSION.md.tmpl` said: *"Replace this paragraph with one sentence: what is this
 product for, and who does it serve?"* A paragraph, in prose, with no structure —
-which is how fon's mission came to be an AI summary that was pasted in, that its
+which is how the first product's mission came to be an AI summary that was pasted in, that its
 author says "kinda sucked", and that then propagated into content and editorial
 judgment because it was the only thing there.
 
@@ -66,7 +65,7 @@ passes `fid derive --check`; a scaffold declares no thesis at all.
 **Keep it in `MISSION.md` and parse the prose.** This is what exists, and it is
 the thing that failed. Extracting a claim from a paragraph means a parser
 guessing which sentence is load-bearing, and it would have guessed wrong about
-fon — the first paragraph is longer and reads more like a mission.
+The first product — the first paragraph is longer and reads more like a mission.
 
 **One `[thesis]` section in `fiducial.toml`.** Fewer moving parts, and every
 tool already reads that file. But it is the wrong lifecycle: facts there are
@@ -123,7 +122,7 @@ describes — those vary by reader and belong to `fid advise`, never to
 `fid derive --check` (`2026-09-20-two-kinds-of-model.md`). A gate whose verdict
 varies is not a gate.
 
-It does not rewrite existing prose. fon's `MISSION.md` keeps its wording; it
+It does not rewrite existing prose. The first product's `MISSION.md` keeps its wording; it
 gains a thesis beside it, and the drift between them becomes visible rather than
 being resolved by a codemod.
 

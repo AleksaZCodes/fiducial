@@ -64,7 +64,7 @@ and any US filing runs against a clock that started at first disclosure.
 > Product repos, domain logic, novel protocols, novel algorithms, and hardware
 > designs live in private repositories and are never published.
 
-So if genuine novelty exists, it is most likely in the private tier — `fon`'s
+So if genuine novelty exists, it is most likely in the private tier — the first product's
 hardware, radio policy and security posture; ROP's domain logic — not in the
 public platform. The platform is integration work, and integration work is
 rarely patentable anyway.

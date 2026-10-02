@@ -2,9 +2,8 @@
 //!
 //! # Why this exists
 //!
-//! `MISSION.md` is prose. fon's is thirty-three lines, and the sentence that
-//! actually decides things — *"no unverified alert ever reaches a responder"* —
-//! is in the middle of its second paragraph. It is a good thesis: falsifiable,
+//! `MISSION.md` is prose. The first product's is thirty-three lines, and the sentence that
+//! actually decides things is in the middle of its second paragraph. It is a good thesis: falsifiable,
 //! it states a tension, and it is the sentence you would sell with. But nothing
 //! downstream can find it. `messages/en.json` restates it by hand as "A person
 //! confirms every event"; `README.md` states it a third way; an editor judging a
@@ -127,7 +126,7 @@ pub struct Arc {
     ///
     /// `where` is a Rust keyword, so the field carries the trailing underscore
     /// and the rename keeps the declaration readable. A product writes
-    /// `where = "Serbia."`, which is the only spelling anyone should have to
+    /// `where = "Norway."`, which is the only spelling anyone should have to
     /// know.
     #[serde(rename = "where", default, skip_serializing_if = "Option::is_none")]
     pub where_: Option<String>,
@@ -146,7 +145,7 @@ pub struct Test {
 
 /// What is actually true today, separated from what is intended.
 ///
-/// This group exists because fon's `MISSION.md` has to end with a paragraph
+/// This group exists because the first product's `MISSION.md` has to end with a paragraph
 /// saying no deployment, pilot or live alerting exists — in prose, where no
 /// generator can see it. A thesis that derives pitch copy and cannot say what
 /// is unproven will produce a pitch that overclaims, and it will do it
@@ -460,28 +459,28 @@ fn json_list(items: &[String]) -> String {
 mod tests {
     use super::*;
 
-    const FON: &str = r#"
+    const ACME: &str = r#"
 [[thesis]]
 date  = "2026-08-02"
-claim = "Wildfire detection should be cheap and solar."
+claim = "Water metering should be cheap and remote."
 
 [[thesis]]
 date       = "2026-09-21"
-claim      = "No unverified alert ever reaches a responder."
+claim      = "No estimated reading ever reaches a bill."
 supersedes = 1
 because    = "Cheap was never the objection. Trust was."
 
 [thesis.arc]
-what     = "A solar LoRa mesh sensor network."
-for_whom = "Municipalities, national parks, public forest enterprises."
-problem  = "A network that cries wolf is worse than no network."
-where    = "Serbia."
+what     = "A battery-powered LoRa meter network."
+for_whom = "Municipal water utilities."
+problem  = "A bill that guesses is worse than no bill."
+where    = "Norway."
 
 [thesis.test]
-falsified_by = "Responders act on machine-only alerts at the same rate."
+falsified_by = "Customers dispute estimated bills at the same rate."
 
 [thesis.evidence]
-not_yet = ["No field deployment. No pilot. No live public alerting."]
+not_yet = ["No field deployment. No pilot. No live billing."]
 "#;
 
     #[test]
@@ -492,17 +491,17 @@ not_yet = ["No field deployment. No pilot. No live public alerting."]
 
     #[test]
     fn the_current_thesis_is_the_one_nothing_supersedes() {
-        let f = parse(FON).unwrap();
+        let f = parse(ACME).unwrap();
         assert_eq!(
             current(&f).unwrap().claim,
-            "No unverified alert ever reaches a responder."
+            "No estimated reading ever reaches a bill."
         );
     }
 
     #[test]
     fn where_is_readable_despite_being_a_rust_keyword() {
-        let f = parse(FON).unwrap();
-        assert_eq!(current(&f).unwrap().arc.where_.as_deref(), Some("Serbia."));
+        let f = parse(ACME).unwrap();
+        assert_eq!(current(&f).unwrap().arc.where_.as_deref(), Some("Norway."));
     }
 
     #[test]
@@ -552,7 +551,7 @@ not_yet = ["No field deployment. No pilot. No live public alerting."]
 
     #[test]
     fn a_filled_field_is_not_asked_about() {
-        let f = parse(FON).unwrap();
+        let f = parse(ACME).unwrap();
         let fields: Vec<&str> = gaps(current(&f).unwrap()).iter().map(|g| g.field).collect();
         assert!(!fields.contains(&"test.falsified_by"));
         assert!(!fields.contains(&"arc.where"));
@@ -562,9 +561,11 @@ not_yet = ["No field deployment. No pilot. No live public alerting."]
 
     #[test]
     fn the_pitch_leads_with_the_claim_and_omits_undeclared_sections() {
-        let f = parse(FON).unwrap();
-        let md = render_pitch_md(current(&f).unwrap(), "fon", "fid-thesis");
-        assert!(md.starts_with("# fon\n\n> **No unverified alert ever reaches a responder.**"));
+        let f = parse(ACME).unwrap();
+        let md = render_pitch_md(current(&f).unwrap(), "acme", "fid-thesis");
+        assert!(md.starts_with(
+            "# acme\n\n> **No estimated reading ever reaches a bill.**"
+        ));
         assert!(md.contains("## Who it is for"));
         assert!(!md.contains("## Why now"), "undeclared sections stay out");
         assert!(md.contains("- ✗ No field deployment."));
@@ -585,11 +586,11 @@ not_yet = ["No field deployment. No pilot. No live public alerting."]
 
     #[test]
     fn rendering_is_deterministic() {
-        let f = parse(FON).unwrap();
+        let f = parse(ACME).unwrap();
         let t = current(&f).unwrap();
         assert_eq!(
-            render_pitch_md(t, "fon", "fid-thesis"),
-            render_pitch_md(t, "fon", "fid-thesis")
+            render_pitch_md(t, "acme", "fid-thesis"),
+            render_pitch_md(t, "acme", "fid-thesis")
         );
         assert_eq!(render_ts(t, "fid-thesis"), render_ts(t, "fid-thesis"));
     }

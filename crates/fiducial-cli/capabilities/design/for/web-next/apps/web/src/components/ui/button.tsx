@@ -31,7 +31,7 @@ import type * as React from "react";
  * and getting some of it wrong. That is the whole argument for starting from
  * the real thing.
  *
- * ## What FON changed, and why it had to change
+ * ## What the first product changed, and why it had to change
  *
  * **The corner.** `rounded-md` is gone. This product's corner strategy is
  * `chamfer` (`design-system.md` § 4), and a chamfer cannot be a border-radius:

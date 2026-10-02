@@ -1,0 +1,68 @@
+# hardware/product.toml — this product's physical facts, declared once.
+#
+# `fid derive` solves it (executor `fid-hardware`); `hardware/build.sh` turns
+# the solution into STEP/STL, board fab files and review renders. Read
+# .fiducial/skills/hardware.md for the model. Every value below is a seed —
+# replace it.
+
+[product]
+name = "device"
+
+[outline]
+svg   = "hardware/outline.svg"
+layer = "outline"
+
+[regions.window]
+svg   = "hardware/outline.svg"
+layer = "window"
+
+[case]
+process  = "fdm"
+wall_mm  = 5.0
+floor_mm = 3.0
+lid_mm   = 4.0
+
+[case.seal]
+kind              = "gasket"
+groove_mm         = 2.0
+depth_mm          = 2.5
+lip_mm            = 1.2
+compression       = 0.25
+window_overlap_mm = 3.0
+
+[case.fasteners]
+size           = "M3"
+max_spacing_mm = 80.0
+
+[board]
+max_mm = [100.0, 100.0]
+
+[cost]
+currency = "EUR"
+ceiling  = 30.0
+
+[[part]]
+id        = "display"
+name      = "Display or panel behind the window"
+place     = "window"
+mount     = "window"
+body_mm   = [60.0, 52.0, 3.0]
+status    = "assumed"
+settle_by = "Choose the part; its size sets the size of everything."
+
+[[part]]
+id      = "mcu"
+name    = "Microcontroller module"
+place   = "board"
+mount   = "smd"
+body_mm = [18.0, 18.0, 3.0]
+status  = "assumed"
+
+[[part]]
+id      = "cell"
+name    = "Cell in holder — space reserved"
+place   = "cavity"
+mount   = "socket"
+shape   = "cylinder"
+body_mm = [70.0, 21.0, 21.0]
+status  = "assumed"

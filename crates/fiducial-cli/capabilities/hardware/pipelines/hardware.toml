@@ -1,0 +1,32 @@
+name     = "hardware"
+executor = "fid-hardware"
+args     = ["hardware/product.toml"]
+outputs  = [
+  "hardware/generated/layout.json",
+  "hardware/generated/placement-model.json",
+  "hardware/generated/placement.json",
+  "hardware/generated/bom.csv",
+  "hardware/generated/assembly.md",
+  "hardware/generated/board.kicad_pcb",
+  "hardware/generated/board.kicad_sch",
+]
+
+# hardware/product.toml → the solved product, by output file name:
+#
+#   layout.json      every position, size and hole, and why — what cad.py builds from
+#   placement-model.json  the board placement as a constraint problem (spec 2026-10-01)
+#   placement.json   the solver's answer, stamped with the model's hash; reused
+#                    while the model is unchanged, so the gate needs no solver
+#   bom.csv          declared parts plus what the design implies (screws, gaskets, printed parts)
+#   assembly.md      the order it goes together in, derived from each part's mount
+#   *.kicad_pcb      the board: outline, holes, real footprints placed, pads on their nets
+#   *.kicad_sch      the schematic: every part's KiCad symbol, pins labelled with their nets
+#
+# Inputs are tracked as well as outputs: the declaration and every SVG it
+# addresses are hashed into fiducial.lock, so a redrawn logo fails
+# `fid derive --check` by name instead of silently disagreeing with the case.
+#
+# STEP, STL, Gerbers and the review renders come from `hardware/build.sh`.
+# They are build products, not gated artifacts: a CAD kernel's tessellation and
+# KiCad's Gerber timestamps are not byte-stable, so hashing them would fail on
+# a tool upgrade rather than on drift. The gate covers the text they come from.

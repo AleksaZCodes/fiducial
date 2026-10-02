@@ -180,6 +180,11 @@ numbering is unchanged._
 
 > EDA pipeline: atopile → KiCad → `board.interface.json` + fab outputs.
 > Done when: A board change regenerates every output; `--check` catches staleness.
+>
+> **Correction, 2026-09-30:** what shipped is the schema, its validation and the
+> freshness gate. No pipeline runs atopile or KiCad, and the fab-output pipeline
+> is a comment in `eda.toml`. The title above is what was intended; see
+> `docs/specs/2026-09-30-a-physical-product-is-parts-in-regions.md`.
 
 | Deliverable | Status |
 | --- | --- |
@@ -383,6 +388,42 @@ built because no product has one yet.
 | `fid capability list --all` — `database`/`storage` now show `selectable: none, d1` / `none, r2` | ✅ |
 | **Deliberately not done, and said so in `ROADMAP.md`, `SHIPPED.md` and the spec**: Workers-as-`deploy` (needs its own design — `deploy` is pipeline-shaped, not a runtime trait), Access, Turnstile, Queues, Workers AI (no contract exists for any of the four, and designing one against zero consumers is the mistake *capability taxonomy, made real* already corrected once), a Rust-side D1/R2 client (would need Cloudflare's HTTP/S3 API over an API token, not a binding — no Tauri product needs it), a working `signedUrl` | ✅ |
 | Clippy (0 warnings), fmt, full Rust suite (all workspace crates) and the new JS test file all green | ✅ |
+
+**Phase 37 — physical products: the `hardware` capability, and input tracking ✅ (2026-09-30)**
+
+> Implements the roadmap item **physical products — outline, region, part, cost**,
+> and closes four of the six gaps recorded in
+> `docs/specs/2026-09-30-a-physical-product-is-parts-in-regions.md`.
+> Spec: `docs/specs/2026-09-30-hardware-is-a-capability.md`.
+
+| Deliverable | Status |
+| --- | --- |
+| `fiducial-geometry::fit` — exact rectangle-in-polygon fit with clearance on **non-convex** outlines, grid placement that only returns exact-fit positions, corner screw points, farthest-point spread; `no_std`, f64; 9 tests | ✅ |
+| `fid-hardware` executor — `hardware/product.toml` → `layout.json` (with a `why` list), `bom.csv` (declared + implied parts), `assembly.md`, a KiCad 7 board frame | ✅ |
+| Outline and regions from **any SVG**, by `data-layer`, path and subpath, through group transforms; curves refused by name | ✅ |
+| Scale solved from the parts: a `window` part grows its region until it meets it; a `pocket` part floors it | ✅ |
+| Board sized from its parts' footprints under a ceiling, not defaulted to it; sockets and board packed together with backtracking | ✅ |
+| Seal and fasteners derived: screws in convex corners, bosses sized so the gasket groove runs between screw and cavity; counterbore keeps 1 mm of skin | ✅ |
+| Cost asserted: a priced total over the ceiling fails derive; unpriced lines listed; `strict` fails on them | ✅ |
+| **Input tracking** — `inputs` on any pipeline, plus executor-reported inputs; hashed into `fiducial.lock`; `--check` names the upstream file that moved. Omitted when empty, so existing locks are unchanged | ✅ |
+| `layout.json → shapes_read` — vertex count, bounds and area of every SVG shape read, so a redraw is a reviewable diff | ✅ |
+| `capabilities/hardware` — seed, pipeline, SKILL.md; `cad.py` (build123d/OCCT: base, lid, tongue, gasket, window gasket, locators, standoffs, bulkheads, screws; interference, insertion, lid-closing and screw-engagement checks), `render.mjs` + `viewer.html` (review pack: four renders and a self-contained 3D viewer) | ✅ |
+| `tests/hardware_pipeline.rs` — 26 end-to-end tests, including a moved SVG failing `--check` by name | ✅ |
+| Agent rule *When you hit a wall* in `AGENTS.md` and the product template; the template's duplicated `## Product layout` heading fixed | ✅ |
+| Second round, from the reference product's review: `surface` mount (adhesive foam ring, lead hole), `fit` rules separate from mounts (`width` exact, unrounded), `under-board` sockets that turn to fit and raise the standoffs, `[[wire]]` routes with cut lengths and a lid service loop, `closure = screws-top \| screws-back \| press-fit` | ✅ |
+| Found by the checks on the way: sharp offset joins built a wall inside the solver's clearance at a reflex corner — offsets are now arc-joined, matching the solver's distance semantics; sinking a counterbore *adds* bite, so screws-back raises the base instead | ✅ |
+| Third round — **real components**: board parts name a KiCad `footprint` and `symbol`; `hardware/parts.py sync` vendors them and their STEP models into `hardware/lib/` (hash-checked, tracked as inputs); the part's size is read from the courtyard; `board.kicad_pcb` places the real footprints; the render draws the manufacturer's model on its copper. Provenance on every other size: `dims_from`, `source_url`, and `unverified_dimensions` for `decided` parts without one | ✅ |
+| Board sectioning: `board.zones` bands sized by their contents, `zone`, `faces`/`faces_pin` turning a part's RF side to its edge, `keepout_mm` as a KiCad keep-out zone *and* a film the interference check enforces, `away_from`; `pads` mount — wire pads carrying nets, the EDA end of a `[[wire]]` | ✅ |
+| Placement by bounded best-cost search instead of first-fit: the reference product's supercaps went from stranded mid-case to the bottom once the board no longer had to be *centred* on the panel, only reach under its lead hole (`board.near` is a cover target). 1 mm default grid: 11.5 s → 0.7 s | ✅ |
+| Seal verified, not drawn: the gasket stands `proud_mm` above its groove and `checks.json → seal` measures that the lid squeezes it by at least half, at most 110 %, of the declared compression — a flush, sunk or crushed gasket fails | ✅ |
+| `fid upgrade` now delivers files a capability gained after install (`parts.py` reached no existing product before); a same-named file of the product's own is left alone. `cad.py` clears stale solids so a removed part cannot linger in the review | ✅ |
+| Fourth round — **a connected board.** `pins` on board parts by symbol pin name → nets on every pad; `board.kicad_sch` derived and gated (KiCad's own netlist of it matches the declaration net for net); `route.py`: Freerouting (pinned, hashed), ground pours, KiCad DRC, fresh retries until nothing is open; real STEP colours, footprint-built bodies, routed copper in the renders | ✅ |
+| Off-board parts wired pin to pad (`leads`, `part#n.pin`), a pigtail of fixed length (`kind = "coax"`, `fixed_mm`), lid `mark`s from a region's roof, `vent` and `adhesive` mounts, a hanging lug; `parts.py` searches a product's `hardware/vendor/` first | ✅ |
+| Fifth round — **assembled without wires or screws.** `follows`/`drill_mm` pads put plated holes under a lying part's leads; `ports` lets a wire end on a connector with no pad (a module's own U.FL); `rotate_deg`; two-terminal parts placed radially beside the pin they serve; the board centred under what it reaches for; `board.mount = "snap"` (pegs and printed hooks); `flush` surface parts in a lid pocket; `case.hang` as two sealed holes through a solid tip; wires laid square | ✅ |
+| Sixth round — **placed against the ratsnest, documented per part.** Quarter-turn and position search per part, scored by connection length and crossings; `board.edge_mm`, `board.pegs`, `board.track_mm`/`clearance_mm`; `ratsnest.py` in the review pack; `datasheet` per part (or LCSC's), fetched with a text copy; `hardware/lib/PARTS.md`; Freerouting's edge keep-out as four strips (a windowed keep-out crashed its maze search) and non-plated hole keep-outs no longer padded twice — the reference product routes complete on the first attempt in 20 s, from 3–44 open after 8 minutes | ✅ |
+| Seventh round — **escape hatches and a wire engine.** `hardware/shapes.py` (product-owned geometry run before the checks), `model =` a part's own STEP in place of its envelope (checked against it), `through_wall` openings with an auto-raised base; wires routed by A* round every obstacle, cores parallel and landed each on its own pad, wire pads turned square to their wire, coax fed from the antenna's near end | ✅ |
+| Eighth round — **placement by an engine, not rules** (spec `2026-10-01-hardware-is-solved-by-engines-not-rules.md`). Board parts are placed by OR-Tools CP-SAT through a gated contract (`placement-model.json` → `place.py` → `placement.json`, reused while the model's hash matches, so `--check` needs no Python); every rule is an instance of a generic kind (inside, no-overlap, fixed, flush, within, apart, near, net); a conflict fails naming a minimal set of declarations; deterministic one-worker large-neighbourhood search, warm-started from the previous answer. The reference product: connections 13 % shorter than the old search, then 10 % more. `seals_to` vents: a chimney printed with the lid on a squeezed ring round a board part, leaning ≤ 3 mm, its ring wholly on the board over a track-free copper land; `membrane = "outside"`. Snap-hook lip counted in side bands; renders load once (115 → 85 s); `build.rs` skips `__pycache__` | ✅ |
+| Research pipeline (`fid-research`) — still not built; its SKILL.md says so | ⬜ |
 
 **Phase 36 — the release actually reaches the registries ✅ (2026-09-16)**
 
@@ -806,7 +847,7 @@ built because no product has one yet.
 | `templates::RENAMED_TEMPLATES` — the declaration of what moved. A rename **cannot** be a codemod: `MigrationOp` is a literal search-and-replace within one file, and this is a file moving | ✅ |
 | `fid upgrade` installs the new path and removes the old one — ordered **before** the "added" pass, which would otherwise install the new file and leave the colliding one behind | ✅ |
 | A **locally modified** file at a renamed path is never deleted: both are kept, with a warning naming the fix. Discarding someone's edits to solve a naming problem is the worse outcome | ✅ |
-| Propagated to the real `fon` product and verified clean | ✅ |
+| Propagated to the real the first product and verified clean | ✅ |
 | 2 new end-to-end tests; captures regenerated so the guides show the new names | ✅ |
 
 **Phase 21 — documentation that cannot lie ✅ (2026-09-14)**
@@ -895,7 +936,7 @@ built because no product has one yet.
 | CI `spine` job derives its crate list from `#![no_std]` | ✅ |
 | CI host job gains `--all-features` so README doctests are not silently skipped | ✅ |
 | Root `README.md` rewritten from a 20-line stub into a real front page | ✅ |
-| `fon` scaffold brought in line with the corrected templates | ✅ |
+| the first product scaffold brought in line with the corrected templates | ✅ |
 | **No behaviour, API or generated output changed** — geometry, wire format, OTA and dash all byte-identical | ✅ |
 | 4-target spine, clippy, fmt clean; full Rust suite + 30 JS tasks green | ✅ |
 
@@ -1156,6 +1197,7 @@ fiducial/
 | **23d** | Locales declare themselves | Each catalog carries its own endonym and flag region; the language picker maps over the locale list and survives a third locale | ✅ |
 | **24** | Workbench authoring — the `cms` capability | A local content editor over the repository's own files; its Decap config derived from `content.toml`, `press/` and the declared locales, so the editor cannot drift from the model. No store, no login, nothing deployed | ✅ |
 | **25** | Routes as a declaration — the `seo` capability | Sitemap, per-page metadata and hreflang derived from the content model and the locales; a social image per route, rendered before each build and never committed | ✅ |
+| **37** | Physical products — the `hardware` capability | Any SVG outline, regions, parts and mounts solve into a gated layout, BOM, KiCad frame and assembly order; a solid kernel builds and checks the model; a moved upstream file fails `--check` by name | ✅ |
 
 **What comes next is not recorded here.** This file is the record of what was
 *built*; [`ROADMAP.md`](ROADMAP.md) holds what is *intended* and in what order.

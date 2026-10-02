@@ -41,6 +41,23 @@ pub struct Lock {
     /// product records what it actually has.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub capabilities: BTreeMap<String, CapabilityRecord>,
+    /// Files a pipeline read, as they were when it last ran, keyed by
+    /// repo-relative path. `fid derive --check` compares them, so an upstream
+    /// file that moved without a re-derive fails the gate instead of shipping.
+    ///
+    /// Omitted when empty, so a product with no tracked inputs gets a lock
+    /// byte-identical to the one it had before this existed.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub inputs: BTreeMap<String, InputRecord>,
+}
+
+/// A file a pipeline read, as it was when the pipeline last ran.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InputRecord {
+    /// Lowercase hex SHA-256 of the file when it was read.
+    pub hash: String,
+    /// Pipelines that read it.
+    pub pipelines: Vec<String>,
 }
 
 /// What a product installed, and from where.
@@ -116,6 +133,7 @@ impl Lock {
             applied_migrations: Vec::new(),
             artifacts: BTreeMap::new(),
             capabilities: BTreeMap::new(),
+            inputs: BTreeMap::new(),
         }
     }
 
@@ -152,6 +170,23 @@ impl Lock {
 
     /// Record a derived artifact produced by a pipeline.
     /// `path` is repo-relative (forward slashes). `content` is the artifact bytes.
+    /// Record that `pipeline` read `path` with this content.
+    pub fn record_input(&mut self, path: impl Into<String>, content: &[u8], pipeline: &str) {
+        let hash = sha256_hex(content);
+        let rec = self
+            .inputs
+            .entry(path.into())
+            .or_insert_with(|| InputRecord {
+                hash: hash.clone(),
+                pipelines: Vec::new(),
+            });
+        rec.hash = hash;
+        if !rec.pipelines.iter().any(|p| p == pipeline) {
+            rec.pipelines.push(pipeline.into());
+            rec.pipelines.sort();
+        }
+    }
+
     pub fn record_artifact(
         &mut self,
         path: impl Into<String>,

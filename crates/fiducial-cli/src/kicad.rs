@@ -1,0 +1,673 @@
+//! KiCad's own formats, read and written without KiCad.
+//!
+//! A part's footprint is a `.kicad_mod`: an S-expression holding its pads (its
+//! pins, numbered, positioned) and its courtyard (the area it claims). Reading
+//! it is what lets `fid-hardware` take a part's size and pin positions from
+//! the component itself instead of from someone typing them — and writing it
+//! back, placed and turned, is what puts the real component into the board
+//! file rather than a drawing of one.
+
+use anyhow::{anyhow, bail, Context, Result};
+use std::fmt::Write as _;
+use std::path::Path;
+
+/// An S-expression: an atom (remembering whether it was quoted, so it can be
+/// written back as it came) or a list.
+#[derive(Debug, Clone, PartialEq)]
+pub enum S {
+    A(String, bool),
+    L(Vec<S>),
+}
+
+impl S {
+    pub fn head(&self) -> Option<&str> {
+        match self {
+            S::L(v) => match v.first() {
+                Some(S::A(s, _)) => Some(s),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+    pub fn items(&self) -> &[S] {
+        match self {
+            S::L(v) => v,
+            _ => &[],
+        }
+    }
+    pub fn atom(&self) -> Option<&str> {
+        match self {
+            S::A(s, _) => Some(s),
+            _ => None,
+        }
+    }
+    /// Direct children whose head is `name`.
+    pub fn children<'a>(&'a self, name: &'a str) -> impl Iterator<Item = &'a S> + 'a {
+        self.items().iter().filter(move |c| c.head() == Some(name))
+    }
+    pub fn child<'a>(&'a self, name: &'a str) -> Option<&'a S> {
+        self.children(name).next()
+    }
+    /// The numbers following the head: `(at 1 2 90)` → [1, 2, 90].
+    pub fn nums(&self) -> Vec<f64> {
+        self.items()
+            .iter()
+            .skip(1)
+            .filter_map(|c| c.atom()?.parse().ok())
+            .collect()
+    }
+}
+
+pub fn parse(text: &str) -> Result<S> {
+    let b = text.as_bytes();
+    let mut i = 0;
+    let mut stack: Vec<Vec<S>> = vec![Vec::new()];
+    while i < b.len() {
+        match b[i] {
+            b'(' => {
+                stack.push(Vec::new());
+                i += 1;
+            }
+            b')' => {
+                let done = stack.pop().ok_or_else(|| anyhow!("unbalanced `)`"))?;
+                stack
+                    .last_mut()
+                    .ok_or_else(|| anyhow!("unbalanced `)`"))?
+                    .push(S::L(done));
+                i += 1;
+            }
+            b'"' => {
+                let mut s = String::new();
+                i += 1;
+                while i < b.len() && b[i] != b'"' {
+                    if b[i] == b'\\' && i + 1 < b.len() {
+                        s.push(b[i + 1] as char);
+                        i += 2;
+                        continue;
+                    }
+                    let ch = text[i..].chars().next().unwrap();
+                    s.push(ch);
+                    i += ch.len_utf8();
+                }
+                i += 1;
+                stack.last_mut().unwrap().push(S::A(s, true));
+            }
+            c if c.is_ascii_whitespace() => i += 1,
+            _ => {
+                let start = i;
+                while i < b.len() && !b[i].is_ascii_whitespace() && b[i] != b'(' && b[i] != b')' {
+                    i += 1;
+                }
+                stack
+                    .last_mut()
+                    .unwrap()
+                    .push(S::A(text[start..i].to_string(), false));
+            }
+        }
+    }
+    if stack.len() != 1 {
+        bail!("unbalanced `(`");
+    }
+    stack
+        .pop()
+        .unwrap()
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow!("empty S-expression"))
+}
+
+pub fn write(s: &S, out: &mut String) {
+    match s {
+        S::A(a, q) => {
+            if *q || a.is_empty() || a.contains([' ', '(', ')', '"']) {
+                let _ = write!(out, "\"{}\"", a.replace('\\', "\\\\").replace('"', "\\\""));
+            } else {
+                out.push_str(a);
+            }
+        }
+        S::L(v) => {
+            out.push('(');
+            for (k, c) in v.iter().enumerate() {
+                if k > 0 {
+                    out.push(' ');
+                }
+                write(c, out);
+            }
+            out.push(')');
+        }
+    }
+}
+
+fn num(x: f64) -> S {
+    let r = (x * 10000.0).round() / 10000.0 + 0.0;
+    S::A(format!("{r}"), false)
+}
+
+/// A pad: number, centre and size, in footprint coordinates (KiCad: y down).
+#[derive(Debug, Clone)]
+pub struct Pad {
+    pub number: String,
+    pub at: (f64, f64),
+    pub size: (f64, f64),
+}
+
+/// What `fid-hardware` needs from a footprint.
+#[derive(Debug, Clone)]
+pub struct Footprint {
+    pub name: String,
+    /// Courtyard bounds, footprint coordinates: (min, max).
+    pub courtyard: ((f64, f64), (f64, f64)),
+    pub pads: Vec<Pad>,
+    /// The model's file stem, and its offset and rotation.
+    pub model: Option<(String, [f64; 3], [f64; 3])>,
+    /// Fab-layer bounds — the package body as drawn — when the footprint has one.
+    pub fab: Option<((f64, f64), (f64, f64))>,
+    pub tree: S,
+}
+
+impl Footprint {
+    pub fn size(&self) -> (f64, f64) {
+        let ((a, b), (c, d)) = self.courtyard;
+        (c - a, d - b)
+    }
+    pub fn centre(&self) -> (f64, f64) {
+        let ((a, b), (c, d)) = self.courtyard;
+        ((a + c) / 2.0, (b + d) / 2.0)
+    }
+    /// Which side of the part — `top`, `bottom`, `left`, `right`, as drawn at
+    /// 0° with y up — a pad sits nearest.
+    pub fn side_of_pad(&self, number: &str) -> Result<&'static str> {
+        let p = self
+            .pads
+            .iter()
+            .find(|p| p.number == number)
+            .ok_or_else(|| {
+                anyhow!(
+                    "footprint {} has no pad `{number}` (pads: {})",
+                    self.name,
+                    self.pads
+                        .iter()
+                        .map(|p| p.number.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            })?;
+        let (cx, cy) = self.centre();
+        let (w, h) = self.size();
+        // Normalised by the body's half-size, so a pad on the short side of a
+        // long module is still found on that side.
+        let (dx, dy) = ((p.at.0 - cx) / (w / 2.0), -(p.at.1 - cy) / (h / 2.0));
+        Ok(if dx.abs() >= dy.abs() {
+            if dx > 0.0 {
+                "right"
+            } else {
+                "left"
+            }
+        } else if dy > 0.0 {
+            "top"
+        } else {
+            "bottom"
+        })
+    }
+}
+
+/// The vendored file for a `Library:Name` footprint id.
+pub fn footprint_path(id: &str) -> Result<String> {
+    let name = id
+        .split_once(':')
+        .map(|(_, n)| n)
+        .ok_or_else(|| anyhow!("footprint `{id}` is not a library id — expected Library:Name"))?;
+    Ok(format!("hardware/lib/footprints/{name}.kicad_mod"))
+}
+
+pub fn read_footprint(root: &Path, id: &str) -> Result<Footprint> {
+    let rel = footprint_path(id)?;
+    let text = std::fs::read_to_string(root.join(&rel))
+        .with_context(|| format!("footprint {id} is declared but not vendored at {rel} — run `python3 hardware/parts.py sync`"))?;
+    let tree = parse(&text).with_context(|| format!("parsing {rel}"))?;
+    let mut pts: Vec<(f64, f64)> = Vec::new();
+    let mut fab: Vec<(f64, f64)> = Vec::new();
+    for g in tree.items() {
+        let layer = g
+            .child("layer")
+            .and_then(|l| l.items().get(1))
+            .and_then(|a| a.atom());
+        if layer == Some("F.Fab")
+            && matches!(
+                g.head(),
+                Some("fp_line") | Some("fp_rect") | Some("fp_poly")
+            )
+        {
+            for k in ["start", "end"] {
+                if let Some(n) = g.child(k).map(|c| c.nums()) {
+                    fab.push((n[0], n[1]));
+                }
+            }
+            if let Some(p) = g.child("pts") {
+                for xy in p.children("xy") {
+                    let n = xy.nums();
+                    fab.push((n[0], n[1]));
+                }
+            }
+        }
+        if layer != Some("F.CrtYd") {
+            continue;
+        }
+        match g.head() {
+            Some("fp_line") | Some("fp_rect") => {
+                for k in ["start", "end"] {
+                    if let Some(n) = g.child(k).map(|c| c.nums()) {
+                        pts.push((n[0], n[1]));
+                    }
+                }
+            }
+            Some("fp_poly") => {
+                if let Some(p) = g.child("pts") {
+                    for xy in p.children("xy") {
+                        let n = xy.nums();
+                        pts.push((n[0], n[1]));
+                    }
+                }
+            }
+            Some("fp_circle") => {
+                if let (Some(c), Some(e)) = (g.child("center"), g.child("end")) {
+                    let (c, e) = (c.nums(), e.nums());
+                    let r = (e[0] - c[0]).hypot(e[1] - c[1]);
+                    pts.extend([(c[0] - r, c[1] - r), (c[0] + r, c[1] + r)]);
+                }
+            }
+            _ => {}
+        }
+    }
+    if pts.is_empty() {
+        bail!("footprint {id} has no courtyard (F.CrtYd), so its size cannot be read");
+    }
+    let lo = pts
+        .iter()
+        .fold((f64::MAX, f64::MAX), |a, p| (a.0.min(p.0), a.1.min(p.1)));
+    let hi = pts
+        .iter()
+        .fold((f64::MIN, f64::MIN), |a, p| (a.0.max(p.0), a.1.max(p.1)));
+    let pads = tree
+        .children("pad")
+        .filter_map(|p| {
+            let number = p.items().get(1)?.atom()?.to_string();
+            let at = p.child("at")?.nums();
+            let size = p.child("size")?.nums();
+            Some(Pad {
+                number,
+                at: (at[0], at[1]),
+                size: (size[0], size[1]),
+            })
+        })
+        .collect();
+    let model = tree.child("model").and_then(|m| {
+        let path = m.items().get(1)?.atom()?;
+        let stem = Path::new(path).file_stem()?.to_str()?.to_string();
+        let xyz = |k: &str| -> [f64; 3] {
+            m.child(k)
+                .and_then(|o| o.child("xyz"))
+                .map(|x| {
+                    let n = x.nums();
+                    [n[0], n[1], n[2]]
+                })
+                .unwrap_or([0.0; 3])
+        };
+        Some((stem, xyz("offset"), xyz("rotate")))
+    });
+    let fab = (!fab.is_empty()).then(|| {
+        (
+            fab.iter()
+                .fold((f64::MAX, f64::MAX), |a, p| (a.0.min(p.0), a.1.min(p.1))),
+            fab.iter()
+                .fold((f64::MIN, f64::MIN), |a, p| (a.0.max(p.0), a.1.max(p.1))),
+        )
+    });
+    Ok(Footprint {
+        name: id.to_string(),
+        courtyard: (lo, hi),
+        pads,
+        model,
+        fab,
+        tree,
+    })
+}
+
+/// A symbol pin: its number (the footprint pad it lands on), its name, and
+/// where it connects, in symbol coordinates (y up) with the direction the pin
+/// runs from that point into the body.
+#[derive(Debug, Clone)]
+pub struct SymPin {
+    pub number: String,
+    pub name: String,
+    pub at: (f64, f64),
+    pub angle: f64,
+    /// The unit it belongs to; 0 is common to every unit.
+    pub unit: u32,
+}
+
+/// What `fid-hardware` needs from a symbol.
+#[derive(Debug, Clone)]
+pub struct Symbol {
+    pub id: String,
+    /// The designator letter KiCad gives it: `U`, `R`, `C`, `L`, `J`.
+    pub prefix: String,
+    pub pins: Vec<SymPin>,
+    /// Bounds of its body and pins, symbol coordinates: (min, max).
+    pub bounds: ((f64, f64), (f64, f64)),
+    /// The library block, verbatim — what a schematic embeds.
+    pub block: String,
+}
+
+impl Symbol {
+    /// The pad numbers a declared pin key means: a pad number as it stands,
+    /// or every pin carrying that name (a module's three `GND` pins).
+    pub fn resolve(&self, key: &str) -> Vec<String> {
+        if self.pins.iter().any(|p| p.number == key) {
+            return vec![key.to_string()];
+        }
+        self.pins
+            .iter()
+            .filter(|p| {
+                p.name == key || p.name.trim_start_matches("~{").trim_end_matches('}') == key
+            })
+            .map(|p| p.number.clone())
+            .collect()
+    }
+}
+
+pub const SYMBOLS: &str = "hardware/lib/symbols.kicad_sym";
+
+/// Every symbol in the vendored library, by id.
+pub fn read_symbols(root: &Path) -> Result<Vec<Symbol>> {
+    let text = std::fs::read_to_string(root.join(SYMBOLS))
+        .with_context(|| format!("symbols are declared but not vendored at {SYMBOLS} — run `python3 hardware/parts.py sync`"))?;
+    let tree = parse(&text).with_context(|| format!("parsing {SYMBOLS}"))?;
+    let mut out = Vec::new();
+    for sym in tree.children("symbol") {
+        let Some(id) = sym.items().get(1).and_then(|a| a.atom()) else {
+            continue;
+        };
+        let mut pins = Vec::new();
+        let mut pts: Vec<(f64, f64)> = Vec::new();
+        // Units are nested `(symbol "Name_u_s" …)` blocks: unit u, body style
+        // s. Style 2 is the De Morgan alternate — the same pins drawn again.
+        for unit in sym.children("symbol") {
+            let tag = unit.items().get(1).and_then(|a| a.atom()).unwrap_or("");
+            let mut parts = tag.rsplitn(3, '_');
+            let style: u32 = parts.next().and_then(|v| v.parse().ok()).unwrap_or(1);
+            let unit_no: u32 = parts.next().and_then(|v| v.parse().ok()).unwrap_or(1);
+            if style > 1 {
+                continue;
+            }
+            for g in unit.items() {
+                match g.head() {
+                    Some("pin") => {
+                        let at = g.child("at").map(|a| a.nums()).unwrap_or_default();
+                        let len = g
+                            .child("length")
+                            .map(|l| l.nums())
+                            .and_then(|n| n.first().copied())
+                            .unwrap_or(0.0);
+                        let name = g
+                            .child("name")
+                            .and_then(|n| n.items().get(1)?.atom().map(String::from))
+                            .unwrap_or_default();
+                        let number = g
+                            .child("number")
+                            .and_then(|n| n.items().get(1)?.atom().map(String::from))
+                            .unwrap_or_default();
+                        if at.len() < 2 {
+                            continue;
+                        }
+                        let angle = at.get(2).copied().unwrap_or(0.0);
+                        let (dx, dy) = (
+                            angle.to_radians().cos() * len,
+                            angle.to_radians().sin() * len,
+                        );
+                        pts.extend([(at[0], at[1]), (at[0] + dx, at[1] + dy)]);
+                        pins.push(SymPin {
+                            number,
+                            name,
+                            at: (at[0], at[1]),
+                            angle,
+                            unit: unit_no,
+                        });
+                    }
+                    Some("rectangle") => {
+                        for k in ["start", "end"] {
+                            if let Some(n) = g.child(k).map(|c| c.nums()) {
+                                pts.push((n[0], n[1]));
+                            }
+                        }
+                    }
+                    Some("polyline") => {
+                        if let Some(p) = g.child("pts") {
+                            for xy in p.children("xy") {
+                                let n = xy.nums();
+                                pts.push((n[0], n[1]));
+                            }
+                        }
+                    }
+                    Some("circle") => {
+                        if let (Some(c), Some(r)) = (g.child("center"), g.child("radius")) {
+                            let (c, r) = (c.nums(), r.nums()[0]);
+                            pts.extend([(c[0] - r, c[1] - r), (c[0] + r, c[1] + r)]);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if pts.is_empty() {
+            pts.push((0.0, 0.0));
+        }
+        let lo = pts
+            .iter()
+            .fold((f64::MAX, f64::MAX), |a, p| (a.0.min(p.0), a.1.min(p.1)));
+        let hi = pts
+            .iter()
+            .fold((f64::MIN, f64::MIN), |a, p| (a.0.max(p.0), a.1.max(p.1)));
+        let prefix = sym
+            .children("property")
+            .find(|p| p.items().get(1).and_then(|a| a.atom()) == Some("Reference"))
+            .and_then(|p| p.items().get(2)?.atom().map(String::from))
+            .unwrap_or_else(|| "U".into());
+        let mut block = String::new();
+        write(sym, &mut block);
+        out.push(Symbol {
+            id: id.to_string(),
+            prefix,
+            pins,
+            bounds: (lo, hi),
+            block,
+        });
+    }
+    Ok(out)
+}
+
+/// The footprint as it goes into a board: placed at `(x, y)` in board
+/// coordinates, turned `rot` degrees, its reference set, its model pointed at
+/// the vendored STEP, each pad's orientation made absolute (KiCad stores a
+/// pad's angle in the board, not relative to its footprint), and each pad on
+/// its net: `nets` maps a pad number to the net's number and name.
+pub fn place_footprint(
+    fp: &Footprint,
+    x: f64,
+    y: f64,
+    rot: f64,
+    reference: &str,
+    model_rel: Option<&str>,
+    nets: &std::collections::BTreeMap<String, (usize, String)>,
+) -> String {
+    let mut out: Vec<S> = Vec::new();
+    let mut placed = false;
+    for (k, c) in fp.tree.items().iter().enumerate() {
+        if k == 1 {
+            out.push(S::A(fp.name.clone(), true));
+            continue;
+        }
+        match c.head() {
+            Some("version") | Some("generator") | Some("generator_version") => continue,
+            // The footprint's own layer — the first one — is where its
+            // placement goes.
+            Some("layer") if !placed => {
+                placed = true;
+                out.push(c.clone());
+                let mut at = vec![S::A("at".into(), false), num(x), num(y)];
+                if rot != 0.0 {
+                    at.push(num(rot));
+                }
+                out.push(S::L(at));
+                continue;
+            }
+            Some("fp_text") if c.items().get(1).and_then(|a| a.atom()) == Some("reference") => {
+                let mut v = c.items().to_vec();
+                v[2] = S::A(reference.to_string(), true);
+                out.push(S::L(v));
+                continue;
+            }
+            Some("pad") => {
+                let number = c.items().get(1).and_then(|a| a.atom()).unwrap_or("");
+                let mut v: Vec<S> = c
+                    .items()
+                    .iter()
+                    .filter(|e| e.head() != Some("net"))
+                    .map(|e| {
+                        if e.head() == Some("at") {
+                            let n = e.nums();
+                            let a = n.get(2).copied().unwrap_or(0.0) + rot;
+                            let mut at = vec![S::A("at".into(), false), num(n[0]), num(n[1])];
+                            if a.rem_euclid(360.0) != 0.0 {
+                                at.push(num(a.rem_euclid(360.0)));
+                            }
+                            S::L(at)
+                        } else {
+                            e.clone()
+                        }
+                    })
+                    .collect();
+                if let Some((n, name)) = nets.get(number) {
+                    v.push(S::L(vec![
+                        S::A("net".into(), false),
+                        S::A(n.to_string(), false),
+                        S::A(name.clone(), true),
+                    ]));
+                }
+                out.push(S::L(v));
+                continue;
+            }
+            Some("model") => {
+                if let Some(rel) = model_rel {
+                    let mut v = c.items().to_vec();
+                    v[1] = S::A(rel.to_string(), true);
+                    out.push(S::L(v));
+                }
+                continue;
+            }
+            _ => out.push(c.clone()),
+        }
+    }
+    let mut s = String::new();
+    write(&S::L(out), &mut s);
+    s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FP: &str = r#"(footprint Test (version 20221018) (generator x)
+  (layer F.Cu)
+  (fp_text reference "REF**" (at 0 -2) (layer F.SilkS))
+  (fp_line (start -2 -1.5) (end 2 -1.5) (stroke (width 0.05) (type solid)) (layer F.CrtYd))
+  (fp_line (start 2 -1.5) (end 2 1.5) (stroke (width 0.05) (type solid)) (layer F.CrtYd))
+  (fp_line (start 2 1.5) (end -2 1.5) (stroke (width 0.05) (type solid)) (layer F.CrtYd))
+  (pad 1 smd rect (at -1.5 0) (size 0.5 1) (layers F.Cu F.Mask))
+  (pad ANT smd rect (at 1.5 0) (size 0.5 1) (layers F.Cu F.Mask))
+  (model ${KICAD7_3DMODEL_DIR}/Lib.3dshapes/Test.wrl (offset (xyz 0 0 0)) (scale (xyz 1 1 1)) (rotate (xyz 0 0 90))))"#;
+
+    #[test]
+    fn a_round_trip_keeps_quoting() {
+        let t = parse(r#"(a "b c" d (e "f"))"#).unwrap();
+        let mut s = String::new();
+        write(&t, &mut s);
+        assert_eq!(s, r#"(a "b c" d (e "f"))"#);
+    }
+
+    #[test]
+    fn a_footprint_reads_its_courtyard_pads_and_model() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("hardware/lib/footprints")).unwrap();
+        std::fs::write(
+            dir.path().join("hardware/lib/footprints/Test.kicad_mod"),
+            FP,
+        )
+        .unwrap();
+        let fp = read_footprint(dir.path(), "Lib:Test").unwrap();
+        assert_eq!(fp.size(), (4.0, 3.0));
+        assert_eq!(fp.pads.len(), 2);
+        assert_eq!(fp.side_of_pad("ANT").unwrap(), "right");
+        assert_eq!(fp.side_of_pad("1").unwrap(), "left");
+        assert_eq!(fp.model.as_ref().unwrap().0, "Test");
+        assert_eq!(fp.model.as_ref().unwrap().2, [0.0, 0.0, 90.0]);
+        let nets = std::collections::BTreeMap::from([("ANT".to_string(), (3, "RF".to_string()))]);
+        let placed = place_footprint(
+            &fp,
+            110.0,
+            105.0,
+            90.0,
+            "U3",
+            Some("../lib/3d/Test.step"),
+            &nets,
+        );
+        assert!(
+            placed.starts_with("(footprint \"Lib:Test\" (layer F.Cu) (at 110 105 90)"),
+            "{placed}"
+        );
+        assert!(
+            placed.contains("\"U3\"")
+                && placed.contains("(at -1.5 0 90)")
+                && placed.contains("\"../lib/3d/Test.step\"")
+        );
+        assert!(
+            placed.contains("(net 3 \"RF\")") && placed.matches("(net ").count() == 1,
+            "{placed}"
+        );
+        assert!(!placed.contains("version"));
+    }
+
+    #[test]
+    fn a_symbol_pin_resolves_by_number_or_by_every_pin_of_that_name() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("hardware/lib")).unwrap();
+        std::fs::write(
+            dir.path().join(SYMBOLS),
+            r#"(kicad_symbol_lib (version 20220914)
+  (symbol "Lib:M" (property "Reference" "U" (at 0 0 0))
+    (symbol "M_0_1" (rectangle (start -5 5) (end 5 -5)))
+    (symbol "M_1_1"
+      (pin power_in line (at -7.54 2.54 0) (length 2.54) (name "GND" (effects)) (number "13" (effects)))
+      (pin power_in line (at -7.54 0 0) (length 2.54) (name "GND" (effects)) (number "15" (effects)))
+      (pin input line (at 7.54 0 180) (length 2.54) (name "~{EN}" (effects)) (number "5" (effects))))))"#,
+        )
+        .unwrap();
+        let s = read_symbols(dir.path()).unwrap();
+        assert_eq!(s[0].id, "Lib:M");
+        assert_eq!(s[0].prefix, "U");
+        assert_eq!(s[0].resolve("GND"), vec!["13", "15"]);
+        assert_eq!(s[0].resolve("15"), vec!["15"]);
+        assert_eq!(s[0].resolve("EN"), vec!["5"]);
+        assert!(s[0].resolve("VDD").is_empty());
+        assert_eq!(s[0].bounds, ((-7.54, -5.0), (7.54, 5.0)));
+    }
+
+    #[test]
+    fn a_missing_footprint_says_how_to_vendor_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let e = read_footprint(dir.path(), "Lib:Nope")
+            .unwrap_err()
+            .to_string();
+        assert!(e.contains("parts.py sync"), "{e}");
+    }
+}

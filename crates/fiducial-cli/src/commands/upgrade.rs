@@ -29,7 +29,11 @@ use crate::{
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-pub fn run(dry_run: bool, portfolio: bool) -> Result<()> {
+/// `only`: refresh one capability's files and instructions and nothing else —
+/// no scaffold templates, no codemods, no other capability. A product mid-way
+/// through a platform migration can take one capability's fix without taking
+/// the whole migration with it.
+pub fn run(dry_run: bool, portfolio: bool, only: Option<String>) -> Result<()> {
     if portfolio {
         println!(
             "✦ fid upgrade --portfolio\n\n\
@@ -65,9 +69,34 @@ pub fn run(dry_run: bool, portfolio: bool) -> Result<()> {
     // firmware capabilities with different content.
     let enabled = cfg.capabilities.enabled.clone();
 
+    let scope: Option<(&'static capability::Capability, Vec<String>)> = match &only {
+        None => None,
+        Some(id) => {
+            if !enabled.iter().any(|e| e == id) {
+                anyhow::bail!(
+                    "`{id}` is not installed in this product (installed: {})",
+                    enabled.join(", ")
+                );
+            }
+            let cap = capability::find(id).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "`{id}` is not a built-in capability; `--capability` refreshes built-ins only"
+                )
+            })?;
+            println!("  Scope: the `{id}` capability only");
+            println!();
+            Some((cap, capability::owned_paths(cap, &enabled)))
+        }
+    };
+
     // ── 1. Template 3-way merge ───────────────────────────────────────────────
     println!("  Templates");
-    let template_paths: Vec<String> = lock.templates.keys().cloned().collect();
+    let template_paths: Vec<String> = lock
+        .templates
+        .keys()
+        .filter(|p| scope.as_ref().is_none_or(|(_, owned)| owned.contains(p)))
+        .cloned()
+        .collect();
     for rel_path in &template_paths {
         if let Some(outcome) = merge_one_template(
             &root,
@@ -94,9 +123,12 @@ pub fn run(dry_run: bool, portfolio: bool) -> Result<()> {
     // path as simply missing and install it, leaving the old file behind — and
     // the old file is the whole problem, because a subagent's filename is its
     // identity and the stale one keeps claiming the colliding name.
+    // Scaffold-level passes (renames, new scaffold files, codemods) belong to a
+    // whole-product upgrade; a scoped one skips them.
     let renamed: Vec<(&str, &str)> = templates::RENAMED_TEMPLATES
         .iter()
         .copied()
+        .filter(|_| scope.is_none())
         .filter(|(old, _)| lock.templates.contains_key(*old) || root.join(old).exists())
         .collect();
 
@@ -160,6 +192,7 @@ pub fn run(dry_run: bool, portfolio: bool) -> Result<()> {
     let added: Vec<(&str, &str)> = templates::SCAFFOLD_FILES
         .iter()
         .copied()
+        .filter(|_| scope.is_none())
         .filter(|(rel_path, _)| !lock.templates.contains_key(*rel_path))
         .collect();
 
@@ -197,10 +230,33 @@ pub fn run(dry_run: bool, portfolio: bool) -> Result<()> {
         println!();
     }
 
+    // ── 1c. Files a capability has gained since it was installed ─────────────
+    for cap_id in &enabled {
+        if scope.as_ref().is_some_and(|(c, _)| c.id != *cap_id) {
+            continue;
+        }
+        let Some(def) = capability::find(cap_id) else {
+            continue;
+        };
+        for rel in
+            capability::install_added(&root, def, &enabled, &mut lock, &cfg.product.name, dry_run)?
+        {
+            any_changes = true;
+            let verb = if dry_run { "would add" } else { "added" };
+            println!("  ✓ {verb}: {rel} (new in `{cap_id}`)");
+        }
+    }
+
     // ── 2. Codemods ───────────────────────────────────────────────────────────
     println!("  Codemods");
-    let pending_count = migration::pending(&lock.applied_migrations).len();
-    if pending_count == 0 {
+    let pending_count = if scope.is_some() {
+        0
+    } else {
+        migration::pending(&lock.applied_migrations).len()
+    };
+    if scope.is_some() {
+        println!("  · skipped (scoped upgrade)");
+    } else if pending_count == 0 {
         println!("  · no pending migrations");
     } else {
         // Apply all pending migrations in one pass. Propagate errors — a failed
@@ -223,21 +279,14 @@ pub fn run(dry_run: bool, portfolio: bool) -> Result<()> {
     // ── 3. Skill files (platform-owned, always overwrite) ─────────────────────
     println!("  Skills (agent instructions)");
     for cap_id in &cfg.capabilities.enabled {
+        if scope.as_ref().is_some_and(|(c, _)| &c.id != cap_id) {
+            continue;
+        }
         if let Some(def) = capability::find(cap_id) {
-            let skill_path = format!(".claude/skills/{cap_id}.md");
-            let dest = root.join(&skill_path);
-            let expanded = def
-                .skill_md
-                .replace("{{name}}", &cfg.product.name)
-                .replace("{{version}}", PLATFORM_VERSION);
+            let skill_path = format!(".fiducial/skills/{cap_id}.md");
             if !dry_run {
-                if let Some(parent) = dest.parent() {
-                    std::fs::create_dir_all(parent)
-                        .with_context(|| format!("creating dir for {skill_path}"))?;
-                }
-                std::fs::write(&dest, &expanded)
-                    .with_context(|| format!("writing {skill_path}"))?;
-                println!("  ✓ {skill_path}: refreshed from platform");
+                capability::write_skill(&root, def, &cfg.product.name)?;
+                println!("  ✓ {skill_path}: refreshed from platform (+ .claude/skills pointer)");
             } else {
                 println!("  · {skill_path}: would refresh from platform");
             }
@@ -493,12 +542,12 @@ mod tests {
     /// upstream". Four declarations went with it.
     #[test]
     fn a_merge_that_deletes_a_declaration_is_not_clean() {
-        let local = "[brand]\nlegal_name = \"Fire Outreach Network\"\n\n\
+        let local = "[brand]\nlegal_name = \"Acme Instruments\"\n\n\
                      [capabilities]\nenabled = [\"legal\"]\n\n\
                      [i18n]\ndefault = \"sr\"\n\n\
                      [legal]\njurisdiction = \"RS\"\n\n\
-                     [product]\nname = \"fon\"\n";
-        let merged = "[product]\nname = \"fon\"\n\n[capabilities]\nenabled = []\n";
+                     [product]\nname = \"acme\"\n";
+        let merged = "[product]\nname = \"acme\"\n\n[capabilities]\nenabled = []\n";
 
         let lost = dropped_sections(CONFIG_FILE, local, merged).expect("must refuse");
         assert!(lost.contains("[brand]"), "{lost}");
@@ -510,8 +559,8 @@ mod tests {
     fn an_upgrade_that_only_adds_is_allowed_through() {
         // The normal case, and the one this must not block: upstream introduces
         // a block the product did not have.
-        let local = "[product]\nname = \"fon\"\n";
-        let merged = "[product]\nname = \"fon\"\n\n[freshness]\ngates = []\n";
+        let local = "[product]\nname = \"acme\"\n";
+        let merged = "[product]\nname = \"acme\"\n\n[freshness]\ngates = []\n";
         assert!(dropped_sections(CONFIG_FILE, local, merged).is_none());
     }
 

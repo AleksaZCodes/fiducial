@@ -64,7 +64,7 @@ reason it does not enter this phase.
 designed first — and Phase 23's own adapter format was explicit that a
 contract designed against zero consumers repeats the mistake it had just
 corrected ("an adapter registry offering `supabase` before anything speaks
-Supabase is that bug with a different noun"). `fon` has not asked for
+Supabase is that bug with a different noun"). The first product has not asked for
 identity, bot protection, a job queue, or inference yet. Designing five new
 contracts speculatively, in the same phase that is supposed to be proving
 the *existing* two are vendor-neutral, would be the anti-goal the platform

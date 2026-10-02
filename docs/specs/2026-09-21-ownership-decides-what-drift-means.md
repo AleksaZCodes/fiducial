@@ -8,7 +8,7 @@
 
 ## Context
 
-`fid doctor` reported 32 issues against fon. Twenty-six of them were files fon
+`fid doctor` reported 32 issues against the first product. Twenty-six of them were files the first product
 had edited on purpose:
 
 ```
@@ -24,7 +24,7 @@ had edited on purpose:
 > It is **product-owned** — edit it freely.
 
 So the platform wrote a file, told the product to edit it, and then reported the
-edit as drift. fon's CI runs `fid doctor` with `continue-on-error` as a result,
+edit as drift. The first product's CI runs `fid doctor` with `continue-on-error` as a result,
 which does not cost only those 26 lines — it costs every real finding too.
 A check that fires on the normal state of a real product is a check people
 switch off.
@@ -90,13 +90,13 @@ classification. Nobody has needed it yet, and adding it now would mean shipping
 a knob before anyone has been bothered by its absence — and a knob that silences
 warnings is one people reach for instead of reading them.
 
-**Leave `fid doctor` alone and fix fon's CI.** This was the status quo, and it
+**Leave `fid doctor` alone and fix the first product's CI.** This was the status quo, and it
 is why `continue-on-error` is there. The tool was wrong; making the product work
 around it would have kept every future product working around it too.
 
 ## Consequences
 
-fon goes from **32 issues to 6**, and all six are real: a `ci.yml` carrying its
+The first product goes from **32 issues to 6**, and all six are real: a `ci.yml` carrying its
 own pin, a deleted `claude-review.yml`, a customised `doodle.tsx`, and three
 forked derive scripts. Each is a file `fid upgrade` will merge over, which is
 worth knowing. `continue-on-error` can come off once those six are resolved —

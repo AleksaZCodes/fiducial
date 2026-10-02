@@ -96,6 +96,15 @@ fn run_derive(
         match run_pipeline_command(pipeline, &working_dir) {
             Ok(_) => {
                 println!(" ✓");
+                for input in pipeline_inputs(pipeline, root) {
+                    match std::fs::read(root.join(&input)) {
+                        Ok(content) => lock.record_input(&input, &content, &pipeline.name),
+                        Err(e) => {
+                            eprintln!("  ⚠ could not read input `{input}`: {e}");
+                            any_error = true;
+                        }
+                    }
+                }
                 let skip = outputs_not_applicable(pipeline, root);
                 for out in &pipeline.outputs {
                     if skip.contains(out) {
@@ -141,6 +150,30 @@ fn run_derive(
     }
     println!("\n✦ fid derive complete — fiducial.lock updated");
     Ok(())
+}
+
+// ── Inputs ────────────────────────────────────────────────────────────────────
+
+/// Every file a pipeline reads: what it declares in `inputs`, plus what a
+/// built-in executor knows it reads.
+///
+/// The executor half is the one that matters for drift nobody sees: a
+/// `fid-hardware` declaration names SVG files by path, and those SVGs belong to
+/// the brand, not to the hardware. When the logo is redrawn the hardware
+/// outputs still match their own hashes; only the input record notices.
+pub(crate) fn pipeline_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
+    let mut inputs = pipeline.inputs.clone();
+    if pipeline.executor == "fid-hardware" {
+        let decl = pipeline
+            .args
+            .first()
+            .cloned()
+            .unwrap_or_else(|| crate::hardware::DECLARATION.to_string());
+        inputs.extend(crate::hardware::inputs(root, &decl));
+    }
+    inputs.sort();
+    inputs.dedup();
+    inputs
 }
 
 // ── Check mode ────────────────────────────────────────────────────────────────
@@ -355,6 +388,28 @@ fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
     let mut issues: Vec<String> = Vec::new();
 
     for pipeline in pipelines {
+        for input in pipeline_inputs(pipeline, root) {
+            match (lock.inputs.get(&input), std::fs::read(root.join(&input))) {
+                (_, Err(e)) => issues.push(format!(
+                    "  {input}: input to `{}` is unreadable — {e}",
+                    pipeline.name
+                )),
+                (None, Ok(_)) => issues.push(format!(
+                    "  {input}: input to `{}` was never recorded (run `fid derive`)",
+                    pipeline.name
+                )),
+                (Some(rec), Ok(content)) if sha256_hex(&content) != rec.hash => {
+                    issues.push(format!(
+                        "  {input}: changed since `{}` last ran (lock:{} file:{}) — \
+                         its outputs may no longer follow from it (run `fid derive`)",
+                        pipeline.name,
+                        short_hash(&rec.hash),
+                        short_hash(&sha256_hex(&content)),
+                    ))
+                }
+                _ => {}
+            }
+        }
         for out in outputs_with_moved_inputs(pipeline, root) {
             issues.push(format!(
                 "  {out}: stale — its inputs changed (run `fid derive`)"
@@ -427,6 +482,42 @@ fn run_fid_validate(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         }
         other => bail!("fid-validate: unknown schema `{other}` (supported: board-interface)"),
     }
+}
+
+// ── Built-in fid-hardware executor ───────────────────────────────────────────
+
+/// Solve `hardware/product.toml` (or `args[0]`) and write each output by file
+/// name — see `crate::hardware`. Nothing is written unless everything solves:
+/// a part that does not fit fails the pipeline with the part and the fact to
+/// change, before a single file moves.
+fn run_fid_hardware(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    let decl = pipeline
+        .args
+        .first()
+        .map(|s| s.as_str())
+        .unwrap_or(crate::hardware::DECLARATION);
+    let (product, solved) = crate::hardware::load(working_dir, decl)?;
+    let rendered = pipeline
+        .outputs
+        .iter()
+        .map(|out| {
+            Ok((
+                out,
+                crate::hardware::render_output(out, &product, &solved, working_dir)?,
+            ))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    for (out, text) in rendered {
+        let abs = working_dir.join(out);
+        if let Some(parent) = abs.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&abs, text).with_context(|| format!("writing {out}"))?;
+    }
+    if let Some(v) = solved.cost_violation {
+        bail!("cost: {v}");
+    }
+    Ok(())
 }
 
 // ── Built-in fid-mesh executor ───────────────────────────────────────────────
@@ -794,10 +885,9 @@ fn run_fid_brand(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
 
 /// Derive the pitch and the importable claim from `thesis.toml`.
 ///
-/// **The claim was being retyped, and the copies had already diverged.** fon
-/// states it three ways: `MISSION.md` has "no unverified alert ever reaches a
-/// responder", `messages/en.json` has "A person confirms every event", and
-/// `README.md` has a third wording. Three hand-written restatements of one
+/// **The claim was being retyped, and the copies had already diverged.** The first product
+/// states it three ways: once in `MISSION.md`, again in `messages/en.json`'s
+/// description, and a third wording in `README.md`. Three hand-written restatements of one
 /// claim, with no source among them — so no one could say which was canonical,
 /// and nothing could notice when a fourth appeared.
 ///
@@ -2205,10 +2295,12 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             "fid-schema" => return run_fid_schema(pipeline, working_dir),
             "fid-legal" => return run_fid_legal(pipeline, working_dir),
             "fid-design" => return run_fid_design(pipeline, working_dir),
+            "fid-hardware" => return run_fid_hardware(pipeline, working_dir),
             other => bail!(
                 "unknown executor `{other}` \
                  (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n, fid-brand, \
-                 fid-adapters, fid-deploy, fid-identity, fid-schema, fid-legal, fid-design)"
+                 fid-adapters, fid-deploy, fid-identity, fid-schema, fid-legal, fid-design, \
+                 fid-hardware)"
             ),
         };
 

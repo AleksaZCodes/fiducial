@@ -64,7 +64,7 @@ and keeps a negative case so per-workflow detection is still covered.
 ### 4 · Scaffolded products were born on a branch nothing referenced
 
 `git init` ran without `--initial-branch`, so the branch came from the user's
-`init.defaultBranch` — still `master` on a default install, as the `fon` product
+`init.defaultBranch` — still `master` on a default install, as the first product
 demonstrates. Meanwhile the scaffold shipped:
 
 - a guard rule named `no-direct-main-push`, guarding a branch that did not exist

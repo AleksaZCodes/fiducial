@@ -17,8 +17,8 @@ That is not cosmetic. `PLATFORM_VERSION` (`capability.rs:30`) is
 `CARGO_PKG_VERSION`, and it is written into every scaffolded product's
 `fiducial.lock` as `source_version`. A product therefore recorded `0.2.2` for
 artifacts that only a *newer* `0.2.2` could reproduce. Nothing could detect it,
-because the version strings matched. It broke fon's CI twice in one session —
-fon pins `0.2.1`, and the artifacts it was handed did not come from `0.2.1`.
+because the version strings matched. It broke the first product's CI twice in one session —
+The first product pins `0.2.1`, and the artifacts it was handed did not come from `0.2.1`.
 
 A second, quieter drift was sitting underneath. The eleven internal
 `fiducial-*` entries in `[workspace.dependencies]` all pinned `version =
@@ -70,8 +70,8 @@ establish a baseline that the merge base already provides for free.
 
 ## Consequences
 
-The workspace moves to `0.3.0` and the eleven internal pins move with it. fon's
-pin must move to `0.3.0` once it is published; until then fon is pinned to a
+The workspace moves to `0.3.0` and the eleven internal pins move with it. The first product's
+pin must move to `0.3.0` once it is published; until then the first product is pinned to a
 version that does not correspond to main, which is the condition this decision
 exists to end.
 

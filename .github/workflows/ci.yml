@@ -128,6 +128,14 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
+      # The hardware tests place board parts with the capability's constraint
+      # solver (hardware/place.py, OR-Tools CP-SAT; spec 2026-10-01). Pinned
+      # where the capability pins it.
+      - name: Install the placement solver
+        run: |
+          python3 -m pip install --user \
+            "$(grep '^ortools==' crates/fiducial-cli/capabilities/hardware/hardware/requirements.txt)"
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 

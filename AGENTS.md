@@ -373,6 +373,7 @@ The capabilities this platform ships:
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
 | `firmware-rp2040` | 10 template file(s); guard rules | `fid add capability firmware-rp2040` |
 | `firmware-stm32` | 9 template file(s); guard rules | `fid add capability firmware-stm32` |
+| `hardware` | declares `hardware/outline.svg`, `hardware/product.toml`; 1 pipeline(s); 9 template file(s) | `fid add capability hardware` |
 | `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
 | `legal` | declares `legal`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability legal` |
@@ -451,6 +452,24 @@ listed in `.github/cla-exempt.txt`, which is the only place that decides who is
 exempt.
 
 <!-- fid:end-describes -->
+
+## When you hit a wall
+
+Fix it where it lives, not where you hit it — here, or in the product that
+found it.
+
+- **Found from a product?** A defect a product works around is a defect in
+  every product. Fix it here, with a test that would have caught it; the
+  product carries a *recorded* patch (`fid rebaseline`, or `patches/` named
+  after the issue) only until the release that fixes it.
+- **A tool that cannot do it:** existing open-source software behind a contract
+  first (principle 6), building second, building around it last.
+- **Change the system, not just the instance.** A change to how something works
+  updates its spec, the prose that describes it (`fid docs --check` will say
+  which), the capability's `SKILL.md`, and this file — in the same change.
+- **Teach the next agent only what is fundamental.** A line here should prevent
+  a class of mistakes. The PR #43 story above earns its space; a one-off does
+  not.
 
 ## What not to do
 

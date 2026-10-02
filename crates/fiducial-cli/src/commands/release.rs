@@ -142,7 +142,7 @@ and were different binaries.
 That is not cosmetic.  `PLATFORM_VERSION` is written into every product's
 `fiducial.lock` as `source_version`, so a product recorded \"0.2.2\" for
 artifacts only a *newer* 0.2.2 could reproduce — and nothing could see it,
-because the version strings matched.  It broke fon's CI twice in one session.
+because the version strings matched.  It broke the first product's CI twice in one session.
 
 Every push to main publishes whatever version the workspace declares, so any
 change to crate source is a new release and must carry a new number.  The rule

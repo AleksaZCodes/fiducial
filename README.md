@@ -122,6 +122,7 @@ product actually needs.
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
 | `firmware-rp2040` | 10 template file(s); guard rules | `fid add capability firmware-rp2040` |
 | `firmware-stm32` | 9 template file(s); guard rules | `fid add capability firmware-stm32` |
+| `hardware` | declares `hardware/outline.svg`, `hardware/product.toml`; 1 pipeline(s); 9 template file(s) | `fid add capability hardware` |
 | `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
 | `legal` | declares `legal`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability legal` |
@@ -135,6 +136,27 @@ product actually needs.
 | `web-svelte` | 10 template file(s); guard rules | `fid add capability web-svelte` |
 | `worker-cloudflare` | 1 template file(s); guard rules | `fid add capability worker-cloudflare` |
 <!-- fid:end capabilities -->
+
+### A physical product, from one file
+
+`hardware` is the capability that goes furthest. One `hardware/product.toml`
+names an outline in any SVG (a logo works), the regions on it, and the parts —
+each a real KiCad symbol, footprint and STEP model, with its LCSC number and
+its datasheet. `fid derive` solves the case round them, sizes and sections the
+board, places its parts with a constraint solver (OR-Tools CP-SAT — every rule
+a constraint, and a contradiction named rather than guessed at), wires every
+pin to its net, and writes a gated layout, BOM, KiCad board and schematic. `hardware/build.sh`
+then routes and DRCs the board (Freerouting), builds the solid model and fails
+on any interference, unsealed joint or part that cannot go in, and exports
+Gerbers, STEP and a review pack of renders. Where the vocabulary stops, a
+product adds its own geometry (`hardware/shapes.py`) or its own STEP model,
+and the checks still run over it.
+
+Everything a part needs travels with it, in KiCad's own library layout:
+`hardware/lib/` holds the symbols, footprints, models and datasheets (with
+text copies), hash-checked, and `hardware/lib/PARTS.md` puts every part on one
+page — what it is, its files, every pin's net — as the context a person or an
+agent starts from.
 
 <!-- fid:describes crates/fiducial-cli/src/adapter.rs#pub static CONTRACTS -->
 
@@ -259,12 +281,18 @@ outputs  = [
 `fiducial.lock`, and `fid derive --check` fails when a hash no longer matches
 what the declaration implies.
 
+`inputs` closes the other half. An output can match its hash while the file it
+was derived *from* has moved — a logo redrawn, a schema another tool rewrote —
+and nobody re-derived. Files listed in `inputs` (and those a built-in executor
+knows it reads, such as the SVGs a `hardware/product.toml` addresses) are
+hashed into the lock too, and `--check` names the one that moved.
+
 <!-- fid:describes crates/fiducial-cli/src/commands/derive.rs#fn run_pipeline_command -->
 
 Executors are `shell` and `cargo-test` — which need no platform change at all —
 plus the in-process ones (`fid-validate`, `fid-mesh`, `fid-i18n`, `fid-brand`,
 `fid-thesis`, `fid-deploy`, `fid-identity`, `fid-adapters`, `fid-schema`,
-`fid-legal`, `fid-design`). Reach for `shell` first; a new in-process executor
+`fid-legal`, `fid-design`, `fid-hardware`). Reach for `shell` first; a new in-process executor
 is warranted only when the work is genuinely a Rust library call rather than a
 tool invocation.
 

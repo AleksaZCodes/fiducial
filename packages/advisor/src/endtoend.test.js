@@ -360,10 +360,10 @@ const THESIS_PAYLOAD = {
   declared: true,
   current: {
     date: "2026-09-21",
-    claim: "No unverified alert ever reaches a responder.",
-    arc: { problem: "A network that cries wolf is worse than no network." },
-    test: { falsified_by: "Responders act on machine-only alerts at the same rate." },
-    evidence: { not_yet: ["No field deployment, no pilot, no live public alerting."] },
+    claim: "No estimated reading ever reaches a bill.",
+    arc: { problem: "A bill that guesses is worse than no bill." },
+    test: { falsified_by: "Customers dispute estimated bills at the same rate." },
+    evidence: { not_yet: ["No field deployment, no pilot, no live billing."] },
   },
   gaps: [{ field: "arc.why_now", question: "What changed?" }],
   history: [],
@@ -386,7 +386,7 @@ const THESIS_CLEAN = {
 describe("end to end — thesis", () => {
   it("asks only the questions whose inputs exist, and never leaks the diff", async () => {
     const { dir, bin } = thesisRepo(THESIS_PAYLOAD);
-    writeFileSync(join(dir, "README.md"), "# fon\n\nHuman-confirmed wildfire detection.\n");
+    writeFileSync(join(dir, "README.md"), "# acme\n\nMeasured water metering.\n");
 
     const s = await stub(THESIS_CLEAN);
     try {
@@ -404,8 +404,8 @@ describe("end to end — thesis", () => {
       assert.ok(asked.includes("overclaims_against_evidence"), asked.join(", "));
 
       // The thesis pass ships the claim and the copy, never the working diff.
-      assert.equal(body.state.claim, "No unverified alert ever reaches a responder.");
-      assert.ok(body.state.restatements.some((r) => r.includes("Human-confirmed")));
+      assert.equal(body.state.claim, "No estimated reading ever reaches a bill.");
+      assert.ok(body.state.restatements.some((r) => r.includes("Measured water")));
       assert.equal(body.state.diff, undefined);
       assert.equal(body.state.numeric_candidates, undefined);
 
@@ -417,7 +417,7 @@ describe("end to end — thesis", () => {
 
   it("reports an overclaim first and still exits 0", async () => {
     const { dir, bin } = thesisRepo(THESIS_PAYLOAD);
-    writeFileSync(join(dir, "README.md"), "# fon\n\nDeployed across Serbia today.\n");
+    writeFileSync(join(dir, "README.md"), "# acme\n\nDeployed across Norway today.\n");
 
     const dirty = {
       ...THESIS_CLEAN,

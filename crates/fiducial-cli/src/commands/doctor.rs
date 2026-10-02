@@ -448,7 +448,7 @@ fn check_lock(
     //
     // Editing a product-owned file is the intended use — `MISSION.md`'s own
     // footer says "It is product-owned — edit it freely" — so reporting it as
-    // an issue meant the platform contradicted its own templates. fon had
+    // an issue meant the platform contradicted its own templates. The first product had
     // seventeen of them and runs `fid doctor` with `continue-on-error` as a
     // result, which costs every real finding too. See `crate::ownership`.
     let mut drifted: Vec<String> = Vec::new();

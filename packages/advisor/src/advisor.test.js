@@ -460,17 +460,17 @@ describe("restatements", () => {
   }
 
   it("finds the opening prose and every locale's meta description", () => {
-    // This is fon's exact shape: the claim restated in four places, none of
+    // This is the first product's exact shape: the claim restated in four places, none of
     // them marked as the source.
     const dir = product();
     writeFileSync(
       join(dir, "README.md"),
-      "# fon\n\n[![badge](x)](y)\n\nEarly wildfire detection for Serbia, human-confirmed.\n\nSecond paragraph.\n",
+      "# acme\n\n[![badge](x)](y)\n\nWater metering for utilities, every reading measured.\n\nSecond paragraph.\n",
     );
     execFileSync("mkdir", ["-p", join(dir, "messages")]);
     writeFileSync(
       join(dir, "messages/en.json"),
-      JSON.stringify({ meta: { description: "A person confirms every event." } }),
+      JSON.stringify({ meta: { description: "A meter measures every reading." } }),
     );
     writeFileSync(
       join(dir, "messages/sr.json"),
@@ -480,12 +480,12 @@ describe("restatements", () => {
 
     const found = restatements(dir);
     assert.ok(found.some((r) => r.startsWith("README.md (opening):")));
-    assert.ok(found.some((r) => r.includes("Early wildfire detection for Serbia")));
+    assert.ok(found.some((r) => r.includes("Water metering for utilities")));
     assert.ok(
       !found.some((r) => r.includes("Second paragraph")),
       "only the opening paragraph, not the whole file",
     );
-    assert.ok(found.some((r) => r.includes("messages/en.json") && r.includes("A person confirms")));
+    assert.ok(found.some((r) => r.includes("messages/en.json") && r.includes("A meter measures")));
     assert.ok(found.some((r) => r.includes("messages/sr.json")));
   });
 
