@@ -326,8 +326,8 @@ Seven kinds, and the difference is not cosmetic — see
 
 | Kind | Is | Example |
 |---|---|---|
-| **Declaration** | a typed fact, written once, inert — a file, a `fiducial.toml` block, or a directory the product fills | `board/board.interface.json`, the `[i18n]` block, `migrations/` |
-| **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/eda.toml` |
+| **Declaration** | a typed fact, written once, inert — a file, a `fiducial.toml` block, or a directory the product fills | `hardware/product.toml`, the `[i18n]` block, `migrations/` |
+| **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/hardware.toml` |
 | **Adapter** | a swappable vendor behind a fixed contract, selected in `[adapters]` | `storage = "none"` |
 | **Tool** | an external command the capability's work needs on PATH — declared, never installed | `requires_tools = ["wrangler"]` |
 | **Prerequisite** | another capability this one cannot work without — checked at install, not at first failure | `requires_capabilities = ["i18n"]` |
