@@ -5,6 +5,9 @@ AI agents*
 
 **Author:** Aleksa Zdravković (ORCID 0009-0004-1535-1839)
 
+The title is the thesis; what must be true for it, and the plan that makes
+it true, is `docs/specs/2026-10-02-making-the-thesis-true.md`.
+
 ## Thesis
 
 Fiducial's own (`MISSION.md`): **declare each fact once; derive every
@@ -32,8 +35,8 @@ the system grows by declarations, not by rules.*
   (`docs/specs/2026-10-01-hardware-is-solved-by-engines-not-rules.md`).
 - The request ledger and retrospective in that spec: where each change
   landed (platform vs product) and what was slow or wrong.
-- A public example product built in this repository — to be built; the
-  paper's worked example.
+- A public example product built in this repository (`examples/sensor-stick/`,
+  G3 of the plan) — the paper's worked example.
 
 ## Limits to state
 
