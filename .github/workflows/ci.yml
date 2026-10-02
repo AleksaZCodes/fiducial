@@ -161,6 +161,13 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
+      # The first-product walkthrough derives the hardware seed, whose board
+      # parts are placed by the capability's solver. Pinned where it pins it.
+      - name: Install the placement solver
+        run: |
+          python3 -m pip install --user \
+            "$(grep '^ortools==' crates/fiducial-cli/capabilities/hardware/hardware/requirements.txt)"
+
       # Runs WITHOUT FIDUCIAL_WRITE_CAPTURES, so the test compares the committed
       # captures against what the binary prints now instead of overwriting them.
       # A change to `fid`'s output that skipped regeneration fails here rather
