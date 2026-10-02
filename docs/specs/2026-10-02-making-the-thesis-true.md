@@ -183,6 +183,14 @@ when convenient.
   off.
 - **Unexplained:** the dev `fid` reports a product's `adapters.generated.ts`
   stale where `0.2.1` does not. Reproduce in a fixture; fix or explain.
+- **Python only where an engine requires it.** `cad.py` (build123d on
+  OpenCascade), `place.py` (OR-Tools CP-SAT) and `route.py` (KiCad's
+  `pcbnew` API, Freerouting) use those engines' maintained interfaces,
+  which are Python. `parts.py`, `fab.py` and `ratsnest.py` use none of them
+  (HTTP, CSV, SQLite, `kicad-cli`, drawing). They move into `fid` itself, in
+  Rust, after the paper: `fid parts resolve|sync|check|fetch` and fab output
+  in the build. Not before — they work and are tested, and a port is no
+  evidence for the thesis.
 - **Not doing:** slicing/print profiles (owner's call); self-hosting fid
   with an older fid (complexity without product value); a landing page.
 
