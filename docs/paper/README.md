@@ -8,6 +8,8 @@ AI agents*
 The title is the thesis; what must be true for it, and the plan that makes
 it true, is `docs/specs/2026-10-02-making-the-thesis-true.md`.
 
+**Draft:** [`paper.md`](paper.md). These notes are its sources.
+
 ## Thesis
 
 Fiducial's own (`MISSION.md`): **declare each fact once; derive every

@@ -222,10 +222,10 @@ Known, not fixed (in order of what bites first):
 4. **No "stay put" cost**: a re-solve may still move parts when it finds a
    shorter layout. A cost toward the previous answer would trade length for
    stability, if wanted.
-5. **Wires are checked against the chimney only**, not against every solid
-   (`cad.py`: "wires are drawn, not checked").
-6. **The dev `fid` reports the reference product's `src/adapters.generated.ts` stale**; the reference product's CI
-   checks that pipeline with fiducial 0.2.1, where it is fresh. Unexplained.
+5. ~~Wires are checked against the chimney only~~ — fixed 2026-10-02:
+   every core against every solid (`making-the-thesis-true.md`).
+6. ~~The dev `fid` reports `adapters.generated.ts` stale~~ — explained
+   2026-10-02: the generator changed, not the inputs; the message now says so.
 7. **The sensor's decoupling cap sits outside the chimney ring**, about 3 mm
    from its pin through a via pair; fine at 100 nF, worth a look in review.
 
