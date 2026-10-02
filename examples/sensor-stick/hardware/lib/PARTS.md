@@ -254,6 +254,7 @@ Paths are relative to `hardware/lib/`. Search a datasheet's `.txt` before readin
 - **status:** assumed
 - **dimensions from:** assumed
 - **still to settle:** Choose the patch (any adhesive ePTFE vent about 8 mm across); its size sets the hole.
+- **placed near:** `apex`
 
 ## `sensor` — Temperature and humidity sensor, I²C
 
