@@ -563,9 +563,7 @@ not_yet = ["No field deployment. No pilot. No live billing."]
     fn the_pitch_leads_with_the_claim_and_omits_undeclared_sections() {
         let f = parse(ACME).unwrap();
         let md = render_pitch_md(current(&f).unwrap(), "acme", "fid-thesis");
-        assert!(md.starts_with(
-            "# acme\n\n> **No estimated reading ever reaches a bill.**"
-        ));
+        assert!(md.starts_with("# acme\n\n> **No estimated reading ever reaches a bill.**"));
         assert!(md.contains("## Who it is for"));
         assert!(!md.contains("## Why now"), "undeclared sections stay out");
         assert!(md.contains("- ✗ No field deployment."));

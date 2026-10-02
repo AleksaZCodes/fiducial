@@ -439,7 +439,7 @@ describe("end to end — thesis", () => {
       assert.ok(firstFinding < secondFinding, `overclaim must rank first:\n${out.stdout}`);
 
       // And it arrives with the offending sentence attached.
-      assert.match(out.stdout, /Deployed across Serbia today/);
+      assert.match(out.stdout, /Deployed across Norway today/);
     } finally {
       await s.close();
     }
