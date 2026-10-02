@@ -112,10 +112,11 @@ jobs:
       # `github-token` input, or the PAT above is silently ignored and the
       # Release PR is bot-authored again.
       #
-      # `push-git-tags` and `create-github-releases` both default to true, so
-      # this step pushes the tags itself (no separate step needed) and creates
-      # the GitHub release — which is the object a Zenodo webhook archives to
-      # mint a DOI. Two links of that chain, from one pin.
+      # `push-git-tags` defaults to true, so this step pushes the per-package
+      # tags itself. Per-package GitHub *releases* are off: they gave six npm
+      # packages a release, the rest a bare tag and the crates nothing, and a
+      # Zenodo webhook mints a DOI for every release it sees. The platform's
+      # one release per version is the last step below.
       - name: Create Release PR or Publish
         id: changesets # referenced by the verify step below
         uses: changesets/action@v2.1.2
@@ -124,6 +125,7 @@ jobs:
           publish-script: pnpm release
           pr-title: "chore: version packages"
           commit-message: "chore: version packages"
+          create-github-releases: false
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -161,3 +163,14 @@ jobs:
       - name: Verify what actually reached the registries
         if: always()
         run: scripts/verify-published.sh
+
+      # ── One GitHub release per platform version ────────────────────────────
+      # `v<workspace version>`, listing every crate and npm package version it
+      # holds — the object a citation and a Zenodo DOI point at. Only after the
+      # registries were verified to hold it; idempotent, so a merge that
+      # publishes nothing new creates nothing.
+      - name: GitHub release for this platform version
+        if: success()
+        run: scripts/github-release.sh
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
