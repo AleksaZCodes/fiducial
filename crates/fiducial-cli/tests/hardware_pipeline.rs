@@ -348,6 +348,29 @@ fn parts_under_the_board_raise_it_and_are_soldered_before_it() {
 }
 
 #[test]
+fn a_wire_over_the_tallest_part_still_runs_under_the_lid() {
+    // The connector stands 6 mm on the board, so "over the tallest part"
+    // (28.0) would put a 1.2 mm wire into a lid whose underside is 28.3.
+    let (_tmp, root, out) = derive_product(&surface_product("screws-back"));
+    assert!(out.status.success(), "{}", text(&out));
+    let l = layout(&root);
+    let base = l["case"]["base_height_mm"].as_f64().unwrap();
+    let lid = base + l["case"]["lid_mm"].as_f64().unwrap();
+    for w in l["wires"].as_array().unwrap() {
+        for core in w["cores_mm"].as_array().unwrap() {
+            for p in core["path_mm"].as_array().unwrap() {
+                let z = p[2].as_f64().unwrap();
+                assert!(
+                    z <= base - 0.6 + 1e-9 || z >= lid - 1e-9,
+                    "wire `{}` runs at {z} mm, inside the lid ({base}–{lid} mm)",
+                    w["id"]
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn a_wire_to_the_lid_carries_a_service_loop_into_the_bom() {
     let (_tmp, root, out) = derive_product(&surface_product("screws-back"));
     assert!(out.status.success(), "{}", text(&out));
@@ -1766,6 +1789,62 @@ fn a_conflict_resolved_to_the_platforms_version_is_not_drift() {
     let out = fid(&root, &["doctor"]);
     assert!(
         !text(&out).contains("hardware/build.sh: modified"),
+        "{}",
+        text(&out)
+    );
+}
+
+fn enabled(root: &Path) -> String {
+    let cfg = std::fs::read_to_string(root.join("fiducial.toml")).unwrap();
+    let doc: toml_edit::DocumentMut = cfg.parse().unwrap();
+    doc["capabilities"]["enabled"].to_string()
+}
+
+#[test]
+fn an_upgrade_keeps_the_capabilities_fid_add_declared() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    let out = fid(&root, &["doctor"]);
+    assert!(
+        !text(&out).contains("fiducial.toml: upstream template updated"),
+        "{}",
+        text(&out)
+    );
+    let out = fid(&root, &["upgrade"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(
+        enabled(&root).contains("\"hardware\""),
+        "{}",
+        enabled(&root)
+    );
+}
+
+#[test]
+fn an_upgrade_repairs_a_merge_base_fid_add_recorded_patched() {
+    // Locks written before the fix hold the patched file as the base, so the
+    // template's `enabled = []` read as an upstream change and was merged over
+    // the product's capabilities — "merged cleanly".
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    let cfg = std::fs::read_to_string(root.join("fiducial.toml")).unwrap();
+    let lock_path = root.join("fiducial.lock");
+    let mut lock: toml_edit::DocumentMut = std::fs::read_to_string(&lock_path)
+        .unwrap()
+        .parse()
+        .unwrap();
+    lock["templates"]["fiducial.toml"]["base_content"] = toml_edit::value(cfg);
+    std::fs::write(&lock_path, lock.to_string()).unwrap();
+
+    let out = fid(&root, &["upgrade"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(
+        enabled(&root).contains("\"hardware\""),
+        "{}",
+        enabled(&root)
+    );
+    let out = fid(&root, &["doctor"]);
+    assert!(
+        !text(&out).contains("fiducial.toml: upstream template updated"),
         "{}",
         text(&out)
     );

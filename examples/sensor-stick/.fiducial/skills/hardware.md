@@ -22,7 +22,7 @@ hardware/build.sh                  # route, solids, checks, fab files, review pa
 | `generated/board.kicad_sch` | the schematic: each part's KiCad symbol, a net label on every connected pin, a no-connect on every other — one row per circuit | yes |
 | `generated/interface.json`, `interface.ts` | what firmware and web read from the hardware: board size, sockets and their windows, every net and the pins on it — `interface.ts` makes the nets a TypeScript type | yes |
 | `generated/board.rs` | with `[firmware] mcu = "<part id>"`: per net on an MCU I/O pin, a macro taking that pin from Embassy's peripherals (`board::sensor_sda!(p)` → `p.PIN_4`) | yes |
-| `build/board-routed.kicad_pcb` | the board to fabricate: routed by Freerouting, ground-poured both sides, DRC'd by KiCad (`route.json`, `drc.rpt`) — fails the build if anything is unconnected or an error | built |
+| `build/board-routed.kicad_pcb` | the board to fabricate: routed by Freerouting, ground-poured both sides, DRC'd by KiCad (`route.json`, `drc.rpt`) — fails the build if anything is unconnected or an error. Freerouting is not deterministic: `route.json` records the placed board's hash and the routed copper's, so a re-route that differs is visible | built |
 | `build/*.step`, `*.stl`, `assembly.step` | every solid, for a manufacturer and a slicer | built |
 | `build/checks.json` | interference (keep-outs included), insertion, lid, screw engagement, seal squeeze | built, fails the build |
 | `build/fab/`, `schematic.pdf` | `gerbers.zip` (Gerbers and drill of the routed board), `bom-assembly.csv` and `cpl.csv` (an assembly service's BOM and placement), and `README.md` listing every placed part without an `lcsc` number — what cannot be ordered assembled yet; the schematic | built |
@@ -127,7 +127,9 @@ stepping out from under the board first where it must; its length is the
 route plus `slack_mm`, plus `case.service_loop_mm` when an end is on the lid
 so the lid opens without unsoldering. The cut length goes into the BOM, and
 the assembly order solders what is under the board before the board goes in.
-Wires are drawn, not interference-checked: a real wire bends.
+Wires are checked like parts, against every solid except what they are
+soldered to; the corridor stays under the lid, round any part too tall to
+clear, and a cradle's ribs stop short of a wire leaving its end.
 
 **Components are KiCad's, not redrawn.** A board part names `footprint =
 "Lib:Name"` and `symbol = "Lib:Name"` from KiCad's official libraries;

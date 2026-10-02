@@ -470,6 +470,19 @@ def build(L):
             sign = 1 if f[0][k] > (bx, by)[k] else -1
             across = [p[1 - k] for p in f]
             leads = (axis, sign, max(across) - min(across) + 1.2)
+        else:
+            # A wire straight off the part leaves the same way: the ribs at
+            # that end stop short of its cores.
+            outs = [cr["path_mm"][0 if wr["from"].split("#")[0].split(".")[0] == s["part"] else -1]
+                    for wr in L.get("wires", []) if s["part"] in (wr["from"].split("#")[0].split(".")[0], wr["to"].split("#")[0].split(".")[0])
+                    for cr in wr.get("cores_mm") or []]
+            if outs:
+                (bx, by) = s["body"]["centre_mm"]
+                axis = s.get("axis", "x")
+                k = 0 if axis == "x" else 1
+                sign = 1 if outs[0][k] > (bx, by)[k] else -1
+                across = [p[1 - k] for p in outs]
+                leads = (axis, sign, max(across) - min(across) + 1.2)
         base += l_locators(s["body"], clr, s["locator_mm"], 10, floor - 0.5, rib_h + 0.5, leads)
 
     for w in c["wall_parts"]:
@@ -732,8 +745,8 @@ def build(L):
             solids[nm] = (box((x, y), (w, d), floor, s["height_mm"]), L["looks"].get(s["part"], "cell"), "socket")
 
     # ── Wires ───────────────────────────────────────────────────────────────
-    # Drawn along the solved route, two cores side by side. Drawn, not
-    # interference-checked: a real wire bends round what it meets.
+    # Drawn along the solved route, two cores side by side, and checked
+    # against every solid but the ends they are soldered to (`checks`).
     # A single-core wire takes the colour of the net it lands on: ground black,
     # a supply red, anything else yellow.
     nets = {}
@@ -806,11 +819,23 @@ def checks(L, solids):
     # Overlaps a design intends: a screw is meant to cut its own thread; a
     # press-fit lid is meant to overlap the base by its interference, and the
     # lid is meant to squeeze the gasket — both measured on their own below.
-    # Wires are drawn, not checked.
+    # A wire is checked like a part, against every solid but those it is
+    # soldered to (its two ends, their leads and pins) and other wires, which
+    # share pads at their ends.
     press = c.get("press_fit")
+    ends = {}
+    for wr in L.get("wires", []):
+        for k in range(max(len(wr.get("cores_mm") or []), wr.get("cores", 2))):
+            ends[f"wire-{wr['id']}-{k}"] = [e.split("#")[0].split(".")[0] for e in (wr["from"], wr["to"])]
+    def wired(w, o):
+        if o.startswith("wire-"):
+            return True
+        return any(o == e or o.startswith(e + "-") for e in ends.get(w, []))
     # A part sits on its own copper.
     intended = lambda a, b: (
-        any(x.startswith(("screw-", "board-screw-", "wire-")) or "-lead-" in x for x in (a, b))
+        any(x.startswith(("screw-", "board-screw-")) or "-lead-" in x for x in (a, b))
+        or (a.startswith("wire-") and wired(a, b))
+        or (b.startswith("wire-") and wired(b, a))
         or any(x.startswith(y + "-copper") for x, y in ((a, b), (b, a)))
         or (press is not None and {a, b} == {"case-base", "case-lid"})
         or {a, b} == {"gasket-lid", "case-lid"}

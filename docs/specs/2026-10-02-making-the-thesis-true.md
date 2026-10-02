@@ -212,6 +212,23 @@ Platform bugs the example found, each fixed and tested:
 - an upgrade conflict moved the merge base to upstream but left the
   recorded hash, so a file resolved to exactly the platform's version was
   reported as drift. Both move now.
+- `fid add` recorded its *patched* `fiducial.toml` as the merge base, so
+  the template's `enabled = []` read as an upstream change: the next full
+  `fid upgrade` emptied the product's capabilities and said "merged
+  cleanly" (the dropped-section guard did not see it: the table survived,
+  its contents did not). The base stays the template now, and a lock
+  written the old way is repaired on read.
+- wires were drawn, not checked. Checked against every solid but what they
+  are soldered to, the first wired product showed two faults: the corridor
+  "over the tallest part" ran a 1.2 mm wire into the lid, and a cradle's
+  ribs stood across the wire leaving a cell's end. The corridor stays under
+  the lid now, and the ribs stop short of the wire.
+- Freerouting routes at the clearance exactly; one route in four of the
+  example came back with a track 0.1252 mm from a pad against a 0.127 mm
+  rule and failed DRC — a flaky build. The router gets 10 µm more than the
+  rule; DRC checks the rule. Five re-routes of one placement then gave five
+  different boards, all DRC-clean: `route.json` now records the placed
+  board's hash and the routed copper's, so that difference is visible.
 
 The guide (`docs/guides/sensor-stick.md`) rebuilds the stick from scratch on
 the current platform, with the first build's refusals kept as its case study.
@@ -243,10 +260,10 @@ when convenient.
 - **Floor placement onto the solver** (engines spec P2). It is the last
   bounded search, and it is why a board could not move under its vent.
 - **Determinism:** CP-SAT placement is deterministic; Freerouting is not.
-  Record the routed board's hash in the build output, so a difference is
-  visible. Hand routing (P4) remains the escape.
-- **Wires are checked only against chimneys.** Check every core against
-  every solid at its height (`cad.py`), as parts are.
+  Done: `route.json` records the placed and routed hashes. Hand routing
+  (P4) remains the escape.
+- **Wires are checked only against chimneys.** Done: every core against
+  every solid, as parts are.
 - **Per-package GitHub releases** that exist stay as history; new ones are
   off.
 - **Unexplained:** the dev `fid` reports a product's `adapters.generated.ts`

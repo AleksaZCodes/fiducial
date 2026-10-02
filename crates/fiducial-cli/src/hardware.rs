@@ -4416,6 +4416,10 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
     if let Some(t) = board_top {
         z_route = z_route.max(t + tallest_on_board + 1.0);
     }
+    // Over the tallest part, but never into the lid: a wire is 1.2 mm thick
+    // (cad.py), and where the corridor cannot clear every part it routes
+    // round the tall ones instead.
+    z_route = z_route.min(base_h - clr - 0.6 - 0.2);
     let lid_mounted = |end: &str| {
         let id = end.split(['#', '.']).next().unwrap_or(end);
         p.parts.iter().any(|q| {

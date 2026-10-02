@@ -18,7 +18,9 @@ net, and stops there: routing is a search, not a derivation. This does it:
 4. KiCad's own DRC.
 
 It writes hardware/build/board-routed.kicad_pcb (open it in KiCad — this is
-the board to fabricate), route.json (the verdict), and copper.json (tracks,
+the board to fabricate), route.json (the verdict, with the placed board's
+and the routed copper's hashes: Freerouting is not deterministic, so a
+re-route of the same placement can differ, and this shows it), and copper.json (tracks,
 vias, pours and pads, for the review renders). It fails when a net is left
 unrouted or DRC finds an error: a board that is not connected is not a board.
 """
@@ -170,6 +172,7 @@ def route_once(board: pcbnew.BOARD) -> str:
     if not pcbnew.ExportSpecctraDSN(board, str(dsn)):
         raise SystemExit("KiCad could not export the board to Specctra DSN")
     unpad_holes(dsn, board)
+    margin_clearances(dsn)
     jar = fetch()
     # Headless, no usage analytics, and a time budget per attempt.
     cmd = ["java", "-Djava.awt.headless=true", "-jar", str(jar), "--gui.enabled=false",
@@ -183,6 +186,19 @@ def route_once(board: pcbnew.BOARD) -> str:
     text = ses.read_text()
     read_session(board, text)
     return text
+
+
+def margin_clearances(dsn: Path) -> None:
+    """Freerouting routes at the clearance exactly, and its read-back can land
+    a hair under it: one route in four of the same placement once came back
+    with a track 0.1252 mm from a pad, against a 0.127 mm rule, and failed
+    DRC. The router gets 10 µm more than the rule; KiCad's DRC checks the
+    rule itself."""
+    text = dsn.read_text()
+    if "(unit um)" not in text and "(resolution um" not in text:
+        return
+    bump = lambda m: f"(clearance {float(m.group(1)) + 10:.1f}" if float(m.group(1)) >= 100 else m.group(0)  # noqa: E731
+    dsn.write_text(re.sub(r"\(clearance ([\d.]+)", bump, text))
 
 
 def unpad_holes(dsn: Path, board: pcbnew.BOARD) -> None:
@@ -336,6 +352,21 @@ def drc(board: pcbnew.BOARD, path: Path) -> dict:
     }
 
 
+def routed_hash(board: pcbnew.BOARD) -> str:
+    """The routed copper — tracks and vias, to the micrometre, in a fixed
+    order — hashed. The board file itself carries UUIDs and a fill, so its
+    bytes would differ on an identical route."""
+    um = lambda v: round(pcbnew.ToMM(v), 3)
+    items = []
+    for t in board.GetTracks():
+        if t.GetClass() == "PCB_VIA":
+            items.append(("via", um(t.GetPosition().x), um(t.GetPosition().y), um(t.GetWidth()), t.GetNetname()))
+        else:
+            a, b = sorted([(um(t.GetStart().x), um(t.GetStart().y)), (um(t.GetEnd().x), um(t.GetEnd().y))])
+            items.append(("track", board.GetLayerName(t.GetLayer()), *a, *b, um(t.GetWidth()), t.GetNetname()))
+    return hashlib.sha256(json.dumps(sorted(items, key=str)).encode()).hexdigest()
+
+
 def copper(board: pcbnew.BOARD) -> dict:
     """Everything copper, in KiCad board coordinates (mm, y down)."""
     mm = pcbnew.ToMM
@@ -392,11 +423,17 @@ def main() -> int:
     verdict["tracks"] = sum(1 for t in board.GetTracks() if t.GetClass() != "PCB_VIA")
     verdict["vias"] = sum(1 for t in board.GetTracks() if t.GetClass() == "PCB_VIA")
     verdict["router"] = f"Freerouting {FREEROUTING}"
+    # Placement is deterministic; Freerouting is not. The placed board's hash
+    # and the routed copper's, side by side, make a different route visible:
+    # same `placed`, different `routed` is the router, not the design.
+    verdict["placed_sha256"] = hashlib.sha256(SRC.read_bytes()).hexdigest()
+    verdict["routed_sha256"] = routed_hash(board)
     board.Save(str(out))
     (BUILD / "route.json").write_text(json.dumps(verdict, indent=2) + "\n")
     (BUILD / "copper.json").write_text(json.dumps(copper(board)) + "\n")
     ok = verdict["unconnected"] == 0 and verdict["violations"] == 0
-    print(f"routed: {verdict['tracks']} tracks, {verdict['vias']} vias; "
+    print(f"routed: {verdict['tracks']} tracks, {verdict['vias']} vias "
+          f"(copper {verdict['routed_sha256'][:12]}); "
           f"DRC {verdict['violations']} violation(s), {verdict['unconnected']} unconnected"
           + ("" if ok else f" — see {verdict['report']}"))
     return 0 if ok else 1
