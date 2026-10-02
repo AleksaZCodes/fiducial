@@ -128,6 +128,14 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
+      # The hardware tests place board parts with the capability's constraint
+      # solver (hardware/place.py, OR-Tools CP-SAT; spec 2026-10-01). Pinned
+      # where the capability pins it.
+      - name: Install the placement solver
+        run: |
+          python3 -m pip install --user \
+            "$(grep '^ortools==' crates/fiducial-cli/capabilities/hardware/hardware/requirements.txt)"
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
@@ -152,6 +160,13 @@ jobs:
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
+
+      # The first-product walkthrough derives the hardware seed, whose board
+      # parts are placed by the capability's solver. Pinned where it pins it.
+      - name: Install the placement solver
+        run: |
+          python3 -m pip install --user \
+            "$(grep '^ortools==' crates/fiducial-cli/capabilities/hardware/hardware/requirements.txt)"
 
       # Runs WITHOUT FIDUCIAL_WRITE_CAPTURES, so the test compares the committed
       # captures against what the binary prints now instead of overwriting them.
@@ -231,6 +246,94 @@ jobs:
       - name: Check firmware workspace (STM32 — thumbv7em-none-eabihf)
         working-directory: firmware
         run: cargo check --target thumbv7em-none-eabihf -p fiducial-firmware-shared -p fiducial-stm32
+
+  # ── The worked example: a whole product, end to end ───────────────────────
+  #
+  # examples/sensor-stick is the platform's public worked example and the
+  # paper's: one declaration → a routed, DRC-clean board, a printed case that
+  # fits and goes together, orderable fab files, firmware and a web page, all
+  # from the same facts. Every claim its README makes is checked here.
+  example:
+    name: example (sensor-stick, end to end)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: examples/sensor-stick
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable + the RP2040 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv6m-none-eabi
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            examples/sensor-stick/firmware -> target
+
+      - name: Build fid from this commit
+        working-directory: .
+        run: |
+          cargo build -p fiducial-cli
+          echo "$PWD/target/debug" >> "$GITHUB_PATH"
+
+      - name: fid derive --check (every derived artifact matches the declaration)
+        run: fid derive --check
+
+      - name: fid doctor (a product the platform scaffolded and the person edited is not drift)
+        run: fid doctor
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: vendored KiCad components match the declaration
+        run: python3 hardware/parts.py check
+
+      # Freerouting, which route.py fetches and pins by hash, needs Java 21.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: install build123d + KiCad
+        run: |
+          pip install -r hardware/requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends kicad
+
+      - name: build (fails unless the board routes, passes DRC and the product goes together)
+        run: SKIP_RENDER=1 hardware/build.sh
+
+      - name: every board part is orderable for assembly
+        run: grep -q "Every board part has an LCSC number" hardware/build/fab/README.md
+
+      - name: firmware compiles against the derived pin map
+        working-directory: examples/sensor-stick/firmware
+        run: cargo check --release --target thumbv6m-none-eabi
+
+      - name: firmware arithmetic and wire format (host tests)
+        working-directory: examples/sensor-stick/firmware
+        run: cargo test -p firmware-shared --target x86_64-unknown-linux-gnu
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: web page decodes what the firmware sends
+        run: node --experimental-strip-types --test web/src/reading.test.ts
+
+      - name: web page type-checks against the derived interface
+        run: npx -y -p typescript@5.9 tsc -p web
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sensor-stick-manufacturing
+          path: examples/sensor-stick/hardware/build/
 
   # ── Types pipeline: generate TS types from Rust, verify freshness ──────────
   #

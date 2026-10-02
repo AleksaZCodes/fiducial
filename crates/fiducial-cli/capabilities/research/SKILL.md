@@ -5,6 +5,12 @@ artifact** — title, authors, venue, and a references directory declared once i
 `[paper]`; bibliography and the typeset document derived from them by the
 `fid-research` pipeline.
 
+> **Not built yet.** Installing this capability seeds the `[paper]` block and
+> nothing else: there is no `fid-research` executor and no pipeline, so
+> `fid derive` produces no bibliography or PDF. Everything below describes the
+> intended design (ROADMAP: *Paper readiness*). Until it lands, run Pandoc
+> yourself: `pandoc paper/main.md --citeproc --bibliography references/*.bib -o paper/main.pdf`.
+
 ## The loop
 
 ```
@@ -20,7 +26,7 @@ paper/main.pdf          ← typeset via Pandoc (IEEE/ACM/APA template per venue)
 ```toml
 [paper]
 title           = "Fiducial: A Declaration-First Platform for Cross-Domain Products"
-authors         = ["Aleksa Živković"]
+authors         = ["Aleksa Zdravković"]
 venue           = "IEEE"           # controls the typeset template: IEEE, ACM, APA, plain
 references_dir  = "references/"    # .bib files here; also accepts .cff, .json (CSL-JSON)
 manuscript      = "paper/main.md"  # Markdown source; if absent, fid-research scaffolds one

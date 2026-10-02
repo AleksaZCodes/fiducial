@@ -448,7 +448,7 @@ fn check_lock(
     //
     // Editing a product-owned file is the intended use — `MISSION.md`'s own
     // footer says "It is product-owned — edit it freely" — so reporting it as
-    // an issue meant the platform contradicted its own templates. fon had
+    // an issue meant the platform contradicted its own templates. The first product had
     // seventeen of them and runs `fid doctor` with `continue-on-error` as a
     // result, which costs every real finding too. See `crate::ownership`.
     let mut drifted: Vec<String> = Vec::new();
@@ -513,7 +513,14 @@ fn check_upstream_templates(
         // otherwise every template carrying a `{{version}}` stamp reads as
         // drift the moment the platform version moves. See
         // `templates::upstream_changed`.
-        if templates::upstream_changed(raw, &cfg.product.name, &record.source_version, base) {
+        let base = templates::merge_base(
+            rel_path,
+            base,
+            raw,
+            &cfg.product.name,
+            &record.source_version,
+        );
+        if templates::upstream_changed(raw, &cfg.product.name, &record.source_version, &base) {
             warnings.push(format!(
                 "{rel_path}: upstream template updated (installed: {}, current: {}) — run `fid upgrade`",
                 record.source_version, PLATFORM_VERSION

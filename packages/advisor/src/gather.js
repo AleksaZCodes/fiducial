@@ -335,8 +335,8 @@ export function collectThesis(cwd) {
  *
  * - `README.md`'s opening prose — the first thing a reader meets.
  * - `meta.description` in every `messages/*.json` — what a search result shows,
- *   and in fon's case the file that restates the thesis as "A person confirms
- *   every event" with nothing connecting the two.
+ *   and in the first product's case the file that restates the thesis as "A meter measures
+ *   every reading" with nothing connecting the two.
  * - `MISSION.md`'s opening — where the claim used to live, and where it drifts
  *   back to.
  *

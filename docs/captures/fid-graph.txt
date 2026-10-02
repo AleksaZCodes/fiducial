@@ -1,11 +1,15 @@
 $ fid graph
-pipeline: eda (fid-validate)
-  → artifact: board/board.interface.json
-pipeline: enclosure (fid-mesh)
-  → artifact: enclosure/case-base.stl
-  → artifact: enclosure/case-lid.stl
-  → artifact: enclosure/gasket.stl
-  → artifact: enclosure/case.glb
+pipeline: hardware (fid-hardware)
+  → artifact: hardware/generated/layout.json
+  → artifact: hardware/generated/placement-model.json
+  → artifact: hardware/generated/placement.json
+  → artifact: hardware/generated/bom.csv
+  → artifact: hardware/generated/assembly.md
+  → artifact: hardware/generated/board.kicad_pcb
+  → artifact: hardware/generated/board.kicad_sch
+  → artifact: hardware/generated/interface.json
+  → artifact: hardware/generated/interface.ts
+  → artifact: hardware/generated/board.rs
 pipeline: thesis (fid-thesis)
   → artifact: PITCH.md
   → artifact: apps/web/src/generated/thesis.ts

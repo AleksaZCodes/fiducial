@@ -76,7 +76,7 @@ actually emits — wrapped scalars and block sequences included, because the
 editor writes those. A line-wise `key: value` reader loses a wrapped summary
 and turns a list into an empty string, silently.
 
-**Quote a value containing a colon.** `alt: The FON icon: a white flame` is not
+**Quote a value containing a colon.** `alt: The Acme icon: a white drop` is not
 YAML: a plain scalar may not contain `": "`. A lenient reader takes the rest of
 the line and everything looks fine, which is how a dozen entries sat in a repo
 being read correctly by the deriver and rejected by every other YAML parser,

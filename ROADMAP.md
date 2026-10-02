@@ -27,9 +27,9 @@
 
 ---
 
-## The thesis, restated at product scale
+## The rule, applied at product scale
 
-The platform's rule is *declare each fact once, derive every artifact from it*.
+The platform's first principle is *declare each fact once, derive every artifact from it*.
 Phases 0–21 applied that to engineering facts: a pin, a board dimension, a
 protocol message.
 
@@ -605,6 +605,41 @@ especially, since the **Open-source bootstrap** item below is explicitly
 waiting on "the command that produces these for any repository," and Fiducial
 now has the files to generalize from.
 
+### Paper readiness — *debt-accruing* ⬜
+
+The IEEESTEC paper's evidence is derived from `SHIPPED.md` and the specs, so a
+claim there that overstates what shipped becomes a claim in the paper. Three
+found on 2026-09-30: the `research` capability's SKILL.md documents a
+`fid-research` executor that does not exist; Phase 14 is titled as running
+KiCad when it validates a schema; and the paper has mechanisms but no
+measurements of the thesis itself.
+
+**Where it lands.** The ordered list is in
+`docs/specs/2026-09-30-a-physical-product-is-parts-in-regions.md`, *Paper
+readiness*. Items 1–2 are text edits to
+`crates/fiducial-cli/capabilities/research/SKILL.md` and `SHIPPED.md`; item 4
+is a script over `git log` counting commits that fixed a gate failure; item 5
+is a `pipelines/research.toml` with a `shell` executor calling Pandoc before it
+is ever a built-in.
+
+### Physical products — outline, region, part, cost ✅
+
+**Shipped 2026-09-30** as the `hardware` capability, with input tracking in
+`fid derive`. Built in the platform before a second product, on the owner's
+call — see `docs/specs/2026-09-30-hardware-is-a-capability.md`, which records
+why that outranks the second-use rule here.
+
+**Since then:** board placement is solved by an engine (OR-Tools CP-SAT) and
+routing by Freerouting, both gated — see
+`docs/specs/2026-10-01-hardware-is-solved-by-engines-not-rules.md`, whose
+plan (P2–P7: floor placement, hand routing, an ngspice power check, a small
+showcase product, paper numbers) is the hardware roadmap now.
+
+**Still open, deliberately:** hand routing for the RF path (P4); curved outlines; the `eda` capability's
+`board.interface.json` and `fid-mesh` case, which now overlap `hardware` and
+should become one path once a product needs both — decide which owns the board
+before a third consumer appears.
+
 ### On demand ✅
 
 None of these block a product; each is added when wanted, through the system
@@ -676,7 +711,7 @@ Item 6 is what makes it a **default** rather than a discipline.
 
 **TypeScript first; Rust later, as a derivation.** An earlier draft argued this
 catalog should be `no_std` Rust immediately, partly on the grounds of device-side
-strings. `fon` is **headless**, so that argument was weak and is withdrawn.
+strings. The first product is **headless**, so that argument was weak and is withdrawn.
 
 The honest remaining case is error codes crossing the wire — a device reports a
 code, and the app renders it in the reader's language from the same declared
@@ -1667,7 +1702,7 @@ Failproof, extensible, customizable, opinionated, working out of the box:
 
 ## Two tensions worth deciding consciously
 
-**1 · "Everything before `fon`" versus the second-use rule.**
+**1 · "Everything before the first product" versus the second-use rule.**
 
 `MISSION.md` anti-goal 2: *"The platform must never become the project. Nothing
 is added speculatively. A capability enters the platform when a real product
@@ -1677,8 +1712,8 @@ The list above is a deliberate, stated exception — *"I can afford to make a
 general thing."* Recorded here so it is a **choice** rather than an erosion, and
 so the rule is still the rule afterwards.
 
-The risk, named plainly: this list is large enough that "everything before `fon`"
-could mean `fon` never gets built, and the mission says shipping products is the
+The risk, named plainly: this list is large enough that "everything before the first product"
+could mean the first product never gets built, and the mission says shipping products is the
 point. Mitigation: each item above should be validated by *some* real consumer,
 even a small one, before the next begins.
 

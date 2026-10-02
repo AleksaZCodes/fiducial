@@ -1202,7 +1202,7 @@ small = "eyebrow"
 
     #[test]
     fn oklch_matches_the_hex_the_declaration_documents() {
-        // These two are checked into fon's design-system.md as hex. If the
+        // These two are checked into the first product's design-system.md as hex. If the
         // conversion drifts, the generated comments start lying.
         assert_eq!(to_hex(to_srgb("oklch(0.56 0.15 48)").unwrap()), "#B85207");
         assert_eq!(to_hex(to_srgb("oklch(0.7 0.18 48)").unwrap()), "#F4741E");

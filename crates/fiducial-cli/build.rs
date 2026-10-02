@@ -92,7 +92,13 @@ fn collect(root: &Path, dir: &Path, out: &mut Vec<String>) {
     {
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with('.') && name != ".cargo" {
+        if name.starts_with('.') && name != ".cargo" && name != ".gitignore" {
+            continue;
+        }
+        // Interpreter caches are not capability files: running a capability's
+        // Python from the source tree (an import in a test or an experiment)
+        // leaves bytecode here, and embedding it broke the build.
+        if name == "__pycache__" || name.ends_with(".pyc") {
             continue;
         }
         if path.is_dir() {

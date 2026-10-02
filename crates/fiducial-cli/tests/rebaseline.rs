@@ -5,7 +5,7 @@
 //! error, that editing the platform's still is, and that accepting a fork
 //! survives into `fid doctor`.
 //!
-//! The case that motivated all of it: fon carried 32 `fid doctor` issues, 26 of
+//! The case that motivated all of it: the first product carried 32 `fid doctor` issues, 26 of
 //! them edits to files whose own template says *"It is product-owned — edit it
 //! freely."* Its CI runs `fid doctor` with `continue-on-error` as a result,
 //! which costs every real finding too.

@@ -236,10 +236,10 @@ mod tests {
         // `short_name` is what a launcher prints under an icon, in about twelve
         // characters. It used to be a second copy of the trading name, which
         // makes the field do nothing but truncate.
-        let manifest = render_manifest("Fire Outreach Network", "FON", "#b85207", "#110a07");
+        let manifest = render_manifest("Acme Instruments", "ACME", "#b85207", "#110a07");
         let value: serde_json::Value = serde_json::from_str(&manifest).expect("valid JSON");
-        assert_eq!(value["name"], "Fire Outreach Network");
-        assert_eq!(value["short_name"], "FON");
+        assert_eq!(value["name"], "Acme Instruments");
+        assert_eq!(value["short_name"], "ACME");
     }
 
     #[test]

@@ -45,7 +45,7 @@ Append a thesis to thesis.toml.
 
 The first one needs only a claim:
 
-  fid thesis set \"No unverified alert ever reaches a responder.\"
+  fid thesis set \"No estimated reading ever reaches a bill.\"
 
 Once a thesis is in force, a new one replaces it and must say why:
 

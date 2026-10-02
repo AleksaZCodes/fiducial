@@ -394,15 +394,15 @@ mod tests {
     fn a_slug_is_read_from_either_remote_form() {
         // Both forms appear in the wild; neither should be the one that works.
         for url in [
-            "https://github.com/AleksaZCodes/fon.git",
-            "git@github.com:AleksaZCodes/fon.git",
-            "https://github.com/AleksaZCodes/fon",
+            "https://github.com/example/acme.git",
+            "git@github.com:example/acme.git",
+            "https://github.com/example/acme",
         ] {
             let rest = url
                 .strip_prefix("https://github.com/")
                 .or_else(|| url.strip_prefix("git@github.com:"))
                 .map(|r| r.trim_end_matches(".git").to_string());
-            assert_eq!(rest.as_deref(), Some("AleksaZCodes/fon"), "{url}");
+            assert_eq!(rest.as_deref(), Some("example/acme"), "{url}");
         }
     }
 }

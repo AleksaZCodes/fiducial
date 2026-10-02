@@ -31,7 +31,7 @@ here should not need the platform checked out to know the rules.
 
 {{principles}}
 
-## Product layout## Product layout
+## Product layout
 
 ```
 {{name}}/
@@ -113,6 +113,27 @@ The `PreToolUse` guard (`fid guard-check`) is contributed by the Fiducial Claude
 plugin (`.claude/settings.json`). It enforces the rules listed in `fiducial.toml [guard]`.
 Rules fire only when a forbidden command is in **command position** — not when it
 appears inside a quoted string or as an argument.
+
+## When you hit a wall
+
+Fix it where it lives, not where you hit it.
+
+- **A platform defect** — a `fid` bug, a wrong template, a capability that is
+  missing or cannot express what this product needs: open an issue or a pull
+  request on [Fiducial](https://github.com/AleksaZCodes/fiducial) with the fix.
+  If this product cannot wait, carry the fix here as a **recorded** fork —
+  `fid rebaseline` for a platform-owned file, or a patch under `patches/` named
+  after the upstream issue — and delete it when upstream ships. Never an
+  unrecorded hand-edit: it is drift nobody can see.
+- **A tool that cannot do it** — prefer existing open-source software behind a
+  contract (principle 6); build only what nobody has; build around it only when
+  both cost more than the problem.
+- **Change the system, not just the instance.** A change to how something works
+  updates the declaration, the docs and the agent instructions that describe it
+  in the same change. Documentation that lags is a stale artifact.
+- **Teach the next agent only what is fundamental.** Add a line to this file when
+  a lesson would have prevented a *class* of mistakes, not for a one-off.
+  Instructions that grow without bound stop being read.
 
 ## What not to do
 

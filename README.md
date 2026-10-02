@@ -1,6 +1,11 @@
 # Fiducial
 
-> **Declare each fact once. Derive every artifact from it.**
+<!-- fid:describes thesis.toml -->
+> **Build any robust multidisciplinary product with AI agents.**
+
+That is the platform's thesis ([`thesis.toml`](thesis.toml), `fid thesis`). How:
+**declare each fact once, derive every artifact from it**, and gate the result.
+<!-- fid:end-describes -->
 
 Fiducial is a cross-domain build system for products that span **web, firmware,
 electronics, mechanical, simulation and content** — built at the quality and pace
@@ -63,45 +68,57 @@ outlives every framework above it.
 cargo install fiducial-cli
 
 fid new my-product && cd my-product
-fid add eda                # board pipeline + enclosure generation
-fid derive                 # run every pipeline, hash every output
-fid dash                   # roadmap, decisions, CI, pipelines, freshness
+fid add capability hardware   # one declaration → case, board, schematic, BOM, interface
+fid add capability firmware-rp2040
+fid derive                    # run every pipeline, hash every output
+fid dash                      # roadmap, decisions, CI, pipelines, freshness
 ```
 
-Declare the board once, in `board/board.interface.json`:
+Declare the product once, in `hardware/product.toml`: its outline, its parts,
+and what each pin connects to (an excerpt):
 
-```json
-{
-  "outline": { "width_mm": 100.0, "height_mm": 60.0, "tolerance": "fdm" },
-  "connectors": [
-    { "id": "J1", "type": "usb-c", "mount": { "side": "south", "offset_mm": 20.0 } }
-  ]
-}
+```toml
+[[part]]
+id     = "mcu"
+symbol = "MCU_RaspberryPi:RP2040"
+pins   = { GPIO4 = "SENSOR_SDA", GPIO5 = "SENSOR_SCL", GND = "GND" }
+
+[[part]]
+id   = "r-sda"
+pick = { category = "Resistors", package = "0603", value = "4k7", has = ["1%"] }  # resolved to a real LCSC part, locked
+pins = { 1 = "SENSOR_SDA", 2 = "3V3" }
+
+[firmware]
+mcu = "mcu"
 ```
 
-Then `fid derive` produces — with nobody modelling anything —
+Then `fid derive` produces — with nobody modelling, drawing or copying anything —
 
-- a **gasket-sealed enclosure**, with the USB-C opening already punched, sized
-  from the connector family and the printing process
-- a printable **STL** and a web-ready **GLB**
-- **TypeScript types** for the same board, for the app that talks to it
+- the **case** around the parts, with every socket's window cut, and the
+  **board** inside it: placed by a constraint solver, every pad on its net;
+- the **schematic**, and the **BOM**, each part's LCSC number taken from
+  `hardware/parts.lock`;
+- `interface.ts` — the nets as a **TypeScript type**, for the app that talks
+  to the device;
+- `board.rs` — the **firmware's pin map**: `board::sensor_sda!(p)` is
+  `p.PIN_4`.
 
-Change `width_mm` to `120.0` and every one of those moves. Until they do,
-`fid derive --check` says so and exits non-zero:
+`hardware/build.sh` then routes the board, builds every solid, checks that
+it all fits and goes together, and writes the files a board house needs to
+make and assemble it.
 
-<!-- capture: fid-derive-check-stale.txt -->
+Move `SENSOR_SDA` to `GPIO6` and the copper, the schematic and the firmware
+move with it — the firmware with no edit. Rename it, and firmware or web code
+still using the old name stops compiling. Until `fid derive` has run,
+`fid derive --check` names every artifact that no longer matches the
+declaration and exits non-zero. It runs in CI, so an artifact that did not
+follow its declaration fails the build instead of shipping. That is the whole
+contract.
 
-```text
-$ fid derive --check
-✗ fid derive --check failed:
-  board/board.interface.json: stale (lock:9d241d22 file:867aeb34) — run `fid derive`
-Error: stale artifacts detected
-```
-
-<!-- /capture -->
-
-That is the whole contract. `fid derive --check` runs in CI, so an artifact that
-did not follow its declaration fails the build instead of shipping.
+The whole of it, on a real product: [`examples/sensor-stick/`](examples/sensor-stick)
+is a USB-C temperature and humidity stick — case, routed board, orderable fab
+files, firmware and a web page from one declaration, built end to end in CI —
+and [how it was made](docs/guides/sensor-stick.md), step by step.
 
 ## What you can add to it
 
@@ -120,8 +137,9 @@ product actually needs.
 | `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
 | `design` | declares `design-system.md`; 1 pipeline(s); 4 template file(s) | `fid add capability design` |
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
-| `firmware-rp2040` | 10 template file(s); guard rules | `fid add capability firmware-rp2040` |
-| `firmware-stm32` | 9 template file(s); guard rules | `fid add capability firmware-stm32` |
+| `firmware-rp2040` | 11 template file(s); guard rules | `fid add capability firmware-rp2040` |
+| `firmware-stm32` | 10 template file(s); guard rules | `fid add capability firmware-stm32` |
+| `hardware` | declares `hardware/outline.svg`, `hardware/product.toml`; 1 pipeline(s); 11 template file(s) | `fid add capability hardware` |
 | `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
 | `legal` | declares `legal`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability legal` |
@@ -135,6 +153,27 @@ product actually needs.
 | `web-svelte` | 10 template file(s); guard rules | `fid add capability web-svelte` |
 | `worker-cloudflare` | 1 template file(s); guard rules | `fid add capability worker-cloudflare` |
 <!-- fid:end capabilities -->
+
+### A physical product, from one file
+
+`hardware` is the capability that goes furthest. One `hardware/product.toml`
+names an outline in any SVG (a logo works), the regions on it, and the parts —
+each a real KiCad symbol, footprint and STEP model, with its LCSC number and
+its datasheet. `fid derive` solves the case round them, sizes and sections the
+board, places its parts with a constraint solver (OR-Tools CP-SAT — every rule
+a constraint, and a contradiction named rather than guessed at), wires every
+pin to its net, and writes a gated layout, BOM, KiCad board and schematic. `hardware/build.sh`
+then routes and DRCs the board (Freerouting), builds the solid model and fails
+on any interference, unsealed joint or part that cannot go in, and exports
+Gerbers, STEP and a review pack of renders. Where the vocabulary stops, a
+product adds its own geometry (`hardware/shapes.py`) or its own STEP model,
+and the checks still run over it.
+
+Everything a part needs travels with it, in KiCad's own library layout:
+`hardware/lib/` holds the symbols, footprints, models and datasheets (with
+text copies), hash-checked, and `hardware/lib/PARTS.md` puts every part on one
+page — what it is, its files, every pin's net — as the context a person or an
+agent starts from.
 
 <!-- fid:describes crates/fiducial-cli/src/adapter.rs#pub static CONTRACTS -->
 
@@ -218,8 +257,8 @@ its description from the first line of prose in its own skill.
 
 | Kind | Is | Example |
 |---|---|---|
-| **Declaration** | a typed fact, written once, inert — a file, a `fiducial.toml` block, or a directory the product fills | `board/board.interface.json`, the `[i18n]` block, `migrations/` |
-| **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/eda.toml` |
+| **Declaration** | a typed fact, written once, inert — a file, a `fiducial.toml` block, or a directory the product fills | `hardware/product.toml`, the `[i18n]` block, `migrations/` |
+| **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/hardware.toml` |
 | **Adapter** | a swappable vendor behind a fixed contract | `storage = "r2"` |
 | **Tool** | an external command the capability's work needs on PATH — declared, never installed | `requires_tools = ["wrangler"]` |
 | **Prerequisite** | another capability this one cannot work without — checked at install, not at first failure | `requires_capabilities = ["i18n"]` |
@@ -259,12 +298,18 @@ outputs  = [
 `fiducial.lock`, and `fid derive --check` fails when a hash no longer matches
 what the declaration implies.
 
+`inputs` closes the other half. An output can match its hash while the file it
+was derived *from* has moved — a logo redrawn, a schema another tool rewrote —
+and nobody re-derived. Files listed in `inputs` (and those a built-in executor
+knows it reads, such as the SVGs a `hardware/product.toml` addresses) are
+hashed into the lock too, and `--check` names the one that moved.
+
 <!-- fid:describes crates/fiducial-cli/src/commands/derive.rs#fn run_pipeline_command -->
 
 Executors are `shell` and `cargo-test` — which need no platform change at all —
 plus the in-process ones (`fid-validate`, `fid-mesh`, `fid-i18n`, `fid-brand`,
 `fid-thesis`, `fid-deploy`, `fid-identity`, `fid-adapters`, `fid-schema`,
-`fid-legal`, `fid-design`). Reach for `shell` first; a new in-process executor
+`fid-legal`, `fid-design`, `fid-hardware`). Reach for `shell` first; a new in-process executor
 is warranted only when the work is genuinely a Rust library call rather than a
 tool invocation.
 

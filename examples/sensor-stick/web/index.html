@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sensor stick</title>
+    <style>
+      body { font: 16px/1.5 system-ui, sans-serif; max-width: 32rem; margin: 3rem auto; padding: 0 1rem; }
+      #value { font-size: 2.5rem; margin: 1rem 0; }
+    </style>
+    <!-- npx esbuild web/src/main.ts --bundle --format=esm --outfile=web/dist/main.js -->
+    <script type="module" src="dist/main.js"></script>
+  </head>
+  <body>
+    <h1>Sensor stick</h1>
+    <p id="about"></p>
+    <button id="connect">Connect</button>
+    <p id="status">Plug the stick in, then connect (Chrome or Edge: Web Serial).</p>
+    <p id="value">—</p>
+  </body>
+</html>

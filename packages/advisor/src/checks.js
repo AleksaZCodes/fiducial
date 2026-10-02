@@ -468,8 +468,8 @@ export const THESIS_QUESTIONS = {
  *
  * `overclaims_against_evidence` outranks everything, including the questions
  * about whether the thesis is any good. A weak thesis costs you focus; public
- * copy claiming a wildfire-detection deployment that does not exist costs
- * someone's trust, and it is the failure fon's MISSION.md already has to guard
+ * copy claiming a metering deployment that does not exist costs
+ * someone's trust, and it is the failure the first product's MISSION.md already has to guard
  * against in prose.
  */
 export const THESIS_WEIGHTS = {

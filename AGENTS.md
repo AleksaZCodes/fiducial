@@ -1,6 +1,7 @@
 # Fiducial — Agent context
 
-> One declaration, many derivations. See `MISSION.md` for the why.
+> The thesis every change here is measured against is declared in `thesis.toml`
+> (`fid thesis`). How it is met — one declaration, many derivations — is `MISSION.md`.
 
 This file covers the same ground as `CLAUDE.md` for agent runtimes that read
 `AGENTS.md` (Codex, Copilot Workspace, etc.). The authoritative design is in
@@ -326,8 +327,8 @@ Seven kinds, and the difference is not cosmetic — see
 
 | Kind | Is | Example |
 |---|---|---|
-| **Declaration** | a typed fact, written once, inert — a file, a `fiducial.toml` block, or a directory the product fills | `board/board.interface.json`, the `[i18n]` block, `migrations/` |
-| **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/eda.toml` |
+| **Declaration** | a typed fact, written once, inert — a file, a `fiducial.toml` block, or a directory the product fills | `hardware/product.toml`, the `[i18n]` block, `migrations/` |
+| **Pipeline** | reads declarations, produces artifacts, **gated by `fid derive --check`** | `pipelines/hardware.toml` |
 | **Adapter** | a swappable vendor behind a fixed contract, selected in `[adapters]` | `storage = "none"` |
 | **Tool** | an external command the capability's work needs on PATH — declared, never installed | `requires_tools = ["wrangler"]` |
 | **Prerequisite** | another capability this one cannot work without — checked at install, not at first failure | `requires_capabilities = ["i18n"]` |
@@ -371,8 +372,9 @@ The capabilities this platform ships:
 | `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
 | `design` | declares `design-system.md`; 1 pipeline(s); 4 template file(s) | `fid add capability design` |
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
-| `firmware-rp2040` | 10 template file(s); guard rules | `fid add capability firmware-rp2040` |
-| `firmware-stm32` | 9 template file(s); guard rules | `fid add capability firmware-stm32` |
+| `firmware-rp2040` | 11 template file(s); guard rules | `fid add capability firmware-rp2040` |
+| `firmware-stm32` | 10 template file(s); guard rules | `fid add capability firmware-stm32` |
+| `hardware` | declares `hardware/outline.svg`, `hardware/product.toml`; 1 pipeline(s); 11 template file(s) | `fid add capability hardware` |
 | `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
 | `legal` | declares `legal`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability legal` |
@@ -451,6 +453,24 @@ listed in `.github/cla-exempt.txt`, which is the only place that decides who is
 exempt.
 
 <!-- fid:end-describes -->
+
+## When you hit a wall
+
+Fix it where it lives, not where you hit it — here, or in the product that
+found it.
+
+- **Found from a product?** A defect a product works around is a defect in
+  every product. Fix it here, with a test that would have caught it; the
+  product carries a *recorded* patch (`fid rebaseline`, or `patches/` named
+  after the issue) only until the release that fixes it.
+- **A tool that cannot do it:** existing open-source software behind a contract
+  first (principle 6), building second, building around it last.
+- **Change the system, not just the instance.** A change to how something works
+  updates its spec, the prose that describes it (`fid docs --check` will say
+  which), the capability's `SKILL.md`, and this file — in the same change.
+- **Teach the next agent only what is fundamental.** A line here should prevent
+  a class of mistakes. The PR #43 story above earns its space; a one-off does
+  not.
 
 ## What not to do
 

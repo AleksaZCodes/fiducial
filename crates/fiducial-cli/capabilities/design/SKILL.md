@@ -172,8 +172,8 @@ both places — and then use it.
 
 ## Rule 3 · Hex with a role, not a description
 
-`--color-primary: #B85207` — *ember orange, primary actions and links*.
-Not "a warm rust". Not "brand orange". The value and what it is for.
+`--color-primary: #1D4ED8` — *deep blue, primary actions and links*.
+Not "a cool blue". Not "brand blue". The value and what it is for.
 
 Then declare the pairs, in `fid:contrast`. **`fid derive` computes every one of
 them and fails if any falls under its minimum.** This is the rule that stopped

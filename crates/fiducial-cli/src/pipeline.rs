@@ -32,6 +32,17 @@ pub struct Pipeline {
     /// Directory to run in, relative to the product root.
     #[serde(default)]
     pub working_dir: Option<String>,
+    /// Files this pipeline **reads**, relative to the product root. Their
+    /// hashes are recorded in `fiducial.lock` at derive time, and
+    /// `fid derive --check` fails when one has moved since — naming it.
+    ///
+    /// Outputs alone cannot catch the drift that matters most: an upstream
+    /// file (a logo, a schema, a declaration another tool writes) changes, no
+    /// one re-derives, and every output still matches its recorded hash. A
+    /// built-in executor that knows what it read reports those files itself;
+    /// this list is for a `shell` pipeline, which cannot.
+    #[serde(default)]
+    pub inputs: Vec<String>,
 }
 
 /// The built-in `types` pipeline, present when `[spine] enabled = true`.
@@ -51,6 +62,7 @@ pub fn builtin_types_pipeline() -> Pipeline {
         ],
         outputs: vec!["packages/wasm-bridge/src/generated.ts".into()],
         working_dir: None,
+        inputs: Vec::new(),
     }
 }
 

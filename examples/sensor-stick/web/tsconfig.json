@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "strict": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "types": [],
+    "paths": {
+      "@fiducial/transport-web": [
+        "../../../packages/transport-web/src/index.ts"
+      ]
+    },
+    "noEmit": true
+  },
+  "include": [
+    "src",
+    "../hardware/generated/interface.ts",
+    "../../../packages/transport-web/src/globals.d.ts"
+  ],
+  "exclude": [
+    "src/**/*.test.ts"
+  ]
+}

@@ -1,0 +1,14 @@
+[package]
+name        = "firmware-shared"
+description = "Target-agnostic firmware helpers for sensor-stick."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+
+
+
+[dependencies]
+fiducial-core     = { workspace = true }
+fiducial-protocol = { workspace = true }
+

@@ -1,0 +1,189 @@
+# Written by `python3 hardware/parts.py resolve` — do not edit.
+# Every `pick` in hardware/product.toml, answered: the exact part it resolved to;
+# every pinned `lcsc`, as LCSC itself describes it.
+# Re-pick with `resolve --update`; a changed pick is re-picked on the next resolve.
+version = 1
+
+[[part]]
+id = "usb"
+lcsc = "C165948"
+mpn = "TYPE-C-31-M-12"
+manufacturer = "Korean Hroparts Elec"
+package = "SMD"
+description = "USB-C (USB TYPE-C) Receptacle Connector 16 Position Surface Mount"
+verified = "2026-10-02"
+
+[[part]]
+id = "r-cc1"
+lcsc = "C23186"
+mpn = "0603WAF5101T5E"
+manufacturer = "UNI-ROYAL"
+package = "0603"
+description = "5.1kΩ ±1% 100mW 0603 Thick Film Resistor"
+verified = "2026-10-02"
+
+[[part]]
+id = "r-cc2"
+lcsc = "C23186"
+mpn = "0603WAF5101T5E"
+manufacturer = "UNI-ROYAL"
+package = "0603"
+description = "5.1kΩ ±1% 100mW 0603 Thick Film Resistor"
+verified = "2026-10-02"
+
+[[part]]
+id = "ldo"
+lcsc = "C6186"
+mpn = "AMS1117-3.3"
+manufacturer = "Advanced Monolithic Systems"
+package = "SOT-223"
+verified = "2026-10-02"
+
+[[part]]
+id = "c-vbus"
+lcsc = "C19702"
+mpn = "CL10A106KP8NNNC"
+manufacturer = "Samsung Electro-Mechanics"
+package = "0603"
+description = "10uF ±10% 10V Ceramic Capacitor X5R 0603"
+verified = "2026-10-02"
+
+[[part]]
+id = "c-3v3"
+lcsc = "C19702"
+mpn = "CL10A106KP8NNNC"
+manufacturer = "Samsung Electro-Mechanics"
+package = "0603"
+description = "10uF ±10% 10V Ceramic Capacitor X5R 0603"
+verified = "2026-10-02"
+
+[[part]]
+id = "mcu"
+lcsc = "C2040"
+mpn = "RP2040"
+manufacturer = "Raspberry Pi"
+package = "LQFN-56(7x7)"
+verified = "2026-10-02"
+
+[[part]]
+id = "c-dec"
+lcsc = "C14663"
+mpn = "CC0603KRX7R9BB104"
+manufacturer = "YAGEO"
+package = "0603"
+description = "100nF ±10% 50V Ceramic Capacitor X7R 0603"
+verified = "2026-10-02"
+
+[[part]]
+id = "c-1v1"
+lcsc = "C15849"
+mpn = "CL10A105KB8NNNC"
+manufacturer = "Samsung Electro-Mechanics"
+package = "0603"
+description = "1uF ±10% 50V Ceramic Capacitor X5R 0603"
+verified = "2026-10-02"
+
+[[part]]
+id = "r-dp"
+lcsc = "C25190"
+mpn = "0603WAF270JT5E"
+manufacturer = "UNI-ROYAL"
+package = "0603"
+description = "27Ω ±1% 100mW 0603 Thick Film Resistor"
+verified = "2026-10-02"
+
+[[part]]
+id = "r-dm"
+lcsc = "C25190"
+mpn = "0603WAF270JT5E"
+manufacturer = "UNI-ROYAL"
+package = "0603"
+description = "27Ω ±1% 100mW 0603 Thick Film Resistor"
+verified = "2026-10-02"
+
+[[part]]
+id = "xtal"
+lcsc = "C9002"
+mpn = "X322512MSB4SI"
+manufacturer = "YXC Crystal Oscillators"
+package = "SMD3225-4P"
+description = "Crystal 12MHz ±10ppm 20pF SMD3225-4P"
+verified = "2026-10-02"
+
+[[part]]
+id = "r-xout"
+lcsc = "C21190"
+mpn = "0603WAF1001T5E"
+manufacturer = "UNI-ROYAL"
+package = "0603"
+description = "1kΩ ±1% 100mW 0603 Thick Film Resistor"
+verified = "2026-10-02"
+
+[[part]]
+id = "c-xin"
+lcsc = "C1663"
+mpn = "CL10C330JB8NNNC"
+manufacturer = "Samsung Electro-Mechanics"
+package = "0603"
+description = "33pF ±5% 50V Ceramic Capacitor C0G 0603"
+verified = "2026-10-02"
+
+[[part]]
+id = "c-xout"
+lcsc = "C1663"
+mpn = "CL10C330JB8NNNC"
+manufacturer = "Samsung Electro-Mechanics"
+package = "0603"
+description = "33pF ±5% 50V Ceramic Capacitor C0G 0603"
+verified = "2026-10-02"
+
+[[part]]
+id = "flash"
+lcsc = "C179173"
+mpn = "W25Q32JVSSIQ"
+manufacturer = "Winbond"
+package = "SOIC-8-208mil"
+verified = "2026-10-02"
+
+[[part]]
+id = "sensor"
+lcsc = "C2757850"
+mpn = "AHT20"
+manufacturer = "Aosong"
+package = "SMD"
+verified = "2026-10-02"
+
+[[part]]
+id = "r-sda"
+lcsc = "C23162"
+mpn = "0603WAF4701T5E"
+manufacturer = "UNI-ROYAL"
+package = "0603"
+description = "4.7kΩ ±1% 100mW 0603 Thick Film Resistor"
+verified = "2026-10-02"
+
+[[part]]
+id = "r-scl"
+lcsc = "C23162"
+mpn = "0603WAF4701T5E"
+manufacturer = "UNI-ROYAL"
+package = "0603"
+description = "4.7kΩ ±1% 100mW 0603 Thick Film Resistor"
+verified = "2026-10-02"
+
+[[part]]
+id = "led"
+lcsc = "C2761795"
+mpn = "WS2812B-B/T"
+manufacturer = "Worldsemi"
+package = "SMD5050-4P"
+verified = "2026-10-02"
+
+[[part]]
+id = "c-led"
+lcsc = "C14663"
+mpn = "CC0603KRX7R9BB104"
+manufacturer = "YAGEO"
+package = "0603"
+description = "100nF ±10% 50V Ceramic Capacitor X7R 0603"
+verified = "2026-10-02"

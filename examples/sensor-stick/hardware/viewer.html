@@ -1,0 +1,231 @@
+<!doctype html>
+<!--
+  The hardware viewer. Platform-owned: installed by `fid add capability hardware`.
+
+  Opened by hardware/render.mjs to take the review-pack pictures, and written
+  by it, with every mesh inlined, as hardware/build/review/viewer.html — one
+  file you can open anywhere, orbit, explode and section.
+
+  Query: ?view=assembled|exploded|section|inside  &shot=1 (fixed camera, no UI)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hardware viewer</title>
+<style>
+  :root { --bg: #f3efe9; --ink: #1d1a17; --muted: #6d655c; --card: rgba(255,255,255,.82); --line: #d8d0c6; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #16130f; --ink: #f1ece6; --muted: #a39a8f; --card: rgba(30,26,22,.82); --line: #3a332c; } }
+  :root[data-theme="dark"] { --bg: #16130f; --ink: #f1ece6; --muted: #a39a8f; --card: rgba(30,26,22,.82); --line: #3a332c; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.4 ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; }
+  .card { position: absolute; background: var(--card); backdrop-filter: blur(8px); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  #title { top: 16px; left: 16px; max-width: min(420px, calc(100vw - 64px)); }
+  #title h1 { margin: 0 0 2px; font-size: 16px; } #title p { margin: 0; color: var(--muted); font-size: 12px; }
+  #legend { bottom: 16px; left: 16px; font-size: 12px; display: grid; grid-template-columns: repeat(2, auto); gap: 4px 14px; }
+  #legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+  #checks { top: 16px; right: 16px; font-size: 12px; }
+  #checks b.ok { color: #2e8b57; } #checks b.bad { color: #c0392b; }
+  #ui { bottom: 16px; right: 16px; display: flex; gap: 6px; flex-wrap: wrap; }
+  #ui button { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+  #ui button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  body.shot #ui { display: none; }
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="title" class="card"><h1 id="name">…</h1><p id="sub"></p></div>
+<div id="checks" class="card"></div>
+<div id="legend" class="card"></div>
+<div id="ui" class="card">
+  <button data-view="assembled">Assembled</button>
+  <button data-view="exploded">Exploded</button>
+  <button data-view="section">Section</button>
+  <button data-view="inside">Inside</button>
+  <button data-view="underside">Underside</button>
+  <button data-view="board">Board</button>
+</div>
+<script type="module">
+import * as THREE from "three";
+import { STLLoader } from "three/addons/loaders/STLLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+const q = new URLSearchParams(location.search);
+const shot = q.get("shot") === "1";
+if (shot) document.body.classList.add("shot");
+
+// Inlined by render.mjs for the standalone viewer; fetched otherwise.
+const scene = window.__SCENE__ ?? await (await fetch("scene.json")).json();
+const checks = window.__CHECKS__ ?? await fetch("checks.json").then(r => r.json()).catch(() => null);
+const loadStl = async (name) => {
+  if (window.__STL__) { const b = atob(window.__STL__[name]); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; }
+  return (await fetch(name)).arrayBuffer();
+};
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(shot ? 1 : Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.localClippingEnabled = true;
+document.body.prepend(renderer.domElement);
+
+const world = new THREE.Scene();
+const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+world.background = new THREE.Color(dark ? 0x16130f : 0xf3efe9);
+world.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+world.add(new THREE.HemisphereLight(0xffffff, 0x8a7a6a, 0.6));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.6;
+sun.shadow.radius = 6;
+world.add(sun, sun.target);
+
+// CAD is z-up in millimetres; three is y-up.
+const root = new THREE.Group();
+root.rotation.x = -Math.PI / 2;
+world.add(root);
+
+const clip = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
+const meshes = [];
+const loader = new STLLoader();
+for (const p of scene.parts) {
+  const geo = loader.parse(await loadStl(p.stl));
+  geo.computeVertexNormals();
+  const [color, metalness, roughness, opacity] = scene.looks[p.look] ?? ["#888888", 0, 0.6, 1];
+  const mat = new THREE.MeshStandardMaterial({ color, metalness, roughness, transparent: opacity < 1, opacity, side: THREE.DoubleSide, clipShadows: true });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = mesh.receiveShadow = true;
+  const g = new THREE.Group(); g.add(mesh); g.userData = p;
+  // A manufacturer's model is already detailed; outlines would only add noise.
+  if (!p.look.startsWith("#")) g.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 28), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28 })));
+  root.add(g); meshes.push(g);
+}
+
+// The routed board's copper, from KiCad's own geometry (route.py → copper.json):
+// pours and tracks under green solder mask, pads exposed in ENIG gold, vias.
+if (scene.copper) {
+  const cu = scene.copper;
+  const [ox, oy] = cu.origin;
+  const P = ([x, y]) => new THREE.Vector2(x + ox, oy - y);   // KiCad (y down) → case (y up)
+  const mats = {
+    pour: new THREE.MeshStandardMaterial({ color: "#145c31", roughness: 0.42, metalness: 0.05 }),
+    track: new THREE.MeshStandardMaterial({ color: "#1f7a42", roughness: 0.38, metalness: 0.1 }),
+    pad: new THREE.MeshStandardMaterial({ color: "#d9b25a", roughness: 0.28, metalness: 0.9 }),
+    via: new THREE.MeshStandardMaterial({ color: "#1f7a42", roughness: 0.38, metalness: 0.1 }),
+    hole: new THREE.MeshBasicMaterial({ color: "#151515" }),
+  };
+  const group = new THREE.Group();
+  const flat = (shape, mat, z) => { const m = new THREE.Mesh(new THREE.ShapeGeometry(shape, 8), mat); m.position.z = z; m.receiveShadow = true; group.add(m); };
+  for (const side of ["F.Cu", "B.Cu"]) {
+    const top = side === "F.Cu";
+    // Just off the board's face, in drawing order: pour, track, pad.
+    const z = (k) => top ? cu.z_top + 0.01 * k : cu.z_bottom - 0.01 * k;
+    for (const p of cu.pours.filter(p => p.layer === side)) {
+      const s = new THREE.Shape(p.outline.map(P));
+      s.holes = p.holes.map(h => new THREE.Path(h.map(P)));
+      flat(s, mats.pour, z(1));
+    }
+    for (const t of cu.tracks.filter(t => t.layer === side)) {
+      const a = P(t.a), b = P(t.b), d = b.clone().sub(a), len = d.length(), r = t.w / 2;
+      const s = new THREE.Shape();
+      if (len > 1e-6) {
+        const n = new THREE.Vector2(-d.y, d.x).normalize().multiplyScalar(r), ang = Math.atan2(d.y, d.x);
+        s.moveTo(a.x + n.x, a.y + n.y); s.lineTo(b.x + n.x, b.y + n.y);
+        s.absarc(b.x, b.y, r, ang + Math.PI / 2, ang - Math.PI / 2, true);
+        s.lineTo(a.x - n.x, a.y - n.y);
+        s.absarc(a.x, a.y, r, ang - Math.PI / 2, ang + Math.PI / 2, true);
+      } else s.absarc(a.x, a.y, r, 0, Math.PI * 2);
+      flat(s, mats.track, z(2));
+    }
+    for (const p of cu.pads.filter(p => p.layers.includes(side))) {
+      const c = P(p.at), [w, h] = p.size, s = new THREE.Shape();
+      if (p.shape === "circle") s.absarc(0, 0, w / 2, 0, Math.PI * 2);
+      else { s.moveTo(-w / 2, -h / 2); s.lineTo(w / 2, -h / 2); s.lineTo(w / 2, h / 2); s.lineTo(-w / 2, h / 2); }
+      const m = new THREE.Mesh(new THREE.ShapeGeometry(s, 12), mats.pad);
+      m.position.set(c.x, c.y, z(3)); m.rotation.z = THREE.MathUtils.degToRad(p.rot);
+      group.add(m);
+    }
+    for (const v of cu.vias) {
+      const c = P(v.at), ring = new THREE.Shape(); ring.absarc(c.x, c.y, v.d / 2, 0, Math.PI * 2);
+      flat(ring, mats.via, z(2));
+      const hole = new THREE.Shape(); hole.absarc(c.x, c.y, v.drill / 2, 0, Math.PI * 2);
+      flat(hole, mats.hole, z(3));
+    }
+  }
+  group.userData = { group: "board", explode_mm: cu.explode_mm, look: "copper" };
+  root.add(group); meshes.push(group);
+}
+
+const box = new THREE.Box3().setFromObject(root);
+const size = box.getSize(new THREE.Vector3()), centre = box.getCenter(new THREE.Vector3());
+const span = Math.max(size.x, size.y, size.z);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(span * 20, span * 20), new THREE.ShadowMaterial({ opacity: dark ? 0.5 : 0.22 }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = box.min.y - 0.01; ground.receiveShadow = true;
+world.add(ground);
+sun.position.set(centre.x + span * 0.8, centre.y + span * 1.6, centre.z + span * 0.9);
+sun.target.position.copy(centre);
+const sc = sun.shadow.camera; sc.left = sc.bottom = -span * 1.5; sc.right = sc.top = span * 1.5; sc.far = span * 6; sc.updateProjectionMatrix();
+
+const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 1, span * 40);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = !shot;
+
+// Legend, title, checks: derived from scene.json and checks.json.
+document.getElementById("name").textContent = scene.product;
+document.getElementById("sub").textContent = `${size.x.toFixed(1)} × ${size.z.toFixed(1)} × ${size.y.toFixed(1)} mm · ${new Set(scene.parts.map(p => p.name)).size} parts`;
+const used = scene.legend ?? [...new Set(scene.parts.map(p => p.look))];
+document.getElementById("legend").innerHTML = used.map(l => `<span style="--c:${scene.looks[l]?.[0] ?? "#888"}">${l}</span>`).join("");
+const ck = document.getElementById("checks");
+if (checks) {
+  const rows = ["interference", "insertion", "lid", "screws", "seal"].map(k => `${k}: <b class="${checks[k]?.length ? "bad" : "ok"}">${checks[k]?.length ? checks[k].length + " failing" : "pass"}</b>`);
+  ck.innerHTML = rows.join("<br>");
+} else ck.remove();
+
+function setView(v) {
+  for (const b of document.querySelectorAll("#ui button")) b.setAttribute("aria-pressed", b.dataset.view === v);
+  for (const g of meshes) {
+    const p = g.userData;
+    g.position.set(0, 0, v === "exploded" ? p.explode_mm : 0);
+    // Inside: everything the lid carries is lifted away. Exploded: wires would
+    // float disconnected from what they join, so they are left out.
+    g.visible = !(((v === "inside" || v === "board") && ["lid", "top", "screws"].includes(p.group)) || (v === "exploded" && p.group === "wires"));
+    g.traverse(c => { if (c.material) c.material.clippingPlanes = v === "section" ? [clip] : []; });
+  }
+  ground.visible = v !== "underside";
+  clip.constant = centre.x;
+  const lift = v === "exploded" ? 75 : 0;
+  const target = centre.clone(); target.y += lift;
+  const d = span * (v === "exploded" ? 2.5 : 2.0);
+  if (v === "board") {
+    // Close on the board: its parts, its copper, the wires that land on it.
+    const bb = new THREE.Box3();
+    for (const g of meshes) if (g.userData.group === "board") bb.expandByObject(g);
+    const c = bb.getCenter(new THREE.Vector3()), s = bb.getSize(new THREE.Vector3()), r = Math.max(s.x, s.z);
+    camera.position.set(c.x + r * 0.35, c.y + r * 1.25, c.z + r * 0.75);
+    controls.target.copy(c); controls.update();
+    return;
+  }
+  if (v === "inside") camera.position.set(centre.x + span * 0.05, centre.y + d * 1.05, centre.z + span * 0.35);
+  else if (v === "underside") camera.position.set(centre.x + d * 0.45, centre.y - d * 0.85, centre.z + d * 0.55);
+  else if (v === "section") camera.position.set(centre.x + d * 0.9, centre.y + d * 0.3, centre.z + d * 0.5);
+  else camera.position.set(centre.x + d * 0.62, centre.y + d * 0.55 + lift * 0.4, centre.z + d * 0.78);
+  controls.target.copy(target); controls.update();
+}
+for (const b of document.querySelectorAll("#ui button")) b.onclick = () => setView(b.dataset.view);
+setView(q.get("view") ?? "assembled");
+// render.mjs loads the page once and switches views here: parsing every
+// mesh again per picture was most of the review pack's time.
+window.setView = setView;
+
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(world, camera); });
+requestAnimationFrame(() => requestAnimationFrame(() => { window.__ready = true; }));
+</script>
+</body>
+</html>

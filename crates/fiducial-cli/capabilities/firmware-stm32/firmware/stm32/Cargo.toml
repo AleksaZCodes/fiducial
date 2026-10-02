@@ -33,15 +33,3 @@ panic-probe = { workspace = true }
 
 cortex-m    = { workspace = true }
 cortex-m-rt = { workspace = true }
-
-[profile.dev]
-debug           = 2
-opt-level       = "s"
-overflow-checks = true
-
-[profile.release]
-debug           = 2
-opt-level       = "s"
-lto             = true
-codegen-units   = 1
-overflow-checks = false

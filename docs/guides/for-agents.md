@@ -115,6 +115,22 @@ triangle counts; they assert the mesh is watertight by directed-edge uniqueness
 and positive signed volume, then ray-probe the shipped STL bytes. Write the test
 that would catch the bug, not the test that describes the code.
 
+**Hardware: read the part before you touch it.** In a product with the
+`hardware` capability, start from `hardware/lib/PARTS.md` — every part, its
+KiCad files, its datasheet and every pin's net on one page. Grep the
+datasheet's `.txt` beside the PDF before choosing a value, a pin or a land
+pattern; a number from memory is how a module gets drawn the wrong size. A new
+part gets its `footprint`, `symbol`, `lcsc` or `datasheet` declared and
+`python3 hardware/parts.py sync` run — never a hand-drawn body.
+
+**Hardware: placement is solved; state requirements as requirements.** Board
+parts are placed by a constraint solver. Something that *must* hold — at an
+edge, at a position, at a turn, kept apart — is declared with a hard kind
+(`zone`, `at_mm`, `rotate_deg`/`faces`, `away_from`); `near` is a preference
+the solver trades against short connections. When derive says declarations
+cannot hold together, it names a minimal set: relax one of those, or give the
+board room — read `hardware/build/placement-model.json` before guessing.
+
 ---
 
 ## Reusing an existing codebase

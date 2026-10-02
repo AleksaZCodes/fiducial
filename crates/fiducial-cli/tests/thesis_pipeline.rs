@@ -86,11 +86,7 @@ fn declaring_a_claim_starts_deriving_the_pitch() {
 
     let out = run(
         &root,
-        &[
-            "thesis",
-            "set",
-            "No unverified alert ever reaches a responder.",
-        ],
+        &["thesis", "set", "No estimated reading ever reaches a bill."],
     );
     assert!(out.status.success(), "{out:?}");
 
@@ -99,7 +95,7 @@ fn declaring_a_claim_starts_deriving_the_pitch() {
 
     let pitch = std::fs::read_to_string(root.join("PITCH.md")).unwrap();
     assert!(
-        pitch.contains("**No unverified alert ever reaches a responder.**"),
+        pitch.contains("**No estimated reading ever reaches a bill.**"),
         "{pitch}"
     );
 

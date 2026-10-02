@@ -172,50 +172,56 @@ this repo runs `fid derive --check`. If you deleted that job, this line would
 change to a warning — the dashboard reports the absence of the guard, not just
 its presence.
 
-## 4 · Declare a board
+## 4 · Declare a product
 
 ```sh
-fid add eda
+fid add capability hardware
 ```
 
-That installs two pipelines and a seed declaration at
-`board/board.interface.json`. Open it. This is the file the rest of the guide
-derives from:
+That installs the `hardware` pipeline and a seed declaration at
+`hardware/product.toml`, with an outline drawn in `hardware/outline.svg`.
+Open it. This is the file the rest of the guide derives from, trimmed:
 
-```json
-{
-  "schema_version": "1.0",
-  "board": { "name": "demo", "revision": "A" },
-  "outline": {
-    "width_mm": 100.0,
-    "height_mm": 60.0,
-    "thickness_mm": 1.6,
-    "tolerance": "fdm",
-    "enclosure": { "headroom_mm": 10.0, "standoff_height_mm": 3.0 }
-  },
-  "connectors": [
-    {
-      "id": "J1", "name": "USB-C", "type": "usb-c",
-      "mount": { "side": "south", "offset_mm": 20.0 },
-      "pins": [{ "number": 1, "name": "VBUS", "net": "PWR_5V", "direction": "power_in" }]
-    }
-  ]
-}
+```toml
+[outline]
+svg   = "hardware/outline.svg"
+layer = "outline"
+
+[case]
+wall_mm  = 5.0
+floor_mm = 3.0
+lid_mm   = 4.0
+
+[[part]]
+id      = "display"
+place   = "window"
+mount   = "window"
+body_mm = [60.0, 52.0, 3.0]
+status  = "assumed"
+
+[[part]]
+id      = "mcu"
+name    = "Microcontroller module"
+place   = "board"
+mount   = "smd"
+body_mm = [18.0, 18.0, 3.0]
+status  = "assumed"
 ```
 
 Three things here are doing more work than they look like they are:
 
-**`"tolerance": "fdm"`** declares the manufacturing process. Clearances and wall
-thicknesses are derived from it, so the same board yields a *tighter* case on
-resin than on FDM without you editing a dimension.
+**The outline is a shape, not a size.** The SVG gives the case its form;
+the parts give it its scale. The window region grows until it holds the
+display, less the gasket's overlap, and the outline grows with it: no
+dimension of the case is typed. `hardware/generated/assembly.md` says why
+each thing is the size it is.
 
-**`"type": "usb-c"`** implies the size of the hole. The connector family maps to
-a body envelope, so the opening is never typed in a second time. Change the
-connector type and the hole changes.
+**`place = "board"`** puts a part on the board, and the board is sized
+from its parts: "324 mm² of footprint at fill 0.4 plus 12.8 mm of mounting
+margin → 42 mm square". Make the module bigger and the board grows.
 
-**`"offset_mm": 20.0`** is in board coordinates, so it means the same thing on
-every edge. Move the connector to `"side": "west"` and it stays 20 mm from the
-same origin.
+**`status = "assumed"`** says this part is a placeholder. `fid derive`
+carries it into the BOM as unsettled, so a guess cannot pass for a choice.
 
 ## 5 · Derive
 
@@ -223,14 +229,13 @@ same origin.
 fid derive
 ```
 
-This runs both pipelines and writes:
-
-```
-enclosure/case-base.stl   the base, with a gasket groove and the USB-C opening
-enclosure/case-lid.stl    the lid, with a compression tongue
-enclosure/gasket.stl      the seal — print this in TPU
-enclosure/case.glb        the exploded assembly, for a web viewer
-```
+This solves the declaration and writes `hardware/generated/`: the layout, the
+board with every part placed and every pad on its net, the schematic, the BOM,
+the assembly order, and the pin map the firmware and the web app read. The
+board placement is solved by CP-SAT, so `pip install -r
+hardware/requirements.txt` first. `hardware/build.sh` then turns it into
+solids, a routed board and fab files ([the sensor stick](./sensor-stick.md)
+walks through it end to end).
 
 **Nobody modelled any of that.** It came from the declaration in step 4.
 
@@ -244,13 +249,17 @@ fid graph
 
 ```text
 $ fid graph
-pipeline: eda (fid-validate)
-  → artifact: board/board.interface.json
-pipeline: enclosure (fid-mesh)
-  → artifact: enclosure/case-base.stl
-  → artifact: enclosure/case-lid.stl
-  → artifact: enclosure/gasket.stl
-  → artifact: enclosure/case.glb
+pipeline: hardware (fid-hardware)
+  → artifact: hardware/generated/layout.json
+  → artifact: hardware/generated/placement-model.json
+  → artifact: hardware/generated/placement.json
+  → artifact: hardware/generated/bom.csv
+  → artifact: hardware/generated/assembly.md
+  → artifact: hardware/generated/board.kicad_pcb
+  → artifact: hardware/generated/board.kicad_sch
+  → artifact: hardware/generated/interface.json
+  → artifact: hardware/generated/interface.ts
+  → artifact: hardware/generated/board.rs
 pipeline: thesis (fid-thesis)
   → artifact: PITCH.md
   → artifact: apps/web/src/generated/thesis.ts
@@ -275,15 +284,16 @@ $ fid derive --check
 
 <!-- /capture -->
 
-Now break it deliberately. Open `board/board.interface.json`, change
-`width_mm` to `120.0`, and run `--check` again:
+Now break it deliberately. Open `hardware/product.toml`, make the
+microcontroller module `body_mm = [24.0, 24.0, 3.0]`, and run `--check`
+again:
 
 <!-- capture: fid-derive-check-stale.txt -->
 
 ```text
 $ fid derive --check
 ✗ fid derive --check failed:
-  board/board.interface.json: stale (lock:9d241d22 file:867aeb34) — run `fid derive`
+  hardware/product.toml: changed since `hardware` last ran (lock:82f5a6d2 file:718d3b8c) — its outputs may no longer follow from it (run `fid derive`)
 Error: stale artifacts detected
 ```
 
@@ -293,8 +303,8 @@ Non-zero exit. **That is the guarantee.** Not "we generate things" — an artifa
 that has drifted from its declaration cannot reach `main`, because the workflow
 scaffolded in step 1 runs exactly this.
 
-Run `fid derive` and it is green again — and the case is now 10 mm wider, with
-the USB-C opening still 20 mm from the same edge.
+Run `fid derive` and it is green again: the board has grown around the
+bigger module, and `assembly.md` says by how much.
 
 ## 7 · Version the wire
 
@@ -328,18 +338,18 @@ fails CI rather than shipping a firmware that cannot talk to its app.
 ## What you just built
 
 ```
-board/board.interface.json     ← you wrote this
+hardware/product.toml          ← you wrote this
          │
          │  fid derive
          ▼
-enclosure/*.stl   enclosure/*.glb   packages/*/types.ts
+board · schematic · BOM · assembly · interface.ts · board.rs
          │
          │  fid derive --check   (in CI, on every push)
          ▼
    a build that fails if any of them stopped matching
 ```
 
-One declaration. Four derivations. A gate that catches the fifth time you forget.
+One declaration. Every discipline derived from it. A gate that catches the time you forget.
 
 ## Where to go next
 

@@ -323,6 +323,9 @@ mod triangulate;
 #[cfg(feature = "alloc")]
 pub use triangulate::{circle, circumradius_for_width, triangulate};
 
+#[cfg(feature = "alloc")]
+pub mod fit;
+
 // ── Board edges ───────────────────────────────────────────────────────────────
 
 /// Which edge of a board — and so which wall of its case — a feature sits on.

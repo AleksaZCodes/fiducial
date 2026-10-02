@@ -18,7 +18,7 @@
 //!   them.
 //!
 //! - For a **platform-owned** file it is the honest way to record a fork you
-//!   meant. fon has six: a `ci.yml` with its own pin, a customised
+//!   meant. The first product has six: a `ci.yml` with its own pin, a customised
 //!   `doodle.tsx`, three forked derive scripts. Each one is real — `fid
 //!   upgrade` will merge over them — and each is intentional. Re-baselining
 //!   says so, in the lock, where the next upgrade can see it.

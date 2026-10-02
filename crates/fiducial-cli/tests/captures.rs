@@ -37,7 +37,7 @@ use std::process::Command;
 ///
 /// Steps run **in order against the same product**, so the captures show the
 /// state a reader actually reaches at that point in the guide. Some steps exist
-/// only to advance that state — `fid add eda` installs the pipelines that make
+/// only to advance that state — `fid add capability hardware` installs the pipeline that make
 /// `fid graph` show anything — and those have no `file`.
 ///
 /// This matters more than it looks. The first version of this harness ran every
@@ -90,7 +90,7 @@ fn steps() -> Vec<Step> {
         capture("fid-dash.txt", &["dash"]),
         capture("fid-dash-ci.txt", &["dash", "--section", "ci"]),
         // From here the guide has a board, so the captures must too.
-        setup(&["add", "eda"]),
+        setup(&["add", "capability", "hardware"]),
         capture("fid-graph.txt", &["graph"]),
         setup(&["derive"]),
         capture("fid-derive-check.txt", &["derive", "--check"]),
@@ -98,9 +98,9 @@ fn steps() -> Vec<Step> {
         // The guarantee, shown failing. Last, because it leaves the product
         // deliberately stale and every capture above it expects fresh.
         edit(
-            "board/board.interface.json",
-            "\"width_mm\": 100.0",
-            "\"width_mm\": 120.0",
+            "hardware/product.toml",
+            "body_mm = [18.0, 18.0, 3.0]",
+            "body_mm = [24.0, 24.0, 3.0]",
         ),
         capture("fid-derive-check-stale.txt", &["derive", "--check"]),
     ]

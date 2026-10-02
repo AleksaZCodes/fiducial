@@ -183,7 +183,10 @@ fn cmd_list(show_all: bool) -> Result<()> {
         if !available.is_empty() {
             println!("  AVAILABLE (not installed)");
             for def in available {
-                println!("  · {id:<24} {desc}", id = def.id, desc = def.description);
+                match &def.deprecated {
+                    Some(why) => println!("  · {id:<24} DEPRECATED — {why}", id = def.id),
+                    None => println!("  · {id:<24} {desc}", id = def.id, desc = def.description),
+                }
                 print_contributions(def);
             }
             println!();

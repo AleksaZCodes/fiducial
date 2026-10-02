@@ -7,7 +7,7 @@
 
 ## Context
 
-Both this repository and `fon` declared `no-direct-main-push` in
+Both this repository and the first product declared `no-direct-main-push` in
 `[guard] rules`. Neither had branch protection on GitHub. Both believed main was
 protected. Neither was.
 
