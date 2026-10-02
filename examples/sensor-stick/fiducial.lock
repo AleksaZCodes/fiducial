@@ -882,7 +882,7 @@ echo "done: hardware/build/ (review pack in hardware/build/review/)"
 
 [templates."hardware/cad.py"]
 source_version = "0.9.0"
-hash = "b2f7ff3794f5edee5b5e0361c6f80f5720228cf5c5477b69e1f3879805053a30"
+hash = "f1869c077324fa3549991531eabbb8ca92232a19cce4738ae41cf627c13221c8"
 base_content = '''
 #!/usr/bin/env python3
 """hardware/generated/layout.json -> a functional, assemblable model.
@@ -1143,13 +1143,34 @@ def board_part(solids, nm, q, top, look, routed):
 
 
 
-def opening(op):
-    """The window through the wall in front of a board part's mouth: from just
-    inside the mouth, out past the outer face, its long side horizontal."""
+def opening(op, inward=0.5):
+    """The window through the wall in front of a board part's mouth: from
+    `inward` inside the mouth, out past the outer face, its long side
+    horizontal. A notch (`notch`) runs on up to the base's top edge, so the
+    board drops in with the socket already in it."""
     (x, y, z), (nx, ny) = op["mouth_mm"], op["normal"]
     w, h = op["size_mm"]
-    pl = Plane(origin=(x - nx * 0.5, y - ny * 0.5, z), x_dir=(-ny, nx, 0), z_dir=(nx, ny, 0))
-    return pl * Box(w, h, op["length_mm"] + 0.5, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    lo = z - h / 2
+    hi = op["top_mm"] + 0.01 if op.get("notch") else z + h / 2
+    if op.get("notch"):
+        # Through the whole wall above the socket, or a lip of it would stand
+        # over the socket's body and stop the board dropping in.
+        inward = max(inward, op["length_mm"])
+    pl = Plane(origin=(x - nx * inward, y - ny * inward, (lo + hi) / 2), x_dir=(-ny, nx, 0), z_dir=(nx, ny, 0))
+    return pl * Box(w, hi - lo, op["length_mm"] + inward, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+
+def notch_plug(op, wall, gap=0.1):
+    """The lid's share of a notch: the wall's thickness, from the window's top
+    up to the lid, `gap` narrower each side so it drops in. With it in, what
+    is left open is the window alone."""
+    (x, y, z), (nx, ny) = op["mouth_mm"], op["normal"]
+    w, h = op["size_mm"]
+    lo, hi = z + h / 2, op["top_mm"] + 0.01
+    # The wall's inner face: the mouth is `recess_mm` in from the outer one.
+    back = op["recess_mm"] - wall
+    pl = Plane(origin=(x + nx * back, y + ny * back, (lo + hi) / 2), x_dir=(-ny, nx, 0), z_dir=(nx, ny, 0))
+    return pl * Box(w - 2 * gap, hi - lo, wall, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
 
 def apply_models(L, solids, out):
@@ -1380,6 +1401,14 @@ def build(L):
             cavity, amount=-1.6, kind=Kind.ARC
         )
         lid += slab(skirt, H - pf["skirt_mm"], pf["skirt_mm"])
+        # The skirt stops where a socket's notch is: the socket stands in it.
+        for op in c.get("openings", []):
+            if op.get("notch"):
+                lid -= opening(op, inward=wall + 2.0)
+    # A notch is closed from above, whatever holds the lid on.
+    for op in c.get("openings", []):
+        if op.get("notch"):
+            lid += notch_plug(op, wall)
 
     for rp in L["region_parts"]:
         body = rp["body"]
@@ -2901,7 +2930,7 @@ if __name__ == "__main__":
 
 [templates."hardware/place.py"]
 source_version = "0.9.0"
-hash = "a2a055a6b9c6a8cc342919be1fa39d3dfbfab44239950c4c823c768fe0dfd66d"
+hash = "ca52e2ed6a4c83c438a6374e0614dd6ec9c5d7f463bfa150bfba6459c08f3869"
 base_content = '''
 #!/usr/bin/env python3
 """Where every board part goes and which way it turns, by constraint programming.
@@ -2978,7 +3007,13 @@ def build(m: dict, explain: bool):
         return lit
 
     (bx0, by0), (bx1, by1) = (0.0, 0.0), (m["board"]["hi_mm"][0] - ox, m["board"]["hi_mm"][1] - oy)
-    span = (units(bx0) - 1, units(bx1) + 1, units(by0) - 1, units(by1) + 1)
+    # The board, and any region reaching past it (a socket through the wall).
+    regs = [it["region"] for it in m["items"] if it.get("region")]
+    lo_x = min([bx0] + [r["lo_mm"][0] - ox for r in regs])
+    hi_x = max([bx1] + [r["hi_mm"][0] - ox for r in regs])
+    lo_y = min([by0] + [r["lo_mm"][1] - oy for r in regs])
+    hi_y = max([by1] + [r["hi_mm"][1] - oy for r in regs])
+    span = (units(lo_x) - 1, units(hi_x) + 1, units(lo_y) - 1, units(hi_y) + 1)
     # Bound on any doubled coordinate or distance, pads past the board included.
     big = 8 * max(abs(v) for v in span) + 1000
     xs, ys = [], []
@@ -4364,12 +4399,12 @@ base_content = """
 [artifacts."hardware/generated/assembly.md"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "0cfe12af0087768791da36dd6a7265efcb73e7893246601fcfac35e05346b7f5"
+hash = "9e772b57beef8707196ca9548185958e63bef2db89dd88142ed9075c9b22c84b"
 
 [artifacts."hardware/generated/board.kicad_pcb"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "a0c21541ef5d9723ad0e575e90654c2ff760158661f58fe01289095ed7adc006"
+hash = "a2bf0a1589687780771e74785935160b3dbe1bf73b57e004403ff139c53d2f2f"
 
 [artifacts."hardware/generated/board.kicad_sch"]
 pipeline = "hardware"
@@ -4389,27 +4424,27 @@ hash = "3639fb7cf7cb75f9d2a59cce41be2ecbf80fb9f9717b79d9c306d0ee63569467"
 [artifacts."hardware/generated/interface.json"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "3b982a34ce06153e93576c672e852d05c4dca406a108e27347690da7773ee1f2"
+hash = "708f73e9e965d98b03706d4b21669cddbd25c694cd06c6ab410b7f55e6f0b82b"
 
 [artifacts."hardware/generated/interface.ts"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "36a3cf49a0cef6137089adbd84a47a7c17c792d85d587c7fb5ddd6ed1e954d57"
+hash = "51f53e038fd9f74d51ca4acfe59a78ad2ef8d71d96f9df07b751ccfcfc2e492f"
 
 [artifacts."hardware/generated/layout.json"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "750db76032dd8901920e3bf013072616fc7b66178525fa3b74e7314a5c6955ac"
+hash = "373e2d1a0363fd8926cd1a1557381ff051f532020fce2d0da0980aabbdebfe7b"
 
 [artifacts."hardware/generated/placement-model.json"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "a238f7eadbb7e0b70b9c70645f2ce34e6bc03af1565f7a0e69513fdf10716ebb"
+hash = "5c224204487862e6d8d9e6d0bac9d9438ec922259849842050f278dfd5131bb1"
 
 [artifacts."hardware/generated/placement.json"]
 pipeline = "hardware"
 source_version = "0.9.0"
-hash = "501212db9cf16ebba4af9da0b4b72aa192cc97981c6b9343fb645e85f27b43e8"
+hash = "7620bcdeedce978b39eae1a7742ae40d027f75ed46def12558a8c5558d921e42"
 
 [capabilities.firmware-rp2040]
 source = "built-in"
@@ -4481,9 +4516,9 @@ hash = "b262a7083e277ed417c399a56dc25386b7948daa7d9729ec76dc5839ce6b626a"
 pipelines = ["hardware"]
 
 [inputs."hardware/outline.svg"]
-hash = "972bf03777173a41052a57b29cab05844971adbb5a38229a90ef9cdaaec9886f"
+hash = "54abc351034e73f7f3b15677c11743ac1b3858181e59a1b81120cd3d54e7194f"
 pipelines = ["hardware"]
 
 [inputs."hardware/product.toml"]
-hash = "ea74dcfd7146e302cd082dbc0fb726d09bf65f889c18187fd5f8e5e7b3b3cd75"
+hash = "de1a7cb152f9b865415185f3431b13ecbe0ed7f705551b11c28d2c5009566853"
 pipelines = ["hardware"]

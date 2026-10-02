@@ -18,7 +18,7 @@ plugged it in. What would be learnt on the bench is not claimed here.
 | | | |
 |---|---|---|
 | ![The stick, assembled](hardware/showcase/assembled.png) | ![The routed board in the case](hardware/showcase/board.png) | ![Exploded: lid, board, base](hardware/showcase/exploded.png) |
-| assembled: 36 × 88.8 × 15.5 mm, the USB-C window at one end, the sensor's vent at the other | the routed board in the base: the sensor alone at the far end, under its chimney | lid, board, base |
+| assembled: 36 × 84 × 15.5 mm, the USB-C socket flush with the case at one end, the sensor's vent at the other | the routed board in the base: the sensor alone at the far end, under its chimney | lid, board, base |
 
 Renders from `hardware/build.sh`, copied to `hardware/showcase/`.
 

@@ -23,10 +23,11 @@ width_mm = 36.0          # wide enough for the board inside; the length follows 
 [case]
 process      = "fdm"
 colour       = "#1d4ed8"   # translucent blue PETG: the LED shows through the lid
-wall_mm      = 2.0
+wall_mm      = 1.6
 floor_mm     = 2.0
 lid_mm       = 2.0
 clearance_mm = 0.3
+grid_mm      = 0.5   # the floor search's step: fine enough for the board to stand against the plug's wall
 
 [case.seal]
 kind = "none"            # indoors: a printed shell, no gasket
@@ -43,7 +44,7 @@ fill         = 0.64
 standoff_mm  = 3.0
 mount        = "snap"
 screw        = "M2"
-near         = ["vent", "bottom"]   # under the vent at one end, against the plug's wall at the other
+near         = ["bottom", "vent"]   # against the plug's wall at one end, under the vent at the other
 edge_mm      = 0.8
 power_nets   = ["VBUS", "3V3", "GND"]
 track_mm     = 0.15                 # the RP2040's 0.4 mm-pitch QFN escapes at 0.15 / 0.127
@@ -70,7 +71,6 @@ mount        = "smd"
 zone         = "usb"
 faces        = "bottom"        # the socket's mouth, as KiCad draws it (pads at the back, top): turned to face the zone's edge
 through_wall = true        # the case wall in front of it gets a window for the plug
-opening_mm   = [12.5, 6.5] # sized for a USB-C plug's moulded body, so the plug goes into the wall
 symbol       = "Connector:USB_C_Receptacle_USB2.0_16P"
 footprint    = "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12"   # KiCad's land pattern, LCSC's model: hardware/vendor/
 height_mm    = 3.2
