@@ -251,3 +251,26 @@ fn an_accepted_fork_survives_the_next_upgrade() {
         "the fork survived:\n{after}"
     );
 }
+
+/// What an upgrade did not merge into a file the product rewrote is one
+/// command away, expanded for this product.
+#[test]
+fn upgrade_upstream_prints_the_platforms_version_of_a_tracked_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    std::fs::write(root.join("MISSION.md"), "# demo\n\nMine, entirely.\n").unwrap();
+    let out = run(&root, &["upgrade", "--upstream", "MISSION.md"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let printed = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        printed.contains("demo") && !printed.contains("Mine, entirely"),
+        "{printed}"
+    );
+    let out = run(&root, &["upgrade", "--upstream", "nowhere.txt"]);
+    assert!(!out.status.success());
+    assert!(
+        text(&out).contains("not a file the platform ships"),
+        "{}",
+        text(&out)
+    );
+}

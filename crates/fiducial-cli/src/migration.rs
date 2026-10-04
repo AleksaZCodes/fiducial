@@ -83,6 +83,27 @@ pub static BUILTIN_MIGRATIONS: &[Migration] = &[
             replace: "compatibility_date = \"2025-01-01\"",
         }],
     },
+    // The web-next template moved to Next 16. A major framework version is a
+    // migration, said and recorded, not a line that rides in on a template
+    // merge — and a product that rewrote its package.json never got it at all.
+    Migration {
+        id: "web-next/0.9.3/next-16",
+        description:
+            "Move Next.js 15 → 16 (the web-next template's version); run `pnpm install` and build",
+        introduced_in: "0.9.3",
+        ops: &[
+            MigrationOp {
+                file_path: "apps/web/package.json",
+                search: r#""next": "^15.0.0""#,
+                replace: r#""next": "^16.0.0""#,
+            },
+            MigrationOp {
+                file_path: "apps/web/package.json",
+                search: r#""next":  "^15.0.0""#,
+                replace: r#""next":  "^16.0.0""#,
+            },
+        ],
+    },
 ];
 
 // ── Apply logic ───────────────────────────────────────────────────────────────
@@ -190,6 +211,27 @@ mod tests {
     use std::fs;
 
     /// Build a temporary directory with a file, apply a migration, check output.
+    #[test]
+    fn next_15_moves_to_16_in_either_spacing() {
+        let migration = BUILTIN_MIGRATIONS
+            .iter()
+            .find(|m| m.id == "web-next/0.9.3/next-16")
+            .expect("the Next 16 migration is registered");
+        for line in [r#""next": "^15.0.0","#, r#""next":  "^15.0.0","#] {
+            let tmp = tempfile::TempDir::new().unwrap();
+            let dir = tmp.path().join("apps/web");
+            fs::create_dir_all(&dir).unwrap();
+            fs::write(dir.join("package.json"), format!("{{\n  {line}\n}}\n")).unwrap();
+            let result = apply_one(tmp.path(), migration, false).unwrap();
+            assert_eq!(result.files_modified, 1);
+            let after = fs::read_to_string(dir.join("package.json")).unwrap();
+            assert!(
+                after.contains("^16.0.0") && !after.contains("^15.0.0"),
+                "{after}"
+            );
+        }
+    }
+
     #[test]
     fn apply_font_migration_renames_inter_to_geist() {
         let tmp = tempfile::TempDir::new().unwrap();

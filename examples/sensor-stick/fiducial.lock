@@ -5,6 +5,7 @@ version = 1
 applied_migrations = [
     "web-next/0.2.0/font-inter-to-geist",
     "worker-cloudflare/0.2.0/wrangler-compatibility-date",
+    "web-next/0.9.3/next-16",
 ]
 
 [templates.".claude/agents/fiducial-design.md"]
