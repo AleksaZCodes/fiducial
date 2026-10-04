@@ -80,8 +80,8 @@ Components are copied into `apps/web/src/components/ui/` and become yours —
 no runtime dependency on a Fiducial package. Edit freely; `fid upgrade` will
 offer upstream changes via 3-way merge.
 
-Base UI (@base-ui-components/react) is used for accessible complex components
-(dialog, popover, menu). Run `pnpm add @base-ui-components/react` after adding
+Base UI (@base-ui/react) is used for accessible complex components
+(dialog, popover, menu). Run `pnpm add @base-ui/react` after adding
 the dialog component.",
         after_long_help = "\
 COMPONENTS

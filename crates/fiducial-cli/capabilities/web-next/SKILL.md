@@ -57,7 +57,7 @@ to copy into `apps/web/src/components/ui/`:
 fid add component button
 fid add component card
 fid add component badge
-fid add component dialog    # requires: pnpm add @base-ui-components/react
+fid add component dialog    # requires: pnpm add @base-ui/react
 ```
 
 **Convention (shadcn-compatible):**
@@ -65,7 +65,7 @@ fid add component dialog    # requires: pnpm add @base-ui-components/react
   and `cva` (class-variance-authority). Same conventions as shadcn/ui.
 - Simple components (button, card, badge) use native HTML — no headless library.
 - Complex components (dialog, popover, menu) use **Base UI**
-  (`@base-ui-components/react`) internally instead of Radix. The external API
+  (`@base-ui/react`) internally instead of Radix. The external API
   matches shadcn exactly; only the internal primitive layer differs.
 - `components.json` is scaffolded at `apps/web/components.json` and configures
   the shadcn registry aliases (`@/components/ui`, `@/lib/utils`, etc.).
@@ -73,7 +73,7 @@ fid add component dialog    # requires: pnpm add @base-ui-components/react
 The web app already has `clsx`, `tailwind-merge`, and `class-variance-authority`
 in its `package.json`. For dialog, add Base UI:
 ```sh
-pnpm add @base-ui-components/react --filter @{{name}}/web
+pnpm add @base-ui/react --filter @{{name}}/web
 ```
 
 After copying, components are yours — edit freely. `fid upgrade` proposes upstream

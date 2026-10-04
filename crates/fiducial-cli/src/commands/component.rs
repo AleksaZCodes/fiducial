@@ -8,7 +8,7 @@
 //! through 3-way merge, same as scaffolded template files.
 //!
 //! React components follow shadcn conventions: Tailwind + CVA + cn() utility.
-//! Complex components (dialog) use @base-ui-components/react internally.
+//! Complex components (dialog) use @base-ui/react internally.
 
 use anyhow::{bail, Context, Result};
 use std::path::Path;
@@ -52,8 +52,8 @@ pub fn run(name: &str, framework: &str) -> Result<()> {
     }
     if name == "dialog" && framework == "react" {
         println!(
-            "\n  Dialog uses @base-ui-components/react for accessibility.\n  \
-             Install it:\n    pnpm add @base-ui-components/react --filter @<product>/web"
+            "\n  Dialog uses @base-ui/react for accessibility.\n  \
+             Install it:\n    pnpm add @base-ui/react --filter @<product>/web"
         );
     }
     Ok(())
