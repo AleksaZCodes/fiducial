@@ -166,6 +166,19 @@ pub const RENAMED_TEMPLATES: &[(&str, &str)] = &[
     ),
 ];
 
+/// Templates the platform no longer ships, and why.
+///
+/// A lock record for a path no template answers to is otherwise kept forever:
+/// `fid upgrade` cannot tell a retired template from a third-party
+/// capability's, and `fid doctor` reports the file missing with a promise
+/// that `fid upgrade` restores it, which it cannot. A whole `fid upgrade`
+/// drops the record and removes the file **only when it is unmodified** — an
+/// edited copy is the product's now, and stays.
+pub const RETIRED_TEMPLATES: &[(&str, &str)] = &[(
+    ".github/workflows/claude-review.yml",
+    "review is on request (`fiducial-review`, `/code-review`), not a CI job on every pull request",
+)];
+
 // ── Lookup ────────────────────────────────────────────────────────────────────
 
 /// Look up the raw (unexpanded) template for a repo-relative path.

@@ -182,6 +182,44 @@ pub fn run(dry_run: bool, portfolio: bool, only: Option<String>) -> Result<()> {
         println!();
     }
 
+    // ── 1a′. Templates the platform has retired ───────────────────────────────
+    // A whole upgrade drops their lock records; the file goes only when it is
+    // still exactly what the platform wrote. See `templates::RETIRED_TEMPLATES`.
+    let retired: Vec<(&str, &str)> = templates::RETIRED_TEMPLATES
+        .iter()
+        .copied()
+        .filter(|_| scope.is_none())
+        .filter(|(old, _)| lock.templates.contains_key(*old))
+        .collect();
+    if !retired.is_empty() {
+        println!("  Retired by the platform");
+        for (old, why) in &retired {
+            let path = root.join(old);
+            let unmodified = match (std::fs::read(&path), lock.templates.get(*old)) {
+                (Ok(bytes), Some(record)) => lock::sha256_hex(&bytes) == record.hash,
+                _ => false,
+            };
+            any_changes = true;
+            let fate = if !path.exists() {
+                "already gone"
+            } else if unmodified {
+                "removed"
+            } else {
+                "edited here, so kept as the product's own"
+            };
+            if dry_run {
+                println!("  · {old}: would stop tracking ({why}); {fate}");
+                continue;
+            }
+            if path.exists() && unmodified {
+                std::fs::remove_file(&path).with_context(|| format!("removing {old}"))?;
+            }
+            lock.templates.remove(*old);
+            println!("  ✓ {old}: no longer tracked ({why}); {fate}");
+        }
+        println!();
+    }
+
     // ── 1b. Templates the platform has added since this product was scaffolded ─
     //
     // A 3-way merge can only update files the lock already knows about, so

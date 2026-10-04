@@ -467,6 +467,16 @@ fn check_lock(
             owned_edits += 1;
             continue;
         }
+        if let Some((_, why)) = crate::templates::RETIRED_TEMPLATES
+            .iter()
+            .find(|(p, _)| *p == key)
+        {
+            drifted.push(format!(
+                "{rel}: the platform no longer ships it ({why}). `fid upgrade` stops \
+                 tracking it, and removes it only if it is unedited."
+            ));
+            continue;
+        }
         drifted.push(format!(
             "{rel}: {problem}. This file is platform-owned — `fid upgrade` will \
              rewrite it, so an edit here will be merged over."

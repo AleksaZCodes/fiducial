@@ -165,3 +165,47 @@ fn an_untracked_path_is_refused_by_name() {
     assert!(!out.status.success());
     assert!(text(&out).contains("not a template this product tracks"));
 }
+
+/// A template the platform retired is not reported as missing forever: the
+/// product that first carried it still had the record of a CI review job the
+/// platform stopped shipping, and `fid doctor` promised `fid upgrade` would
+/// restore it. An unedited copy goes; an edited one stays as the product's.
+#[test]
+fn a_retired_template_stops_being_tracked_and_goes_only_if_unedited() {
+    use sha2::{Digest, Sha256};
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    let retired = ".github/workflows/claude-review.yml";
+    let content = "name: review\n";
+    let hash = format!("{:x}", Sha256::digest(content.as_bytes()));
+    let lock = root.join("fiducial.lock");
+    let mut s = std::fs::read_to_string(&lock).unwrap();
+    s.push_str(&format!(
+        "\n[templates.\"{retired}\"]\nsource_version = \"0.1.0\"\nhash = \"{hash}\"\n"
+    ));
+    std::fs::write(&lock, &s).unwrap();
+
+    // Recorded but deleted: doctor tells the truth about it.
+    let out = run(&root, &["doctor"]);
+    assert!(text(&out).contains("no longer ships it"), "{}", text(&out));
+
+    // Recorded and unedited: upgrade removes it and the record.
+    std::fs::write(root.join(retired), content).unwrap();
+    let out = run(&root, &["upgrade"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(!root.join(retired).exists());
+    assert!(!std::fs::read_to_string(&lock).unwrap().contains(retired));
+
+    // Recorded and edited: kept, as the product's own.
+    std::fs::write(&lock, &s).unwrap();
+    std::fs::write(root.join(retired), "name: my review\n").unwrap();
+    let out = run(&root, &["upgrade"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(
+        text(&out).contains("kept as the product's own"),
+        "{}",
+        text(&out)
+    );
+    assert!(root.join(retired).exists());
+    assert!(!std::fs::read_to_string(&lock).unwrap().contains(retired));
+}
