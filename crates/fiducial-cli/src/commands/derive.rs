@@ -407,10 +407,55 @@ fn outputs_with_moved_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
         .collect()
 }
 
+/// `fid-hardware` regenerated in memory and compared with what is committed.
+///
+/// Its outputs are a function of the committed declaration, its inputs and
+/// the committed solver answers, so a hash against `fiducial.lock` is not
+/// enough: a platform change to what the executor writes left a product's
+/// `layout.json` stale while `--check` passed. The solver is never run here
+/// (`place::check_only`); a model whose committed answer no longer fits is
+/// reported instead.
+fn hardware_drift(pipeline: &Pipeline, root: &Path) -> Vec<String> {
+    let decl = pipeline
+        .args
+        .first()
+        .map(|s| s.as_str())
+        .unwrap_or(crate::hardware::DECLARATION);
+    crate::place::check_only(true);
+    let loaded = crate::hardware::load(root, decl);
+    let skip = outputs_not_applicable(pipeline, root);
+    let issues = match loaded {
+        Err(e) => vec![format!(
+            "  `{}`: does not derive from what is committed — {e:#}",
+            pipeline.name
+        )],
+        Ok((product, solved)) => pipeline
+            .outputs
+            .iter()
+            .filter(|out| !skip.contains(*out))
+            .filter_map(|out| {
+                let want = crate::hardware::render_output(out, &product, &solved, root);
+                match (want, std::fs::read_to_string(root.join(out.as_str()))) {
+                    (Ok(want), Ok(have)) if want == have => None,
+                    (Err(e), _) => Some(format!("  {out}: cannot be derived — {e:#}")),
+                    _ => Some(format!(
+                        "  {out}: stale — not what this fid ({}) derives from its inputs: \
+                         an input or the generator changed (run `fid derive`)",
+                        crate::capability::PLATFORM_VERSION
+                    )),
+                }
+            })
+            .collect(),
+    };
+    crate::place::check_only(false);
+    issues
+}
+
 fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
     let mut issues: Vec<String> = Vec::new();
 
     for pipeline in pipelines {
+        let before = issues.len();
         for input in pipeline_inputs(pipeline, root) {
             match (lock.inputs.get(&input), std::fs::read(root.join(&input))) {
                 (_, Err(e)) => issues.push(format!(
@@ -443,6 +488,11 @@ fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
                  an input or the generator changed (run `fid derive`)",
                 crate::capability::PLATFORM_VERSION
             ));
+        }
+        // Regenerated only when no input moved: a moved input already says
+        // the outputs may not follow, and re-derive is the answer either way.
+        if pipeline.executor == "fid-hardware" && issues.len() == before {
+            issues.extend(hardware_drift(pipeline, root));
         }
         let skip = outputs_not_applicable(pipeline, root);
         for out in &pipeline.outputs {

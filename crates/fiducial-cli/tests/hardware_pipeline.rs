@@ -2325,3 +2325,37 @@ fn a_sealed_case_keeps_a_socket_behind_its_wall_rather_than_notch_the_gasket() {
         text(&out)
     );
 }
+
+/// `--check` regenerates the hardware outputs and compares them, so a
+/// layout the lock agrees with but this fid would not write fails — the
+/// shape of a platform change to what the executor writes, which passed a
+/// hash-only check while the example's `layout.json` went stale.
+#[test]
+fn check_regenerates_hardware_outputs_rather_than_trusting_the_lock() {
+    use sha2::{Digest, Sha256};
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    assert!(fid(&root, &["derive", "--pipeline", "hardware"])
+        .status
+        .success());
+    let path = root.join("hardware/generated/layout.json");
+    let old = std::fs::read_to_string(&path).unwrap();
+    let new = old.replacen("\"why\"", "\"why_not\"", 1);
+    assert_ne!(old, new);
+    std::fs::write(&path, &new).unwrap();
+    let lock = root.join("fiducial.lock");
+    let (h_old, h_new) = (
+        format!("{:x}", Sha256::digest(old.as_bytes())),
+        format!("{:x}", Sha256::digest(new.as_bytes())),
+    );
+    let l = std::fs::read_to_string(&lock).unwrap();
+    assert!(l.contains(&h_old));
+    std::fs::write(&lock, l.replace(&h_old, &h_new)).unwrap();
+    let out = fid(&root, &["derive", "--check"]);
+    assert!(!out.status.success());
+    assert!(
+        text(&out).contains("hardware/generated/layout.json: stale"),
+        "{}",
+        text(&out)
+    );
+}

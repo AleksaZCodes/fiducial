@@ -48,6 +48,15 @@ pub fn solve(root: &Path, model: &Value) -> Result<Placed> {
 /// The case floor's model: the sockets and the board, inside the cavity.
 pub const FLOOR_ANSWER: &str = "hardware/generated/floor.json";
 
+/// Set by `fid derive --check`: answer only from the committed answers and
+/// never run the solver, so a check needs no Python and writes nothing. A
+/// model whose answer is not committed is then an error the check reports.
+static CHECK_ONLY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn check_only(on: bool) {
+    CHECK_ONLY.store(on, std::sync::atomic::Ordering::SeqCst);
+}
+
 /// Solve a model whose answer is kept at `answer_path`; `what` names what is
 /// being placed, for the messages.
 pub fn solve_at(root: &Path, model: &Value, answer_path: &str, what: &str) -> Result<Placed> {
@@ -61,6 +70,11 @@ pub fn solve_at(root: &Path, model: &Value, answer_path: &str, what: &str) -> Re
         .filter(|v| v["model_sha256"] == stamp.as_str());
     let answer = match cached {
         Some(v) => v,
+        None if CHECK_ONLY.load(std::sync::atomic::Ordering::SeqCst) => {
+            anyhow::bail!(
+                "the {what} model changed since {answer_path} was solved (run `fid derive`)"
+            )
+        }
         None => {
             // The last answer seeds the search (not the stamp: it answered
             // another model), so a small change moves little.

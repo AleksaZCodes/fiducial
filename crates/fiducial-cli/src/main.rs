@@ -452,8 +452,9 @@ than over it.
 
 `fiducial.lock` stores the content the platform wrote for every scaffolded file.
 That record is a merge base: it is how `fid upgrade` tells an upstream change
-apart from a local one. Re-baselining replaces it with the file as it stands
-now — declaring the difference intentional.
+apart from a local one. Re-baselining records the file's current hash, so the
+difference stops being reported, and keeps the merge base as the platform
+shipped it, so the next upgrade folds upstream changes into your version.
 
 That is only ever right for a file the PLATFORM owns. A product-owned file —
 MISSION.md, your catalogs, your pages — must keep its original base, because

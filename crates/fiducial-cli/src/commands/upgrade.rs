@@ -182,6 +182,44 @@ pub fn run(dry_run: bool, portfolio: bool, only: Option<String>) -> Result<()> {
         println!();
     }
 
+    // ── 1a′. Templates the platform has retired ───────────────────────────────
+    // A whole upgrade drops their lock records; the file goes only when it is
+    // still exactly what the platform wrote. See `templates::RETIRED_TEMPLATES`.
+    let retired: Vec<(&str, &str)> = templates::RETIRED_TEMPLATES
+        .iter()
+        .copied()
+        .filter(|_| scope.is_none())
+        .filter(|(old, _)| lock.templates.contains_key(*old))
+        .collect();
+    if !retired.is_empty() {
+        println!("  Retired by the platform");
+        for (old, why) in &retired {
+            let path = root.join(old);
+            let unmodified = match (std::fs::read(&path), lock.templates.get(*old)) {
+                (Ok(bytes), Some(record)) => lock::sha256_hex(&bytes) == record.hash,
+                _ => false,
+            };
+            any_changes = true;
+            let fate = if !path.exists() {
+                "already gone"
+            } else if unmodified {
+                "removed"
+            } else {
+                "edited here, so kept as the product's own"
+            };
+            if dry_run {
+                println!("  · {old}: would stop tracking ({why}); {fate}");
+                continue;
+            }
+            if path.exists() && unmodified {
+                std::fs::remove_file(&path).with_context(|| format!("removing {old}"))?;
+            }
+            lock.templates.remove(*old);
+            println!("  ✓ {old}: no longer tracked ({why}); {fate}");
+        }
+        println!();
+    }
+
     // ── 1b. Templates the platform has added since this product was scaffolded ─
     //
     // A 3-way merge can only update files the lock already knows about, so
@@ -294,6 +332,28 @@ pub fn run(dry_run: bool, portfolio: bool, only: Option<String>) -> Result<()> {
         }
     }
     println!();
+
+    // ── 4. The platform version the product says it is built on ───────────────
+    // `fid new` writes "Built on [Fiducial](…) X." into AGENTS.md and
+    // README.md; nothing moved it after, so a product said 0.1.0 at 0.9.1.
+    // Only that one line, only on a whole upgrade: a scoped one is not a move.
+    if scope.is_none() {
+        for file in ["AGENTS.md", "README.md"] {
+            let path = root.join(file);
+            let Ok(text) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            if let Some(updated) = stamp_platform_version(&text, PLATFORM_VERSION) {
+                if dry_run {
+                    println!("  · {file}: would say it is built on fiducial {PLATFORM_VERSION}");
+                } else {
+                    std::fs::write(&path, updated).with_context(|| format!("writing {file}"))?;
+                    println!("  ✓ {file}: built on fiducial {PLATFORM_VERSION}");
+                }
+                any_changes = true;
+            }
+        }
+    }
 
     // ── Persist lock ──────────────────────────────────────────────────────────
     if !dry_run && any_changes {
@@ -527,6 +587,34 @@ fn merge_one_template(
                 "CONFLICT — conflict markers written; resolve and run `fid upgrade` again".into(),
             )))
         }
+    }
+}
+
+/// The "Built on [Fiducial](…) X." line `fid new` writes, moved to
+/// `version`. `None` when there is no such line or it already says so.
+fn stamp_platform_version(text: &str, version: &str) -> Option<String> {
+    const LEAD: &str = "Built on [Fiducial](https://github.com/AleksaZCodes/fiducial) ";
+    let line = text
+        .lines()
+        .find(|l| l.starts_with(LEAD) && l.ends_with('.'))?;
+    let want = format!("{LEAD}{version}.");
+    (line != want).then(|| text.replacen(line, &want, 1))
+}
+
+#[cfg(test)]
+mod stamp_tests {
+    use super::stamp_platform_version;
+
+    #[test]
+    fn the_built_on_line_moves_to_the_platform_version_and_nothing_else_does() {
+        let text = "# p\n\nBuilt on [Fiducial](https://github.com/AleksaZCodes/fiducial) 0.1.0.\n\nBuilt on sand.\n";
+        let out = stamp_platform_version(text, "0.9.1").unwrap();
+        assert_eq!(
+            out,
+            "# p\n\nBuilt on [Fiducial](https://github.com/AleksaZCodes/fiducial) 0.9.1.\n\nBuilt on sand.\n"
+        );
+        assert_eq!(stamp_platform_version(&out, "0.9.1"), None);
+        assert_eq!(stamp_platform_version("no such line\n", "0.9.1"), None);
     }
 }
 

@@ -4,9 +4,11 @@
 //!
 //! `fiducial.lock` records, for every scaffolded file, the content the platform
 //! wrote. That record is a **merge base**: `fid upgrade` uses it to tell an
-//! upstream change apart from a local one and fold the two together. Replacing
-//! it with the file as it stands now — re-baselining — declares "this version
-//! is mine, stop treating the difference as news".
+//! upstream change apart from a local one and fold the two together. Next to
+//! it is the file's hash, which `fid doctor` compares. Re-baselining moves the
+//! hash to the file as it stands now — declaring "this version is mine, stop
+//! treating the difference as news" — and leaves the base alone, so the next
+//! upgrade still merges into the fork instead of over it.
 //!
 //! That is a coherent thing to want for exactly one category of file.
 //!
@@ -86,12 +88,19 @@ pub fn run(paths: &[String]) -> Result<()> {
             continue;
         }
 
-        // The source version stays where it was. This records *your* content as
-        // the base, not a claim that the platform shipped it — and `fid doctor`
-        // reads source_version to decide whether upstream has moved since, a
-        // question this command has not answered.
-        let source_version = record.source_version.clone();
-        lock.record(rel.clone(), &content, &source_version);
+        // Only the hash moves: it is what `fid doctor` compares, so the fork
+        // stops being reported. The merge base stays what the platform
+        // shipped. Recording *your* content as the base — as this once did —
+        // made the next upgrade see no local change and take upstream whole:
+        // a product's CI fork lost its hardware and web jobs to a
+        // "merged cleanly". With the platform's base, an upstream change is
+        // folded into your version, or conflicts where both touched a line.
+        // The source version stays too: `fid doctor` reads it to decide
+        // whether upstream has moved since, a question this has not answered.
+        let hash = crate::lock::sha256_hex(&content);
+        if let Some(record) = lock.templates.get_mut(&rel) {
+            record.hash = hash;
+        }
         accepted.push(rel);
     }
 
