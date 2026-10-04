@@ -2051,6 +2051,42 @@ fn a_set_point_out_of_its_window_fails_naming_it() {
 }
 
 #[test]
+fn a_pinned_parts_price_comes_from_the_lock_and_counts_toward_the_ceiling() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    edit(
+        &root,
+        "hardware/product.toml",
+        "body_mm = [18.0, 18.0, 3.0]",
+        "body_mm = [18.0, 18.0, 3.0]\nlcsc    = \"C2040\"",
+    );
+    // As `parts.py resolve` writes it after verifying the number at LCSC.
+    let lock = |price: f64| {
+        std::fs::write(
+            root.join("hardware/parts.lock"),
+            format!(
+                "version = 1\n\n[[part]]\nid = \"mcu\"\nlcsc = \"C2040\"\nmpn = \"RP2040\"\n\
+                 unit_price = {price}\ncurrency = \"EUR\"\nat_qty = 10\nbuy_qty = 10\nverified = \"2026-10-04\"\n"
+            ),
+        )
+        .unwrap()
+    };
+    lock(12.5);
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert_eq!(layout(&root)["cost"]["priced_total"].as_f64(), Some(12.5));
+    // Re-priced over the 30 EUR ceiling: the declared ceiling holds.
+    lock(31.5);
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(!out.status.success());
+    assert!(
+        text(&out).contains("priced parts already total 31.5 EUR, over the 30 ceiling"),
+        "{}",
+        text(&out)
+    );
+}
+
+#[test]
 fn the_case_colour_is_declared_and_checked() {
     let tmp = tempfile::tempdir().unwrap();
     let root = scaffold(tmp.path());

@@ -343,8 +343,12 @@ look at what moved, re-render, and show it.
   board that uses the part, a symbol from an openly licensed library. A
   footprint with no model gets a body built from its own fab outline.
 - **Curves.** Straight segments only; a curve fails naming the command.
-- **Prices.** Never estimated. An unpriced line is listed; `cost.strict = true`
-  makes that fail derive.
+- **Prices.** Never estimated. `resolve` records each pinned part's LCSC
+  price at the build quantity too, minimum orders included and pooled across
+  lines of the same part, and derive asserts the total against
+  `cost.ceiling`. An unpriced line (a printed part, an assumed one) is
+  listed; `[cost.prices]` declares one; `cost.strict = true` makes any left
+  unpriced fail derive.
 
 ## Tools
 

@@ -731,13 +731,27 @@ pub const PARTS_LOCK: &str = "hardware/parts.lock";
 /// its price when the lock's currency is the cost's. An unanswered pick
 /// stops derive — a BOM line without a part number is not orderable.
 fn resolve_picks(root: &Path, p: &mut Product) -> Result<()> {
-    if p.parts.iter().all(|q| q.pick.is_none()) {
-        return Ok(());
-    }
     let lock: PartsLock = match std::fs::read_to_string(root.join(PARTS_LOCK)) {
         Ok(raw) => toml::from_str(&raw).map_err(|e| anyhow!("{PARTS_LOCK}: {e}"))?,
         Err(_) => PartsLock::default(),
     };
+    // A pinned part's price, as `resolve` read it from LCSC at the cost's
+    // quantity: what the ceiling is asserted against.
+    for q in p.parts.iter_mut().filter(|q| q.pick.is_none()) {
+        let Some(lcsc) = &q.lcsc else { continue };
+        if let Some(hit) = lock
+            .part
+            .iter()
+            .find(|e| e.id == q.id && &e.lcsc == lcsc && e.pick.is_none())
+        {
+            if q.unit_cost.is_none() && hit.currency.as_deref() == Some(p.cost.currency.as_str()) {
+                q.unit_cost = hit.unit_price;
+            }
+        }
+    }
+    if p.parts.iter().all(|q| q.pick.is_none()) {
+        return Ok(());
+    }
     for q in &mut p.parts {
         let Some(pick) = &q.pick else { continue };
         if q.lcsc.is_some() {
@@ -6126,8 +6140,9 @@ pub fn inputs(root: &Path, decl: &str) -> Vec<String> {
         );
         // So is a part's own solid model: a changed STEP is a changed part.
         out.extend(p.parts.iter().filter_map(|q| q.model.clone()));
-        // And the lock that answers its picks: a re-pick changes the BOM.
-        if p.parts.iter().any(|q| q.pick.is_some()) {
+        // And the lock that answers its picks and prices its pins: a re-pick
+        // or a re-priced part changes the BOM.
+        if p.parts.iter().any(|q| q.pick.is_some()) || root.join(PARTS_LOCK).exists() {
             out.push(PARTS_LOCK.to_string());
         }
         // A hand-routed board is checked against the declaration on every
