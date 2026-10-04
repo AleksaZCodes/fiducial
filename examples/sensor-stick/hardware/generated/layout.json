@@ -44,7 +44,7 @@
       {
         "body": {
           "centre_mm": [
-            21.6,
+            22.1,
             4.9
           ],
           "size_mm": [
@@ -58,7 +58,7 @@
         "footprint": {
           "fab": {
             "centre_mm": [
-              21.6,
+              22.1,
               4.34
             ],
             "size_mm": [
@@ -81,13 +81,13 @@
             ]
           },
           "origin_mm": [
-            21.6,
+            22.1,
             4.34
           ],
           "pads": [
             {
               "at_mm": [
-                24.49,
+                24.99,
                 6.94
               ],
               "drill_mm": [
@@ -102,7 +102,7 @@
             },
             {
               "at_mm": [
-                18.71,
+                19.21,
                 6.94
               ],
               "drill_mm": [
@@ -117,7 +117,7 @@
             },
             {
               "at_mm": [
-                18.35,
+                18.85,
                 8.385
               ],
               "drill_mm": null,
@@ -129,7 +129,7 @@
             },
             {
               "at_mm": [
-                19.15,
+                19.65,
                 8.385
               ],
               "drill_mm": null,
@@ -141,7 +141,7 @@
             },
             {
               "at_mm": [
-                20.35,
+                20.85,
                 8.385
               ],
               "drill_mm": null,
@@ -153,7 +153,7 @@
             },
             {
               "at_mm": [
-                21.35,
+                21.85,
                 8.385
               ],
               "drill_mm": null,
@@ -165,7 +165,7 @@
             },
             {
               "at_mm": [
-                21.85,
+                22.35,
                 8.385
               ],
               "drill_mm": null,
@@ -177,7 +177,7 @@
             },
             {
               "at_mm": [
-                22.85,
+                23.35,
                 8.385
               ],
               "drill_mm": null,
@@ -189,7 +189,7 @@
             },
             {
               "at_mm": [
-                24.05,
+                24.55,
                 8.385
               ],
               "drill_mm": null,
@@ -201,7 +201,7 @@
             },
             {
               "at_mm": [
-                24.85,
+                25.35,
                 8.385
               ],
               "drill_mm": null,
@@ -213,7 +213,7 @@
             },
             {
               "at_mm": [
-                24.85,
+                25.35,
                 8.385
               ],
               "drill_mm": null,
@@ -225,7 +225,7 @@
             },
             {
               "at_mm": [
-                24.05,
+                24.55,
                 8.385
               ],
               "drill_mm": null,
@@ -237,7 +237,7 @@
             },
             {
               "at_mm": [
-                23.35,
+                23.85,
                 8.385
               ],
               "drill_mm": null,
@@ -249,7 +249,7 @@
             },
             {
               "at_mm": [
-                22.35,
+                22.85,
                 8.385
               ],
               "drill_mm": null,
@@ -261,7 +261,7 @@
             },
             {
               "at_mm": [
-                20.85,
+                21.35,
                 8.385
               ],
               "drill_mm": null,
@@ -273,7 +273,7 @@
             },
             {
               "at_mm": [
-                19.85,
+                20.35,
                 8.385
               ],
               "drill_mm": null,
@@ -285,7 +285,7 @@
             },
             {
               "at_mm": [
-                19.15,
+                19.65,
                 8.385
               ],
               "drill_mm": null,
@@ -297,7 +297,7 @@
             },
             {
               "at_mm": [
-                18.35,
+                18.85,
                 8.385
               ],
               "drill_mm": null,
@@ -309,7 +309,7 @@
             },
             {
               "at_mm": [
-                17.28,
+                17.78,
                 3.29
               ],
               "drill_mm": [
@@ -324,7 +324,7 @@
             },
             {
               "at_mm": [
-                17.28,
+                17.78,
                 7.47
               ],
               "drill_mm": [
@@ -339,7 +339,7 @@
             },
             {
               "at_mm": [
-                25.92,
+                26.42,
                 7.47
               ],
               "drill_mm": [
@@ -354,7 +354,7 @@
             },
             {
               "at_mm": [
-                25.92,
+                26.42,
                 3.29
               ],
               "drill_mm": [
@@ -382,7 +382,7 @@
         "pads_at": [
           {
             "at_mm": [
-              24.49,
+              24.99,
               6.94
             ],
             "drill_mm": [
@@ -393,7 +393,7 @@
           },
           {
             "at_mm": [
-              18.71,
+              19.21,
               6.94
             ],
             "drill_mm": [
@@ -404,119 +404,119 @@
           },
           {
             "at_mm": [
-              18.35,
+              18.85,
               8.385
             ],
             "pin": "A1"
           },
           {
             "at_mm": [
-              19.15,
+              19.65,
               8.385
             ],
             "pin": "A4"
           },
           {
             "at_mm": [
-              20.35,
+              20.85,
               8.385
             ],
             "pin": "A5"
           },
           {
             "at_mm": [
-              21.35,
+              21.85,
               8.385
             ],
             "pin": "A6"
           },
           {
             "at_mm": [
-              21.85,
+              22.35,
               8.385
             ],
             "pin": "A7"
           },
           {
             "at_mm": [
-              22.85,
+              23.35,
               8.385
             ],
             "pin": "A8"
           },
           {
             "at_mm": [
-              24.05,
+              24.55,
               8.385
             ],
             "pin": "A9"
           },
           {
             "at_mm": [
-              24.85,
+              25.35,
               8.385
             ],
             "pin": "A12"
           },
           {
             "at_mm": [
-              24.85,
+              25.35,
               8.385
             ],
             "pin": "B1"
           },
           {
             "at_mm": [
-              24.05,
+              24.55,
               8.385
             ],
             "pin": "B4"
           },
           {
             "at_mm": [
-              23.35,
+              23.85,
               8.385
             ],
             "pin": "B5"
           },
           {
             "at_mm": [
-              22.35,
+              22.85,
               8.385
             ],
             "pin": "B6"
           },
           {
             "at_mm": [
-              20.85,
+              21.35,
               8.385
             ],
             "pin": "B7"
           },
           {
             "at_mm": [
-              19.85,
+              20.35,
               8.385
             ],
             "pin": "B8"
           },
           {
             "at_mm": [
-              19.15,
+              19.65,
               8.385
             ],
             "pin": "B9"
           },
           {
             "at_mm": [
-              18.35,
+              18.85,
               8.385
             ],
             "pin": "B12"
           },
           {
             "at_mm": [
-              17.28,
+              17.78,
               3.29
             ],
             "drill_mm": [
@@ -527,7 +527,7 @@
           },
           {
             "at_mm": [
-              17.28,
+              17.78,
               7.47
             ],
             "drill_mm": [
@@ -538,7 +538,7 @@
           },
           {
             "at_mm": [
-              25.92,
+              26.42,
               7.47
             ],
             "drill_mm": [
@@ -549,7 +549,7 @@
           },
           {
             "at_mm": [
-              25.92,
+              26.42,
               3.29
             ],
             "drill_mm": [
@@ -2412,7 +2412,7 @@
         "pin_nets": {
           "1": "VBUS",
           "3": "GND",
-          "4": "LED_DIN"
+          "4": "LED_DIN_5V"
         },
         "pitch_mm": null,
         "ref": "D1",
@@ -2586,6 +2586,185 @@
       {
         "body": {
           "centre_mm": [
+            13.85,
+            17.6
+          ],
+          "size_mm": [
+            4.1,
+            3.4
+          ]
+        },
+        "drill_mm": null,
+        "faces": null,
+        "follows": null,
+        "footprint": {
+          "fab": {
+            "centre_mm": [
+              13.85,
+              17.6
+            ],
+            "size_mm": [
+              1.6,
+              2.9
+            ]
+          },
+          "id": "Package_TO_SOT_SMD:SOT-23-5",
+          "model": {
+            "file": "hardware/lib/3d/SOT-23-5.step",
+            "offset_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotate_deg": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "origin_mm": [
+            13.85,
+            17.6
+          ],
+          "pads": [
+            {
+              "at_mm": [
+                14.987,
+                16.65
+              ],
+              "drill_mm": null,
+              "pin": "1",
+              "size_mm": [
+                1.325,
+                0.6
+              ]
+            },
+            {
+              "at_mm": [
+                14.987,
+                17.6
+              ],
+              "drill_mm": null,
+              "pin": "2",
+              "size_mm": [
+                1.325,
+                0.6
+              ]
+            },
+            {
+              "at_mm": [
+                14.987,
+                18.55
+              ],
+              "drill_mm": null,
+              "pin": "3",
+              "size_mm": [
+                1.325,
+                0.6
+              ]
+            },
+            {
+              "at_mm": [
+                12.713,
+                18.55
+              ],
+              "drill_mm": null,
+              "pin": "4",
+              "size_mm": [
+                1.325,
+                0.6
+              ]
+            },
+            {
+              "at_mm": [
+                12.713,
+                16.65
+              ],
+              "drill_mm": null,
+              "pin": "5",
+              "size_mm": [
+                1.325,
+                0.6
+              ]
+            }
+          ],
+          "ports": {},
+          "symbol": "74xGxx:74AHCT1G125"
+        },
+        "height_mm": 1.45,
+        "keepout": null,
+        "mount": "smd",
+        "mpn": "SN74AHCT1G125DBVR",
+        "n": 0,
+        "near": "led.DIN",
+        "nets": [],
+        "pad_mm": null,
+        "pads_at": [
+          {
+            "at_mm": [
+              14.987,
+              16.65
+            ],
+            "pin": "1"
+          },
+          {
+            "at_mm": [
+              14.987,
+              17.6
+            ],
+            "pin": "2"
+          },
+          {
+            "at_mm": [
+              14.987,
+              18.55
+            ],
+            "pin": "3"
+          },
+          {
+            "at_mm": [
+              12.713,
+              18.55
+            ],
+            "pin": "4"
+          },
+          {
+            "at_mm": [
+              12.713,
+              16.65
+            ],
+            "pin": "5"
+          }
+        ],
+        "part": "buf",
+        "pin_names": {
+          "1": "~",
+          "2": "~",
+          "3": "GND",
+          "4": "~",
+          "5": "VCC"
+        },
+        "pin_nets": {
+          "1": "GND",
+          "2": "LED_DIN",
+          "3": "GND",
+          "4": "LED_DIN_5V",
+          "5": "VBUS"
+        },
+        "pitch_mm": null,
+        "ref": "U4",
+        "rotation_deg": 180.0,
+        "size_unrotated_mm": [
+          4.1,
+          3.4
+        ],
+        "symbol": "74xGxx:74AHCT1G125",
+        "value": null,
+        "zone": null
+      },
+      {
+        "body": {
+          "centre_mm": [
             18.0,
             75.15
           ],
@@ -2748,7 +2927,7 @@
           "5": "GND"
         },
         "pitch_mm": null,
-        "ref": "U4",
+        "ref": "U5",
         "rotation_deg": 270.0,
         "size_unrotated_mm": [
           3.3,
@@ -2993,8 +3172,124 @@
       {
         "body": {
           "centre_mm": [
-            24.85,
-            36.1
+            12.7,
+            10.65
+          ],
+          "size_mm": [
+            2.96,
+            1.46
+          ]
+        },
+        "drill_mm": null,
+        "faces": null,
+        "follows": null,
+        "footprint": {
+          "fab": {
+            "centre_mm": [
+              12.7,
+              10.65
+            ],
+            "size_mm": [
+              1.6,
+              0.8
+            ]
+          },
+          "id": "Capacitor_SMD:C_0603_1608Metric",
+          "model": {
+            "file": "hardware/lib/3d/C_0603_1608Metric.step",
+            "offset_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotate_deg": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "origin_mm": [
+            12.7,
+            10.65
+          ],
+          "pads": [
+            {
+              "at_mm": [
+                13.475,
+                10.65
+              ],
+              "drill_mm": null,
+              "pin": "1",
+              "size_mm": [
+                0.9,
+                0.95
+              ]
+            },
+            {
+              "at_mm": [
+                11.925,
+                10.65
+              ],
+              "drill_mm": null,
+              "pin": "2",
+              "size_mm": [
+                0.9,
+                0.95
+              ]
+            }
+          ],
+          "ports": {},
+          "symbol": "Device:C"
+        },
+        "height_mm": 0.9,
+        "keepout": null,
+        "mount": "smd",
+        "mpn": null,
+        "n": 0,
+        "near": "buf.5",
+        "nets": [],
+        "pad_mm": null,
+        "pads_at": [
+          {
+            "at_mm": [
+              13.475,
+              10.65
+            ],
+            "pin": "1"
+          },
+          {
+            "at_mm": [
+              11.925,
+              10.65
+            ],
+            "pin": "2"
+          }
+        ],
+        "part": "c-buf",
+        "pin_names": {
+          "1": "~",
+          "2": "~"
+        },
+        "pin_nets": {
+          "1": "VBUS",
+          "2": "GND"
+        },
+        "pitch_mm": null,
+        "ref": "C3",
+        "rotation_deg": 180.0,
+        "size_unrotated_mm": [
+          2.96,
+          1.46
+        ],
+        "symbol": "Device:C",
+        "value": "100nF 50V X7R",
+        "zone": null
+      },
+      {
+        "body": {
+          "centre_mm": [
+            21.65,
+            37.9
           ],
           "size_mm": [
             1.46,
@@ -3007,8 +3302,8 @@
         "footprint": {
           "fab": {
             "centre_mm": [
-              24.85,
-              36.1
+              21.65,
+              37.9
             ],
             "size_mm": [
               0.8,
@@ -3030,14 +3325,14 @@
             ]
           },
           "origin_mm": [
-            24.85,
-            36.1
+            21.65,
+            37.9
           ],
           "pads": [
             {
               "at_mm": [
-                24.85,
-                36.875
+                21.65,
+                37.125
               ],
               "drill_mm": null,
               "pin": "1",
@@ -3048,8 +3343,8 @@
             },
             {
               "at_mm": [
-                24.85,
-                35.325
+                21.65,
+                38.675
               ],
               "drill_mm": null,
               "pin": "2",
@@ -3073,15 +3368,15 @@
         "pads_at": [
           {
             "at_mm": [
-              24.85,
-              36.875
+              21.65,
+              37.125
             ],
             "pin": "1"
           },
           {
             "at_mm": [
-              24.85,
-              35.325
+              21.65,
+              38.675
             ],
             "pin": "2"
           }
@@ -3096,8 +3391,8 @@
           "2": "GND"
         },
         "pitch_mm": null,
-        "ref": "C3",
-        "rotation_deg": 270.0,
+        "ref": "C4",
+        "rotation_deg": 90.0,
         "size_unrotated_mm": [
           2.96,
           1.46
@@ -3109,8 +3404,8 @@
       {
         "body": {
           "centre_mm": [
-            21.6,
-            34.65
+            25.6,
+            35.45
           ],
           "size_mm": [
             2.96,
@@ -3123,8 +3418,8 @@
         "footprint": {
           "fab": {
             "centre_mm": [
-              21.6,
-              34.65
+              25.6,
+              35.45
             ],
             "size_mm": [
               1.6,
@@ -3146,14 +3441,14 @@
             ]
           },
           "origin_mm": [
-            21.6,
-            34.65
+            25.6,
+            35.45
           ],
           "pads": [
             {
               "at_mm": [
-                20.825,
-                34.65
+                24.825,
+                35.45
               ],
               "drill_mm": null,
               "pin": "1",
@@ -3164,8 +3459,8 @@
             },
             {
               "at_mm": [
-                22.375,
-                34.65
+                26.375,
+                35.45
               ],
               "drill_mm": null,
               "pin": "2",
@@ -3189,15 +3484,15 @@
         "pads_at": [
           {
             "at_mm": [
-              20.825,
-              34.65
+              24.825,
+              35.45
             ],
             "pin": "1"
           },
           {
             "at_mm": [
-              22.375,
-              34.65
+              26.375,
+              35.45
             ],
             "pin": "2"
           }
@@ -3212,7 +3507,7 @@
           "2": "GND"
         },
         "pitch_mm": null,
-        "ref": "C4",
+        "ref": "C5",
         "rotation_deg": 0.0,
         "size_unrotated_mm": [
           2.96,
@@ -3328,7 +3623,7 @@
           "2": "GND"
         },
         "pitch_mm": null,
-        "ref": "C5",
+        "ref": "C6",
         "rotation_deg": 270.0,
         "size_unrotated_mm": [
           2.96,
@@ -3341,12 +3636,12 @@
       {
         "body": {
           "centre_mm": [
-            21.65,
-            37.9
+            21.6,
+            34.65
           ],
           "size_mm": [
-            1.46,
-            2.96
+            2.96,
+            1.46
           ]
         },
         "drill_mm": null,
@@ -3355,12 +3650,12 @@
         "footprint": {
           "fab": {
             "centre_mm": [
-              21.65,
-              37.9
+              21.6,
+              34.65
             ],
             "size_mm": [
-              0.8,
-              1.6
+              1.6,
+              0.8
             ]
           },
           "id": "Capacitor_SMD:C_0603_1608Metric",
@@ -3378,32 +3673,32 @@
             ]
           },
           "origin_mm": [
-            21.65,
-            37.9
+            21.6,
+            34.65
           ],
           "pads": [
             {
               "at_mm": [
-                21.65,
-                38.675
+                20.825,
+                34.65
               ],
               "drill_mm": null,
               "pin": "1",
               "size_mm": [
-                0.95,
-                0.9
+                0.9,
+                0.95
               ]
             },
             {
               "at_mm": [
-                21.65,
-                37.125
+                22.375,
+                34.65
               ],
               "drill_mm": null,
               "pin": "2",
               "size_mm": [
-                0.95,
-                0.9
+                0.9,
+                0.95
               ]
             }
           ],
@@ -3421,15 +3716,15 @@
         "pads_at": [
           {
             "at_mm": [
-              21.65,
-              38.675
+              20.825,
+              34.65
             ],
             "pin": "1"
           },
           {
             "at_mm": [
-              21.65,
-              37.125
+              22.375,
+              34.65
             ],
             "pin": "2"
           }
@@ -3444,8 +3739,8 @@
           "2": "GND"
         },
         "pitch_mm": null,
-        "ref": "C6",
-        "rotation_deg": 270.0,
+        "ref": "C7",
+        "rotation_deg": 0.0,
         "size_unrotated_mm": [
           2.96,
           1.46
@@ -3458,7 +3753,7 @@
         "body": {
           "centre_mm": [
             24.85,
-            32.1
+            32.2
           ],
           "size_mm": [
             1.46,
@@ -3472,7 +3767,7 @@
           "fab": {
             "centre_mm": [
               24.85,
-              32.1
+              32.2
             ],
             "size_mm": [
               0.8,
@@ -3495,13 +3790,13 @@
           },
           "origin_mm": [
             24.85,
-            32.1
+            32.2
           ],
           "pads": [
             {
               "at_mm": [
                 24.85,
-                32.875
+                32.975
               ],
               "drill_mm": null,
               "pin": "1",
@@ -3513,7 +3808,7 @@
             {
               "at_mm": [
                 24.85,
-                31.325
+                31.425
               ],
               "drill_mm": null,
               "pin": "2",
@@ -3538,14 +3833,14 @@
           {
             "at_mm": [
               24.85,
-              32.875
+              32.975
             ],
             "pin": "1"
           },
           {
             "at_mm": [
               24.85,
-              31.325
+              31.425
             ],
             "pin": "2"
           }
@@ -3560,7 +3855,7 @@
           "2": "GND"
         },
         "pitch_mm": null,
-        "ref": "C7",
+        "ref": "C8",
         "rotation_deg": 270.0,
         "size_unrotated_mm": [
           2.96,
@@ -3676,7 +3971,7 @@
           "2": "GND"
         },
         "pitch_mm": null,
-        "ref": "C8",
+        "ref": "C9",
         "rotation_deg": 180.0,
         "size_unrotated_mm": [
           2.96,
@@ -3792,7 +4087,7 @@
           "2": "GND"
         },
         "pitch_mm": null,
-        "ref": "C9",
+        "ref": "C10",
         "rotation_deg": 90.0,
         "size_unrotated_mm": [
           2.96,
@@ -3908,7 +4203,7 @@
           "2": "GND"
         },
         "pitch_mm": null,
-        "ref": "C10",
+        "ref": "C11",
         "rotation_deg": 270.0,
         "size_unrotated_mm": [
           2.96,
@@ -3922,7 +4217,7 @@
         "body": {
           "centre_mm": [
             8.65,
-            23.5
+            21.0
           ],
           "size_mm": [
             1.46,
@@ -3936,7 +4231,7 @@
           "fab": {
             "centre_mm": [
               8.65,
-              23.5
+              21.0
             ],
             "size_mm": [
               0.8,
@@ -3959,13 +4254,13 @@
           },
           "origin_mm": [
             8.65,
-            23.5
+            21.0
           ],
           "pads": [
             {
               "at_mm": [
                 8.65,
-                24.275
+                21.775
               ],
               "drill_mm": null,
               "pin": "1",
@@ -3977,7 +4272,7 @@
             {
               "at_mm": [
                 8.65,
-                22.725
+                20.225
               ],
               "drill_mm": null,
               "pin": "2",
@@ -4002,14 +4297,14 @@
           {
             "at_mm": [
               8.65,
-              24.275
+              21.775
             ],
             "pin": "1"
           },
           {
             "at_mm": [
               8.65,
-              22.725
+              20.225
             ],
             "pin": "2"
           }
@@ -4024,7 +4319,7 @@
           "2": "GND"
         },
         "pitch_mm": null,
-        "ref": "C11",
+        "ref": "C12",
         "rotation_deg": 270.0,
         "size_unrotated_mm": [
           2.96,
@@ -4037,7 +4332,7 @@
       {
         "body": {
           "centre_mm": [
-            20.0,
+            20.6,
             11.35
           ],
           "size_mm": [
@@ -4051,7 +4346,7 @@
         "footprint": {
           "fab": {
             "centre_mm": [
-              20.0,
+              20.6,
               11.35
             ],
             "size_mm": [
@@ -4074,13 +4369,13 @@
             ]
           },
           "origin_mm": [
-            20.0,
+            20.6,
             11.35
           ],
           "pads": [
             {
               "at_mm": [
-                20.825,
+                21.425,
                 11.35
               ],
               "drill_mm": null,
@@ -4092,7 +4387,7 @@
             },
             {
               "at_mm": [
-                19.175,
+                19.775,
                 11.35
               ],
               "drill_mm": null,
@@ -4117,14 +4412,14 @@
         "pads_at": [
           {
             "at_mm": [
-              20.825,
+              21.425,
               11.35
             ],
             "pin": "1"
           },
           {
             "at_mm": [
-              19.175,
+              19.775,
               11.35
             ],
             "pin": "2"
@@ -4153,7 +4448,7 @@
       {
         "body": {
           "centre_mm": [
-            24.0,
+            24.6,
             11.35
           ],
           "size_mm": [
@@ -4167,7 +4462,7 @@
         "footprint": {
           "fab": {
             "centre_mm": [
-              24.0,
+              24.6,
               11.35
             ],
             "size_mm": [
@@ -4190,13 +4485,13 @@
             ]
           },
           "origin_mm": [
-            24.0,
+            24.6,
             11.35
           ],
           "pads": [
             {
               "at_mm": [
-                23.175,
+                23.775,
                 11.35
               ],
               "drill_mm": null,
@@ -4208,7 +4503,7 @@
             },
             {
               "at_mm": [
-                24.825,
+                25.425,
                 11.35
               ],
               "drill_mm": null,
@@ -4233,14 +4528,14 @@
         "pads_at": [
           {
             "at_mm": [
-              23.175,
+              23.775,
               11.35
             ],
             "pin": "1"
           },
           {
             "at_mm": [
-              24.825,
+              25.425,
               11.35
             ],
             "pin": "2"
@@ -4264,122 +4559,6 @@
         ],
         "symbol": "Device:R",
         "value": "5.1k",
-        "zone": null
-      },
-      {
-        "body": {
-          "centre_mm": [
-            24.85,
-            26.6
-          ],
-          "size_mm": [
-            1.46,
-            2.96
-          ]
-        },
-        "drill_mm": null,
-        "faces": null,
-        "follows": null,
-        "footprint": {
-          "fab": {
-            "centre_mm": [
-              24.85,
-              26.6
-            ],
-            "size_mm": [
-              0.825,
-              1.6
-            ]
-          },
-          "id": "Resistor_SMD:R_0603_1608Metric",
-          "model": {
-            "file": "hardware/lib/3d/R_0603_1608Metric.step",
-            "offset_mm": [
-              0.0,
-              0.0,
-              0.0
-            ],
-            "rotate_deg": [
-              0.0,
-              0.0,
-              0.0
-            ]
-          },
-          "origin_mm": [
-            24.85,
-            26.6
-          ],
-          "pads": [
-            {
-              "at_mm": [
-                24.85,
-                25.775
-              ],
-              "drill_mm": null,
-              "pin": "1",
-              "size_mm": [
-                0.95,
-                0.8
-              ]
-            },
-            {
-              "at_mm": [
-                24.85,
-                27.425
-              ],
-              "drill_mm": null,
-              "pin": "2",
-              "size_mm": [
-                0.95,
-                0.8
-              ]
-            }
-          ],
-          "ports": {},
-          "symbol": "Device:R"
-        },
-        "height_mm": 0.5,
-        "keepout": null,
-        "mount": "smd",
-        "mpn": null,
-        "n": 0,
-        "near": "mcu.USB_DM",
-        "nets": [],
-        "pad_mm": null,
-        "pads_at": [
-          {
-            "at_mm": [
-              24.85,
-              25.775
-            ],
-            "pin": "1"
-          },
-          {
-            "at_mm": [
-              24.85,
-              27.425
-            ],
-            "pin": "2"
-          }
-        ],
-        "part": "r-dm",
-        "pin_names": {
-          "1": "~",
-          "2": "~"
-        },
-        "pin_nets": {
-          "1": "USB_DM",
-          "2": "USB_DM_MCU"
-        },
-        "pitch_mm": null,
-        "ref": "R3",
-        "rotation_deg": 90.0,
-        "size_unrotated_mm": [
-          2.96,
-          1.46
-        ],
-        "symbol": "Device:R",
-        "value": "27R",
         "zone": null
       },
       {
@@ -4459,7 +4638,7 @@
         "mount": "smd",
         "mpn": null,
         "n": 0,
-        "near": "mcu.USB_DP",
+        "near": "mcu.USB_DM",
         "nets": [],
         "pad_mm": null,
         "pads_at": [
@@ -4474,6 +4653,122 @@
             "at_mm": [
               22.35,
               16.725
+            ],
+            "pin": "2"
+          }
+        ],
+        "part": "r-dm",
+        "pin_names": {
+          "1": "~",
+          "2": "~"
+        },
+        "pin_nets": {
+          "1": "USB_DM",
+          "2": "USB_DM_MCU"
+        },
+        "pitch_mm": null,
+        "ref": "R3",
+        "rotation_deg": 90.0,
+        "size_unrotated_mm": [
+          2.96,
+          1.46
+        ],
+        "symbol": "Device:R",
+        "value": "27R",
+        "zone": null
+      },
+      {
+        "body": {
+          "centre_mm": [
+            24.85,
+            27.0
+          ],
+          "size_mm": [
+            1.46,
+            2.96
+          ]
+        },
+        "drill_mm": null,
+        "faces": null,
+        "follows": null,
+        "footprint": {
+          "fab": {
+            "centre_mm": [
+              24.85,
+              27.0
+            ],
+            "size_mm": [
+              0.825,
+              1.6
+            ]
+          },
+          "id": "Resistor_SMD:R_0603_1608Metric",
+          "model": {
+            "file": "hardware/lib/3d/R_0603_1608Metric.step",
+            "offset_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotate_deg": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "origin_mm": [
+            24.85,
+            27.0
+          ],
+          "pads": [
+            {
+              "at_mm": [
+                24.85,
+                26.175
+              ],
+              "drill_mm": null,
+              "pin": "1",
+              "size_mm": [
+                0.95,
+                0.8
+              ]
+            },
+            {
+              "at_mm": [
+                24.85,
+                27.825
+              ],
+              "drill_mm": null,
+              "pin": "2",
+              "size_mm": [
+                0.95,
+                0.8
+              ]
+            }
+          ],
+          "ports": {},
+          "symbol": "Device:R"
+        },
+        "height_mm": 0.5,
+        "keepout": null,
+        "mount": "smd",
+        "mpn": null,
+        "n": 0,
+        "near": "mcu.USB_DP",
+        "nets": [],
+        "pad_mm": null,
+        "pads_at": [
+          {
+            "at_mm": [
+              24.85,
+              26.175
+            ],
+            "pin": "1"
+          },
+          {
+            "at_mm": [
+              24.85,
+              27.825
             ],
             "pin": "2"
           }
@@ -4733,8 +5028,8 @@
       {
         "body": {
           "centre_mm": [
-            11.8,
-            37.15
+            7.9,
+            24.25
           ],
           "size_mm": [
             2.96,
@@ -4747,8 +5042,8 @@
         "footprint": {
           "fab": {
             "centre_mm": [
-              11.8,
-              37.15
+              7.9,
+              24.25
             ],
             "size_mm": [
               1.6,
@@ -4770,14 +5065,14 @@
             ]
           },
           "origin_mm": [
-            11.8,
-            37.15
+            7.9,
+            24.25
           ],
           "pads": [
             {
               "at_mm": [
-                12.625,
-                37.15
+                8.725,
+                24.25
               ],
               "drill_mm": null,
               "pin": "1",
@@ -4788,8 +5083,8 @@
             },
             {
               "at_mm": [
-                10.975,
-                37.15
+                7.075,
+                24.25
               ],
               "drill_mm": null,
               "pin": "2",
@@ -4813,15 +5108,15 @@
         "pads_at": [
           {
             "at_mm": [
-              12.625,
-              37.15
+              8.725,
+              24.25
             ],
             "pin": "1"
           },
           {
             "at_mm": [
-              10.975,
-              37.15
+              7.075,
+              24.25
             ],
             "pin": "2"
           }
@@ -5060,6 +5355,26 @@
           1.46,
           0.9
         ]
+      },
+      {
+        "part": "buf",
+        "qty": 1,
+        "shape": "box",
+        "size_mm": [
+          4.1,
+          3.4,
+          1.45
+        ]
+      },
+      {
+        "part": "c-buf",
+        "qty": 1,
+        "shape": "box",
+        "size_mm": [
+          2.96,
+          1.46,
+          0.9
+        ]
       }
     ],
     "pilot_mm": 1.6,
@@ -5116,7 +5431,7 @@
       {
         "length_mm": 2.69,
         "mouth_mm": [
-          21.6,
+          22.1,
           0.69,
           8.2
         ],
@@ -5221,40 +5536,21 @@
     "at_quantity": 5,
     "ceiling": 15.0,
     "currency": "USD",
-    "priced_total": 0.0,
+    "priced_total": 4.739,
     "unpriced": [
-      "usb",
-      "r-cc1",
-      "r-cc2",
-      "ldo",
-      "c-vbus",
-      "c-3v3",
-      "mcu",
-      "c-dec",
-      "c-1v1",
-      "r-dp",
-      "r-dm",
-      "xtal",
-      "r-xout",
-      "c-xin",
-      "c-xout",
-      "flash",
       "vent",
-      "sensor",
-      "r-sda",
-      "r-scl",
-      "led",
-      "c-led",
       "chimney-ring-vent",
       "case-base",
       "case-lid"
     ],
-    "verdict": "25 line(s) unpriced — the ceiling cannot be asserted yet"
+    "verdict": "4 line(s) unpriced — the ceiling cannot be asserted yet"
   },
   "generated_by": "fid-hardware from hardware/product.toml — do not edit",
   "looks": {
+    "buf": "component",
     "c-1v1": "component",
     "c-3v3": "component",
+    "c-buf": "component",
     "c-dec": "component",
     "c-led": "component",
     "c-vbus": "component",
@@ -5282,6 +5578,12 @@
     "version": "0.1.0"
   },
   "provenance": {
+    "buf": {
+      "dims_from": "footprint",
+      "footprint": "Package_TO_SOT_SMD:SOT-23-5",
+      "source_url": null,
+      "symbol": "74xGxx:74AHCT1G125"
+    },
     "c-1v1": {
       "dims_from": "footprint",
       "footprint": "Capacitor_SMD:C_0603_1608Metric",
@@ -5289,6 +5591,12 @@
       "symbol": "Device:C"
     },
     "c-3v3": {
+      "dims_from": "footprint",
+      "footprint": "Capacitor_SMD:C_0603_1608Metric",
+      "source_url": null,
+      "symbol": "Device:C"
+    },
+    "c-buf": {
       "dims_from": "footprint",
       "footprint": "Capacitor_SMD:C_0603_1608Metric",
       "source_url": null,
@@ -5468,12 +5776,12 @@
     "outline is 36 × 84 mm",
     "press-fit lid: a 5 mm skirt, 0.15 mm oversize, grips the inside of the base. No screws — retention is friction alone; prove it on a print",
     "`vent` on the lid's underside at (18, 76), over a 2.5 mm hole through the lid",
-    "board sized from its parts: 526.871 mm² of footprint at fill 0.64 plus 13.4 mm of mounting margin → 26 × 79 mm: 43 mm square would pass board.max_mm, so one side is held at its ceiling and the other carries the area",
+    "board sized from its parts: 545.133 mm² of footprint at fill 0.66 plus 13.4 mm of mounting margin → 26 × 79 mm: 43 mm square would pass board.max_mm, so one side is held at its ceiling and the other carries the area",
     "board sits 10.45 mm from its `near` target: the closest spot that leaves room for the rest",
     "board held by two pegs through diagonal corners and two snap hooks on its side edges — no screws, it presses in",
-    "21 board parts placed by the constraint solver — every rule a constraint, connections kept short (hardware/generated/placement.json)",
+    "23 board parts placed by the constraint solver — every rule a constraint, connections kept short (hardware/generated/placement.json)",
     "`usb` turned 0° so its bottom side faces the board's bottom edge",
-    "22 nets connect 100 pins on the board",
+    "23 nets connect 107 pins on the board",
     "board at (18, 41.4) on 3 mm standoffs",
     "base is 10.1 mm tall: floor 2 + tallest stack 7.8 + clearance",
     "base raised 3.4 mm to 13.5 mm so the lid's 5 mm skirt clears the board and its snap hooks",

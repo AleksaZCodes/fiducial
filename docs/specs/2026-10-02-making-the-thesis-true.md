@@ -182,8 +182,11 @@ Departures from the plan:
   has no model for the latter two.
 - **Parts:** pinned and verified, not picked, because the catalogue was
   mid-migration.
-- **Bill:** about $5.14 of parts per board at five boards, LCSC prices with
-  minimum order quantities.
+- **Bill:** $4.74 of parts per board at five boards (23 parts since the
+  LED's buffer, 2026-10-04), LCSC's prices at that quantity with minimum
+  orders pooled across lines of the same part — read by `parts.py resolve`
+  into the lock, asserted by derive against the $15 ceiling. The printed case
+  and the vent are not priced.
 
 Platform bugs the example found, each fixed and tested:
 - seal and fastener fields required when irrelevant;

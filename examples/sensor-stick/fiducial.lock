@@ -2129,8 +2129,8 @@ base_content = """
 """
 
 [templates."hardware/parts.py"]
-source_version = "0.9.0"
-hash = "6abd88405124cb320979d342df0dabc38e31143dba8544ebc50f6cc6003b40d2"
+source_version = "0.9.1"
+hash = "99845e8182f4c2e325ccac0cb520b00ad4690e9d44300bbbda94a3b2d83b66eb"
 base_content = '''
 #!/usr/bin/env python3
 """Vendor every declared part's KiCad component into hardware/lib/.
@@ -2642,10 +2642,28 @@ def lcsc_product(code: str) -> dict | None:
         d = (json.load(r) or {}).get("result") or {}
     if not d.get("productCode"):
         return None
+    tiers = [(int(t.get("ladder") or 1), float(t.get("usdPrice") or t.get("productPrice")))
+             for t in d.get("productPriceList") or [] if (t.get("usdPrice") or t.get("productPrice"))]
     return {
         "mpn": d.get("productModel", ""), "manufacturer": d.get("brandNameEn", ""),
         "package": d.get("encapStandard", ""), "description": d.get("productDescEn", ""),
+        "tiers": sorted(tiers), "min_buy": int(d.get("minBuyNumber") or 1),
     }
+
+
+def unit_cost(tiers: list[tuple[int, float]], min_buy: int, qty: int) -> tuple[float | None, int]:
+    """What each unit costs when `qty` are needed: LCSC sells no fewer than its
+    minimum (or its first price break), so a 0603 resistor bought for five
+    boards is a strip of a hundred, and each of the five carries its share.
+    Returns the per-unit cost and how many are bought."""
+    if not tiers:
+        return None, qty
+    buy = max(qty, min_buy, tiers[0][0])
+    price = tiers[0][1]
+    for ladder, p in tiers:
+        if ladder <= buy:
+            price = p
+    return round(price * buy / qty, 5), buy
 
 
 def read_lock() -> dict[str, dict]:
@@ -2691,13 +2709,22 @@ def resolve(args: list[str]) -> int:
     given = args[args.index("--catalogue") + 1] if "--catalogue" in args else None
     locked = read_lock()
     entries, problems, cat, today = [], [], None, datetime.date.today().isoformat()
+    # Lines that are the same LCSC part are bought together: one strip of 5.1 kΩ
+    # for both CC pull-downs, not a minimum order each.
+    pooled: dict[str, int] = {}
+    for part in decl.get("part", []):
+        if part.get("lcsc") and not part.get("pick"):
+            pooled[part["lcsc"]] = pooled.get(part["lcsc"], 0) + build_qty(decl, part)
     for part in decl.get("part", []):
         pick = part.get("pick")
         if not pick and part.get("lcsc"):
             # Pinned: confirm the number is a real part, and the one meant —
             # a mistyped C-number orders the wrong part without complaint.
             old = locked.get(part["id"])
-            if old and old.get("lcsc") == part["lcsc"] and not old.get("pick") and not update:
+            # A lock from before prices were recorded, or bought in another
+            # quantity, is verified once more.
+            if (old and old.get("lcsc") == part["lcsc"] and not old.get("pick")
+                    and old.get("at_qty") == pooled[part["lcsc"]] and not update):
                 entries.append(old)
                 continue
             try:
@@ -2711,8 +2738,12 @@ def resolve(args: list[str]) -> int:
             if part.get("mpn") and found["mpn"] and part["mpn"].lower() != found["mpn"].lower():
                 problems.append(f"{part['id']}: {part['lcsc']} is {found['mpn']} at LCSC, not the declared mpn {part['mpn']}")
                 continue
-            entries.append({"id": part["id"], "lcsc": part["lcsc"], **found, "verified": today})
-            print(f"{part['id']}: {part['lcsc']} is {found['mpn']} ({found['package']}) — verified")
+            qty = pooled[part["lcsc"]]
+            price, buy = unit_cost(found.pop("tiers"), found.pop("min_buy"), qty)
+            entries.append({"id": part["id"], "lcsc": part["lcsc"], **found, "verified": today, "at_qty": qty,
+                            **({"unit_price": price, "currency": "USD", "buy_qty": buy} if price is not None else {})})
+            print(f"{part['id']}: {part['lcsc']} is {found['mpn']} ({found['package']}) — verified"
+                  + (f", ${price:.4f} each at {qty} with its like (buying {buy})" if price is not None else ""))
             continue
         if not pick:
             continue
@@ -4533,17 +4564,17 @@ base_content = """
 [artifacts."hardware/generated/assembly.md"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "719a84d439366e18090daf72a8103b6c5ede80cdbeabb45bbc165677b8b9943f"
+hash = "cb6392f5c9fb966287263a3339fbb3a73ffdd22fbaaa2c6efef8d20e5657036a"
 
 [artifacts."hardware/generated/board.kicad_pcb"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "b0b5b8121b671a06b990feb1724f66ba6ec7a5ee7dfdd70e9965d6484bacac65"
+hash = "2dea892820f94a39a7fbad31bd2831fb953598b70c81150f6f971bcae210be5c"
 
 [artifacts."hardware/generated/board.kicad_sch"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "d7002215eae3b407a74b94896359e92a39051b97e0dca33a1ea35500543103cb"
+hash = "9d35b60d5b2bf6a184cb5665ef3be762cb0e73315b981c7f5add739857470428"
 
 [artifacts."hardware/generated/board.rs"]
 pipeline = "hardware"
@@ -4553,7 +4584,7 @@ hash = "bf7afda3e9e69a60c7bcf51ef7e89fb7ebcbe1783706436ff7809e9f8bc6d7c1"
 [artifacts."hardware/generated/bom.csv"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "3639fb7cf7cb75f9d2a59cce41be2ecbf80fb9f9717b79d9c306d0ee63569467"
+hash = "1298557c3a957cd5c625da6895558e94130edd8c6e06e93ea5fb1fc88013df29"
 
 [artifacts."hardware/generated/floor-model.json"]
 pipeline = "hardware"
@@ -4568,27 +4599,27 @@ hash = "9035519920e9c814dc7d43ba1811668ddcc2d74802c4554467010cb8c763b21f"
 [artifacts."hardware/generated/interface.json"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "708f73e9e965d98b03706d4b21669cddbd25c694cd06c6ab410b7f55e6f0b82b"
+hash = "a3b619ecd912cfd7093c8dbede053eb49e878f358dce38e636b6c2aaf2220dcf"
 
 [artifacts."hardware/generated/interface.ts"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "51f53e038fd9f74d51ca4acfe59a78ad2ef8d71d96f9df07b751ccfcfc2e492f"
+hash = "6ddc6361d467c61216e4abbf84a846bff50488bf1a109999adbdb4672b7333ec"
 
 [artifacts."hardware/generated/layout.json"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "cd26ff5cda3ddc61f4d38a4b1a52d4586bc707a921e50b87459763a1c3168017"
+hash = "1da13d816d04a5bec903c44363c26b9a92d8afec3c2dc0a109ac2cbcb043c972"
 
 [artifacts."hardware/generated/placement-model.json"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "21580e4608e5b4541cf204bae9d2ff0b94bad8f9a08504731264d7a5fdf527f9"
+hash = "487f9e94bf6bda59f0a79ef01ad44ab0cd3a72b897eee792149b466f26bb016e"
 
 [artifacts."hardware/generated/placement.json"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "3375f7b60139ec0232b340f7c1e5fa6179f31fd784253d02ec10d2952dc2974b"
+hash = "8ae6cf48fce78a7e517cfe3b61b8d1c328f31768cfb232949c4d6f34bae4ebc9"
 
 [capabilities.firmware-rp2040]
 source = "built-in"
@@ -4651,6 +4682,10 @@ pipelines = ["hardware"]
 hash = "becb00034848d4e5adc1105530a9fd64d9f4378deecea5d6bf66ff45521ebe00"
 pipelines = ["hardware"]
 
+[inputs."hardware/lib/footprints/SOT-23-5.kicad_mod"]
+hash = "428744bf0ef6b4f15c735b90c0119d7ae4b9eef99642e9ecca7ec1a32d4240e0"
+pipelines = ["hardware"]
+
 [inputs."hardware/lib/footprints/USB-C_SMD-TYPE-C-31-M-12_1.kicad_mod"]
 hash = "23f0330aa064caa45ec3fb10cabf2e57691cf355c1c692a32e2d7d1f54ab0a49"
 pipelines = ["hardware"]
@@ -4663,6 +4698,10 @@ pipelines = ["hardware"]
 hash = "54abc351034e73f7f3b15677c11743ac1b3858181e59a1b81120cd3d54e7194f"
 pipelines = ["hardware"]
 
+[inputs."hardware/parts.lock"]
+hash = "792edbe333edb73d259dbf466ca35c5acb60fd724eff5884c382e598f771549f"
+pipelines = ["hardware"]
+
 [inputs."hardware/product.toml"]
-hash = "b26fbe6f1dd27390cb79426ca87a607e8b231918f90d352279abf601508eff3f"
+hash = "a3a7d162d587d43a67be531fbdc8015cbbadba63a9677565c082805990c37725"
 pipelines = ["hardware"]

@@ -31,7 +31,7 @@ What the stick is, chosen by a person:
 - an RP2040 with its crystal and QSPI flash;
 - a 3.3 V regulator from USB's 5 V;
 - an AHT20 temperature and humidity sensor;
-- a WS2812B LED;
+- a WS2812B LED, behind a 74AHCT1G125 buffer that lifts its data line to 5 V;
 - a USB-C socket;
 - the passives each of those needs.
 
@@ -218,10 +218,11 @@ Each mistake was refused at the step that made it, by name.
 | upgrade | the same conflict, written back after it was resolved | the merge base never moved | **platform**: the base moves; markers are refused |
 | doctor | the declaration and the firmware reported as drift | they were classed as platform-owned | **platform**: product-owned |
 | render | the case was another product's orange | a platform default copied from a product | **platform**: `case.colour`, a neutral default |
+| review | none: the LED's data line came from a 3.3 V pin, its input high threshold 0.7 × 5 V = 3.5 V | a WS2812B on 5 V driven straight from the RP2040: out of spec, though it often works on a bench | product: a 74AHCT1G125 buffer on 5 V between them. No gate compares one part's output levels with another's input thresholds |
 
-Seventeen of the twenty-three were the platform's. Three no gate caught, all at
-the socket: facing inward, standing back from the case's face, and a slot
-left open above it. A person, or an agent
+Seventeen of the twenty-four were the platform's. Four no gate caught: three
+at the socket (facing inward, standing back from the case's face, a slot left
+open above it) and the LED's data level, found reading its datasheet. A person, or an agent
 asked to look, has to. Each platform bug was fixed in the platform,
 where every later product gets the fix, with a test. The decision record is
 `docs/specs/2026-10-02-making-the-thesis-true.md`.

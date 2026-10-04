@@ -5,8 +5,10 @@ whole product, from one declaration, built with
 [Fiducial](https://github.com/AleksaZCodes/fiducial) and checked in its CI.
 
 It is the platform's worked example: small and cheap (an RP2040, an AHT20
-sensor, a WS2812B LED, a USB-C socket, 21 parts, about $5 of parts at five
-boards), but it carries every discipline a product has — a printed case, a
+sensor, a WS2812B LED behind a 5 V buffer, a USB-C socket: 23 parts, $4.74
+of them per board at five boards, LCSC's prices with minimum orders, checked
+against a $15 ceiling on every derive; the printed case and the vent are not
+priced), but it carries every discipline a product has — a printed case, a
 routed board, firmware and a web page — and every one of them is derived
 from, or checked against, the same facts.
 

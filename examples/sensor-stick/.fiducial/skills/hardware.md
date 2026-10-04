@@ -186,6 +186,17 @@ pad, approached square to the row, carrying that pad's net
 its wire; a declared `rotate_deg` is followed and the route adapts. A
 cylinder's free end is the end facing the other end of its cable.
 
+**Set points are checked, not remembered.** A `[[check]]` drives nets
+(`drive = { CC1 = { volts = 5.0, ohms = 56000 } }`: a voltage, behind a
+resistance if given; GND is 0 V) and says where others must land
+(`expect = { CC1 = [0.25, 0.61] }`). Derive solves it from the declared
+resistors — every part whose `value` reads as one (`27R`, `5.1k`, `4k7`) and
+whose two pins are on nets — by nodal analysis, and fails naming each net
+outside its window; the results go in `why`. Change a resistor's value or a
+pin's net and the check moves with it. It is DC and linear only: what
+switches, saturates or moves in time (a regulator's loop, a transistor) is a
+simulator's job, and no check can ask for it.
+
 **One change, every discipline.** A net is declared once, on the pins of the
 parts it joins. The same derive that puts it on the copper and in the
 schematic writes it into `interface.ts` and, with `[firmware] mcu`, into
@@ -332,8 +343,12 @@ look at what moved, re-render, and show it.
   board that uses the part, a symbol from an openly licensed library. A
   footprint with no model gets a body built from its own fab outline.
 - **Curves.** Straight segments only; a curve fails naming the command.
-- **Prices.** Never estimated. An unpriced line is listed; `cost.strict = true`
-  makes that fail derive.
+- **Prices.** Never estimated. `resolve` records each pinned part's LCSC
+  price at the build quantity too, minimum orders included and pooled across
+  lines of the same part, and derive asserts the total against
+  `cost.ceiling`. An unpriced line (a printed part, an assumed one) is
+  listed; `[cost.prices]` declares one; `cost.strict = true` makes any left
+  unpriced fail derive.
 
 ## Tools
 

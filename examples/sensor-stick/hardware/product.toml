@@ -39,7 +39,7 @@ closure = "press-fit"    # no screws: the lid's skirt is a friction fit
 max_mm       = [26.0, 80.0]
 thickness_mm = 1.6
 layers       = 2
-fill         = 0.64
+fill         = 0.66
 standoff_mm  = 3.0
 mount        = "snap"
 screw        = "M2"
@@ -361,7 +361,7 @@ footprint = "LED_SMD:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
 height_mm = 1.6
 mpn       = "WS2812B-B/T"
 lcsc      = "C2761795"
-pins      = { VDD = "VBUS", VSS = "GND", DIN = "LED_DIN" }
+pins      = { VDD = "VBUS", VSS = "GND", DIN = "LED_DIN_5V" }
 status    = "decided"
 
 [[part]]
@@ -375,6 +375,34 @@ height_mm = 0.9
 value     = "100nF 50V X7R"
 lcsc      = "C14663"
 near      = "led.VDD"
+pins      = { 1 = "VBUS", 2 = "GND" }
+status    = "decided"
+
+[[part]]
+id        = "buf"
+name      = "LED data buffer: 3.3 V in, 5 V out (the WS2812B reads high only above 0.7 × VDD, 3.5 V at 5 V)"
+place     = "board"
+mount     = "smd"
+symbol    = "74xGxx:74AHCT1G125"
+footprint = "Package_TO_SOT_SMD:SOT-23-5"
+height_mm = 1.45
+mpn       = "SN74AHCT1G125DBVR"
+lcsc      = "C7484"
+near      = "led.DIN"
+pins      = { 1 = "GND", 2 = "LED_DIN", 3 = "GND", 4 = "LED_DIN_5V", 5 = "VBUS" }   # 1: output enable, active low
+status    = "decided"
+
+[[part]]
+id        = "c-buf"
+name      = "Buffer supply decoupling (100 nF)"
+place     = "board"
+mount     = "smd"
+symbol    = "Device:C"
+footprint = "Capacitor_SMD:C_0603_1608Metric"
+height_mm = 0.9
+value     = "100nF 50V X7R"
+lcsc      = "C14663"
+near      = "buf.5"
 pins      = { 1 = "VBUS", 2 = "GND" }
 status    = "decided"
 

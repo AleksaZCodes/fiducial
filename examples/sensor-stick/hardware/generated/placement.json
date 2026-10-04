@@ -1,5 +1,12 @@
 {
   "items": {
+    "buf": {
+      "centre_mm": [
+        13.85,
+        17.6
+      ],
+      "rotation_deg": 180.0
+    },
     "c-1v1": {
       "centre_mm": [
         27.35,
@@ -14,17 +21,24 @@
       ],
       "rotation_deg": 180.0
     },
+    "c-buf": {
+      "centre_mm": [
+        12.7,
+        10.65
+      ],
+      "rotation_deg": 180.0
+    },
     "c-dec#1": {
       "centre_mm": [
-        24.85,
-        36.1
+        21.65,
+        37.9
       ],
-      "rotation_deg": 270.0
+      "rotation_deg": 90.0
     },
     "c-dec#2": {
       "centre_mm": [
-        21.6,
-        34.65
+        25.6,
+        35.45
       ],
       "rotation_deg": 0.0
     },
@@ -37,15 +51,15 @@
     },
     "c-dec#4": {
       "centre_mm": [
-        21.65,
-        37.9
+        21.6,
+        34.65
       ],
-      "rotation_deg": 270.0
+      "rotation_deg": 0.0
     },
     "c-dec#5": {
       "centre_mm": [
         24.85,
-        32.1
+        32.2
       ],
       "rotation_deg": 270.0
     },
@@ -73,7 +87,7 @@
     "c-xout": {
       "centre_mm": [
         8.65,
-        23.5
+        21.0
       ],
       "rotation_deg": 270.0
     },
@@ -107,29 +121,29 @@
     },
     "r-cc1": {
       "centre_mm": [
-        20.0,
+        20.6,
         11.35
       ],
       "rotation_deg": 180.0
     },
     "r-cc2": {
       "centre_mm": [
-        24.0,
+        24.6,
         11.35
       ],
       "rotation_deg": 0.0
     },
     "r-dm": {
       "centre_mm": [
-        24.85,
-        26.6
+        22.35,
+        15.9
       ],
       "rotation_deg": 90.0
     },
     "r-dp": {
       "centre_mm": [
-        22.35,
-        15.9
+        24.85,
+        27.0
       ],
       "rotation_deg": 90.0
     },
@@ -149,8 +163,8 @@
     },
     "r-xout": {
       "centre_mm": [
-        11.8,
-        37.15
+        7.9,
+        24.25
       ],
       "rotation_deg": 180.0
     },
@@ -163,7 +177,7 @@
     },
     "usb": {
       "centre_mm": [
-        21.6,
+        22.1,
         4.9
       ],
       "rotation_deg": 0.0
@@ -176,7 +190,7 @@
       "rotation_deg": 90.0
     }
   },
-  "model_sha256": "21580e4608e5b4541cf204bae9d2ff0b94bad8f9a08504731264d7a5fdf527f9",
-  "objective": 119520,
+  "model_sha256": "487f9e94bf6bda59f0a79ef01ad44ab0cd3a72b897eee792149b466f26bb016e",
+  "objective": 128231,
   "status": "feasible"
 }
