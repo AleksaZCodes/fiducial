@@ -26,11 +26,16 @@ npm install -g @fiducial/cli
 | Command | Does |
 | --- | --- |
 | `fid new <name>` | Scaffold a new product repository |
-| `fid add app <target>` | Add a Next / SvelteKit / Tauri / mobile / worker app |
-| `fid add firmware <target>` | Add firmware support (rp2040, stm32, nrf52, …) |
-| `fid add module <name>` | Add a bounded-context Rust+TS module |
+| `fid add <app\|firmware\|module\|capability> …` | Grow it: an app, a firmware target, a module, a capability (`fid add capability hardware`) |
+| `fid derive` | Run its pipelines; `--check` fails when an artifact or an input it was derived from drifted |
+| `fid upgrade` | Pull platform template and capability updates (`--capability <id>` for one) |
 | `fid doctor` | Check for drift: stale templates, outdated deps |
-| `fid guard-check` | Shell-aware PreToolUse guard hook (used by Claude Code) |
+| `fid dash` | One read-only view of roadmap, decisions, CI, graph and freshness |
+| `fid thesis` | The claim the product is built to test |
+| `fid docs --check` | Fail when prose describes something that changed |
+
+`fid --help` lists every command. Install the binary at the platform version
+you want: `cargo install fiducial-cli --version 0.9.1`.
 
 ## Guard
 
