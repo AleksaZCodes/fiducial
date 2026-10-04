@@ -49,6 +49,9 @@ def main() -> int:
     svg = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{(w + 4) * k:.0f}" height="{(h + 4) * k:.0f}" font-family="sans-serif">',
         '<rect width="100%" height="100%" fill="#fff"/>',
+        # The board's outline: its rectangle, or cut to the case (board.cut_mm).
+        (f'<polygon points="{" ".join(f"{X(x):.1f},{Y(y):.1f}" for x, y in board["outline_mm"])}" '
+         'fill="#e8f0e8" stroke="#000" stroke-width="2"/>') if board.get("outline_mm") else
         f'<rect x="{X(x0):.1f}" y="{Y(y1):.1f}" width="{w * k:.1f}" height="{h * k:.1f}" fill="#e8f0e8" stroke="#000" stroke-width="2"/>',
     ]
     nets: dict[str, list[tuple[float, float]]] = {}

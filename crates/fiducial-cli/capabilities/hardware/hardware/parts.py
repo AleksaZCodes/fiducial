@@ -508,10 +508,28 @@ def lcsc_product(code: str) -> dict | None:
         d = (json.load(r) or {}).get("result") or {}
     if not d.get("productCode"):
         return None
+    tiers = [(int(t.get("ladder") or 1), float(t.get("usdPrice") or t.get("productPrice")))
+             for t in d.get("productPriceList") or [] if (t.get("usdPrice") or t.get("productPrice"))]
     return {
         "mpn": d.get("productModel", ""), "manufacturer": d.get("brandNameEn", ""),
         "package": d.get("encapStandard", ""), "description": d.get("productDescEn", ""),
+        "tiers": sorted(tiers), "min_buy": int(d.get("minBuyNumber") or 1),
     }
+
+
+def unit_cost(tiers: list[tuple[int, float]], min_buy: int, qty: int) -> tuple[float | None, int]:
+    """What each unit costs when `qty` are needed: LCSC sells no fewer than its
+    minimum (or its first price break), so a 0603 resistor bought for five
+    boards is a strip of a hundred, and each of the five carries its share.
+    Returns the per-unit cost and how many are bought."""
+    if not tiers:
+        return None, qty
+    buy = max(qty, min_buy, tiers[0][0])
+    price = tiers[0][1]
+    for ladder, p in tiers:
+        if ladder <= buy:
+            price = p
+    return round(price * buy / qty, 5), buy
 
 
 def read_lock() -> dict[str, dict]:
@@ -557,13 +575,22 @@ def resolve(args: list[str]) -> int:
     given = args[args.index("--catalogue") + 1] if "--catalogue" in args else None
     locked = read_lock()
     entries, problems, cat, today = [], [], None, datetime.date.today().isoformat()
+    # Lines that are the same LCSC part are bought together: one strip of 5.1 kΩ
+    # for both CC pull-downs, not a minimum order each.
+    pooled: dict[str, int] = {}
+    for part in decl.get("part", []):
+        if part.get("lcsc") and not part.get("pick"):
+            pooled[part["lcsc"]] = pooled.get(part["lcsc"], 0) + build_qty(decl, part)
     for part in decl.get("part", []):
         pick = part.get("pick")
         if not pick and part.get("lcsc"):
             # Pinned: confirm the number is a real part, and the one meant —
             # a mistyped C-number orders the wrong part without complaint.
             old = locked.get(part["id"])
-            if old and old.get("lcsc") == part["lcsc"] and not old.get("pick") and not update:
+            # A lock from before prices were recorded, or bought in another
+            # quantity, is verified once more.
+            if (old and old.get("lcsc") == part["lcsc"] and not old.get("pick")
+                    and old.get("at_qty") == pooled[part["lcsc"]] and not update):
                 entries.append(old)
                 continue
             try:
@@ -577,8 +604,12 @@ def resolve(args: list[str]) -> int:
             if part.get("mpn") and found["mpn"] and part["mpn"].lower() != found["mpn"].lower():
                 problems.append(f"{part['id']}: {part['lcsc']} is {found['mpn']} at LCSC, not the declared mpn {part['mpn']}")
                 continue
-            entries.append({"id": part["id"], "lcsc": part["lcsc"], **found, "verified": today})
-            print(f"{part['id']}: {part['lcsc']} is {found['mpn']} ({found['package']}) — verified")
+            qty = pooled[part["lcsc"]]
+            price, buy = unit_cost(found.pop("tiers"), found.pop("min_buy"), qty)
+            entries.append({"id": part["id"], "lcsc": part["lcsc"], **found, "verified": today, "at_qty": qty,
+                            **({"unit_price": price, "currency": "USD", "buy_qty": buy} if price is not None else {})})
+            print(f"{part['id']}: {part['lcsc']} is {found['mpn']} ({found['package']}) — verified"
+                  + (f", ${price:.4f} each at {qty} with its like (buying {buy})" if price is not None else ""))
             continue
         if not pick:
             continue

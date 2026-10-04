@@ -622,6 +622,14 @@ is a script over `git log` counting commits that fixed a gate failure; item 5
 is a `pipelines/research.toml` with a `shell` executor calling Pandoc before it
 is ever a built-in.
 
+**State, 2026-10-04.** Items 1–2 done (the `research` SKILL.md says it is not
+built; Phase 14 carries its correction). Item 3 waits on one click by the
+owner: connect Zenodo before the 0.9.1 release (`v0.9.0` has no DOI). Item 4
+in part: the engines spec's P7 numbers. Items 4–6 belong to the paper's own
+session, which starts from the owner's `.docx` template and prior paper
+(`docs/paper/README.md`) — so item 5 targets that template (Pandoc's
+`--reference-doc`), not an IEEE LaTeX one.
+
 ### Physical products — outline, region, part, cost ✅
 
 **Shipped 2026-09-30** as the `hardware` capability, with input tracking in
@@ -629,16 +637,17 @@ is ever a built-in.
 call — see `docs/specs/2026-09-30-hardware-is-a-capability.md`, which records
 why that outranks the second-use rule here.
 
-**Since then:** board placement is solved by an engine (OR-Tools CP-SAT) and
-routing by Freerouting, both gated — see
-`docs/specs/2026-10-01-hardware-is-solved-by-engines-not-rules.md`, whose
-plan (P2–P7: floor placement, hand routing, an ngspice power check, a small
-showcase product, paper numbers) is the hardware roadmap now.
+**Since then:** placement on the board and on the case floor is solved by an
+engine (OR-Tools CP-SAT), routing by Freerouting or by hand, set points by
+nodal analysis — all gated. The engines plan
+(`docs/specs/2026-10-01-hardware-is-solved-by-engines-not-rules.md`, P1–P7)
+is done; parts, nets and the public example are 0.9.0
+(`docs/specs/2026-10-02-making-the-thesis-true.md`).
 
-**Still open, deliberately:** hand routing for the RF path (P4); curved outlines; the `eda` capability's
-`board.interface.json` and `fid-mesh` case, which now overlap `hardware` and
-should become one path once a product needs both — decide which owns the board
-before a third consumer appears.
+**Still open, deliberately:** curved outlines (refused by name, not
+flattened); nonlinear or transient circuit checks (ngspice is the engine
+when a product needs one); the deprecated `eda` capability, removed in
+0.10.0 (a breaking change, so not in a patch) — `hardware` owns the board.
 
 ### On demand ✅
 

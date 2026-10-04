@@ -421,6 +421,46 @@
         "url": "https://datasheet.lcsc.com/datasheet/pdf/23ccee80ee542e7cf156a772bb589942.pdf?productCode=C14663",
         "file": null
       }
+    },
+    "buf": {
+      "footprint": {
+        "id": "Package_TO_SOT_SMD:SOT-23-5",
+        "from": "/usr/share/kicad/footprints/Package_TO_SOT_SMD.pretty/SOT-23-5.kicad_mod",
+        "sha256": "428744bf0ef6b4f15c735b90c0119d7ae4b9eef99642e9ecca7ec1a32d4240e0"
+      },
+      "model": {
+        "from": "https://gitlab.com/kicad/libraries/kicad-packages3D/-/raw/7.0.11/Package_TO_SOT_SMD.3dshapes/SOT-23-5.step",
+        "sha256": "3b70f1b6dd947543fda90b947f91f2e2804766c39b78e56c87f1448dfd575ed8",
+        "file": "3d/SOT-23-5.step"
+      },
+      "symbol": {
+        "id": "74xGxx:74AHCT1G125",
+        "from": "/usr/share/kicad/symbols/74xGxx.kicad_sym"
+      },
+      "datasheet": {
+        "url": "https://datasheet.lcsc.com/datasheet/pdf/74b1f7dfbe12452e8a365e0596ae902b.pdf?productCode=C7484",
+        "file": null
+      }
+    },
+    "c-buf": {
+      "footprint": {
+        "id": "Capacitor_SMD:C_0603_1608Metric",
+        "from": "/usr/share/kicad/footprints/Capacitor_SMD.pretty/C_0603_1608Metric.kicad_mod",
+        "sha256": "608e18fb80450783fac25cc58c9252747b9ea2194cf45d152599bf23170afeb6"
+      },
+      "model": {
+        "from": "https://gitlab.com/kicad/libraries/kicad-packages3D/-/raw/7.0.11/Capacitor_SMD.3dshapes/C_0603_1608Metric.step",
+        "sha256": "4857b3dc717675bf1fb22edda622ac3b3ae03cf44d81eefaf3fa3ba3a86d84c1",
+        "file": "3d/C_0603_1608Metric.step"
+      },
+      "symbol": {
+        "id": "Device:C",
+        "from": "/usr/share/kicad/symbols/Device.kicad_sym"
+      },
+      "datasheet": {
+        "url": "https://datasheet.lcsc.com/datasheet/pdf/23ccee80ee542e7cf156a772bb589942.pdf?productCode=C14663",
+        "file": null
+      }
     }
   },
   "problems": [
@@ -444,6 +484,8 @@
     "r-sda: datasheet https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C23162 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/r-sda.pdf",
     "r-scl: datasheet https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C23162 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/r-scl.pdf",
     "led: datasheet https://datasheet.lcsc.com/datasheet/pdf/bc8264a6d62c958a89e25ec8cc82b690.pdf?productCode=C2761795 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/WS2812B-B_T.pdf",
-    "c-led: datasheet https://datasheet.lcsc.com/datasheet/pdf/23ccee80ee542e7cf156a772bb589942.pdf?productCode=C14663 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/c-led.pdf"
+    "c-led: datasheet https://datasheet.lcsc.com/datasheet/pdf/23ccee80ee542e7cf156a772bb589942.pdf?productCode=C14663 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/c-led.pdf",
+    "buf: datasheet https://datasheet.lcsc.com/datasheet/pdf/74b1f7dfbe12452e8a365e0596ae902b.pdf?productCode=C7484 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/SN74AHCT1G125DBVR.pdf",
+    "c-buf: datasheet https://datasheet.lcsc.com/datasheet/pdf/23ccee80ee542e7cf156a772bb589942.pdf?productCode=C14663 could not be fetched (URLError: <urlopen error Tunnel connection failed: 403 Forbidden>) \u2014 save it as hardware/vendor/datasheets/c-buf.pdf"
   ]
 }

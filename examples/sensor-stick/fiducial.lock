@@ -884,8 +884,8 @@ echo "done: hardware/build/ (review pack in hardware/build/review/)"
 """
 
 [templates."hardware/cad.py"]
-source_version = "0.9.0"
-hash = "392f2110c6c03d2effcb37d53f1e1f5f2363266c9af9b2830b6be8aef53a6ec8"
+source_version = "0.9.1"
+hash = "5df7ba5b13cce71488c020fe9741117560c9e73cd7bf35bddffd424cff665251"
 base_content = '''
 #!/usr/bin/env python3
 """hardware/generated/layout.json -> a functional, assemblable model.
@@ -969,6 +969,13 @@ ROOT = Path(__file__).resolve().parent.parent
 LAYOUT = ROOT / "hardware" / "generated" / "layout.json"
 BUILD = ROOT / "hardware" / "build"
 TOL = 1e-3  # mm³ — below this, two touching faces, not an overlap
+
+
+def common(a, b):
+    """The volume two solids share. build123d gives None, not an empty
+    solid, when they share nothing (boxes that overlap, bodies that do not)."""
+    r = a & b
+    return r.volume if r is not None else 0.0
 
 
 def face(pts):
@@ -1548,7 +1555,9 @@ def build(L):
     if b:
         (bx, by), (bw, bd) = b["body"]["centre_mm"], b["body"]["size_mm"]
         z = b["z_bottom_mm"]
-        pcb = box((bx, by), (bw, bd), z, b["thickness_mm"])
+        # Cut to the case (board.cut_mm): its outline, not its rectangle.
+        pcb = (slab(face(b["outline_mm"]), z, b["thickness_mm"]) if b.get("outline_mm")
+               else box((bx, by), (bw, bd), z, b["thickness_mm"]))
         for h in b["holes_mm"]:
             pcb -= cyl(h, b["hole_mm"] / 2, z - 1, b["thickness_mm"] + 2)
         # Plated holes for leads soldered through the board.
@@ -1736,7 +1745,7 @@ def checks(L, solids):
     if seal and "gasket-lid" in solids:
         g = solids["gasket-lid"][0]
         area = g.volume / seal["gasket_height_mm"]
-        squeezed = (g & solids["case-lid"][0]).volume
+        squeezed = common(g, solids["case-lid"][0])
         # On average at least half the declared squeeze: a flush gasket (0 proud,
         # no tongue) must fail here, not pass on a lower bound of zero.
         least = area * seal["gasket_height_mm"] * seal["compression"] * 0.5
@@ -1792,7 +1801,7 @@ def checks(L, solids):
             sa, sb = solids[a][0], solids[bn][0]
             if not sa.bounding_box().overlaps(sb.bounding_box()):
                 continue
-            v = (sa & sb).volume
+            v = common(sa, sb)
             if v > TOL:
                 out["interference"].append({"a": a, "b": bn, "mm3": round(v, 3)})
     # A socket reserves its *declared* envelope, not the shape drawn in it: a
@@ -1802,7 +1811,7 @@ def checks(L, solids):
         env = box(s["body"]["centre_mm"], s["body"]["size_mm"], floor, s["height_mm"])
         for other, (so, _, g) in solids.items():
             if g in ("lid", "board", "wall") and not other.startswith("board-screw"):
-                v = (env & so).volume
+                v = common(env, so)
                 if v > TOL:
                     out["interference"].append({"a": f"{s['part']} (declared envelope)", "b": other, "mm3": round(v, 3)})
     base = solids["case-base"][0]
@@ -1813,18 +1822,21 @@ def checks(L, solids):
         sweep = Pos(0, 0, bb.max.Z) * Box(bb.size.X - 0.02, bb.size.Y - 0.02, H + 20 - bb.max.Z, align=(Align.MIN, Align.MIN, Align.MIN))
         sweep = Pos(bb.min.X + 0.01, bb.min.Y + 0.01, 0) * sweep
         brd = L.get("board")
+        if nm == "board" and brd and brd.get("outline_mm"):
+            # Cut to the case: what goes down is its outline, not its box.
+            sweep = slab(offset(face(brd["outline_mm"]), amount=-0.01, kind=Kind.INTERSECTION), bb.max.Z, H + 20 - bb.max.Z)
         if nm == "board" and brd and brd.get("mount") == "snap":
             # Its holes go down over the locating pegs: they are meant to.
             for h in brd["holes_mm"]:
                 sweep -= cyl(h, brd["hole_mm"] / 2, 0, H + 40)
-        v = (sweep & base).volume
+        v = common(sweep, base)
         if v > TOL:
             out["insertion"].append({"part": nm, "blocked_mm3": round(v, 3)})
     lid_group = [n for n, (_, _, g) in solids.items() if g == "lid"]
     below = [n for n, (_, _, g) in solids.items() if g in ("socket", "board", "wall")]
     for ln in lid_group:
         for bn in below:
-            v = (solids[ln][0] & solids[bn][0]).volume
+            v = common(solids[ln][0], solids[bn][0])
             if v > TOL:
                 out["lid"].append({"lid_part": ln, "hits": bn, "mm3": round(v, 3)})
     sc = c["screws"]
@@ -1842,7 +1854,7 @@ def checks(L, solids):
             out["screws"].append({"engagement_mm": round(engage, 3), "needs_mm": need})
     else:
         # The skirt should overlap the base by about its interference band, no more.
-        ov = (solids["case-lid"][0] & solids["case-base"][0]).volume
+        ov = common(solids["case-lid"][0], solids["case-base"][0])
         expected = fit_perimeter(c["outline_mm"]) * press["interference_mm"] * press["skirt_mm"]
         if ov > 3 * expected + 1:
             out["lid"].append({"lid_part": "case-lid", "hits": "case-base", "mm3": round(ov, 3), "expected_press_fit_mm3": round(expected, 3)})
@@ -2129,8 +2141,8 @@ base_content = """
 """
 
 [templates."hardware/parts.py"]
-source_version = "0.9.0"
-hash = "6abd88405124cb320979d342df0dabc38e31143dba8544ebc50f6cc6003b40d2"
+source_version = "0.9.1"
+hash = "99845e8182f4c2e325ccac0cb520b00ad4690e9d44300bbbda94a3b2d83b66eb"
 base_content = '''
 #!/usr/bin/env python3
 """Vendor every declared part's KiCad component into hardware/lib/.
@@ -2642,10 +2654,28 @@ def lcsc_product(code: str) -> dict | None:
         d = (json.load(r) or {}).get("result") or {}
     if not d.get("productCode"):
         return None
+    tiers = [(int(t.get("ladder") or 1), float(t.get("usdPrice") or t.get("productPrice")))
+             for t in d.get("productPriceList") or [] if (t.get("usdPrice") or t.get("productPrice"))]
     return {
         "mpn": d.get("productModel", ""), "manufacturer": d.get("brandNameEn", ""),
         "package": d.get("encapStandard", ""), "description": d.get("productDescEn", ""),
+        "tiers": sorted(tiers), "min_buy": int(d.get("minBuyNumber") or 1),
     }
+
+
+def unit_cost(tiers: list[tuple[int, float]], min_buy: int, qty: int) -> tuple[float | None, int]:
+    """What each unit costs when `qty` are needed: LCSC sells no fewer than its
+    minimum (or its first price break), so a 0603 resistor bought for five
+    boards is a strip of a hundred, and each of the five carries its share.
+    Returns the per-unit cost and how many are bought."""
+    if not tiers:
+        return None, qty
+    buy = max(qty, min_buy, tiers[0][0])
+    price = tiers[0][1]
+    for ladder, p in tiers:
+        if ladder <= buy:
+            price = p
+    return round(price * buy / qty, 5), buy
 
 
 def read_lock() -> dict[str, dict]:
@@ -2691,13 +2721,22 @@ def resolve(args: list[str]) -> int:
     given = args[args.index("--catalogue") + 1] if "--catalogue" in args else None
     locked = read_lock()
     entries, problems, cat, today = [], [], None, datetime.date.today().isoformat()
+    # Lines that are the same LCSC part are bought together: one strip of 5.1 kΩ
+    # for both CC pull-downs, not a minimum order each.
+    pooled: dict[str, int] = {}
+    for part in decl.get("part", []):
+        if part.get("lcsc") and not part.get("pick"):
+            pooled[part["lcsc"]] = pooled.get(part["lcsc"], 0) + build_qty(decl, part)
     for part in decl.get("part", []):
         pick = part.get("pick")
         if not pick and part.get("lcsc"):
             # Pinned: confirm the number is a real part, and the one meant —
             # a mistyped C-number orders the wrong part without complaint.
             old = locked.get(part["id"])
-            if old and old.get("lcsc") == part["lcsc"] and not old.get("pick") and not update:
+            # A lock from before prices were recorded, or bought in another
+            # quantity, is verified once more.
+            if (old and old.get("lcsc") == part["lcsc"] and not old.get("pick")
+                    and old.get("at_qty") == pooled[part["lcsc"]] and not update):
                 entries.append(old)
                 continue
             try:
@@ -2711,8 +2750,12 @@ def resolve(args: list[str]) -> int:
             if part.get("mpn") and found["mpn"] and part["mpn"].lower() != found["mpn"].lower():
                 problems.append(f"{part['id']}: {part['lcsc']} is {found['mpn']} at LCSC, not the declared mpn {part['mpn']}")
                 continue
-            entries.append({"id": part["id"], "lcsc": part["lcsc"], **found, "verified": today})
-            print(f"{part['id']}: {part['lcsc']} is {found['mpn']} ({found['package']}) — verified")
+            qty = pooled[part["lcsc"]]
+            price, buy = unit_cost(found.pop("tiers"), found.pop("min_buy"), qty)
+            entries.append({"id": part["id"], "lcsc": part["lcsc"], **found, "verified": today, "at_qty": qty,
+                            **({"unit_price": price, "currency": "USD", "buy_qty": buy} if price is not None else {})})
+            print(f"{part['id']}: {part['lcsc']} is {found['mpn']} ({found['package']}) — verified"
+                  + (f", ${price:.4f} each at {qty} with its like (buying {buy})" if price is not None else ""))
             continue
         if not pick:
             continue
@@ -2957,8 +3000,8 @@ if __name__ == "__main__":
 '''
 
 [templates."hardware/place.py"]
-source_version = "0.9.0"
-hash = "ca52e2ed6a4c83c438a6374e0614dd6ec9c5d7f463bfa150bfba6459c08f3869"
+source_version = "0.9.1"
+hash = "86f15779610278b5f99ac748879f4fb9284660d56beddaa226c76c39d3f440e0"
 base_content = '''
 #!/usr/bin/env python3
 """Where every board part goes and which way it turns, by constraint programming.
@@ -2976,7 +3019,9 @@ with a size and pads per allowed rotation and a region it must stay inside;
 fixed obstacles; and constraints of a few generic kinds. Every product rule
 in product.toml is one instance of a kind; no rule has code of its own here.
 
-  hard  inside     an item stays inside its region
+  hard  inside     an item stays inside its region — or, per turn, its centre
+                   inside one of a set of rectangles (`centres_mm`: the case
+                   floor, where fid has worked out where it fits the outline)
         no_overlap items and obstacles stay `gap_mm` apart
         fixed      an item's centre (or one coordinate of it) is given
         flush      an item touches one side of its region (a connector at
@@ -2985,7 +3030,8 @@ in product.toml is one instance of a kind; no rule has code of its own here.
                    under a vent's leaning chimney)
         apart      two items stay at least `mm` apart, edge to edge
   cost  near       an item (or one of its pads) as close as it can get to a
-                   point or to another item's pad, weighted
+                   point or to another item's pad, weighted; `slack_mm` per
+                   axis is free, `axes` may limit it to one
         net        a net's pads as close together as they can get: the
                    half-perimeter of their bounding box, weighted
         rotation   each turn but the first listed costs a little: ties go
@@ -3061,6 +3107,22 @@ def build(m: dict, explain: bool):
         y = md.NewIntVar(span[2], span[3], f"{iid}.y")
         # Twice the centre, in grid units: integer whatever the size's parity.
         cx2, cy2 = 2 * x + w, 2 * y + h
+        # Where the centre may be, per turn: a set of rectangles (the case
+        # floor, whose outline is any shape — fid works out where each item
+        # fits it). Rounded inward, so the solver never leaves them.
+        if any("centres_mm" in r for r in rots):
+            ok = guard(it.get("inside_from", f"{iid} inside its region"))
+            for bi, r in zip(b, rots):
+                boxes = r.get("centres_mm", [])
+                zs = [md.NewBoolVar("") for _ in boxes]
+                md.Add(sum(zs) == 1).OnlyEnforceIf([bi, ok])
+                for z, ((x0, y0), (x1, y1)) in zip(zs, boxes):
+                    md.Add(cx2 >= math.ceil(2 * (x0 - ox) / g - 1e-9)).OnlyEnforceIf(z)
+                    md.Add(cx2 <= math.floor(2 * (x1 - ox) / g + 1e-9)).OnlyEnforceIf(z)
+                    md.Add(cy2 >= math.ceil(2 * (y0 - oy) / g - 1e-9)).OnlyEnforceIf(z)
+                    md.Add(cy2 <= math.floor(2 * (y1 - oy) / g + 1e-9)).OnlyEnforceIf(z)
+                if not boxes:
+                    md.Add(bi == 0).OnlyEnforceIf(ok)
         reg = it.get("region")
         if reg:
             ok = guard(reg["from"])
@@ -3114,15 +3176,29 @@ def build(m: dict, explain: bool):
         for bi in b[1:]:
             costs.append((m["weights"]["rotation"], bi))
 
+    # Obstacles are fixed: they must stay clear of every item, not of each
+    # other — two screw bosses whose keep-outs touch are no contradiction.
+    # So they go in groups that do not overlap among themselves, each group
+    # with every item in one no-overlap (usually a single group).
+    groups: list[list[tuple]] = []
     for o in m.get("obstacles", []):
         (ox0, oy0), (ox1, oy1) = (o["lo_mm"][0] - ox, o["lo_mm"][1] - oy), (o["hi_mm"][0] - ox, o["hi_mm"][1] - oy)
-        lo_x, hi_x = units(ox0 - hg), units(ox1 + hg)
-        lo_y, hi_y = units(oy0 - hg), units(oy1 + hg)
-        # Present unless we are asking which declarations conflict.
-        on = guard(o.get("from", "an obstacle on the board"))
-        xs.append(md.NewOptionalIntervalVar(lo_x, hi_x - lo_x, hi_x, on, "obstacle.x"))
-        ys.append(md.NewOptionalIntervalVar(lo_y, hi_y - lo_y, hi_y, on, "obstacle.y"))
-    md.AddNoOverlap2D(xs, ys)
+        box = (units(ox0 - hg), units(ox1 + hg), units(oy0 - hg), units(oy1 + hg), o.get("from", "an obstacle on the board"))
+        clash = lambda a, c: a[0] < c[1] and c[0] < a[1] and a[2] < c[3] and c[2] < a[3]  # noqa: E731
+        for grp in groups:
+            if not any(clash(box, c) for c in grp):
+                grp.append(box)
+                break
+        else:
+            groups.append([box])
+    for grp in groups or [[]]:
+        gx, gy = list(xs), list(ys)
+        for lo_x, hi_x, lo_y, hi_y, why in grp:
+            # Present unless we are asking which declarations conflict.
+            on = guard(why)
+            gx.append(md.NewOptionalIntervalVar(lo_x, hi_x - lo_x, hi_x, on, "obstacle.x"))
+            gy.append(md.NewOptionalIntervalVar(lo_y, hi_y - lo_y, hi_y, on, "obstacle.y"))
+        md.AddNoOverlap2D(gx, gy)
 
     for a in m.get("apart", []):
         p, q, d = items[a["a"]], items[a["b"]], units(a["mm"])
@@ -3140,18 +3216,29 @@ def build(m: dict, explain: bool):
         it = items[ref["item"]]
         return it["pads"][ref["pad"]] if "pad" in ref else it["c2"]
 
-    def dist(a, b, tag: str):
-        """L1 distance between two points, as a variable the objective can weigh."""
+    def dist(a, b, tag: str, slack=(0.0, 0.0), axes="xy"):
+        """L1 distance between two points, as a variable the objective can weigh.
+
+        `slack` per axis is free: only what lies beyond it counts (an item
+        that need only cover a point, not centre on it)."""
         out = []
         for k in range(2):
+            if "xy"[k] not in axes:
+                continue
             v = md.NewIntVar(0, big, f"{tag}.{k}")
             md.AddAbsEquality(v, a[k] - b[k])
+            free = units(2 * slack[k])
+            if free > 0:
+                over = md.NewIntVar(0, big, f"{tag}.{k}.over")
+                md.AddMaxEquality(over, [v - free, 0])
+                v = over
             out.append(v)
-        return out[0] + out[1]
+        return sum(out)
 
     for n in m.get("near", []):
         frm = {"item": n["item"], **({"pad": n["pad"]} if "pad" in n else {})}
-        costs.append((n["weight"], dist(point(frm), point(n["to"]), f"near.{n['item']}")))
+        costs.append((n["weight"], dist(point(frm), point(n["to"]), f"near.{n['item']}",
+                                        n.get("slack_mm", (0.0, 0.0)), n.get("axes", "xy"))))
 
     for net in m.get("nets", []):
         ends = [point(e) for e in net["pads"]]
@@ -3409,8 +3496,8 @@ status  = "assumed"
 """
 
 [templates."hardware/ratsnest.py"]
-source_version = "0.9.0"
-hash = "3b2c40fb1919ddfa9966bb8a8a1aa66a89ce7ed9b7f30d8ea50054f262929927"
+source_version = "0.9.1"
+hash = "bc35da8a958116933748882a9abf8d044d89a55e74109182ef9a58446f4f8af9"
 base_content = '''
 #!/usr/bin/env python3
 """The board as placed, with its ratsnest: hardware/build/review/ratsnest.svg.
@@ -3463,6 +3550,9 @@ def main() -> int:
     svg = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{(w + 4) * k:.0f}" height="{(h + 4) * k:.0f}" font-family="sans-serif">',
         '<rect width="100%" height="100%" fill="#fff"/>',
+        # The board's outline: its rectangle, or cut to the case (board.cut_mm).
+        (f'<polygon points="{" ".join(f"{X(x):.1f},{Y(y):.1f}" for x, y in board["outline_mm"])}" '
+         'fill="#e8f0e8" stroke="#000" stroke-width="2"/>') if board.get("outline_mm") else
         f'<rect x="{X(x0):.1f}" y="{Y(y1):.1f}" width="{w * k:.1f}" height="{h * k:.1f}" fill="#e8f0e8" stroke="#000" stroke-width="2"/>',
     ]
     nets: dict[str, list[tuple[float, float]]] = {}
@@ -3624,8 +3714,8 @@ ortools==9.15.6755
 """
 
 [templates."hardware/route.py"]
-source_version = "0.9.0"
-hash = "67c62fdf9b85d3da7ce5a20bb46f0a1b1576d523acaceef5e596416826dbe373"
+source_version = "0.9.1"
+hash = "89a34424eae25e8bfa5a94be98860fe8405976d8a0aab5c270fe7a16c52a0cdc"
 base_content = '''
 #!/usr/bin/python3
 """hardware/generated/board.kicad_pcb → a routed, poured, DRC-checked board.
@@ -3646,6 +3736,10 @@ net, and stops there: routing is a search, not a derivation. This does it:
 3. a ground pour on both layers, filled;
 4. KiCad's own DRC.
 
+With `board.routing = "hand"` it routes nothing: the product's own
+hardware/board-routed.kicad_pcb, which `fid derive` has checked against the
+declaration, gets the same rules, zone fill and DRC.
+
 It writes hardware/build/board-routed.kicad_pcb (open it in KiCad — this is
 the board to fabricate), route.json (the verdict, with the placed board's
 and the routed copper's hashes: Freerouting is not deterministic, so a
@@ -3658,6 +3752,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import subprocess
 import sys
@@ -3668,6 +3763,7 @@ import pcbnew
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "hardware" / "generated" / "board.kicad_pcb"
+HAND = ROOT / "hardware" / "board-routed.kicad_pcb"  # board.routing = "hand"
 BUILD = ROOT / "hardware" / "build"
 TOOLS = BUILD / "tools"
 FREEROUTING = "2.1.0"
@@ -3752,11 +3848,22 @@ def route(board: pcbnew.BOARD) -> None:
     # Four plain strips, not one frame with a hole: Freerouting 2.1's maze
     # search fails on a keep-out with a window (NullPointerException, and a
     # third of the connections left open on the same board).
+    # One strip per edge of the board's real outline — four for a rectangle,
+    # more for a board cut to its case (board.cut_mm) — each straddling its
+    # edge, so the inner half keeps tracks off it.
     edge = MM(0.5)
-    box = board.GetBoardEdgesBoundingBox()
-    l, t, r, b = box.GetLeft(), box.GetTop(), box.GetRight(), box.GetBottom()
+    outline = pcbnew.SHAPE_POLY_SET()
+    board.GetBoardPolygonOutlines(outline)
+    ring = outline.Outline(0)
+    pts = [(ring.CPoint(k).x, ring.CPoint(k).y) for k in range(ring.PointCount())]
     strips = []
-    for x0, y0, x1, y1 in ((l, t, r, t + edge), (l, b - edge, r, b), (l, t, l + edge, b), (r - edge, t, r, b)):
+    for k in range(len(pts)):
+        (ax, ay), (bx, by) = pts[k], pts[(k + 1) % len(pts)]
+        length = math.hypot(bx - ax, by - ay)
+        if length < 1:
+            continue
+        nx, ny = -(by - ay) / length * edge, (bx - ax) / length * edge
+        quad = [(ax + nx, ay + ny), (bx + nx, by + ny), (bx - nx, by - ny), (ax - nx, ay - ny)]
         strip = pcbnew.ZONE(board)
         strip.SetIsRuleArea(True)
         strip.SetDoNotAllowTracks(True)
@@ -3767,8 +3874,8 @@ def route(board: pcbnew.BOARD) -> None:
         strip.SetLayerSet(pcbnew.LSET.AllCuMask())
         o = strip.Outline()
         o.NewOutline()
-        for x, y in ((x0, y0), (x1, y0), (x1, y1), (x0, y1)):
-            o.Append(x, y)
+        for x, y in quad:
+            o.Append(int(round(x)), int(round(y)))
         board.Add(strip)
         strips.append(strip)
     best: tuple[int, str] | None = None
@@ -3804,8 +3911,14 @@ def route_once(board: pcbnew.BOARD) -> str:
     margin_clearances(dsn)
     jar = fetch()
     # Headless, no usage analytics, and a time budget per attempt.
+    #
+    # Fan-out first: a short escape from every SMD pad before the maze search.
+    # Without it, a 0.4 mm-pitch QFN beside its flash left one to four
+    # connections open in about half of all runs — the example's CI failed
+    # whenever four attempts in a row did. With it, eight runs of eight routed
+    # completely, in a quarter of the time.
     cmd = ["java", "-Djava.awt.headless=true", "-jar", str(jar), "--gui.enabled=false",
-           "--usage_and_diagnostic_data.disable_analytics=true",
+           "--usage_and_diagnostic_data.disable_analytics=true", "--router.fanout.enabled=true",
            "--router.optimizer.enabled=false", "--router.max_passes=200", "--router.job_timeout=00:02:00",
            "-de", str(dsn), "-do", str(ses), "-mt", "1"]
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
@@ -4040,10 +4153,20 @@ def copper(board: pcbnew.BOARD) -> dict:
 
 def main() -> int:
     BUILD.mkdir(parents=True, exist_ok=True)
-    board = pcbnew.LoadBoard(str(SRC))
-    rules(board)
-    route(board)
-    pour(board)
+    # `board.routing = "hand"`: a person routed it in KiCad, and `fid derive`
+    # has already refused it unless its parts, nets and outline are still the
+    # declaration's. Nothing to route; the same rules and DRC decide it.
+    hand = board_decl().get("routing", "auto") == "hand"
+    if hand:
+        if not HAND.exists():
+            raise SystemExit(f"board.routing = \"hand\" and there is no {HAND.relative_to(ROOT)}")
+        board = pcbnew.LoadBoard(str(HAND))
+        rules(board)
+    else:
+        board = pcbnew.LoadBoard(str(SRC))
+        rules(board)
+        route(board)
+        pour(board)
     out = BUILD / "board-routed.kicad_pcb"
     board.Save(str(out))
     board = pcbnew.LoadBoard(str(out))
@@ -4051,7 +4174,7 @@ def main() -> int:
     verdict = drc(board, BUILD / "drc.rpt")
     verdict["tracks"] = sum(1 for t in board.GetTracks() if t.GetClass() != "PCB_VIA")
     verdict["vias"] = sum(1 for t in board.GetTracks() if t.GetClass() == "PCB_VIA")
-    verdict["router"] = f"Freerouting {FREEROUTING}"
+    verdict["router"] = f"by hand ({HAND.relative_to(ROOT)})" if hand else f"Freerouting {FREEROUTING}"
     # Placement is deterministic; Freerouting is not. The placed board's hash
     # and the routed copper's, side by side, make a different route visible:
     # same `placed`, different `routed` is the router, not the design.
@@ -4310,14 +4433,16 @@ requestAnimationFrame(() => requestAnimationFrame(() => { window.__ready = true;
 """
 
 [templates."pipelines/hardware.toml"]
-source_version = "0.9.0"
-hash = "3a53bea882cd2b37a799f6d74d297b97a97c7f250c3dd9372db8162c5c8f1b79"
+source_version = "0.9.1"
+hash = "c720f0541687ccf3b5cfc3ee578f3d164db8bebf56f1a5b7b24ad865da62d107"
 base_content = """
 name     = "hardware"
 executor = "fid-hardware"
 args     = ["hardware/product.toml"]
 outputs  = [
   "hardware/generated/layout.json",
+  "hardware/generated/floor-model.json",
+  "hardware/generated/floor.json",
   "hardware/generated/placement-model.json",
   "hardware/generated/placement.json",
   "hardware/generated/bom.csv",
@@ -4332,6 +4457,8 @@ outputs  = [
 # hardware/product.toml → the solved product, by output file name:
 #
 #   layout.json      every position, size and hole, and why — what cad.py builds from
+#   floor-model.json the case floor (sockets and the board, inside the cavity)
+#                    as a constraint problem, and floor.json its answer
 #   placement-model.json  the board placement as a constraint problem (spec 2026-10-01)
 #   placement.json   the solver's answer, stamped with the model's hash; reused
 #                    while the model is unchanged, so the gate needs no solver
@@ -4463,53 +4590,63 @@ base_content = """
 
 [artifacts."hardware/generated/assembly.md"]
 pipeline = "hardware"
-source_version = "0.9.0"
-hash = "9e772b57beef8707196ca9548185958e63bef2db89dd88142ed9075c9b22c84b"
+source_version = "0.9.1"
+hash = "efd9de333e2b0cf8c49fb7089a6163a972af398e8708d6e48864d03f6700117c"
 
 [artifacts."hardware/generated/board.kicad_pcb"]
 pipeline = "hardware"
-source_version = "0.9.0"
-hash = "a2bf0a1589687780771e74785935160b3dbe1bf73b57e004403ff139c53d2f2f"
+source_version = "0.9.1"
+hash = "851780eb17fde73c2c07b11dffe15b6a921639ec2d55cc6b898e47e1cf4522cf"
 
 [artifacts."hardware/generated/board.kicad_sch"]
 pipeline = "hardware"
-source_version = "0.9.0"
-hash = "d7002215eae3b407a74b94896359e92a39051b97e0dca33a1ea35500543103cb"
+source_version = "0.9.1"
+hash = "9d35b60d5b2bf6a184cb5665ef3be762cb0e73315b981c7f5add739857470428"
 
 [artifacts."hardware/generated/board.rs"]
 pipeline = "hardware"
-source_version = "0.9.0"
+source_version = "0.9.1"
 hash = "bf7afda3e9e69a60c7bcf51ef7e89fb7ebcbe1783706436ff7809e9f8bc6d7c1"
 
 [artifacts."hardware/generated/bom.csv"]
 pipeline = "hardware"
-source_version = "0.9.0"
-hash = "3639fb7cf7cb75f9d2a59cce41be2ecbf80fb9f9717b79d9c306d0ee63569467"
+source_version = "0.9.1"
+hash = "1298557c3a957cd5c625da6895558e94130edd8c6e06e93ea5fb1fc88013df29"
+
+[artifacts."hardware/generated/floor-model.json"]
+pipeline = "hardware"
+source_version = "0.9.1"
+hash = "4835974c22b538c344fd26c37d2d700aa8e0f83760a81ab259ef985d29d21acf"
+
+[artifacts."hardware/generated/floor.json"]
+pipeline = "hardware"
+source_version = "0.9.1"
+hash = "2d9fe102998e3412474f3a5ad6dc77bda71aad4bd40dfb1f12ccd0f69e28c885"
 
 [artifacts."hardware/generated/interface.json"]
 pipeline = "hardware"
-source_version = "0.9.0"
-hash = "708f73e9e965d98b03706d4b21669cddbd25c694cd06c6ab410b7f55e6f0b82b"
+source_version = "0.9.1"
+hash = "a3b619ecd912cfd7093c8dbede053eb49e878f358dce38e636b6c2aaf2220dcf"
 
 [artifacts."hardware/generated/interface.ts"]
 pipeline = "hardware"
-source_version = "0.9.0"
-hash = "51f53e038fd9f74d51ca4acfe59a78ad2ef8d71d96f9df07b751ccfcfc2e492f"
+source_version = "0.9.1"
+hash = "6ddc6361d467c61216e4abbf84a846bff50488bf1a109999adbdb4672b7333ec"
 
 [artifacts."hardware/generated/layout.json"]
 pipeline = "hardware"
-source_version = "0.9.0"
-hash = "373e2d1a0363fd8926cd1a1557381ff051f532020fce2d0da0980aabbdebfe7b"
+source_version = "0.9.1"
+hash = "64ce5110803a1809bc80faa7210b7142007713519f519dd1789a4a1c74148c05"
 
 [artifacts."hardware/generated/placement-model.json"]
 pipeline = "hardware"
-source_version = "0.9.0"
-hash = "5c224204487862e6d8d9e6d0bac9d9438ec922259849842050f278dfd5131bb1"
+source_version = "0.9.1"
+hash = "f19d86a0e8e1ed0b037a9ea183966903d79303a2ae345cb73f3584fc119a0d1f"
 
 [artifacts."hardware/generated/placement.json"]
 pipeline = "hardware"
-source_version = "0.9.0"
-hash = "7620bcdeedce978b39eae1a7742ae40d027f75ed46def12558a8c5558d921e42"
+source_version = "0.9.1"
+hash = "4e9b09bb755bb527300482df4d0c4c49bc3b3ba9bcf79907a0be441ef1cb690f"
 
 [capabilities.firmware-rp2040]
 source = "built-in"
@@ -4572,6 +4709,10 @@ pipelines = ["hardware"]
 hash = "becb00034848d4e5adc1105530a9fd64d9f4378deecea5d6bf66ff45521ebe00"
 pipelines = ["hardware"]
 
+[inputs."hardware/lib/footprints/SOT-23-5.kicad_mod"]
+hash = "428744bf0ef6b4f15c735b90c0119d7ae4b9eef99642e9ecca7ec1a32d4240e0"
+pipelines = ["hardware"]
+
 [inputs."hardware/lib/footprints/USB-C_SMD-TYPE-C-31-M-12_1.kicad_mod"]
 hash = "23f0330aa064caa45ec3fb10cabf2e57691cf355c1c692a32e2d7d1f54ab0a49"
 pipelines = ["hardware"]
@@ -4581,9 +4722,13 @@ hash = "b262a7083e277ed417c399a56dc25386b7948daa7d9729ec76dc5839ce6b626a"
 pipelines = ["hardware"]
 
 [inputs."hardware/outline.svg"]
-hash = "54abc351034e73f7f3b15677c11743ac1b3858181e59a1b81120cd3d54e7194f"
+hash = "0507cf7150868a5a93cc03806b5e043a50df9f00d8934c43e05ddaa32939061e"
+pipelines = ["hardware"]
+
+[inputs."hardware/parts.lock"]
+hash = "792edbe333edb73d259dbf466ca35c5acb60fd724eff5884c382e598f771549f"
 pipelines = ["hardware"]
 
 [inputs."hardware/product.toml"]
-hash = "de1a7cb152f9b865415185f3431b13ecbe0ed7f705551b11c28d2c5009566853"
+hash = "52af90c3b00161a7d1df9c064727f766df40ad1de3e6ef76ba4a130951c97999"
 pipelines = ["hardware"]

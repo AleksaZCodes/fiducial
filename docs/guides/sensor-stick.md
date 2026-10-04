@@ -31,7 +31,7 @@ What the stick is, chosen by a person:
 - an RP2040 with its crystal and QSPI flash;
 - a 3.3 V regulator from USB's 5 V;
 - an AHT20 temperature and humidity sensor;
-- a WS2812B LED;
+- a WS2812B LED, behind a 74AHCT1G125 buffer that lifts its data line to 5 V;
 - a USB-C socket;
 - the passives each of those needs.
 
@@ -76,7 +76,6 @@ width_mm = 36.0
 
 [case]
 colour  = "#1d4ed8"          # translucent blue PETG: the LED shows through
-grid_mm = 0.5                # fine enough for the board to stand against the plug's wall
 
 [case.fasteners]
 closure = "press-fit"        # no screws
@@ -122,9 +121,11 @@ fid derive                           # case, placed board, schematic, BOM, inter
 ```
 
 `resolve` reports each number verified, with the MPN and package LCSC gives
-it. `fid derive` solves the case around the parts and places the board with
-a constraint solver. `layout.json → why` says what set each size and
-position. `fid derive --check` fails from then on whenever an artifact no
+it. `fid derive` solves the case around the parts and places the board and
+the floor with a constraint solver. It also solves the three `[[check]]`s at
+the end of `product.toml`: the USB-C pull-downs against a default, 1.5 A and
+3 A source, each inside the window the Type-C spec gives. `layout.json → why`
+says what set each size and position, and what each check read. `fid derive --check` fails from then on whenever an artifact no
 longer matches the declaration.
 
 ### 5. Build, route, check, fab
@@ -210,17 +211,18 @@ Each mistake was refused at the step that made it, by name.
 | checks | the socket blocked dropping the board in: a lip of wall over it | the notch began 0.5 mm inside the mouth, short of the wall's inner face | **platform**: a notch runs through the whole wall |
 | review | none: the notch stood open above the socket, a slot 7 mm tall | the lid's skirt was cut away there and nothing closed it | **platform**: a plug on the lid fills the notch down to the window |
 | doctor | `cad.py`, resolved to the platform's own version, reported as drift | a conflict moved the merge base but not the recorded hash | **platform**: both move |
-| derive | the mouth 1.19 mm behind the case's face | the floor search's 1 mm step, and the chamfer at the plug's end, held the board back | product: `grid_mm = 0.5`, a smaller chamfer. A board cut to follow the case is the platform's next step |
+| derive | the mouth 1.19 mm behind the case's face | the floor search's 1 mm step, and the chamfer at the plug's end, held the board back | **platform** (since): the floor is placed by the solver to a tenth of a millimetre, so the board stands against the wall (0.69 mm). And the board is cut to the case (`board.cut_mm`), so the chamfer is back at full size. Then: `grid_mm = 0.5` and a smaller chamfer in the product |
 | route | connections left open | 0.4 mm-pitch pins at 0.2 / 0.15 mm rules | product: 0.15 / 0.127 mm, JLCPCB's standard process |
 | checks | the lid's skirt cuts the board and its snap hooks | derive did not know about the skirt | **platform**: the base grows until the skirt clears |
 | firmware | `fiducial-protocol = "0.1"`, profiles ignored | stale firmware templates | **platform**: templates on the platform's version |
 | upgrade | the same conflict, written back after it was resolved | the merge base never moved | **platform**: the base moves; markers are refused |
 | doctor | the declaration and the firmware reported as drift | they were classed as platform-owned | **platform**: product-owned |
 | render | the case was another product's orange | a platform default copied from a product | **platform**: `case.colour`, a neutral default |
+| review | none: the LED's data line came from a 3.3 V pin, its input high threshold 0.7 × 5 V = 3.5 V | a WS2812B on 5 V driven straight from the RP2040: out of spec, though it often works on a bench | product: a 74AHCT1G125 buffer on 5 V between them. No gate compares one part's output levels with another's input thresholds |
 
-Sixteen of the twenty-three were the platform's. Three no gate caught, all at
-the socket: facing inward, standing back from the case's face, and a slot
-left open above it. A person, or an agent
+Seventeen of the twenty-four were the platform's. Four no gate caught: three
+at the socket (facing inward, standing back from the case's face, a slot left
+open above it) and the LED's data level, found reading its datasheet. A person, or an agent
 asked to look, has to. Each platform bug was fixed in the platform,
 where every later product gets the fix, with a test. The decision record is
 `docs/specs/2026-10-02-making-the-thesis-true.md`.

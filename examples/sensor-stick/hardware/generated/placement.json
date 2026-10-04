@@ -1,182 +1,196 @@
 {
   "items": {
+    "buf": {
+      "centre_mm": [
+        10.75,
+        23.3
+      ],
+      "rotation_deg": 180.0
+    },
     "c-1v1": {
       "centre_mm": [
-        28.1,
-        26.95
+        24.6,
+        28.95
       ],
       "rotation_deg": 0.0
     },
     "c-3v3": {
       "centre_mm": [
-        15.8,
-        38.65
+        12.65,
+        44.0
+      ],
+      "rotation_deg": 270.0
+    },
+    "c-buf": {
+      "centre_mm": [
+        8.1,
+        19.85
       ],
       "rotation_deg": 180.0
     },
     "c-dec#1": {
       "centre_mm": [
-        27.35,
+        21.3,
+        37.15
+      ],
+      "rotation_deg": 0.0
+    },
+    "c-dec#2": {
+      "centre_mm": [
+        27.2,
+        32.25
+      ],
+      "rotation_deg": 0.0
+    },
+    "c-dec#3": {
+      "centre_mm": [
+        23.95,
         32.2
       ],
       "rotation_deg": 270.0
     },
-    "c-dec#2": {
+    "c-dec#4": {
       "centre_mm": [
-        21.55,
-        37.9
-      ],
-      "rotation_deg": 270.0
-    },
-    "c-dec#3": {
-      "centre_mm": [
-        21.6,
+        20.7,
         34.65
       ],
       "rotation_deg": 0.0
     },
-    "c-dec#4": {
-      "centre_mm": [
-        24.85,
-        32.2
-      ],
-      "rotation_deg": 270.0
-    },
     "c-dec#5": {
       "centre_mm": [
-        25.6,
-        35.45
+        12.45,
+        35.4
       ],
-      "rotation_deg": 0.0
+      "rotation_deg": 90.0
     },
     "c-led": {
       "centre_mm": [
-        12.7,
+        9.2,
         34.65
       ],
       "rotation_deg": 180.0
     },
     "c-vbus": {
       "centre_mm": [
-        21.15,
-        41.9
+        12.65,
+        40.0
       ],
       "rotation_deg": 90.0
     },
     "c-xin": {
       "centre_mm": [
-        16.1,
-        22.85
+        11.35,
+        18.6
       ],
-      "rotation_deg": 0.0
+      "rotation_deg": 270.0
     },
     "c-xout": {
       "centre_mm": [
-        11.65,
-        18.6
+        18.25,
+        15.9
       ],
       "rotation_deg": 270.0
     },
     "flash": {
       "centre_mm": [
-        23.5,
+        22.4,
         21.0
       ],
       "rotation_deg": 270.0
     },
     "ldo": {
       "centre_mm": [
-        15.8,
-        44.8
+        18.8,
+        42.5
       ],
-      "rotation_deg": 90.0
+      "rotation_deg": 0.0
     },
     "led": {
       "centre_mm": [
-        11.05,
+        9.05,
         29.45
       ],
       "rotation_deg": 270.0
     },
     "mcu": {
       "centre_mm": [
-        18.95,
+        17.95,
         28.75
       ],
       "rotation_deg": 270.0
     },
     "r-cc1": {
       "centre_mm": [
-        19.6,
-        11.45
+        19.1,
+        11.35
       ],
       "rotation_deg": 180.0
     },
     "r-cc2": {
       "centre_mm": [
-        23.6,
-        11.45
+        23.1,
+        11.35
       ],
       "rotation_deg": 0.0
     },
     "r-dm": {
       "centre_mm": [
-        24.85,
-        27.1
+        24.6,
+        26.45
       ],
-      "rotation_deg": 90.0
+      "rotation_deg": 180.0
     },
     "r-dp": {
       "centre_mm": [
-        22.35,
+        21.35,
         15.9
       ],
       "rotation_deg": 90.0
     },
     "r-scl": {
       "centre_mm": [
-        19.05,
-        37.9
+        17.3,
+        37.15
       ],
-      "rotation_deg": 90.0
+      "rotation_deg": 180.0
     },
     "r-sda": {
       "centre_mm": [
-        17.6,
+        16.7,
         34.65
       ],
       "rotation_deg": 180.0
     },
     "r-xout": {
       "centre_mm": [
-        12.1,
-        24.25
+        15.75,
+        22.1
       ],
-      "rotation_deg": 180.0
+      "rotation_deg": 270.0
     },
     "sensor": {
       "centre_mm": [
-        18.0,
-        75.25
+        17.0,
+        75.15
       ],
       "rotation_deg": 270.0
     },
     "usb": {
       "centre_mm": [
-        21.6,
-        5.0
+        20.6,
+        4.9
       ],
       "rotation_deg": 0.0
     },
     "xtal": {
       "centre_mm": [
-        15.5,
-        19.4
+        14.8,
+        17.5
       ],
-      "rotation_deg": 180.0
+      "rotation_deg": 270.0
     }
   },
-  "model_sha256": "5c224204487862e6d8d9e6d0bac9d9438ec922259849842050f278dfd5131bb1",
-  "objective": 116649,
+  "model_sha256": "f19d86a0e8e1ed0b037a9ea183966903d79303a2ae345cb73f3584fc119a0d1f",
+  "objective": 127136,
   "status": "feasible"
 }

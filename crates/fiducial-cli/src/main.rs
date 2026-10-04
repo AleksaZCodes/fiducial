@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 mod adapter;
 mod brand;
 mod capability;
+mod circuit;
 mod commands;
 mod config;
 mod context;

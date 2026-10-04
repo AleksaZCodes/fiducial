@@ -22,7 +22,7 @@ hardware/build.sh                  # route, solids, checks, fab files, review pa
 | `generated/board.kicad_sch` | the schematic: each part's KiCad symbol, a net label on every connected pin, a no-connect on every other — one row per circuit | yes |
 | `generated/interface.json`, `interface.ts` | what firmware and web read from the hardware: board size, sockets and their windows, every net and the pins on it — `interface.ts` makes the nets a TypeScript type | yes |
 | `generated/board.rs` | with `[firmware] mcu = "<part id>"`: per net on an MCU I/O pin, a macro taking that pin from Embassy's peripherals (`board::sensor_sda!(p)` → `p.PIN_4`) | yes |
-| `build/board-routed.kicad_pcb` | the board to fabricate: routed by Freerouting, ground-poured both sides, DRC'd by KiCad (`route.json`, `drc.rpt`) — fails the build if anything is unconnected or an error. Freerouting is not deterministic: `route.json` records the placed board's hash and the routed copper's, so a re-route that differs is visible | built |
+| `build/board-routed.kicad_pcb` | the board to fabricate: routed by Freerouting (or the product's own hand-routed board with `board.routing = "hand"`), ground-poured both sides, DRC'd by KiCad (`route.json`, `drc.rpt`) — fails the build if anything is unconnected or an error. Freerouting is not deterministic: `route.json` records the placed board's hash and the routed copper's, so a re-route that differs is visible | built |
 | `build/*.step`, `*.stl`, `assembly.step` | every solid, for a manufacturer and a slicer | built |
 | `build/checks.json` | interference (keep-outs included), insertion, lid, screw engagement, seal squeeze | built, fails the build |
 | `build/fab/`, `schematic.pdf` | `gerbers.zip` (Gerbers and drill of the routed board), `bom-assembly.csv` and `cpl.csv` (an assembly service's BOM and placement), and `README.md` listing every placed part without an `lcsc` number — what cannot be ordered assembled yet; the schematic | built |
@@ -56,7 +56,7 @@ placement, a look — and carry on when it was purely mechanical. A green
 | `smd`, `tht` | `board` | nothing; its footprint sizes the board, its height the cavity |
 | `pads` | `board` | nothing: copper pads, one per `nets` entry at `pitch_mm`, for a wire to land on — the EDA end of a `[[wire]]`. `follows = "supercap"` puts one pad under each lead of that socketed part instead, inset from the board edge the leads face, and `drill_mm` plates them through: the part lies flat and its leads solder straight into the board, no wire |
 | `bulkhead` | `wall` | a hole through the longest edge facing `side`, clear of every screw boss |
-| `vent` | a `case.mark`, or `lid` | a `pass_through_mm` hole through the lid and a membrane (`body_mm`) bonded over it inside; placed nearest its `near`, clear of the lid's other parts. With `seals_to = "<board part>"` it gets a **chimney**: a tube printed with the lid from round the membrane down to a silicone ring squeezed on the board round that part — outside air reaches the part, not the cavity. The part sits as near under the vent as it can — the tube may lean up to 3 mm (it still prints unsupported) — with its whole ring on the board and nothing else under it; the board is made to reach under the vent and sized for the ring, wires route round the tube, and the ring is on the BOM. When the ring cannot fit, derive names what it conflicts with. `membrane = "outside"` bonds the patch on the lid's face (sunk in a debossed mark), as adhesive vents are made to be: the bore then need only clear the hole and the part, so the ring is smaller. Under the ring the top copper is a keep-out for tracks and vias — the ring lands on flat pour, and the part's signals leave through vias inside the bore. `cad.py` checks the bore holds only that part, the lean, and that no wire passes through |
+| `vent` | a `case.mark`, or `lid` | a `pass_through_mm` hole through the lid and a membrane (`body_mm`) bonded over it inside; placed nearest its `near`, clear of the lid's other parts. With `seals_to = "<board part>"` it gets a **chimney**: a tube printed with the lid from round the membrane down to a silicone ring squeezed on the board round that part — outside air reaches the part, not the cavity. The part sits as near under the vent as it can — the tube may lean up to 3 mm (it still prints unsupported) — with its whole ring on the board and nothing else under it. The vent itself takes the nearest spot in its mark where the ring below fits the cavity; the board is held where the ring can land on it (a requirement, not a preference, on the floor) and sized for the ring, wires route round the tube, and the ring is on the BOM. When the ring cannot fit, derive names what it conflicts with. `membrane = "outside"` bonds the patch on the lid's face (sunk in a debossed mark), as adhesive vents are made to be: the bore then need only clear the hole and the part, so the ring is smaller. Under the ring the top copper is a keep-out for tracks and vias — the ring lands on flat pour, and the part's signals leave through vias inside the bore. `cad.py` checks the bore holds only that part, the lean, and that no wire passes through |
 | `adhesive` | `lid`, or a mark | bonded flat to the lid's underside — a flex antenna, `near = "apex"` to reach up into the outline's highest point |
 
 **Connections are declared once, on the parts.** A board part's `pins = {
@@ -173,8 +173,8 @@ listed under `unverified_dimensions`.
   it, and a plug on the lid fills the notch down to the window's top. A
   sealed case refuses the notch and keeps the socket behind the wall. Derive also fails if the window would cut a
   boss; the base rises so the window clears the lid seal. The window is not
-  sealed, and `why` says so. The floor search steps by `case.grid_mm`
-  (1 mm): set 0.5 when the board must stand closer to that wall.
+  sealed, and `why` says so. The floor is placed by the solver to a tenth
+  of a millimetre, so the board stands as close to that wall as it fits.
 
 **Wires are dressed, not drawn.** Each `[[wire]]` is routed by a grid search
 at its height: inside the cavity, round every boss, socket and part that
@@ -185,6 +185,17 @@ pad, approached square to the row, carrying that pad's net
 (`layout.json → wires[].cores_mm`). A pad row nobody turned turns square to
 its wire; a declared `rotate_deg` is followed and the route adapts. A
 cylinder's free end is the end facing the other end of its cable.
+
+**Set points are checked, not remembered.** A `[[check]]` drives nets
+(`drive = { CC1 = { volts = 5.0, ohms = 56000 } }`: a voltage, behind a
+resistance if given; GND is 0 V) and says where others must land
+(`expect = { CC1 = [0.25, 0.61] }`). Derive solves it from the declared
+resistors — every part whose `value` reads as one (`27R`, `5.1k`, `4k7`) and
+whose two pins are on nets — by nodal analysis, and fails naming each net
+outside its window; the results go in `why`. Change a resistor's value or a
+pin's net and the check moves with it. It is DC and linear only: what
+switches, saturates or moves in time (a regulator's loop, a transistor) is a
+simulator's job, and no check can ask for it.
 
 **One change, every discipline.** A net is declared once, on the pins of the
 parts it joins. The same derive that puts it on the copper and in the
@@ -245,12 +256,18 @@ unless `board.size_mm` fixes it, and sectioned:
 | part `rotate_deg` | turns it explicitly (90° steps) — a module's connector into a corner |
 | `board.edge_mm` | a clear strip round the edge, no parts in it, where tracks run the perimeter; the board grows by twice it |
 | `board.near = ["panel", "vent"]` | the board must reach under each of those lid parts (one, or a list), far enough in for the parts that are `near` it too — the panel's wire drops straight onto its pads, the sensor sits under its vent |
+| `board.cut_mm = 2.5` | where the case narrows (a chamfer, a taper) the board keeps its length and loses its corners instead, each by at most this: its outline is the rectangle clipped to the cavity, wall and clearance in, written to `Edge.Cuts`. What was cut is an obstacle to every part (a part pinned there fails naming the corner), default holes move in with it, the case's solids and the insertion check use the outline. 0, the default: a rectangle |
 
-**Placement** is a bounded search, not first-fit: each floor item tries its
-nearest spots and a spread of alternatives, and the arrangement with the least
-total distance from every `near` wins. `layout.json → why` says how far each
-one ended up from where it asked to be. Ties go to the arrangement whose
-board sits centred under what it reaches for.
+**On the floor, placement is solved too** (the same solver). fid works out,
+for each socket (either way round) and the board, the rectangles where its
+centre may sit inside the cavity, its wall's distance in — any outline shape —
+and writes them to `generated/floor-model.json`: every item and screw boss kept
+`clearance_mm` apart, each as close to its `near` as the rest allows (the
+board need only reach under its targets, and is centred on the first, other
+things equal). The answer, `generated/floor.json`, is continuous to a tenth
+of a millimetre and checked against the exact fit. `layout.json → why` says
+how far each one ended up from where it asked to be; when they cannot all
+fit, derive names which of them conflict.
 
 **On the board, placement is solved by a constraint solver** (OR-Tools
 CP-SAT, through `hardware/place.py`; spec 2026-10-01). Every rule in the
@@ -309,18 +326,30 @@ look at what moved, re-render, and show it.
 ## What is not derived
 
 - **Routing is a search, not a derivation**, so it is built, not gated:
-  `route.py` routes `board.kicad_pcb` with Freerouting into
-  `build/board-routed.kicad_pcb`. Open that in KiCad to adjust; the gated
-  board keeps placement and nets. A part without a footprint is a courtyard
-  placeholder (`Pending_<id>`) until it gets one.
+  `route.py` routes `board.kicad_pcb` with Freerouting (fan-out first)
+  into `build/board-routed.kicad_pcb`. A part without a footprint is a
+  courtyard placeholder (`Pending_<id>`) until it gets one.
+- **A board the autorouter cannot do, or should not** (fast signals, RF, a
+  layout a person wants to own): `board.routing = "hand"`. Copy
+  `generated/board.kicad_pcb` to `hardware/board-routed.kicad_pcb`, route it
+  in KiCad and commit it. It stays gated: `fid derive` fails while any part
+  in it has moved, turned, flipped, been added or removed, or any pad is on
+  another net than the declaration says, or the outline differs, naming
+  each. Change `product.toml`, re-derive, and re-route what moved; never
+  move a part in KiCad. The build runs no router: it applies the declared
+  rules and KiCad's DRC to that board.
 - **A component no library has.** Put it in `hardware/vendor/` (KiCad's own
   layout: `<Lib>.pretty/`, `<Lib>.kicad_sym`, `<Lib>.3dshapes/`) with a
   `SOURCES.md` naming where every number came from — a land pattern from a
   board that uses the part, a symbol from an openly licensed library. A
   footprint with no model gets a body built from its own fab outline.
 - **Curves.** Straight segments only; a curve fails naming the command.
-- **Prices.** Never estimated. An unpriced line is listed; `cost.strict = true`
-  makes that fail derive.
+- **Prices.** Never estimated. `resolve` records each pinned part's LCSC
+  price at the build quantity too, minimum orders included and pooled across
+  lines of the same part, and derive asserts the total against
+  `cost.ceiling`. An unpriced line (a printed part, an assumed one) is
+  listed; `[cost.prices]` declares one; `cost.strict = true` makes any left
+  unpriced fail derive.
 
 ## Tools
 

@@ -69,13 +69,26 @@ The author's position, for the discussion section:
 
 ## Limits to state
 
-N = 1 product; floor placement still a bounded search; autorouting not
-deterministic; power-circuit values computed, not simulated; nothing yet
+N = 2 products (1 public); autorouting not
+deterministic; set points solved for DC only, nothing simulated in time; nothing yet
 manufactured and tested.
 
 ## Citing the software
 
 Cite the **version DOI** of the release the paper describes (see
-`docs/specs/2026-10-02-one-release-per-platform-version.md`): connect Zenodo,
-merge the release that carries the hardware work (0.9.0), and the `v0.9.0`
-release mints it.
+`docs/specs/2026-10-02-one-release-per-platform-version.md`). `v0.9.0`
+was released before Zenodo was connected, so it has none: connect Zenodo,
+and the next release (`v0.9.1`, which carries the solvers, the set-point
+checks, prices and the cut board) mints one.
+
+## How the paper gets written (owner's plan, 2026-10-04)
+
+Not before Fiducial is finished and makes sense as a whole. Then the owner
+provides:
+- the conference's `.docx` paper template;
+- last year's best-paper award winner, written by the owner.
+
+From those: the owner's writing style, what made that paper succeed, and how
+its images and illustrations work. Then, together: how best to present,
+sell and frame Fiducial. The draft written on 2026-10-02 was removed; start
+from these notes, not from it.

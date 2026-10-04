@@ -5,8 +5,10 @@ whole product, from one declaration, built with
 [Fiducial](https://github.com/AleksaZCodes/fiducial) and checked in its CI.
 
 It is the platform's worked example: small and cheap (an RP2040, an AHT20
-sensor, a WS2812B LED, a USB-C socket, 21 parts, about $5 of parts at five
-boards), but it carries every discipline a product has — a printed case, a
+sensor, a WS2812B LED behind a 5 V buffer, a USB-C socket: 23 parts, $4.74
+of them per board at five boards, LCSC's prices with minimum orders, checked
+against a $15 ceiling on every derive; the printed case and the vent are not
+priced), but it carries every discipline a product has — a printed case, a
 routed board, firmware and a web page — and every one of them is derived
 from, or checked against, the same facts.
 
@@ -44,6 +46,7 @@ Renders from `hardware/build.sh`, copied to `hardware/showcase/`.
 | `hardware/generated/bom.csv`, `assembly.md` | the bill of materials; the order it goes together in |
 | `hardware/generated/interface.ts` | the nets as a TypeScript type — the page imports it |
 | `hardware/generated/board.rs` | the firmware's pin map: `board::sensor_sda!(p)` is `p.PIN_4` — the firmware takes every pin through it |
+| `hardware/generated/assembly.md` → why | the USB-C CC voltage each kind of source reads, solved from the pull-downs and checked against the Type-C spec's window — a wrong resistor fails derive |
 
 `hardware/build.sh` (built, checked, not committed): the routed and
 DRC-checked board, the case as STEP and STL, the fit and assembly checks,

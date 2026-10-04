@@ -203,16 +203,13 @@ pub fn place_rect(
     target: P,
     step: f64,
 ) -> Option<Rect> {
-    place_rect_candidates(poly, size, clearance, avoid, gap, target, step, 1, 0.0)
-        .into_iter()
-        .next()
+    place_rect_where(poly, size, clearance, avoid, gap, target, step, |_| true)
 }
 
-/// Up to `max` placements that fit, nearest `target` first, each at least
-/// `spacing` from the ones before it — the alternatives a search can fall back
-/// on when the nearest spot leaves no room for what comes after.
+/// As [`place_rect`], at the nearest placement that `ok` also accepts — a
+/// condition the rectangle alone does not show (what stands beneath it).
 #[allow(clippy::too_many_arguments)]
-pub fn place_rect_candidates(
+pub fn place_rect_where(
     poly: &[P],
     size: P,
     clearance: f64,
@@ -220,10 +217,8 @@ pub fn place_rect_candidates(
     gap: f64,
     target: P,
     step: f64,
-    max: usize,
-    spacing: f64,
-) -> Vec<Rect> {
-    let mut out: Vec<Rect> = Vec::new();
+    ok: impl Fn(&Rect) -> bool,
+) -> Option<Rect> {
     let (lo, hi) = bounds(poly);
     let reach = libm::fmax(hi.0 - lo.0, hi.1 - lo.1);
     let rings = libm::ceil(reach / step) as i64 + 1;
@@ -258,24 +253,15 @@ pub fn place_rect_candidates(
             {
                 continue;
             }
-            if out
-                .iter()
-                .any(|o| libm::hypot(o.centre.0 - c.0, o.centre.1 - c.1) < spacing)
-            {
-                continue;
-            }
             if avoid.iter().any(|o| r.overlaps(o, gap)) {
                 continue;
             }
-            if rect_fits(poly, &r, clearance) {
-                out.push(r);
-                if out.len() >= max {
-                    return out;
-                }
+            if rect_fits(poly, &r, clearance) && ok(&r) {
+                return Some(r);
             }
         }
     }
-    out
+    None
 }
 
 /// Interior angle at each vertex in degrees; above 180 is a reflex (inward) corner.
@@ -377,8 +363,179 @@ pub fn spread(candidates: &[P], count: usize) -> Vec<usize> {
     chosen
 }
 
+/// Does polygon `inner` lie inside `outer`, at least `clearance` from every
+/// wall? The general form of [`rect_fits`]: every vertex of `inner` inside
+/// `outer`, no vertex of `outer` inside `inner` (a notch poking in), and every
+/// pair of edges at least `clearance` apart.
+pub fn poly_fits(outer: &[P], inner: &[P], clearance: f64) -> bool {
+    if inner.iter().any(|&v| !contains(outer, v)) || outer.iter().any(|&v| contains(inner, v)) {
+        return false;
+    }
+    let (n, m) = (outer.len(), inner.len());
+    for i in 0..m {
+        let (a, b) = (inner[i], inner[(i + 1) % m]);
+        for j in 0..n {
+            if dist_seg_seg(a, b, outer[j], outer[(j + 1) % n]) < clearance {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// The polygon moved inward by `d`: each edge offset along its inward normal,
+/// consecutive offset edges meeting at a mitre. Exact for convex corners and
+/// for concave ones too, as long as `d` is smaller than the features it
+/// passes (a wall thickness inside a case, not a case's width).
+pub fn inset(poly: &[P], d: f64) -> Vec<P> {
+    let n = poly.len();
+    if n < 3 {
+        return poly.to_vec();
+    }
+    // Counter-clockwise: the inward normal of a → b is its left normal.
+    let ccw = signed_area2(poly) > 0.0;
+    let shifted: Vec<(P, P)> = (0..n)
+        .map(|i| {
+            let (a, b) = (poly[i], poly[(i + 1) % n]);
+            let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+            let l = libm::hypot(dx, dy).max(1e-12);
+            let (nx, ny) = if ccw {
+                (-dy / l, dx / l)
+            } else {
+                (dy / l, -dx / l)
+            };
+            ((a.0 + nx * d, a.1 + ny * d), (b.0 + nx * d, b.1 + ny * d))
+        })
+        .collect();
+    (0..n)
+        .map(|i| {
+            let (p0, p1) = shifted[(i + n - 1) % n];
+            let (q0, q1) = shifted[i];
+            let (r, s) = ((p1.0 - p0.0, p1.1 - p0.1), (q1.0 - q0.0, q1.1 - q0.1));
+            let den = r.0 * s.1 - r.1 * s.0;
+            if den.abs() < 1e-12 {
+                // Collinear edges: the shared vertex, moved.
+                q0
+            } else {
+                let t = ((q0.0 - p0.0) * s.1 - (q0.1 - p0.1) * s.0) / den;
+                (p0.0 + t * r.0, p0.1 + t * r.1)
+            }
+        })
+        .collect()
+}
+
+/// The part of `poly` inside the rectangle `lo`–`hi` (Sutherland–Hodgman: a
+/// convex window clips any simple polygon). Collinear repeats are dropped.
+pub fn clip_to_rect(poly: &[P], lo: P, hi: P) -> Vec<P> {
+    let mut out: Vec<P> = poly.to_vec();
+    // Each side: the axis it cuts, where, and whether inside is above it.
+    let at = |p: P, axis: usize| if axis == 0 { p.0 } else { p.1 };
+    for (axis, edge, low) in [
+        (0, lo.0, true),
+        (0, hi.0, false),
+        (1, lo.1, true),
+        (1, hi.1, false),
+    ] {
+        let inside = |p: P| {
+            if low {
+                at(p, axis) >= edge
+            } else {
+                at(p, axis) <= edge
+            }
+        };
+        let input = core::mem::take(&mut out);
+        let k = input.len();
+        for i in 0..k {
+            let (cur, prev) = (input[i], input[(i + k - 1) % k]);
+            let (ci, pi) = (inside(cur), inside(prev));
+            let cross = |a: P, b: P| -> P {
+                let (av, bv) = (at(a, axis), at(b, axis));
+                let t = (edge - av) / (bv - av);
+                (a.0 + t * (b.0 - a.0), a.1 + t * (b.1 - a.1))
+            };
+            if ci {
+                if !pi {
+                    out.push(cross(prev, cur));
+                }
+                out.push(cur);
+            } else if pi {
+                out.push(cross(prev, cur));
+            }
+        }
+    }
+    // Drop repeats and points on a straight line between their neighbours.
+    out.dedup_by(|a, b| libm::hypot(a.0 - b.0, a.1 - b.1) < 1e-9);
+    if out.len() > 1
+        && libm::hypot(
+            out[0].0 - out[out.len() - 1].0,
+            out[0].1 - out[out.len() - 1].1,
+        ) < 1e-9
+    {
+        out.pop();
+    }
+    let mut i = 0;
+    while out.len() > 3 && i < out.len() {
+        let n = out.len();
+        let (a, b, c) = (out[(i + n - 1) % n], out[i], out[(i + 1) % n]);
+        if orient(a, b, c).abs() < 1e-9 {
+            out.remove(i);
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_rectangle_clipped_by_a_chamfered_cavity_loses_its_corner() {
+        // A 40 × 40 case chamfered 10 mm at the bottom left, inset 2 mm.
+        let case = [
+            (10.0, 0.0),
+            (40.0, 0.0),
+            (40.0, 40.0),
+            (0.0, 40.0),
+            (0.0, 10.0),
+        ];
+        let cavity = inset(&case, 2.0);
+        assert!((bounds(&cavity).0 .0 - 2.0).abs() < 1e-9, "{cavity:?}");
+        // A board from (2, 2) to (30, 30): its bottom-left corner is cut.
+        let board = clip_to_rect(&cavity, (2.0, 2.0), (30.0, 30.0));
+        assert_eq!(board.len(), 5, "{board:?}");
+        let area = signed_area2(&board).abs() / 2.0;
+        assert!(area < 28.0 * 28.0 && area > 28.0 * 28.0 - 60.0, "{area}");
+        // Away from the chamfer the rectangle is whole.
+        let whole = clip_to_rect(&cavity, (15.0, 15.0), (30.0, 30.0));
+        assert_eq!(whole.len(), 4, "{whole:?}");
+    }
+
+    #[test]
+    fn a_polygon_fits_with_clearance_or_does_not() {
+        let outer = [(0.0, 0.0), (20.0, 0.0), (20.0, 20.0), (0.0, 20.0)];
+        let oct = [
+            (3.0, 2.0),
+            (17.0, 2.0),
+            (18.0, 3.0),
+            (18.0, 17.0),
+            (17.0, 18.0),
+            (3.0, 18.0),
+            (2.0, 17.0),
+            (2.0, 3.0),
+        ];
+        assert!(poly_fits(&outer, &oct, 1.9));
+        assert!(!poly_fits(&outer, &oct, 2.1));
+        // A notch poking into it.
+        let notched = [
+            (0.0, 0.0),
+            (20.0, 0.0),
+            (20.0, 20.0),
+            (10.0, 10.0),
+            (0.0, 20.0),
+        ];
+        assert!(!poly_fits(&notched, &oct, 0.0));
+    }
+
     use super::*;
     use alloc::vec;
 

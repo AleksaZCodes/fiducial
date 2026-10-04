@@ -17,6 +17,10 @@ net, and stops there: routing is a search, not a derivation. This does it:
 3. a ground pour on both layers, filled;
 4. KiCad's own DRC.
 
+With `board.routing = "hand"` it routes nothing: the product's own
+hardware/board-routed.kicad_pcb, which `fid derive` has checked against the
+declaration, gets the same rules, zone fill and DRC.
+
 It writes hardware/build/board-routed.kicad_pcb (open it in KiCad — this is
 the board to fabricate), route.json (the verdict, with the placed board's
 and the routed copper's hashes: Freerouting is not deterministic, so a
@@ -29,6 +33,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import subprocess
 import sys
@@ -39,6 +44,7 @@ import pcbnew
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "hardware" / "generated" / "board.kicad_pcb"
+HAND = ROOT / "hardware" / "board-routed.kicad_pcb"  # board.routing = "hand"
 BUILD = ROOT / "hardware" / "build"
 TOOLS = BUILD / "tools"
 FREEROUTING = "2.1.0"
@@ -123,11 +129,22 @@ def route(board: pcbnew.BOARD) -> None:
     # Four plain strips, not one frame with a hole: Freerouting 2.1's maze
     # search fails on a keep-out with a window (NullPointerException, and a
     # third of the connections left open on the same board).
+    # One strip per edge of the board's real outline — four for a rectangle,
+    # more for a board cut to its case (board.cut_mm) — each straddling its
+    # edge, so the inner half keeps tracks off it.
     edge = MM(0.5)
-    box = board.GetBoardEdgesBoundingBox()
-    l, t, r, b = box.GetLeft(), box.GetTop(), box.GetRight(), box.GetBottom()
+    outline = pcbnew.SHAPE_POLY_SET()
+    board.GetBoardPolygonOutlines(outline)
+    ring = outline.Outline(0)
+    pts = [(ring.CPoint(k).x, ring.CPoint(k).y) for k in range(ring.PointCount())]
     strips = []
-    for x0, y0, x1, y1 in ((l, t, r, t + edge), (l, b - edge, r, b), (l, t, l + edge, b), (r - edge, t, r, b)):
+    for k in range(len(pts)):
+        (ax, ay), (bx, by) = pts[k], pts[(k + 1) % len(pts)]
+        length = math.hypot(bx - ax, by - ay)
+        if length < 1:
+            continue
+        nx, ny = -(by - ay) / length * edge, (bx - ax) / length * edge
+        quad = [(ax + nx, ay + ny), (bx + nx, by + ny), (bx - nx, by - ny), (ax - nx, ay - ny)]
         strip = pcbnew.ZONE(board)
         strip.SetIsRuleArea(True)
         strip.SetDoNotAllowTracks(True)
@@ -138,8 +155,8 @@ def route(board: pcbnew.BOARD) -> None:
         strip.SetLayerSet(pcbnew.LSET.AllCuMask())
         o = strip.Outline()
         o.NewOutline()
-        for x, y in ((x0, y0), (x1, y0), (x1, y1), (x0, y1)):
-            o.Append(x, y)
+        for x, y in quad:
+            o.Append(int(round(x)), int(round(y)))
         board.Add(strip)
         strips.append(strip)
     best: tuple[int, str] | None = None
@@ -175,8 +192,14 @@ def route_once(board: pcbnew.BOARD) -> str:
     margin_clearances(dsn)
     jar = fetch()
     # Headless, no usage analytics, and a time budget per attempt.
+    #
+    # Fan-out first: a short escape from every SMD pad before the maze search.
+    # Without it, a 0.4 mm-pitch QFN beside its flash left one to four
+    # connections open in about half of all runs — the example's CI failed
+    # whenever four attempts in a row did. With it, eight runs of eight routed
+    # completely, in a quarter of the time.
     cmd = ["java", "-Djava.awt.headless=true", "-jar", str(jar), "--gui.enabled=false",
-           "--usage_and_diagnostic_data.disable_analytics=true",
+           "--usage_and_diagnostic_data.disable_analytics=true", "--router.fanout.enabled=true",
            "--router.optimizer.enabled=false", "--router.max_passes=200", "--router.job_timeout=00:02:00",
            "-de", str(dsn), "-do", str(ses), "-mt", "1"]
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
@@ -411,10 +434,20 @@ def copper(board: pcbnew.BOARD) -> dict:
 
 def main() -> int:
     BUILD.mkdir(parents=True, exist_ok=True)
-    board = pcbnew.LoadBoard(str(SRC))
-    rules(board)
-    route(board)
-    pour(board)
+    # `board.routing = "hand"`: a person routed it in KiCad, and `fid derive`
+    # has already refused it unless its parts, nets and outline are still the
+    # declaration's. Nothing to route; the same rules and DRC decide it.
+    hand = board_decl().get("routing", "auto") == "hand"
+    if hand:
+        if not HAND.exists():
+            raise SystemExit(f"board.routing = \"hand\" and there is no {HAND.relative_to(ROOT)}")
+        board = pcbnew.LoadBoard(str(HAND))
+        rules(board)
+    else:
+        board = pcbnew.LoadBoard(str(SRC))
+        rules(board)
+        route(board)
+        pour(board)
     out = BUILD / "board-routed.kicad_pcb"
     board.Save(str(out))
     board = pcbnew.LoadBoard(str(out))
@@ -422,7 +455,7 @@ def main() -> int:
     verdict = drc(board, BUILD / "drc.rpt")
     verdict["tracks"] = sum(1 for t in board.GetTracks() if t.GetClass() != "PCB_VIA")
     verdict["vias"] = sum(1 for t in board.GetTracks() if t.GetClass() == "PCB_VIA")
-    verdict["router"] = f"Freerouting {FREEROUTING}"
+    verdict["router"] = f"by hand ({HAND.relative_to(ROOT)})" if hand else f"Freerouting {FREEROUTING}"
     # Placement is deterministic; Freerouting is not. The placed board's hash
     # and the routed copper's, side by side, make a different route visible:
     # same `placed`, different `routed` is the router, not the design.

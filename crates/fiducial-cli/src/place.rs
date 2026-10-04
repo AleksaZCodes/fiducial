@@ -42,9 +42,18 @@ fn sha(s: &str) -> String {
 
 /// Solve `model`, or reuse the committed answer to exactly this model.
 pub fn solve(root: &Path, model: &Value) -> Result<Placed> {
+    solve_at(root, model, ANSWER, "board parts")
+}
+
+/// The case floor's model: the sockets and the board, inside the cavity.
+pub const FLOOR_ANSWER: &str = "hardware/generated/floor.json";
+
+/// Solve a model whose answer is kept at `answer_path`; `what` names what is
+/// being placed, for the messages.
+pub fn solve_at(root: &Path, model: &Value, answer_path: &str, what: &str) -> Result<Placed> {
     let text = serde_json::to_string_pretty(model)? + "\n";
     let stamp = sha(&text);
-    let previous = std::fs::read_to_string(root.join(ANSWER))
+    let previous = std::fs::read_to_string(root.join(answer_path))
         .ok()
         .and_then(|s| serde_json::from_str::<Value>(&s).ok());
     let cached = previous
@@ -66,9 +75,16 @@ pub fn solve(root: &Path, model: &Value) -> Result<Placed> {
         answer["status"].as_str(),
         Some("optimal") | Some("feasible")
     );
+    // The problem as the solver saw it, for a person or an agent to read.
+    let dump = root.join(format!(
+        "hardware/build/{}",
+        Path::new(answer_path)
+            .file_name()
+            .and_then(|f| f.to_str())
+            .unwrap_or("placement.json")
+            .replace(".json", "-model.json")
+    ));
     if !ok {
-        // The problem as the solver saw it, for a person or an agent to read.
-        let dump = root.join("hardware/build/placement-model.json");
         if let Some(dir) = dump.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
@@ -87,20 +103,20 @@ pub fn solve(root: &Path, model: &Value) -> Result<Placed> {
                 })
                 .unwrap_or_default();
             bail!(
-                "the board parts cannot all be placed: these declarations cannot hold together \
+                "the {what} cannot all be placed: these declarations cannot hold together \
                  (with every part kept clear of every other):\n{}\n\
-                 relax one of them, or give the board room (board.size_mm, board.fill); \
-                 the model is in hardware/build/placement-model.json",
+                 relax one of them, or give them room; the model is in {}",
                 if named.is_empty() {
                     "  (the solver named none)".to_string()
                 } else {
                     named.join("\n")
-                }
+                },
+                dump.display()
             )
         }
         other => bail!(
-            "the placement solver found no placement within its effort ({}); \
-             raise placement.effort or give the board room",
+            "the placement solver found no placement of the {what} within its effort ({}); \
+             raise board.placement_effort or give them room",
             other.unwrap_or("no status")
         ),
     }
@@ -112,9 +128,9 @@ pub fn solve(root: &Path, model: &Value) -> Result<Placed> {
             (
                 (
                     c[0].as_f64()
-                        .ok_or_else(|| anyhow!("{ANSWER}: `{id}` has no centre"))?,
+                        .ok_or_else(|| anyhow!("{answer_path}: `{id}` has no centre"))?,
                     c[1].as_f64()
-                        .ok_or_else(|| anyhow!("{ANSWER}: `{id}` has no centre"))?,
+                        .ok_or_else(|| anyhow!("{answer_path}: `{id}` has no centre"))?,
                 ),
                 v["rotation_deg"].as_f64().unwrap_or(0.0),
             ),

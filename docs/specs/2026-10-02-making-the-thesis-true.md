@@ -182,8 +182,11 @@ Departures from the plan:
   has no model for the latter two.
 - **Parts:** pinned and verified, not picked, because the catalogue was
   mid-migration.
-- **Bill:** about $5.14 of parts per board at five boards, LCSC prices with
-  minimum order quantities.
+- **Bill:** $4.74 of parts per board at five boards (23 parts since the
+  LED's buffer, 2026-10-04), LCSC's prices at that quantity with minimum
+  orders pooled across lines of the same part — read by `parts.py resolve`
+  into the lock, asserted by derive against the $15 ceiling. The printed case
+  and the vent are not priced.
 
 Platform bugs the example found, each fixed and tested:
 - seal and fastener fields required when irrelevant;
@@ -238,6 +241,13 @@ Platform bugs the example found, each fixed and tested:
   rule; DRC checks the rule. Five re-routes of one placement then gave five
   different boards, all DRC-clean: `route.json` now records the placed
   board's hash and the routed copper's, so that difference is visible.
+- the example's CI then failed twice in nine runs with 2–3 connections open:
+  about half of all Freerouting runs left one to four open at the RP2040's
+  0.4 mm-pitch QFN and its flash, and a build failed when four attempts in
+  a row did. Neither the margin nor further completion passes changed that.
+  Freerouting's fan-out (an escape from every SMD pad before the maze
+  search) did: thirteen runs of thirteen routed completely, DRC-clean, in a
+  quarter of the time.
 
 - the first-product guide's captures walked through the deprecated `eda`;
   they are the hardware capability's now (still generated and CI-checked),
@@ -248,30 +258,44 @@ The guide (`docs/guides/sensor-stick.md`) rebuilds the stick from scratch on
 the current platform, with the first build's refusals kept as its case study.
 
 Not done:
-- a "case wraps the board" sizing mode (the stick declares `width_mm`);
-- **a board cut to its case.** The board is always a rectangle. At the
+- a "case wraps the board" sizing mode (the stick declares `width_mm`) —
+  decided 2026-10-04: not built. Each candidate width is a whole solve, and
+  no one model hash can cache the search, so `--check` would solve again on
+  every run. A declared width that the solver refuses by name when the
+  board does not fit already gives the loop (narrow it until it refuses);
+  the width stays a judgment, declared (MISSION 1b);
+- ~~**a board cut to its case.** The board was always a rectangle; at the
   stick's plug end its corners met the case's chamfer and held the socket
-  back, so the example's chamfer was made smaller. A board should stay
-  rectangular where it can, and be cut (a chamfer, a notch) where the case
-  needs it: the outline offset inward by wall + clearance, intersected with
-  the rectangle, written to `Edge.Cuts` and checked like the rest;
-- the floor search's 1 mm step (`case.grid_mm`) also held the board back;
-  the example sets 0.5. Floor placement on the solver (P2) makes it
-  continuous.
+  back, so the example's chamfer was made smaller~~ — done 2026-10-04:
+  `board.cut_mm` keeps the board rectangular where it can and cuts its
+  corners where the case needs it (the outline offset inward by wall +
+  clearance, intersected with the rectangle), written to `Edge.Cuts` as a
+  polygon, with the cut corners as obstacles to placement and the outline
+  used by the case, the routing edge strip and the insertion check. The
+  stick's plug-end chamfer is back to 5 outline units (it had been cut to
+  3) and its board loses two corners, not its length; the mouth stays
+  0.69 mm from the face;
+- ~~the floor search's 1 mm step (`case.grid_mm`) also held the board back~~
+  — done 2026-10-04: the floor is on the solver (P2), continuous to a tenth;
+  the example's `grid_mm = 0.5` is gone and its mouth is 0.69 mm from the
+  face, closer than the workaround's 0.79.
 
 ### G4 · The renders
 
-Software WebGL takes about 10 s a view; CI skips renders. Not on the paper's
-critical path. Fewer shadow passes in `viewer.html` is the cheap fix, done
-when convenient.
+Software WebGL takes about 6 s a view; CI skips renders. Closed
+2026-10-04: the shadow map is not the cost (2048² and 4096² render the same
+six views in 38 s and 37 s), so the "cheap fix" was not one; only a GPU
+changes it (engines spec, *Retrospective* 1).
 
 ## Remove or fix
 
-- **`eda` capability:** deprecate (G2).
+- **`eda` capability:** deprecated (G2) in 0.9.0 and still installable;
+  removed in 0.10.0 with `fiducial-eda`, its `fid-mesh` enclosure pipeline
+  and `@fiducial/board-schema`. Not in 0.9.1: a removal breaks a product
+  that installed it, which a patch release must not.
 - **One product's logo structure in the design capability.** Done (G3):
   `mark`, `letters` and an optional `accent`, with neutral fallback colours.
-- **Floor placement onto the solver** (engines spec P2). It is the last
-  bounded search, and it is why a board could not move under its vent.
+- **Floor placement onto the solver** (engines spec P2). Done 2026-10-04.
 - **Determinism:** CP-SAT placement is deterministic; Freerouting is not.
   Done: `route.json` records the placed and routed hashes. Hand routing
   (P4) remains the escape.
@@ -333,10 +357,10 @@ Cost of delay first (MISSION 5c):
 
 ## Resuming after a context reset
 
-- Branch `claude/elegant-ritchie-bxgij1` in `AleksaZCodes/fiducial`, PR #90
-  (green). Read this file, then
+- Branch `claude/elegant-ritchie-bxgij1` in `AleksaZCodes/fiducial`
+  (PR #90 merged as 0.9.0; PR #91 carries 0.9.1). Read this file, then
   `2026-10-01-hardware-is-solved-by-engines-not-rules.md` (placement, ledger,
   retrospective) and `docs/paper/README.md`.
 - The private reference product is never named or described in this
   repository: not in docs, comments, fixtures, PR text or commit messages.
-- Start with G1.
+- G1–G3 are done; what is open is listed under each G's "Not done".

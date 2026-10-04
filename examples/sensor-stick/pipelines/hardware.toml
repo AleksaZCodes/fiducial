@@ -3,6 +3,8 @@ executor = "fid-hardware"
 args     = ["hardware/product.toml"]
 outputs  = [
   "hardware/generated/layout.json",
+  "hardware/generated/floor-model.json",
+  "hardware/generated/floor.json",
   "hardware/generated/placement-model.json",
   "hardware/generated/placement.json",
   "hardware/generated/bom.csv",
@@ -17,6 +19,8 @@ outputs  = [
 # hardware/product.toml → the solved product, by output file name:
 #
 #   layout.json      every position, size and hole, and why — what cad.py builds from
+#   floor-model.json the case floor (sockets and the board, inside the cavity)
+#                    as a constraint problem, and floor.json its answer
 #   placement-model.json  the board placement as a constraint problem (spec 2026-10-01)
 #   placement.json   the solver's answer, stamped with the model's hash; reused
 #                    while the model is unchanged, so the gate needs no solver

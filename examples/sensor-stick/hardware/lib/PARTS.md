@@ -28,6 +28,8 @@ Paths are relative to `hardware/lib/`. Search a datasheet's `.txt` before readin
 | `r-scl` | I²C SCL pull-up (4.7 kΩ) | 4.7k |  | C23162 | decided | **missing** |
 | `led` | RGB status LED, addressable (shows through a lid printed in translucent filament) |  | WS2812B-B/T | C2761795 | decided | **missing** |
 | `c-led` | LED supply decoupling (100 nF) | 100nF 50V X7R |  | C14663 | decided | **missing** |
+| `buf` | LED data buffer: 3.3 V in, 5 V out (the WS2812B reads high only above 0.7 × VDD, 3.5 V at 5 V) |  | SN74AHCT1G125DBVR | C7484 | decided | **missing** |
+| `c-buf` | Buffer supply decoupling (100 nF) | 100nF 50V X7R |  | C14663 | decided | **missing** |
 
 ## `usb` — USB-C receptacle, 16 pin, USB 2.0
 
@@ -312,7 +314,7 @@ Paths are relative to `hardware/lib/`. Search a datasheet's `.txt` before readin
 - **footprint:** `LED_SMD:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm` → [footprints/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.kicad_mod](footprints/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.kicad_mod)
 - **3D model:** [3d/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step](3d/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step)
 - **datasheet:** not yet fetched — https://datasheet.lcsc.com/datasheet/pdf/bc8264a6d62c958a89e25ec8cc82b690.pdf?productCode=C2761795; see `problems` in manifest.json
-- **pins → nets:** `VDD` → `VBUS`, `VSS` → `GND`, `DIN` → `LED_DIN`
+- **pins → nets:** `VDD` → `VBUS`, `VSS` → `GND`, `DIN` → `LED_DIN_5V`
 
 ## `c-led` — LED supply decoupling (100 nF)
 
@@ -327,3 +329,31 @@ Paths are relative to `hardware/lib/`. Search a datasheet's `.txt` before readin
 - **datasheet:** not yet fetched — https://datasheet.lcsc.com/datasheet/pdf/23ccee80ee542e7cf156a772bb589942.pdf?productCode=C14663; see `problems` in manifest.json
 - **pins → nets:** `1` → `VBUS`, `2` → `GND`
 - **placed near:** `led.VDD`
+
+## `buf` — LED data buffer: 3.3 V in, 5 V out (the WS2812B reads high only above 0.7 × VDD, 3.5 V at 5 V)
+
+- **place / mount:** board / smd
+- **MPN:** SN74AHCT1G125DBVR
+- **LCSC:** C7484
+- **status:** decided
+- **dimensions from:** footprint
+- **symbol:** `74xGxx:74AHCT1G125` (in [symbols.kicad_sym](symbols.kicad_sym))
+- **footprint:** `Package_TO_SOT_SMD:SOT-23-5` → [footprints/SOT-23-5.kicad_mod](footprints/SOT-23-5.kicad_mod)
+- **3D model:** [3d/SOT-23-5.step](3d/SOT-23-5.step)
+- **datasheet:** not yet fetched — https://datasheet.lcsc.com/datasheet/pdf/74b1f7dfbe12452e8a365e0596ae902b.pdf?productCode=C7484; see `problems` in manifest.json
+- **pins → nets:** `1` → `GND`, `2` → `LED_DIN`, `3` → `GND`, `4` → `LED_DIN_5V`, `5` → `VBUS`
+- **placed near:** `led.DIN`
+
+## `c-buf` — Buffer supply decoupling (100 nF)
+
+- **place / mount:** board / smd
+- **LCSC:** C14663
+- **value:** 100nF 50V X7R
+- **status:** decided
+- **dimensions from:** footprint
+- **symbol:** `Device:C` (in [symbols.kicad_sym](symbols.kicad_sym))
+- **footprint:** `Capacitor_SMD:C_0603_1608Metric` → [footprints/C_0603_1608Metric.kicad_mod](footprints/C_0603_1608Metric.kicad_mod)
+- **3D model:** [3d/C_0603_1608Metric.step](3d/C_0603_1608Metric.step)
+- **datasheet:** not yet fetched — https://datasheet.lcsc.com/datasheet/pdf/23ccee80ee542e7cf156a772bb589942.pdf?productCode=C14663; see `problems` in manifest.json
+- **pins → nets:** `1` → `VBUS`, `2` → `GND`
+- **placed near:** `buf.5`

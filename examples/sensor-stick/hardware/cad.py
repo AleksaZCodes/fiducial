@@ -82,6 +82,13 @@ BUILD = ROOT / "hardware" / "build"
 TOL = 1e-3  # mm³ — below this, two touching faces, not an overlap
 
 
+def common(a, b):
+    """The volume two solids share. build123d gives None, not an empty
+    solid, when they share nothing (boxes that overlap, bodies that do not)."""
+    r = a & b
+    return r.volume if r is not None else 0.0
+
+
 def face(pts):
     return make_face(Polyline(*[tuple(p) for p in pts], close=True))
 
@@ -659,7 +666,9 @@ def build(L):
     if b:
         (bx, by), (bw, bd) = b["body"]["centre_mm"], b["body"]["size_mm"]
         z = b["z_bottom_mm"]
-        pcb = box((bx, by), (bw, bd), z, b["thickness_mm"])
+        # Cut to the case (board.cut_mm): its outline, not its rectangle.
+        pcb = (slab(face(b["outline_mm"]), z, b["thickness_mm"]) if b.get("outline_mm")
+               else box((bx, by), (bw, bd), z, b["thickness_mm"]))
         for h in b["holes_mm"]:
             pcb -= cyl(h, b["hole_mm"] / 2, z - 1, b["thickness_mm"] + 2)
         # Plated holes for leads soldered through the board.
@@ -847,7 +856,7 @@ def checks(L, solids):
     if seal and "gasket-lid" in solids:
         g = solids["gasket-lid"][0]
         area = g.volume / seal["gasket_height_mm"]
-        squeezed = (g & solids["case-lid"][0]).volume
+        squeezed = common(g, solids["case-lid"][0])
         # On average at least half the declared squeeze: a flush gasket (0 proud,
         # no tongue) must fail here, not pass on a lower bound of zero.
         least = area * seal["gasket_height_mm"] * seal["compression"] * 0.5
@@ -903,7 +912,7 @@ def checks(L, solids):
             sa, sb = solids[a][0], solids[bn][0]
             if not sa.bounding_box().overlaps(sb.bounding_box()):
                 continue
-            v = (sa & sb).volume
+            v = common(sa, sb)
             if v > TOL:
                 out["interference"].append({"a": a, "b": bn, "mm3": round(v, 3)})
     # A socket reserves its *declared* envelope, not the shape drawn in it: a
@@ -913,7 +922,7 @@ def checks(L, solids):
         env = box(s["body"]["centre_mm"], s["body"]["size_mm"], floor, s["height_mm"])
         for other, (so, _, g) in solids.items():
             if g in ("lid", "board", "wall") and not other.startswith("board-screw"):
-                v = (env & so).volume
+                v = common(env, so)
                 if v > TOL:
                     out["interference"].append({"a": f"{s['part']} (declared envelope)", "b": other, "mm3": round(v, 3)})
     base = solids["case-base"][0]
@@ -924,18 +933,21 @@ def checks(L, solids):
         sweep = Pos(0, 0, bb.max.Z) * Box(bb.size.X - 0.02, bb.size.Y - 0.02, H + 20 - bb.max.Z, align=(Align.MIN, Align.MIN, Align.MIN))
         sweep = Pos(bb.min.X + 0.01, bb.min.Y + 0.01, 0) * sweep
         brd = L.get("board")
+        if nm == "board" and brd and brd.get("outline_mm"):
+            # Cut to the case: what goes down is its outline, not its box.
+            sweep = slab(offset(face(brd["outline_mm"]), amount=-0.01, kind=Kind.INTERSECTION), bb.max.Z, H + 20 - bb.max.Z)
         if nm == "board" and brd and brd.get("mount") == "snap":
             # Its holes go down over the locating pegs: they are meant to.
             for h in brd["holes_mm"]:
                 sweep -= cyl(h, brd["hole_mm"] / 2, 0, H + 40)
-        v = (sweep & base).volume
+        v = common(sweep, base)
         if v > TOL:
             out["insertion"].append({"part": nm, "blocked_mm3": round(v, 3)})
     lid_group = [n for n, (_, _, g) in solids.items() if g == "lid"]
     below = [n for n, (_, _, g) in solids.items() if g in ("socket", "board", "wall")]
     for ln in lid_group:
         for bn in below:
-            v = (solids[ln][0] & solids[bn][0]).volume
+            v = common(solids[ln][0], solids[bn][0])
             if v > TOL:
                 out["lid"].append({"lid_part": ln, "hits": bn, "mm3": round(v, 3)})
     sc = c["screws"]
@@ -953,7 +965,7 @@ def checks(L, solids):
             out["screws"].append({"engagement_mm": round(engage, 3), "needs_mm": need})
     else:
         # The skirt should overlap the base by about its interference band, no more.
-        ov = (solids["case-lid"][0] & solids["case-base"][0]).volume
+        ov = common(solids["case-lid"][0], solids["case-base"][0])
         expected = fit_perimeter(c["outline_mm"]) * press["interference_mm"] * press["skirt_mm"]
         if ov > 3 * expected + 1:
             out["lid"].append({"lid_part": "case-lid", "hits": "case-base", "mm3": round(ov, 3), "expected_press_fit_mm3": round(expected, 3)})

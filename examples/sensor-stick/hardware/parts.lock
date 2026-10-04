@@ -11,7 +11,11 @@ mpn = "TYPE-C-31-M-12"
 manufacturer = "Korean Hroparts Elec"
 package = "SMD"
 description = "USB-C (USB TYPE-C) Receptacle Connector 16 Position Surface Mount"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.1877
+currency = "USD"
+at_qty = 5
+buy_qty = 5
 
 [[part]]
 id = "r-cc1"
@@ -20,7 +24,11 @@ mpn = "0603WAF5101T5E"
 manufacturer = "UNI-ROYAL"
 package = "0603"
 description = "5.1kΩ ±1% 100mW 0603 Thick Film Resistor"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.015
+currency = "USD"
+at_qty = 10
+buy_qty = 100
 
 [[part]]
 id = "r-cc2"
@@ -29,7 +37,11 @@ mpn = "0603WAF5101T5E"
 manufacturer = "UNI-ROYAL"
 package = "0603"
 description = "5.1kΩ ±1% 100mW 0603 Thick Film Resistor"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.015
+currency = "USD"
+at_qty = 10
+buy_qty = 100
 
 [[part]]
 id = "ldo"
@@ -37,7 +49,11 @@ lcsc = "C6186"
 mpn = "AMS1117-3.3"
 manufacturer = "Advanced Monolithic Systems"
 package = "SOT-223"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.2093
+currency = "USD"
+at_qty = 5
+buy_qty = 5
 
 [[part]]
 id = "c-vbus"
@@ -46,7 +62,11 @@ mpn = "CL10A106KP8NNNC"
 manufacturer = "Samsung Electro-Mechanics"
 package = "0603"
 description = "10uF ±10% 10V Ceramic Capacitor X5R 0603"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.0644
+currency = "USD"
+at_qty = 10
+buy_qty = 20
 
 [[part]]
 id = "c-3v3"
@@ -55,7 +75,11 @@ mpn = "CL10A106KP8NNNC"
 manufacturer = "Samsung Electro-Mechanics"
 package = "0603"
 description = "10uF ±10% 10V Ceramic Capacitor X5R 0603"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.0644
+currency = "USD"
+at_qty = 10
+buy_qty = 20
 
 [[part]]
 id = "mcu"
@@ -63,7 +87,11 @@ lcsc = "C2040"
 mpn = "RP2040"
 manufacturer = "Raspberry Pi"
 package = "LQFN-56(7x7)"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.9975
+currency = "USD"
+at_qty = 5
+buy_qty = 5
 
 [[part]]
 id = "c-dec"
@@ -72,7 +100,11 @@ mpn = "CC0603KRX7R9BB104"
 manufacturer = "YAGEO"
 package = "0603"
 description = "100nF ±10% 50V Ceramic Capacitor X7R 0603"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.01771
+currency = "USD"
+at_qty = 35
+buy_qty = 50
 
 [[part]]
 id = "c-1v1"
@@ -81,7 +113,11 @@ mpn = "CL10A105KB8NNNC"
 manufacturer = "Samsung Electro-Mechanics"
 package = "0603"
 description = "1uF ±10% 50V Ceramic Capacitor X5R 0603"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.17
+currency = "USD"
+at_qty = 5
+buy_qty = 50
 
 [[part]]
 id = "r-dp"
@@ -90,7 +126,11 @@ mpn = "0603WAF270JT5E"
 manufacturer = "UNI-ROYAL"
 package = "0603"
 description = "27Ω ±1% 100mW 0603 Thick Film Resistor"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.021
+currency = "USD"
+at_qty = 10
+buy_qty = 100
 
 [[part]]
 id = "r-dm"
@@ -99,7 +139,11 @@ mpn = "0603WAF270JT5E"
 manufacturer = "UNI-ROYAL"
 package = "0603"
 description = "27Ω ±1% 100mW 0603 Thick Film Resistor"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.021
+currency = "USD"
+at_qty = 10
+buy_qty = 100
 
 [[part]]
 id = "xtal"
@@ -108,7 +152,11 @@ mpn = "X322512MSB4SI"
 manufacturer = "YXC Crystal Oscillators"
 package = "SMD3225-4P"
 description = "Crystal 12MHz ±10ppm 20pF SMD3225-4P"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.0957
+currency = "USD"
+at_qty = 5
+buy_qty = 5
 
 [[part]]
 id = "r-xout"
@@ -117,7 +165,11 @@ mpn = "0603WAF1001T5E"
 manufacturer = "UNI-ROYAL"
 package = "0603"
 description = "1kΩ ±1% 100mW 0603 Thick Film Resistor"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.052
+currency = "USD"
+at_qty = 5
+buy_qty = 100
 
 [[part]]
 id = "c-xin"
@@ -126,7 +178,11 @@ mpn = "CL10C330JB8NNNC"
 manufacturer = "Samsung Electro-Mechanics"
 package = "0603"
 description = "33pF ±5% 50V Ceramic Capacitor C0G 0603"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.062
+currency = "USD"
+at_qty = 10
+buy_qty = 100
 
 [[part]]
 id = "c-xout"
@@ -135,7 +191,11 @@ mpn = "CL10C330JB8NNNC"
 manufacturer = "Samsung Electro-Mechanics"
 package = "0603"
 description = "33pF ±5% 50V Ceramic Capacitor C0G 0603"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.062
+currency = "USD"
+at_qty = 10
+buy_qty = 100
 
 [[part]]
 id = "flash"
@@ -143,7 +203,11 @@ lcsc = "C179173"
 mpn = "W25Q32JVSSIQ"
 manufacturer = "Winbond"
 package = "SOIC-8-208mil"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 1.5101
+currency = "USD"
+at_qty = 5
+buy_qty = 5
 
 [[part]]
 id = "sensor"
@@ -151,7 +215,11 @@ lcsc = "C2757850"
 mpn = "AHT20"
 manufacturer = "Aosong"
 package = "SMD"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.8032
+currency = "USD"
+at_qty = 5
+buy_qty = 5
 
 [[part]]
 id = "r-sda"
@@ -160,7 +228,11 @@ mpn = "0603WAF4701T5E"
 manufacturer = "UNI-ROYAL"
 package = "0603"
 description = "4.7kΩ ±1% 100mW 0603 Thick Film Resistor"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.028
+currency = "USD"
+at_qty = 10
+buy_qty = 100
 
 [[part]]
 id = "r-scl"
@@ -169,7 +241,11 @@ mpn = "0603WAF4701T5E"
 manufacturer = "UNI-ROYAL"
 package = "0603"
 description = "4.7kΩ ±1% 100mW 0603 Thick Film Resistor"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.028
+currency = "USD"
+at_qty = 10
+buy_qty = 100
 
 [[part]]
 id = "led"
@@ -177,7 +253,11 @@ lcsc = "C2761795"
 mpn = "WS2812B-B/T"
 manufacturer = "Worldsemi"
 package = "SMD5050-4P"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.1077
+currency = "USD"
+at_qty = 5
+buy_qty = 5
 
 [[part]]
 id = "c-led"
@@ -186,4 +266,33 @@ mpn = "CC0603KRX7R9BB104"
 manufacturer = "YAGEO"
 package = "0603"
 description = "100nF ±10% 50V Ceramic Capacitor X7R 0603"
-verified = "2026-10-02"
+verified = "2026-10-04"
+unit_price = 0.01771
+currency = "USD"
+at_qty = 35
+buy_qty = 50
+
+[[part]]
+id = "buf"
+lcsc = "C7484"
+mpn = "SN74AHCT1G125DBVR"
+manufacturer = "TI"
+package = "SOT-23-5"
+verified = "2026-10-04"
+unit_price = 0.1009
+currency = "USD"
+at_qty = 5
+buy_qty = 5
+
+[[part]]
+id = "c-buf"
+lcsc = "C14663"
+mpn = "CC0603KRX7R9BB104"
+manufacturer = "YAGEO"
+package = "0603"
+description = "100nF ±10% 50V Ceramic Capacitor X7R 0603"
+verified = "2026-10-04"
+unit_price = 0.01771
+currency = "USD"
+at_qty = 35
+buy_qty = 50
