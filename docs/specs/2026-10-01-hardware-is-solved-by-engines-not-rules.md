@@ -1,7 +1,7 @@
 # Hardware is solved by engines, not by a growing list of rules
 
 **Date:** 2026-10-01
-**Status:** accepted — P1–P6 shipped (P5 re-scoped, see *Progress*); P7 in *Progress*
+**Status:** accepted — P1–P7 done (P5 re-scoped, see *Progress*)
 **Supersedes:** the placement half of `2026-09-30-hardware-is-a-capability.md`
 
 ---
@@ -147,15 +147,15 @@ Kept here so it survives a context reset. Update it with every commit.
 | 5 | Wire engine: avoid collisions, dressed like real wires | done — `wires.rs` (eb11b33) |
 | 6 | Antenna fed from its near end | done (eb11b33) |
 | 7 | How coherent fiducial is, for the paper | answered 2026-10-01; strengthened by P1–P3, P7 |
-| 8 | Minimal cheap showcase example | **P6** |
+| 8 | Minimal cheap showcase example | done (P6): `examples/sensor-stick` |
 | 9 | Existing engines vs building it ourselves | this spec |
 | 10 | Track every request; don't forget | this ledger |
 | 11 | No Raspberry Pi demo | dropped |
 | 12 | the reference product layout notes (gas sensor central, power pads turned, programming pads at an edge, perimeter margin) | done (e701601, eb11b33) |
 | 13 | Datasheets fetched + AI-ready parts context | done — `parts.py`, `PARTS.md` (e701601); vendor PDFs blocked by this environment's network |
-| 14 | PRs open | AleksaZCodes/fiducial#90, and the product's own |
-| 15 | Sensor isolated: room round the gas sensor for a small sealed tube from the vent, so outside air and water reach the sensor, not the cavity | done — vent `seals_to`: a chimney printed with the lid on a squeezed silicone ring, leaning up to 3 mm. In the model: a keep-out, a region (ring on the board) and one new kind, `within`. The reference product: membrane 10 → 8 mm and the radio's left band became `near = "left"` — both named by the solver as the conflict; **open question to the owner** which should give |
-| 16 | Isolation (not waterproofing): a smaller ring, wholly on the board, landing on a uniform surface; radio on the left; board may get narrower later | done — `membrane = "outside"` (10.2 mm ring, was 13.8), F.Cu track/via keep-out under the ring, hook lip counted in side bands so the radio's left band fits again. Narrower board: after P2 |
+| 14 | PRs open | AleksaZCodes/fiducial#90 merged (0.9.0); #91 carries 0.9.1; and the product's own |
+| 15 | Sensor isolated: room round the gas sensor for a small sealed tube from the vent, so outside air and water reach the sensor, not the cavity | done — vent `seals_to`: a chimney printed with the lid on a squeezed silicone ring, leaning up to 3 mm. In the model: a keep-out, a region (ring on the board) and one new kind, `within`. The reference product: membrane 10 → 8 mm and the radio's left band became `near = "left"` — both named by the solver as the conflict; the owner's answer is #16 |
+| 16 | Isolation (not waterproofing): a smaller ring, wholly on the board, landing on a uniform surface; radio on the left; board may get narrower later | done — `membrane = "outside"` (10.2 mm ring, was 13.8), F.Cu track/via keep-out under the ring, hook lip counted in side bands so the radio's left band fits again. Narrower board: P2 placed the floor exactly; the board's width is its parts' area at `board.fill`, so narrower is the owner's declaration (`fill`, or `size_mm`), not a platform gap |
 | 17 | Look back: fix what was slow or buggy, note the rest; paper next | done — see *Retrospective* |
 
 ## Progress
@@ -226,6 +226,41 @@ Kept here so it survives a context reset. Update it with every commit.
   transient, which no check can yet ask for. The example declares three
   checks (default, 1.5 A and 3 A sources); a 22 kΩ in place of 5.1 kΩ fails.
 
+- 2026-10-04 — **P7 done: the numbers.**
+  - *Rules → constraint instances.* Every placement rule is an instance of
+    eight kinds (inside, no-overlap, fixed, flush, within, apart, near, net).
+    The sensor stick's board: 27 parts, 80 instances of six kinds (27 inside,
+    1 flush, 1 within, 1 no-overlap over 33 boxes, 28 near, 22 net); its
+    floor: 5. The reference product's board: 26 parts, 78 instances of seven
+    kinds (26 inside, 1 fixed, 1 within, 1 no-overlap over 30 boxes, 26 near,
+    4 apart, 19 net); its floor (two sockets and the board, five bosses): 9.
+    No kind was added for either product after P2.
+  - *Lines.* P1 replaced the ratsnest search with a model builder of about
+    the same length (`hardware.rs` +389/−354) plus `place.rs` (155) and
+    `place.py` (328): the gain is that a new rule is a new instance, not a
+    new interaction. P2 deleted the bounded floor search (`hardware.rs`
+    +335/−122, `place.py` +57). P4 added `kicad.rs` (242); P5 `circuit.rs`
+    (339). Today: `hardware.rs` 6,805, `place.rs` 177, `place.py` 416.
+  - *The reference product, before and after.* Connection length 9,087 →
+    7,908 (−13 %, P1), then −10 % with the warm start. Floor (P2): the board
+    within 0.05 mm of where the search put it, its `near` miss 2.59 →
+    2.54 mm; it routes (DRC 0) and passes every case check on this release.
+  - *The sensor stick.* Board mouth 0.69 mm from the face with no
+    workaround (was 0.79 with `grid_mm = 0.5`); its plug-end chamfer back at
+    full size with the board cut to the case; $4.74 a board at five.
+
+- 2026-10-04 — **Regressions found by building the reference product on
+  this release**, which CI cannot (it is private): a vent sealed to a board
+  part was sized by its chimney's ring *inside its lid mark* (since 0.9.0),
+  which held a vent in a small roof mark 2.5 mm from where the ring had
+  room; and the floor treated the board's reach under a sealed vent as a
+  preference, so it could stop short of the chimney. Now the vent's own
+  body goes in its area, at the nearest spot whose ring fits the cavity
+  below, and the board's centre is held (a hard `inside`) where the ring
+  can land on it within the chimney's lean. `cad.py` also failed on two
+  solids whose boxes overlap and bodies do not (build123d returns nothing
+  for an empty intersection). Each is tested.
+
 ## Retrospective — 2026-10-01, before the paper
 
 What was slow, buggy or missing in today's work, and what was done about it.
@@ -248,26 +283,31 @@ Freerouting attempts), `cad.py` solids and checks 27 s, KiCad exports 4 s,
 renders 85 s; a changed placement model adds ~65 s of solving.
 
 Known, not fixed (in order of what bites first):
-1. **Renders are software WebGL** (~10 s a view). A GPU, or fewer shadow
-   passes in `viewer.html`, would cut most of it; `SKIP_RENDER=1` skips them.
+1. ~~Renders are slow~~ — measured 2026-10-04: about 6 s a view (six
+   views, 37 s, the sensor stick). The shadow map is not the cost (2048²
+   and 4096², 38 s and 37 s); software rasterising is, and only a GPU
+   changes that. CI skips them (`SKIP_RENDER=1`). Closed: not worth more.
 2. ~~Floor placement is still the old bounded search~~ — done 2026-10-04 (P2).
 3. **Freerouting is not deterministic**: the routed board differs run to
    run; the build retries until 0 open. Hand routing (P4) is the escape.
-4. **No "stay put" cost**: a re-solve may still move parts when it finds a
-   shorter layout. A cost toward the previous answer would trade length for
-   stability, if wanted.
+4. ~~No "stay put" cost~~ — decided 2026-10-04: not added. The answer is
+   reused until the model changes, and a re-solve starts from the previous
+   answer; what must not move is declared (`at_mm`, `rotate_deg`), which is
+   hard. A stay-put cost would trade a shorter layout for an undeclared
+   preference.
 5. ~~Wires are checked against the chimney only~~ — fixed 2026-10-02:
    every core against every solid (`making-the-thesis-true.md`).
 6. ~~The dev `fid` reports `adapters.generated.ts` stale~~ — explained
    2026-10-02: the generator changed, not the inputs; the message now says so.
 7. **The sensor's decoupling cap sits outside the chimney ring**, about 3 mm
-   from its pin through a via pair; fine at 100 nF, worth a look in review.
+   from its pin through a via pair; fine at 100 nF. A review item for the
+   reference product's owner, not a platform defect.
 
 ## Resuming after a context reset
 
 Branch `claude/elegant-ritchie-bxgij1`. Read this file, then
 `crates/fiducial-cli/src/hardware.rs` (board placement: search for
-"Ratsnest placement"; floor placement: "Search: each item tries"), then
+"placement-model"; floor placement: "The floor, by the solver"), then
 `capabilities/hardware/hardware/` (`cad.py`, `route.py`, `parts.py`).
 The reference product (a private repository) is the product every change is
 verified on: `PATH=<fiducial>/target/release:$PATH bash hardware/build.sh`,

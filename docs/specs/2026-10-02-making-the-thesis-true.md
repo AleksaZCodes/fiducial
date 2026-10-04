@@ -258,13 +258,23 @@ The guide (`docs/guides/sensor-stick.md`) rebuilds the stick from scratch on
 the current platform, with the first build's refusals kept as its case study.
 
 Not done:
-- a "case wraps the board" sizing mode (the stick declares `width_mm`);
-- **a board cut to its case.** The board is always a rectangle. At the
+- a "case wraps the board" sizing mode (the stick declares `width_mm`) —
+  decided 2026-10-04: not built. Each candidate width is a whole solve, and
+  no one model hash can cache the search, so `--check` would solve again on
+  every run. A declared width that the solver refuses by name when the
+  board does not fit already gives the loop (narrow it until it refuses);
+  the width stays a judgment, declared (MISSION 1b);
+- ~~**a board cut to its case.** The board was always a rectangle; at the
   stick's plug end its corners met the case's chamfer and held the socket
-  back, so the example's chamfer was made smaller. A board should stay
-  rectangular where it can, and be cut (a chamfer, a notch) where the case
-  needs it: the outline offset inward by wall + clearance, intersected with
-  the rectangle, written to `Edge.Cuts` and checked like the rest;
+  back, so the example's chamfer was made smaller~~ — done 2026-10-04:
+  `board.cut_mm` keeps the board rectangular where it can and cuts its
+  corners where the case needs it (the outline offset inward by wall +
+  clearance, intersected with the rectangle), written to `Edge.Cuts` as a
+  polygon, with the cut corners as obstacles to placement and the outline
+  used by the case, the routing edge strip and the insertion check. The
+  stick's plug-end chamfer is back to 5 outline units (it had been cut to
+  3) and its board loses two corners, not its length; the mouth stays
+  0.69 mm from the face;
 - ~~the floor search's 1 mm step (`case.grid_mm`) also held the board back~~
   — done 2026-10-04: the floor is on the solver (P2), continuous to a tenth;
   the example's `grid_mm = 0.5` is gone and its mouth is 0.69 mm from the
@@ -272,13 +282,17 @@ Not done:
 
 ### G4 · The renders
 
-Software WebGL takes about 10 s a view; CI skips renders. Not on the paper's
-critical path. Fewer shadow passes in `viewer.html` is the cheap fix, done
-when convenient.
+Software WebGL takes about 6 s a view; CI skips renders. Closed
+2026-10-04: the shadow map is not the cost (2048² and 4096² render the same
+six views in 38 s and 37 s), so the "cheap fix" was not one; only a GPU
+changes it (engines spec, *Retrospective* 1).
 
 ## Remove or fix
 
-- **`eda` capability:** deprecate (G2).
+- **`eda` capability:** deprecated (G2) in 0.9.0 and still installable;
+  removed in 0.10.0 with `fiducial-eda`, its `fid-mesh` enclosure pipeline
+  and `@fiducial/board-schema`. Not in 0.9.1: a removal breaks a product
+  that installed it, which a patch release must not.
 - **One product's logo structure in the design capability.** Done (G3):
   `mark`, `letters` and an optional `accent`, with neutral fallback colours.
 - **Floor placement onto the solver** (engines spec P2). Done 2026-10-04.
@@ -343,10 +357,10 @@ Cost of delay first (MISSION 5c):
 
 ## Resuming after a context reset
 
-- Branch `claude/elegant-ritchie-bxgij1` in `AleksaZCodes/fiducial`, PR #90
-  (green). Read this file, then
+- Branch `claude/elegant-ritchie-bxgij1` in `AleksaZCodes/fiducial`
+  (PR #90 merged as 0.9.0; PR #91 carries 0.9.1). Read this file, then
   `2026-10-01-hardware-is-solved-by-engines-not-rules.md` (placement, ledger,
   retrospective) and `docs/paper/README.md`.
 - The private reference product is never named or described in this
   repository: not in docs, comments, fixtures, PR text or commit messages.
-- Start with G1.
+- G1–G3 are done; what is open is listed under each G's "Not done".
