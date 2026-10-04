@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu } from "@base-ui-components/react/menu";
+import { Menu } from "@base-ui/react/menu";
 import { type Locale, locales, messages } from "@/generated/messages";
 import { queryLocaleHref } from "@/lib/locale-href";
 import * as Flags from "country-flag-icons/react/3x2";

@@ -2,11 +2,11 @@
 // Copy-in via `fid add component <name>` — not an installed runtime dependency.
 //
 // Simple components (button, card, badge) use native HTML + Tailwind + CVA.
-// Complex components (dialog) use @base-ui-components/react internally for
+// Complex components (dialog) use @base-ui/react internally for
 // accessible focus trap, keyboard nav, and ARIA — the external API matches shadcn.
 //
 // Requires in the consuming app: clsx, tailwind-merge, class-variance-authority,
-// @base-ui-components/react (dialog only).
+// @base-ui/react (dialog only).
 
 export { Button, buttonVariants } from "./button.js";
 export type { ButtonProps } from "./button.js";
