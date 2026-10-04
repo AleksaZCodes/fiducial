@@ -1850,6 +1850,86 @@ fn an_upgrade_repairs_a_merge_base_fid_add_recorded_patched() {
     );
 }
 
+fn hand_routed(root: &Path) {
+    edit(
+        root,
+        "hardware/product.toml",
+        "[board]",
+        "[board]\nrouting = \"hand\"",
+    );
+}
+
+#[test]
+fn a_hand_routed_board_is_asked_for_by_name() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    hand_routed(&root);
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(!out.status.success());
+    assert!(
+        text(&out).contains("there is no hardware/board-routed.kicad_pcb"),
+        "{}",
+        text(&out)
+    );
+}
+
+#[test]
+fn a_hand_routed_board_passes_until_a_part_moves_in_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    // The person starts from the derived board, then switches to hand.
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    hand_routed(&root);
+    let derived = root.join("hardware/generated/board.kicad_pcb");
+    let routed = root.join("hardware/board-routed.kicad_pcb");
+    std::fs::copy(&derived, &routed).unwrap();
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let out = fid(&root, &["derive", "--check"]);
+    assert!(out.status.success(), "{}", text(&out));
+
+    // Moved in KiCad rather than in product.toml.
+    let board = std::fs::read_to_string(&routed).unwrap();
+    let at = board.find("(fp_text reference \"U1\"").unwrap();
+    let start = board[..at].rfind("(footprint").unwrap();
+    let pos = start + board[start..].find("(at ").unwrap() + 4;
+    let end = pos + board[pos..].find(' ').unwrap();
+    let x: f64 = board[pos..end].parse().unwrap();
+    std::fs::write(
+        &routed,
+        format!("{}{}{}", &board[..pos], x + 2.0, &board[end..]),
+    )
+    .unwrap();
+    let out = fid(&root, &["derive", "--check"]);
+    assert!(
+        !out.status.success(),
+        "an edited hand-routed board is a changed input"
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(!out.status.success());
+    assert!(text(&out).contains("U1 moved"), "{}", text(&out));
+}
+
+#[test]
+fn routing_is_auto_or_hand() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    edit(
+        &root,
+        "hardware/product.toml",
+        "[board]",
+        "[board]\nrouting = \"magic\"",
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(!out.status.success());
+    assert!(
+        text(&out).contains("board.routing = `magic`"),
+        "{}",
+        text(&out)
+    );
+}
+
 #[test]
 fn a_symbol_that_extends_another_is_vendored_whole() {
     let tmp = tempfile::tempdir().unwrap();

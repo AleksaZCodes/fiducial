@@ -79,3 +79,15 @@ Cite the **version DOI** of the release the paper describes (see
 `docs/specs/2026-10-02-one-release-per-platform-version.md`): connect Zenodo,
 merge the release that carries the hardware work (0.9.0), and the `v0.9.0`
 release mints it.
+
+## How the paper gets written (owner's plan, 2026-10-04)
+
+Not before Fiducial is finished and makes sense as a whole. Then the owner
+provides:
+- the conference's `.docx` paper template;
+- last year's best-paper award winner, written by the owner.
+
+From those: the owner's writing style, what made that paper succeed, and how
+its images and illustrations work. Then, together: how best to present,
+sell and frame Fiducial. The draft written on 2026-10-02 was removed; start
+from these notes, not from it.

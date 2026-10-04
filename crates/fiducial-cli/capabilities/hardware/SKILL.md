@@ -22,7 +22,7 @@ hardware/build.sh                  # route, solids, checks, fab files, review pa
 | `generated/board.kicad_sch` | the schematic: each part's KiCad symbol, a net label on every connected pin, a no-connect on every other — one row per circuit | yes |
 | `generated/interface.json`, `interface.ts` | what firmware and web read from the hardware: board size, sockets and their windows, every net and the pins on it — `interface.ts` makes the nets a TypeScript type | yes |
 | `generated/board.rs` | with `[firmware] mcu = "<part id>"`: per net on an MCU I/O pin, a macro taking that pin from Embassy's peripherals (`board::sensor_sda!(p)` → `p.PIN_4`) | yes |
-| `build/board-routed.kicad_pcb` | the board to fabricate: routed by Freerouting, ground-poured both sides, DRC'd by KiCad (`route.json`, `drc.rpt`) — fails the build if anything is unconnected or an error. Freerouting is not deterministic: `route.json` records the placed board's hash and the routed copper's, so a re-route that differs is visible | built |
+| `build/board-routed.kicad_pcb` | the board to fabricate: routed by Freerouting (or the product's own hand-routed board with `board.routing = "hand"`), ground-poured both sides, DRC'd by KiCad (`route.json`, `drc.rpt`) — fails the build if anything is unconnected or an error. Freerouting is not deterministic: `route.json` records the placed board's hash and the routed copper's, so a re-route that differs is visible | built |
 | `build/*.step`, `*.stl`, `assembly.step` | every solid, for a manufacturer and a slicer | built |
 | `build/checks.json` | interference (keep-outs included), insertion, lid, screw engagement, seal squeeze | built, fails the build |
 | `build/fab/`, `schematic.pdf` | `gerbers.zip` (Gerbers and drill of the routed board), `bom-assembly.csv` and `cpl.csv` (an assembly service's BOM and placement), and `README.md` listing every placed part without an `lcsc` number — what cannot be ordered assembled yet; the schematic | built |
@@ -309,10 +309,18 @@ look at what moved, re-render, and show it.
 ## What is not derived
 
 - **Routing is a search, not a derivation**, so it is built, not gated:
-  `route.py` routes `board.kicad_pcb` with Freerouting into
-  `build/board-routed.kicad_pcb`. Open that in KiCad to adjust; the gated
-  board keeps placement and nets. A part without a footprint is a courtyard
-  placeholder (`Pending_<id>`) until it gets one.
+  `route.py` routes `board.kicad_pcb` with Freerouting (fan-out first)
+  into `build/board-routed.kicad_pcb`. A part without a footprint is a
+  courtyard placeholder (`Pending_<id>`) until it gets one.
+- **A board the autorouter cannot do, or should not** (fast signals, RF, a
+  layout a person wants to own): `board.routing = "hand"`. Copy
+  `generated/board.kicad_pcb` to `hardware/board-routed.kicad_pcb`, route it
+  in KiCad and commit it. It stays gated: `fid derive` fails while any part
+  in it has moved, turned, flipped, been added or removed, or any pad is on
+  another net than the declaration says, or the outline differs, naming
+  each. Change `product.toml`, re-derive, and re-route what moved; never
+  move a part in KiCad. The build runs no router: it applies the declared
+  rules and KiCad's DRC to that board.
 - **A component no library has.** Put it in `hardware/vendor/` (KiCad's own
   layout: `<Lib>.pretty/`, `<Lib>.kicad_sym`, `<Lib>.3dshapes/`) with a
   `SOURCES.md` naming where every number came from — a land pattern from a

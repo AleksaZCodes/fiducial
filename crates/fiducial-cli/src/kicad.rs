@@ -615,8 +615,250 @@ pub fn place_footprint(
     s
 }
 
+/// One footprint on a board, as far as the declaration decides it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Placed {
+    pub lib: String,
+    pub layer: String,
+    pub at: (f64, f64, f64),
+    /// Pad number → net name; a pad on no net is absent.
+    pub nets: std::collections::BTreeMap<String, String>,
+}
+
+/// Footprints by reference, and the outline's extent `[x0, y0, x1, y1]`.
+pub type BoardContents = (std::collections::BTreeMap<String, Placed>, Option<[f64; 4]>);
+
+/// What a board file says about what the declaration owns: each footprint by
+/// reference, and the outline's extent on `Edge.Cuts`. Tracks, zones, vias
+/// and silkscreen are not here — they are the routing, which is the person's.
+pub fn board_contents(text: &str) -> Result<BoardContents> {
+    let root = parse(text)?;
+    let pcb = root
+        .items()
+        .iter()
+        .find(|c| c.head() == Some("kicad_pcb"))
+        .unwrap_or(&root);
+    let mut parts = std::collections::BTreeMap::new();
+    for fp in pcb.children("footprint") {
+        let lib = fp
+            .items()
+            .get(1)
+            .and_then(S::atom)
+            .unwrap_or("")
+            .to_string();
+        let layer = fp
+            .child("layer")
+            .and_then(|l| l.items().get(1)?.atom())
+            .unwrap_or("")
+            .to_string();
+        let a = fp.child("at").map(S::nums).unwrap_or_default();
+        let at = (
+            a.first().copied().unwrap_or(0.0),
+            a.get(1).copied().unwrap_or(0.0),
+            a.get(2).copied().unwrap_or(0.0).rem_euclid(360.0),
+        );
+        // KiCad 6/7 name it in `fp_text reference`; KiCad 8 in a property.
+        let reference = fp
+            .children("fp_text")
+            .find(|t| t.items().get(1).and_then(S::atom) == Some("reference"))
+            .and_then(|t| t.items().get(2)?.atom())
+            .or_else(|| {
+                fp.children("property")
+                    .find(|t| t.items().get(1).and_then(S::atom) == Some("Reference"))
+                    .and_then(|t| t.items().get(2)?.atom())
+            })
+            .ok_or_else(|| anyhow!("a footprint `{lib}` has no reference"))?
+            .to_string();
+        let mut nets = std::collections::BTreeMap::new();
+        for pad in fp.children("pad") {
+            let num = pad
+                .items()
+                .get(1)
+                .and_then(S::atom)
+                .unwrap_or("")
+                .to_string();
+            if let Some(net) = pad.child("net").and_then(|n| n.items().get(2)?.atom()) {
+                if !net.is_empty() && !num.is_empty() {
+                    nets.insert(num, net.to_string());
+                }
+            }
+        }
+        parts.insert(
+            reference,
+            Placed {
+                lib,
+                layer,
+                at,
+                nets,
+            },
+        );
+    }
+    let mut pts: Vec<(f64, f64)> = Vec::new();
+    for g in pcb.items() {
+        let on_edge = g
+            .child("layer")
+            .and_then(|l| l.items().get(1)?.atom())
+            .is_some_and(|l| l == "Edge.Cuts");
+        if !on_edge || !g.head().is_some_and(|h| h.starts_with("gr_")) {
+            continue;
+        }
+        for k in ["start", "end", "mid", "center"] {
+            if let Some(v) = g.child(k).map(S::nums) {
+                if v.len() >= 2 {
+                    pts.push((v[0], v[1]));
+                }
+            }
+        }
+        if let Some(list) = g.child("pts") {
+            for xy in list.children("xy") {
+                let v = xy.nums();
+                if v.len() >= 2 {
+                    pts.push((v[0], v[1]));
+                }
+            }
+        }
+    }
+    let outline = (!pts.is_empty()).then(|| {
+        let f = |sel: fn(&(f64, f64)) -> f64, min: bool| {
+            pts.iter().map(sel).fold(
+                if min {
+                    f64::INFINITY
+                } else {
+                    f64::NEG_INFINITY
+                },
+                |a, b| if min { a.min(b) } else { a.max(b) },
+            )
+        };
+        [
+            f(|p| p.0, true),
+            f(|p| p.1, true),
+            f(|p| p.0, false),
+            f(|p| p.1, false),
+        ]
+    });
+    Ok((parts, outline))
+}
+
+/// Where a hand-routed board no longer matches the derived one: a part moved,
+/// turned, flipped, swapped, added or missing, a pad on another net, or the
+/// outline changed. Empty when it still follows from the declaration.
+pub fn board_differences(derived: &str, routed: &str) -> Result<Vec<String>> {
+    const MM: f64 = 0.01;
+    const DEG: f64 = 0.1;
+    let (want, want_edge) = board_contents(derived)?;
+    let (have, have_edge) = board_contents(routed)?;
+    let mut out = Vec::new();
+    for (r, w) in &want {
+        let Some(h) = have.get(r) else {
+            out.push(format!("{r} is missing"));
+            continue;
+        };
+        if h.lib != w.lib {
+            out.push(format!(
+                "{r} is `{}`, the declaration says `{}`",
+                h.lib, w.lib
+            ));
+        }
+        if h.layer != w.layer {
+            out.push(format!(
+                "{r} is on {}, the declaration puts it on {}",
+                h.layer, w.layer
+            ));
+        }
+        if (h.at.0 - w.at.0).abs() > MM || (h.at.1 - w.at.1).abs() > MM {
+            out.push(format!(
+                "{r} moved: at ({}, {}), the declaration places it at ({}, {})",
+                h.at.0, h.at.1, w.at.0, w.at.1
+            ));
+        }
+        let turn = (h.at.2 - w.at.2).rem_euclid(360.0);
+        if turn.min(360.0 - turn) > DEG {
+            out.push(format!(
+                "{r} turned: {}°, the declaration says {}°",
+                h.at.2, w.at.2
+            ));
+        }
+        for (pad, net) in &w.nets {
+            match h.nets.get(pad) {
+                Some(n) if n == net => {}
+                Some(n) => out.push(format!(
+                    "{r} pad {pad} is on {n}, the declaration puts it on {net}"
+                )),
+                None => out.push(format!(
+                    "{r} pad {pad} is on no net, the declaration puts it on {net}"
+                )),
+            }
+        }
+        for (pad, net) in &h.nets {
+            if !w.nets.contains_key(pad) {
+                out.push(format!(
+                    "{r} pad {pad} is on {net}, the declaration leaves it unconnected"
+                ));
+            }
+        }
+    }
+    for r in have.keys().filter(|r| !want.contains_key(*r)) {
+        out.push(format!(
+            "{r} is not in the declaration — declare it in product.toml"
+        ));
+    }
+    match (want_edge, have_edge) {
+        (Some(w), Some(h)) if w.iter().zip(&h).any(|(a, b)| (a - b).abs() > MM) => out.push(
+            format!("the outline changed: {:?}, the declaration's is {:?}", h, w),
+        ),
+        (Some(_), None) => out.push("the outline (Edge.Cuts) is missing".into()),
+        _ => {}
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
+    const KICAD7: &str = r#"(kicad_pcb (version 20221018)
+  (gr_rect (start 100 100) (end 130 140) (layer "Edge.Cuts"))
+  (footprint "R:R_0402" (layer "F.Cu") (at 110 120 90)
+    (fp_text reference "R1" (at 0 0) (layer "F.SilkS"))
+    (pad "1" smd rect (at -0.5 0) (size 0.5 0.5) (layers "F.Cu") (net 1 "VBUS"))
+    (pad "2" smd rect (at 0.5 0) (size 0.5 0.5) (layers "F.Cu") (net 2 "GND")))
+  (segment (start 1 1) (end 2 2) (width 0.2) (layer "F.Cu") (net 1)))"#;
+
+    #[test]
+    fn a_board_saved_by_kicad_8_reads_the_same_as_kicad_7() {
+        let k8 = KICAD7
+            .replace(
+                "(fp_text reference \"R1\" (at 0 0) (layer \"F.SilkS\"))",
+                "(property \"Reference\" \"R1\" (at 0 0 0) (layer \"F.SilkS\"))",
+            )
+            .replace("(at 110 120 90)", "(at 110.000001 120 450)");
+        assert!(board_differences(KICAD7, &k8).unwrap().is_empty());
+    }
+
+    #[test]
+    fn routing_is_the_persons_and_everything_else_is_the_declarations() {
+        // Tracks added: still the declared board.
+        let routed = KICAD7.replace(
+            "(segment",
+            "(segment (start 3 3) (end 4 4) (width 0.2) (layer \"B.Cu\") (net 2)) (segment",
+        );
+        assert!(board_differences(KICAD7, &routed).unwrap().is_empty());
+        let netted = KICAD7.replace("(net 2 \"GND\")", "(net 1 \"VBUS\")");
+        let d = board_differences(KICAD7, &netted).unwrap();
+        assert_eq!(
+            d,
+            vec!["R1 pad 2 is on VBUS, the declaration puts it on GND".to_string()]
+        );
+        let flipped = KICAD7.replace("(layer \"F.Cu\") (at 110", "(layer \"B.Cu\") (at 110");
+        assert!(board_differences(KICAD7, &flipped).unwrap()[0].contains("R1 is on B.Cu"));
+        let turned = KICAD7.replace("(at 110 120 90)", "(at 110 120 0)");
+        assert!(board_differences(KICAD7, &turned).unwrap()[0].contains("R1 turned"));
+        let grown = KICAD7.replace("(end 130 140)", "(end 131 140)");
+        assert!(board_differences(KICAD7, &grown).unwrap()[0].contains("outline changed"));
+        let extra = KICAD7.replacen("(footprint", "(footprint \"X:Y\" (layer \"F.Cu\") (at 1 1) (fp_text reference \"TP1\" (at 0 0))) (footprint", 1);
+        assert!(
+            board_differences(KICAD7, &extra).unwrap()[0].contains("TP1 is not in the declaration")
+        );
+    }
+
     use super::*;
 
     const FP: &str = r#"(footprint Test (version 20221018) (generator x)

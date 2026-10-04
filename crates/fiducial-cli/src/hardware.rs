@@ -464,6 +464,14 @@ pub struct Board {
     /// drawing. Unset: four, inset `hole_inset_mm` from the corners.
     #[serde(default)]
     pub holes_mm: Option<Vec<[f64; 2]>>,
+    /// Who routes the board: `auto` (Freerouting, in `hardware/build.sh`) or
+    /// `hand` — a person routes it in KiCad, starting from the derived
+    /// board, and keeps it as `hardware/board-routed.kicad_pcb`. `fid derive`
+    /// then fails while that board's parts, turns, sides, pad nets or outline
+    /// differ from the declaration's; the build checks it with KiCad's DRC
+    /// instead of routing.
+    #[serde(default = "d_routing")]
+    pub routing: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -754,6 +762,13 @@ fn resolve_picks(root: &Path, p: &mut Product) -> Result<()> {
     }
     Ok(())
 }
+
+fn d_routing() -> String {
+    "auto".into()
+}
+
+/// A hand-routed board, kept by the product (`board.routing = "hand"`).
+pub const HAND_ROUTED: &str = "hardware/board-routed.kicad_pcb";
 
 fn d_process() -> String {
     "fdm".into()
@@ -2666,6 +2681,12 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                     v.unwrap()
                 );
             }
+        }
+        if !matches!(b.routing.as_str(), "auto" | "hand") {
+            bail!(
+                "board.routing = `{}`: `auto` (Freerouting) or `hand` (routed in KiCad, kept as {HAND_ROUTED})",
+                b.routing
+            );
         }
         let snap = match b.mount.as_str() {
             "screws" => false,
@@ -5889,6 +5910,11 @@ pub fn inputs(root: &Path, decl: &str) -> Vec<String> {
         if p.parts.iter().any(|q| q.pick.is_some()) {
             out.push(PARTS_LOCK.to_string());
         }
+        // A hand-routed board is checked against the declaration on every
+        // derive, so an edit to it is an edit to an input.
+        if p.board.routing == "hand" {
+            out.push(HAND_ROUTED.to_string());
+        }
     }
     out.sort();
     out.dedup();
@@ -6192,6 +6218,27 @@ fn overhang_allowed(fp: &crate::kicad::Footprint, faces: &str) -> f64 {
     }
 }
 
+/// A hand-routed board must still be the declared one: the same parts, at
+/// the same places and turns, on the same sides, every pad on its net, the
+/// same outline. The routing — tracks, vias, zones — is the person's; the
+/// rest follows from `product.toml`, and a move made in KiCad instead of
+/// there is drift like any other.
+fn check_hand_routed(derived: &str, root: &Path) -> Result<()> {
+    let routed = std::fs::read_to_string(root.join(HAND_ROUTED)).map_err(|_| {
+        anyhow!(
+            "board.routing = \"hand\" and there is no {HAND_ROUTED}: copy hardware/generated/board.kicad_pcb there, route it in KiCad, and commit it"
+        )
+    })?;
+    let diffs = crate::kicad::board_differences(derived, &routed)?;
+    if !diffs.is_empty() {
+        bail!(
+            "{HAND_ROUTED} no longer matches the declaration — change product.toml, not the board, then re-route what moved:\n  {}",
+            diffs.join("\n  ")
+        );
+    }
+    Ok(())
+}
+
 /// What `fid-hardware` writes for one output path, chosen by file name.
 pub fn render_output(out: &str, product: &Product, solved: &Solved, root: &Path) -> Result<String> {
     let file = Path::new(out)
@@ -6209,7 +6256,13 @@ pub fn render_output(out: &str, product: &Product, solved: &Solved, root: &Path)
         "interface.ts" => render_interface_ts(&interface(product, solved)?),
         "board.rs" => render_board_rs(product, &interface(product, solved)?)?,
         "assembly.md" => render_assembly(solved, &product.product.name),
-        f if f.ends_with(".kicad_pcb") => render_kicad(solved, root)?,
+        f if f.ends_with(".kicad_pcb") => {
+            let derived = render_kicad(solved, root)?;
+            if product.board.routing == "hand" {
+                check_hand_routed(&derived, root)?;
+            }
+            derived
+        }
         f if f.ends_with(".kicad_sch") => render_schematic(solved, root, &product.product.name)?,
         other => bail!("fid-hardware: unknown output `{other}` (layout.json, placement-model.json, placement.json, bom.csv, assembly.md, interface.json, interface.ts, board.rs, *.kicad_pcb, *.kicad_sch)"),
     })

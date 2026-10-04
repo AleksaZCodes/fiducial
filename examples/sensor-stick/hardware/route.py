@@ -17,6 +17,10 @@ net, and stops there: routing is a search, not a derivation. This does it:
 3. a ground pour on both layers, filled;
 4. KiCad's own DRC.
 
+With `board.routing = "hand"` it routes nothing: the product's own
+hardware/board-routed.kicad_pcb, which `fid derive` has checked against the
+declaration, gets the same rules, zone fill and DRC.
+
 It writes hardware/build/board-routed.kicad_pcb (open it in KiCad — this is
 the board to fabricate), route.json (the verdict, with the placed board's
 and the routed copper's hashes: Freerouting is not deterministic, so a
@@ -39,6 +43,7 @@ import pcbnew
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "hardware" / "generated" / "board.kicad_pcb"
+HAND = ROOT / "hardware" / "board-routed.kicad_pcb"  # board.routing = "hand"
 BUILD = ROOT / "hardware" / "build"
 TOOLS = BUILD / "tools"
 FREEROUTING = "2.1.0"
@@ -417,10 +422,20 @@ def copper(board: pcbnew.BOARD) -> dict:
 
 def main() -> int:
     BUILD.mkdir(parents=True, exist_ok=True)
-    board = pcbnew.LoadBoard(str(SRC))
-    rules(board)
-    route(board)
-    pour(board)
+    # `board.routing = "hand"`: a person routed it in KiCad, and `fid derive`
+    # has already refused it unless its parts, nets and outline are still the
+    # declaration's. Nothing to route; the same rules and DRC decide it.
+    hand = board_decl().get("routing", "auto") == "hand"
+    if hand:
+        if not HAND.exists():
+            raise SystemExit(f"board.routing = \"hand\" and there is no {HAND.relative_to(ROOT)}")
+        board = pcbnew.LoadBoard(str(HAND))
+        rules(board)
+    else:
+        board = pcbnew.LoadBoard(str(SRC))
+        rules(board)
+        route(board)
+        pour(board)
     out = BUILD / "board-routed.kicad_pcb"
     board.Save(str(out))
     board = pcbnew.LoadBoard(str(out))
@@ -428,7 +443,7 @@ def main() -> int:
     verdict = drc(board, BUILD / "drc.rpt")
     verdict["tracks"] = sum(1 for t in board.GetTracks() if t.GetClass() != "PCB_VIA")
     verdict["vias"] = sum(1 for t in board.GetTracks() if t.GetClass() == "PCB_VIA")
-    verdict["router"] = f"Freerouting {FREEROUTING}"
+    verdict["router"] = f"by hand ({HAND.relative_to(ROOT)})" if hand else f"Freerouting {FREEROUTING}"
     # Placement is deterministic; Freerouting is not. The placed board's hash
     # and the routed copper's, side by side, make a different route visible:
     # same `placed`, different `routed` is the router, not the design.

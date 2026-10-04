@@ -141,7 +141,7 @@ Kept here so it survives a context reset. Update it with every commit.
 | # | Request | State |
 |---|---|---|
 | 1 | Escape hatch: the product adds its own geometry | done — `hardware/shapes.py`, `model =` (eb11b33) |
-| 2 | Hand routing, gated | **P4** |
+| 2 | Hand routing, gated | done (P4): `board.routing = "hand"` |
 | 3 | Component orientation always sensible, esp. along a wire | wires/pads done (eb11b33); every free part's turn chosen by the solver to shorten its connections (P1 done) |
 | 4 | Explicit user constraints always win | done (P1): `at_mm`, `rotate_deg`, `faces`, `zone`, `away_from` are hard; a conflict fails naming them (test `a_declared_position_and_turn_are_kept…`) |
 | 5 | Wire engine: avoid collisions, dressed like real wires | done — `wires.rs` (eb11b33) |
@@ -190,6 +190,15 @@ Kept here so it survives a context reset. Update it with every commit.
     +389/−354 (the model builder is as long as the search it replaced — the
     gain is that a new rule is a new instance, not a new interaction), plus
     `place.rs` 155 and `place.py` 328.
+
+- 2026-10-04 — **P4 done.** `board.routing = "hand"`: the product keeps
+  `hardware/board-routed.kicad_pcb`, routed in KiCad from the derived board.
+  `fid derive` reads it (an input like any other) and fails while a part has
+  moved, turned, flipped, been added or removed, a pad is on another net, or
+  the outline differs — each named. The build routes nothing: the declared
+  rules and KiCad's DRC decide it. Tested both ways, on a board KiCad itself
+  saved (KiCad 7's `fp_text reference` and KiCad 8's `property`), with
+  routing left to the person: tracks and zones are not compared.
 
 ## Retrospective — 2026-10-01, before the paper
 
