@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import subprocess
 import sys
@@ -128,11 +129,22 @@ def route(board: pcbnew.BOARD) -> None:
     # Four plain strips, not one frame with a hole: Freerouting 2.1's maze
     # search fails on a keep-out with a window (NullPointerException, and a
     # third of the connections left open on the same board).
+    # One strip per edge of the board's real outline — four for a rectangle,
+    # more for a board cut to its case (board.cut_mm) — each straddling its
+    # edge, so the inner half keeps tracks off it.
     edge = MM(0.5)
-    box = board.GetBoardEdgesBoundingBox()
-    l, t, r, b = box.GetLeft(), box.GetTop(), box.GetRight(), box.GetBottom()
+    outline = pcbnew.SHAPE_POLY_SET()
+    board.GetBoardPolygonOutlines(outline)
+    ring = outline.Outline(0)
+    pts = [(ring.CPoint(k).x, ring.CPoint(k).y) for k in range(ring.PointCount())]
     strips = []
-    for x0, y0, x1, y1 in ((l, t, r, t + edge), (l, b - edge, r, b), (l, t, l + edge, b), (r - edge, t, r, b)):
+    for k in range(len(pts)):
+        (ax, ay), (bx, by) = pts[k], pts[(k + 1) % len(pts)]
+        length = math.hypot(bx - ax, by - ay)
+        if length < 1:
+            continue
+        nx, ny = -(by - ay) / length * edge, (bx - ax) / length * edge
+        quad = [(ax + nx, ay + ny), (bx + nx, by + ny), (bx - nx, by - ny), (ax - nx, ay - ny)]
         strip = pcbnew.ZONE(board)
         strip.SetIsRuleArea(True)
         strip.SetDoNotAllowTracks(True)
@@ -143,8 +155,8 @@ def route(board: pcbnew.BOARD) -> None:
         strip.SetLayerSet(pcbnew.LSET.AllCuMask())
         o = strip.Outline()
         o.NewOutline()
-        for x, y in ((x0, y0), (x1, y0), (x1, y1), (x0, y1)):
-            o.Append(x, y)
+        for x, y in quad:
+            o.Append(int(round(x)), int(round(y)))
         board.Add(strip)
         strips.append(strip)
     best: tuple[int, str] | None = None

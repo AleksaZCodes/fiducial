@@ -42,6 +42,7 @@ layers       = 2
 fill         = 0.66
 standoff_mm  = 3.0
 mount        = "snap"
+cut_mm       = 2.5     # the plug end tapers: the board loses its corners there rather than its length
 screw        = "M2"
 near         = ["bottom", "vent"]   # against the plug's wall at one end, under the vent at the other
 edge_mm      = 0.8

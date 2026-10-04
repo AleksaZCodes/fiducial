@@ -479,6 +479,13 @@ pub struct Board {
     /// instead of routing.
     #[serde(default = "d_routing")]
     pub routing: String,
+    /// How far each corner of the board may be cut to follow the case, in mm
+    /// (0, the default: a rectangle). Where the case narrows — a chamfer, a
+    /// taper — the board stays as long as it needs and loses its corners
+    /// instead: its outline is the rectangle clipped to the cavity, written
+    /// to Edge.Cuts, and nothing on it is placed in what is cut.
+    #[serde(default)]
+    pub cut_mm: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -858,16 +865,7 @@ pub fn pads_symbol(n: usize) -> String {
 /// Every rectangle is inside the true region, give or take a tenth: the
 /// solver's answer is checked against the exact fit afterwards.
 fn feasible_centres(outline: &[P], size: P, wall: f64) -> Vec<(P, P)> {
-    const ROW: f64 = 0.5;
-    const SCAN: f64 = 1.0;
-    const TOL: f64 = 0.1;
-    let (lo, hi) = fit::bounds(outline);
-    let (x0, x1) = (lo.0 + wall + size.0 / 2.0, hi.0 - wall - size.0 / 2.0);
-    let (y0, y1) = (lo.1 + wall + size.1 / 2.0, hi.1 - wall - size.1 / 2.0);
-    if x0 > x1 || y0 > y1 {
-        return Vec::new();
-    }
-    let fits = |x: f64, y: f64| {
+    feasible_centres_by(outline, size, wall, |x, y| {
         fit::rect_fits(
             outline,
             &Rect {
@@ -877,7 +875,42 @@ fn feasible_centres(outline: &[P], size: P, wall: f64) -> Vec<(P, P)> {
             // A rectangle exactly at the wall distance fits.
             wall - 1e-6,
         )
-    };
+    })
+}
+
+/// A rectangle of `size` with each corner cut `cut` along both edges: the
+/// least of a board whose corners may be cut to follow the case.
+fn chamfered(c: P, size: P, cut: f64) -> Vec<P> {
+    let (hw, hh) = (size.0 / 2.0, size.1 / 2.0);
+    let k = cut.min(hw).min(hh);
+    vec![
+        (c.0 - hw + k, c.1 - hh),
+        (c.0 + hw - k, c.1 - hh),
+        (c.0 + hw, c.1 - hh + k),
+        (c.0 + hw, c.1 + hh - k),
+        (c.0 + hw - k, c.1 + hh),
+        (c.0 - hw + k, c.1 + hh),
+        (c.0 - hw, c.1 + hh - k),
+        (c.0 - hw, c.1 - hh + k),
+    ]
+}
+
+/// [`feasible_centres`] with any test of whether the item fits at a centre.
+fn feasible_centres_by(
+    outline: &[P],
+    size: P,
+    wall: f64,
+    fits: impl Fn(f64, f64) -> bool,
+) -> Vec<(P, P)> {
+    const ROW: f64 = 0.5;
+    const SCAN: f64 = 1.0;
+    const TOL: f64 = 0.1;
+    let (lo, hi) = fit::bounds(outline);
+    let (x0, x1) = (lo.0 + wall + size.0 / 2.0, hi.0 - wall - size.0 / 2.0);
+    let (y0, y1) = (lo.1 + wall + size.1 / 2.0, hi.1 - wall - size.1 / 2.0);
+    if x0 > x1 || y0 > y1 {
+        return Vec::new();
+    }
     // The boundary between an infeasible `out` and a feasible `inn`.
     let edge = |y: f64, mut out: f64, mut inn: f64| {
         for _ in 0..12 {
@@ -2216,17 +2249,27 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
         };
         let vent = part.mount == "vent";
         // A vent sealed to a board part stands over its chimney's ring, and
-        // that ring must land on the board, inside the cavity: placed by the
-        // membrane alone, a vent at the apex leaves no room for the ring.
+        // that ring must land on the board, inside the cavity, clear of the
+        // screw bosses: the vent's own body goes in its area (a mark, or the
+        // underside), at the nearest spot whose ring fits below. Sizing the
+        // vent by its ring instead held a vent in a small mark far from where
+        // the ring had room.
         let sealed_ring = part
             .seals_to
             .as_deref()
             .and_then(|t| p.parts.iter().find(|q| q.id == t))
             .map(|q| 2.0 * (chimney_radii(part, q).1 + p.board.edge_mm + case.clearance_mm));
-        let sizes = if let Some(d) = sealed_ring {
-            let d = d.max(part.body_mm[0]).max(part.body_mm[1]);
-            vec![(d, d)]
-        } else if vent || part.body_mm[0] == part.body_mm[1] {
+        let ring_fits = |c: P| {
+            sealed_ring.is_none_or(|d| {
+                let r = Rect {
+                    centre: c,
+                    size: (d, d),
+                };
+                fit::rect_fits(&outline, &r, inner)
+                    && boss_keepouts.iter().all(|k| !k.overlaps(&r, 1.0))
+            })
+        };
+        let sizes = if vent || part.body_mm[0] == part.body_mm[1] {
             vec![(part.body_mm[0], part.body_mm[1])]
         } else {
             vec![
@@ -2236,7 +2279,9 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
         };
         let best = sizes
             .iter()
-            .filter_map(|sz| fit::place_rect(&area, *sz, clearance, &lid_taken, 1.0, target, case.grid_mm / 2.0))
+            .filter_map(|sz| {
+                fit::place_rect_where(&area, *sz, clearance, &lid_taken, 1.0, target, case.grid_mm / 2.0, |r| ring_fits(r.centre))
+            })
             .min_by(|a, b| {
                 let d = |r: &Rect| (r.centre.0 - target.0).hypot(r.centre.1 - target.1);
                 d(a).partial_cmp(&d(b)).unwrap()
@@ -2418,6 +2463,10 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
     let mut cover: Vec<f64> = Vec::new();
     // Further targets an item must also reach under (the board: panel and vent).
     let mut also: Vec<Vec<(P, f64)>> = Vec::new();
+    // Where the board's floor rectangle (its centre) may sit so that each
+    // vent sealed to a board part has its chimney's ring wholly on the
+    // board: a requirement, not a preference — the chimney stands on it.
+    let mut board_must: Vec<(String, P, P)> = Vec::new();
     for q in &sockets {
         items.push((
             if q.qty > 1 {
@@ -2550,6 +2599,8 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                 .map(|q| q.body_mm[0].max(q.body_mm[1]) / 2.0)
                 .fold(0.0, f64::max);
             // A vent sealed to a board part: its whole ring on the board.
+            // (Its lean is not counted here: under it is where the board
+            // should reach; the floor's hard limit, below, allows for it.)
             let ring = p
                 .parts
                 .iter()
@@ -2591,6 +2642,25 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                 r3(ov_t)
             ));
         }
+        for v in p.parts.iter().filter(|v| v.seals_to.is_some()) {
+            // The ring may sit up to the chimney's lean from under the vent
+            // (along an axis: the flat of the solver's octagon round it).
+            let (t, m) = (near_point(&v.id)?, margin(&v.id) - CHIMNEY_LEAN / 1.0824);
+            // The floor rectangle's centre is the board's, less the overhang.
+            let d = ((ov_l - ov_r) / 2.0, (ov_b - ov_t) / 2.0);
+            let (rx, ry) = (size.0 / 2.0 - m, size.1 / 2.0 - m);
+            if rx < 0.0 || ry < 0.0 {
+                bail!(
+                    "vent `{}` seals to the board, but its chimney's ring ({} mm in from the edge) is wider than the {} × {} mm board",
+                    v.id, r3(m), r3(size.0), r3(size.1)
+                );
+            }
+            board_must.push((
+                v.id.clone(),
+                (t.0 - d.0 - rx, t.1 - d.1 - ry),
+                (t.0 - d.0 + rx, t.1 - d.1 + ry),
+            ));
+        }
         items.push((
             "board".into(),
             (size.0 + ov_l + ov_r, size.1 + ov_b + ov_t),
@@ -2629,7 +2699,38 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
         let rotations: Vec<Value> = turns
             .iter()
             .map(|(deg, sz)| {
-                let centres: Vec<Value> = feasible_centres(&outline, *sz, *wall)
+                // A board that may lose its corners need only fit as the
+                // rectangle with them cut.
+                let cut = if name == "board" {
+                    b.cut_mm.max(0.0)
+                } else {
+                    0.0
+                };
+                let regions = if cut > 0.0 {
+                    feasible_centres_by(&outline, *sz, *wall, |x, y| {
+                        fit::poly_fits(&outline, &chamfered((x, y), *sz, cut), *wall - 1e-6)
+                    })
+                } else {
+                    feasible_centres(&outline, *sz, *wall)
+                };
+                // The board's centre also within reach of each sealed vent.
+                let regions: Vec<(P, P)> = if name == "board" {
+                    regions
+                        .into_iter()
+                        .filter_map(|(l, h)| {
+                            board_must.iter().try_fold((l, h), |(l, h), (_, ml, mh)| {
+                                let (l, h) = (
+                                    (l.0.max(ml.0), l.1.max(ml.1)),
+                                    (h.0.min(mh.0), h.1.min(mh.1)),
+                                );
+                                (l.0 <= h.0 + 1e-9 && l.1 <= h.1 + 1e-9).then_some((l, h))
+                            })
+                        })
+                        .collect()
+                } else {
+                    regions
+                };
+                let centres: Vec<Value> = regions
                     .iter()
                     .map(|(l, h)| json!([[l.0, l.1], [h.0, h.1]]))
                     .collect();
@@ -2640,6 +2741,15 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
             .iter()
             .all(|r| r["centres_mm"].as_array().is_none_or(|a| a.is_empty()))
         {
+            if name == "board" && !board_must.is_empty() {
+                bail!(
+                    "these do not fit on the floor: the board ({} × {} mm) fits nowhere inside the case, {} mm from its walls, with the chimney's ring of {} wholly on it. Move the vent inward, or enlarge the outline.",
+                    r3(size.0),
+                    r3(size.1),
+                    r3(*wall),
+                    board_must.iter().map(|(v, ..)| format!("`{v}`")).collect::<Vec<_>>().join(" and ")
+                );
+            }
             bail!(
                 "these do not fit on the floor: {name} ({} × {} mm) fits nowhere inside the case, {} mm from its walls, either way round. Shrink it, or enlarge the outline.",
                 r3(size.0),
@@ -2729,7 +2839,17 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
         };
         // The rectangles of centres are a hair inside the true region; this
         // is the exact test, so an approximation that missed is a bug, loud.
-        if !fit::rect_fits(&outline, &r, *wall - 0.02) {
+        let cut = if name == "board" {
+            b.cut_mm.max(0.0)
+        } else {
+            0.0
+        };
+        let fits = if cut > 0.0 {
+            fit::poly_fits(&outline, &chamfered(r.centre, r.size, cut), *wall - 0.02)
+        } else {
+            fit::rect_fits(&outline, &r, *wall - 0.02)
+        };
+        if !fits {
             bail!("the floor solver put {name} at ({}, {}), which does not fit the cavity — a fid bug, please report it", r3(c.0), r3(c.1));
         }
         spots.push(r);
@@ -2854,7 +2974,24 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
             size,
         };
         let (x0, y0) = (r.centre.0 - size.0 / 2.0, r.centre.1 - size.1 / 2.0);
-        let i = b.hole_inset_mm;
+        if b.cut_mm < 0.0 {
+            bail!(
+                "board.cut_mm = {}: 0 (a rectangle) or how far each corner may be cut",
+                b.cut_mm
+            );
+        }
+        // Cut to the case: the rectangle clipped to the cavity. None when
+        // the clip leaves it whole.
+        let cut_outline: Option<Vec<P>> = (b.cut_mm > 0.0)
+            .then(|| {
+                fit::clip_to_rect(
+                    &fit::inset(&outline, inner),
+                    (x0, y0),
+                    (x0 + size.0, y0 + size.1),
+                )
+            })
+            .filter(|poly| fit::signed_area2(poly).abs() / 2.0 < size.0 * size.1 - 1e-6);
+        let i = b.hole_inset_mm + if cut_outline.is_some() { b.cut_mm } else { 0.0 };
         let declared_holes = b.holes_mm.is_some();
         let mut holes = match &b.holes_mm {
             Some(hs) => {
@@ -2927,6 +3064,65 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                 size: (b_clear + 2.0, b_clear + 2.0),
             })
             .collect();
+        // What each obstacle is, for a conflict to name it by.
+        let mut on_board_from: Vec<String> = holes
+            .iter()
+            .map(|h| {
+                format!(
+                    "the board's hole at ({}, {}) and its clearance (board.holes_mm, board.mount)",
+                    r3(h.0 - x0),
+                    r3(h.1 - y0)
+                )
+            })
+            .collect();
+        // A cut corner: nothing on the board may sit in what was cut away.
+        if let Some(poly) = &cut_outline {
+            let mut cuts = 0;
+            for (cx, cy) in [
+                (x0, y0),
+                (x0 + size.0, y0),
+                (x0 + size.0, y0 + size.1),
+                (x0, y0 + size.1),
+            ] {
+                if fit::contains(
+                    poly,
+                    (
+                        cx + (r.centre.0 - cx).signum() * 1e-3,
+                        cy + (r.centre.1 - cy).signum() * 1e-3,
+                    ),
+                ) {
+                    continue;
+                }
+                let reach = b.cut_mm + 1e-6;
+                let near: Vec<&P> = poly
+                    .iter()
+                    .filter(|v| (v.0 - cx).abs() <= reach && (v.1 - cy).abs() <= reach)
+                    .collect();
+                let (mut lx, mut hx, mut ly, mut hy) = (cx, cx, cy, cy);
+                for v in near {
+                    lx = lx.min(v.0);
+                    hx = hx.max(v.0);
+                    ly = ly.min(v.1);
+                    hy = hy.max(v.1);
+                }
+                if hx - lx > 1e-6 && hy - ly > 1e-6 {
+                    on_board.push(Rect {
+                        centre: ((lx + hx) / 2.0, (ly + hy) / 2.0),
+                        size: (hx - lx, hy - ly),
+                    });
+                    on_board_from.push(format!(
+                        "the board's corner at ({}, {}), cut to follow the case (board.cut_mm)",
+                        r3(cx - x0),
+                        r3(cy - y0)
+                    ));
+                    cuts += 1;
+                }
+            }
+            why.push(format!(
+                "board cut to the case at {cuts} corner(s), each by at most {} mm (board.cut_mm): its outline is the rectangle clipped to the cavity",
+                b.cut_mm
+            ));
+        }
         // A hook's lip reaches over the board edge: nothing may sit under it.
         let hook_w = 6.0;
         let hooks: Vec<(P, &str)> = if snap {
@@ -2947,6 +3143,8 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                 centre: (p.0 + dx, p.1),
                 size: (HOOK_LIP, hook_w + 2.0),
             });
+            on_board_from
+                .push("a snap hook's lip over the board edge (board.mount = \"snap\")".to_string());
         }
         if snap {
             why.push(
@@ -3658,13 +3856,9 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
             "effort": b.placement_effort,
             "weights": { "rotation": W_TURN },
             "board": { "lo_mm": mm((x0, y0)), "hi_mm": mm((x0 + size.0, y0 + size.1)) },
-            "obstacles": on_board.iter().enumerate().map(|(i, o)| {
+            "obstacles": on_board.iter().zip(&on_board_from).map(|(o, from)| {
                 let mut v = lohi(o.centre, o.size);
-                v["from"] = json!(if i < holes.len() {
-                    format!("the board's hole at ({}, {}) and its clearance (board.holes_mm, board.mount)", r3(o.centre.0 - x0), r3(o.centre.1 - y0))
-                } else {
-                    "a snap hook's lip over the board edge (board.mount = \"snap\")".to_string()
-                });
+                v["from"] = json!(from);
                 v
             }).collect::<Vec<_>>(),
             "items": items,
@@ -3745,6 +3939,7 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                         size: ks,
                     };
                     on_board.push(kr);
+                    on_board_from.push(format!("`{}`'s keep-out", q.id));
                     ko_json = rect_json(&kr);
                     keepouts.push(json!({ "part": q.id, "body": rect_json(&kr) }));
                 }
@@ -4130,6 +4325,7 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
         ));
         board_json = json!({
             "body": rect_json(&r),
+            "outline_mm": cut_outline.as_deref().map(pts),
             "thickness_mm": b.thickness_mm,
             "layers": b.layers,
             "power_nets": b.power_nets,
@@ -5865,12 +6061,38 @@ pub fn render_kicad(s: &Solved, root: &Path) -> Result<String> {
             );
         }
     }
-    let _ = writeln!(
-        out,
-        "  (gr_rect (start {x0} {y0}) (end {} {}) (stroke (width 0.1) (type default)) (fill none) (layer \"Edge.Cuts\"))",
-        r3(x0 + w),
-        r3(y0 + h)
-    );
+    // The outline: the rectangle, or — cut to the case (board.cut_mm) — the
+    // rectangle clipped to the cavity.
+    match s.layout["board"]["outline_mm"]
+        .as_array()
+        .filter(|a| a.len() >= 3)
+    {
+        Some(poly) => {
+            let xy: Vec<String> = poly
+                .iter()
+                .map(|v| {
+                    format!(
+                        "(xy {} {})",
+                        kx(v[0].as_f64().unwrap_or(0.0)),
+                        ky(v[1].as_f64().unwrap_or(0.0))
+                    )
+                })
+                .collect();
+            let _ = writeln!(
+                out,
+                "  (gr_poly (pts {}) (stroke (width 0.1) (type default)) (fill none) (layer \"Edge.Cuts\"))",
+                xy.join(" ")
+            );
+        }
+        None => {
+            let _ = writeln!(
+                out,
+                "  (gr_rect (start {x0} {y0}) (end {} {}) (stroke (width 0.1) (type default)) (fill none) (layer \"Edge.Cuts\"))",
+                r3(x0 + w),
+                r3(y0 + h)
+            );
+        }
+    }
     for (i, (hx, hy)) in holes.iter().enumerate() {
         // KiCad's y grows downward.
         let (px, py) = (r3(x0 + hx - ox), r3(y0 + h - (hy - oy)));

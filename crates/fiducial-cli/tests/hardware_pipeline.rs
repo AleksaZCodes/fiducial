@@ -125,6 +125,93 @@ fn a_part_that_cannot_fit_fails_naming_it() {
 }
 
 #[test]
+fn a_board_too_big_for_the_chamfered_case_fits_once_its_corners_may_be_cut() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    let p = root.join("hardware/product.toml");
+    let s = std::fs::read_to_string(&p).unwrap();
+    // No cell, no screw bosses: the board alone against the octagon's chamfers.
+    let s = s[..s.find("[[part]]\nid      = \"cell\"").unwrap()]
+        .replace(
+            "max_spacing_mm = 80.0",
+            "max_spacing_mm = 80.0\nclosure = \"press-fit\"",
+        )
+        .replace(
+            "max_mm = [100.0, 100.0]",
+            "max_mm  = [120.0, 120.0]\nsize_mm = [116.0, 90.0]",
+        );
+    std::fs::write(&p, &s).unwrap();
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(!out.status.success());
+    assert!(text(&out).contains("fits nowhere"), "{}", text(&out));
+
+    edit(
+        &root,
+        "hardware/product.toml",
+        "size_mm = [116.0, 90.0]",
+        "size_mm = [116.0, 90.0]\ncut_mm  = 10.0",
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let l = layout(&root);
+    assert_eq!(
+        l["board"]["body"]["size_mm"],
+        serde_json::json!([116.0, 90.0])
+    );
+    let outline: Vec<(f64, f64)> = l["board"]["outline_mm"]
+        .as_array()
+        .expect("a cut board has an outline")
+        .iter()
+        .map(|v| (v[0].as_f64().unwrap(), v[1].as_f64().unwrap()))
+        .collect();
+    assert_eq!(outline.len(), 8, "four corners cut: {outline:?}");
+    let inside = |(x, y): (f64, f64)| {
+        let mut c = false;
+        for i in 0..outline.len() {
+            let (a, b) = (outline[i], outline[(i + 1) % outline.len()]);
+            if (a.1 > y) != (b.1 > y) && x < a.0 + (y - a.1) * (b.0 - a.0) / (b.1 - a.1) {
+                c = !c;
+            }
+        }
+        c
+    };
+    let (cx, cy) = (
+        l["board"]["body"]["centre_mm"][0].as_f64().unwrap(),
+        l["board"]["body"]["centre_mm"][1].as_f64().unwrap(),
+    );
+    // The corners are gone; the holes moved in with them.
+    assert!(!inside((cx - 57.9, cy - 44.9)));
+    for h in l["board"]["holes_mm"].as_array().unwrap() {
+        assert!(
+            inside((h[0].as_f64().unwrap(), h[1].as_f64().unwrap())),
+            "{h}"
+        );
+    }
+    assert!(l["why"].as_array().unwrap().iter().any(|w| w
+        .as_str()
+        .unwrap()
+        .contains("board cut to the case at 4 corner(s)")));
+    let pcb = std::fs::read_to_string(root.join("hardware/generated/board.kicad_pcb")).unwrap();
+    assert!(
+        pcb.contains("gr_poly") && !pcb.contains("(gr_rect"),
+        "the board edge is the outline"
+    );
+
+    // A part pinned in a cut corner is refused, naming the corner.
+    add_board_part(
+        &root,
+        "id = \"a\"\nname = \"A\"\nbody_mm = [3.0, 3.0, 1.0]\nat_mm = [2.0, 2.0]",
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(!out.status.success());
+    assert!(
+        text(&out).contains("cut to follow the case"),
+        "{}",
+        text(&out)
+    );
+}
+
+#[test]
 fn an_upstream_svg_that_moved_fails_check_by_name() {
     let tmp = tempfile::tempdir().unwrap();
     let root = scaffold(tmp.path());
@@ -983,6 +1070,32 @@ fn a_roof_mark_a_vent_in_it_and_a_hanging_lug() {
         hang["plug_y_mm"].as_f64().unwrap() < across,
         "the cavity stops below both holes: {hang}"
     );
+    // Sealed to a board part, the vent stays where its own body fits the
+    // roof: its chimney's ring is on the board below, not in the roof, and
+    // the board reaches under it.
+    std::fs::write(
+        &p,
+        std::fs::read_to_string(&p).unwrap().replace(
+            "near = \"display\"\n",
+            "near = \"display\"\nseals_to = \"gas\"\nmembrane = \"outside\"\n",
+        ),
+    )
+    .unwrap();
+    add_board_part(
+        &root,
+        "id = \"gas\"\nname = \"Gas sensor\"\nbody_mm = [3.0, 3.0, 1.0]",
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let l = layout(&root);
+    let sealed = l["region_parts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["part"] == "vent")
+        .unwrap();
+    assert_eq!(sealed["body"]["centre_mm"], vent["body"]["centre_mm"]);
+    assert_eq!(l["chimneys"][0]["part"], "gas");
 }
 
 #[test]

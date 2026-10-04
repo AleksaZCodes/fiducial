@@ -4476,25 +4476,47 @@
   ],
   "obstacles": [
     {
-      "from": "the board's hole at (3.5, 3.5) and its clearance (board.holes_mm, board.mount)",
+      "from": "the board's hole at (6, 6) and its clearance (board.holes_mm, board.mount)",
       "hi_mm": [
-        10.7,
-        7.6
+        13.2,
+        10.1
       ],
       "lo_mm": [
-        6.3,
-        3.2
+        8.8,
+        5.7
       ]
     },
     {
-      "from": "the board's hole at (22.5, 75.5) and its clearance (board.holes_mm, board.mount)",
+      "from": "the board's hole at (20, 73) and its clearance (board.holes_mm, board.mount)",
       "hi_mm": [
-        29.7,
-        79.6
+        27.2,
+        77.1
       ],
       "lo_mm": [
-        25.3,
-        75.2
+        22.8,
+        72.7
+      ]
+    },
+    {
+      "from": "the board's corner at (0, 0), cut to follow the case (board.cut_mm)",
+      "hi_mm": [
+        6.787,
+        3.687
+      ],
+      "lo_mm": [
+        5.0,
+        1.9
+      ]
+    },
+    {
+      "from": "the board's corner at (26, 0), cut to follow the case (board.cut_mm)",
+      "hi_mm": [
+        31.0,
+        3.687
+      ],
+      "lo_mm": [
+        29.213,
+        1.9
       ]
     },
     {

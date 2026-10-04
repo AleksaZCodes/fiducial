@@ -884,8 +884,8 @@ echo "done: hardware/build/ (review pack in hardware/build/review/)"
 """
 
 [templates."hardware/cad.py"]
-source_version = "0.9.0"
-hash = "392f2110c6c03d2effcb37d53f1e1f5f2363266c9af9b2830b6be8aef53a6ec8"
+source_version = "0.9.1"
+hash = "5df7ba5b13cce71488c020fe9741117560c9e73cd7bf35bddffd424cff665251"
 base_content = '''
 #!/usr/bin/env python3
 """hardware/generated/layout.json -> a functional, assemblable model.
@@ -969,6 +969,13 @@ ROOT = Path(__file__).resolve().parent.parent
 LAYOUT = ROOT / "hardware" / "generated" / "layout.json"
 BUILD = ROOT / "hardware" / "build"
 TOL = 1e-3  # mm³ — below this, two touching faces, not an overlap
+
+
+def common(a, b):
+    """The volume two solids share. build123d gives None, not an empty
+    solid, when they share nothing (boxes that overlap, bodies that do not)."""
+    r = a & b
+    return r.volume if r is not None else 0.0
 
 
 def face(pts):
@@ -1548,7 +1555,9 @@ def build(L):
     if b:
         (bx, by), (bw, bd) = b["body"]["centre_mm"], b["body"]["size_mm"]
         z = b["z_bottom_mm"]
-        pcb = box((bx, by), (bw, bd), z, b["thickness_mm"])
+        # Cut to the case (board.cut_mm): its outline, not its rectangle.
+        pcb = (slab(face(b["outline_mm"]), z, b["thickness_mm"]) if b.get("outline_mm")
+               else box((bx, by), (bw, bd), z, b["thickness_mm"]))
         for h in b["holes_mm"]:
             pcb -= cyl(h, b["hole_mm"] / 2, z - 1, b["thickness_mm"] + 2)
         # Plated holes for leads soldered through the board.
@@ -1736,7 +1745,7 @@ def checks(L, solids):
     if seal and "gasket-lid" in solids:
         g = solids["gasket-lid"][0]
         area = g.volume / seal["gasket_height_mm"]
-        squeezed = (g & solids["case-lid"][0]).volume
+        squeezed = common(g, solids["case-lid"][0])
         # On average at least half the declared squeeze: a flush gasket (0 proud,
         # no tongue) must fail here, not pass on a lower bound of zero.
         least = area * seal["gasket_height_mm"] * seal["compression"] * 0.5
@@ -1792,7 +1801,7 @@ def checks(L, solids):
             sa, sb = solids[a][0], solids[bn][0]
             if not sa.bounding_box().overlaps(sb.bounding_box()):
                 continue
-            v = (sa & sb).volume
+            v = common(sa, sb)
             if v > TOL:
                 out["interference"].append({"a": a, "b": bn, "mm3": round(v, 3)})
     # A socket reserves its *declared* envelope, not the shape drawn in it: a
@@ -1802,7 +1811,7 @@ def checks(L, solids):
         env = box(s["body"]["centre_mm"], s["body"]["size_mm"], floor, s["height_mm"])
         for other, (so, _, g) in solids.items():
             if g in ("lid", "board", "wall") and not other.startswith("board-screw"):
-                v = (env & so).volume
+                v = common(env, so)
                 if v > TOL:
                     out["interference"].append({"a": f"{s['part']} (declared envelope)", "b": other, "mm3": round(v, 3)})
     base = solids["case-base"][0]
@@ -1813,18 +1822,21 @@ def checks(L, solids):
         sweep = Pos(0, 0, bb.max.Z) * Box(bb.size.X - 0.02, bb.size.Y - 0.02, H + 20 - bb.max.Z, align=(Align.MIN, Align.MIN, Align.MIN))
         sweep = Pos(bb.min.X + 0.01, bb.min.Y + 0.01, 0) * sweep
         brd = L.get("board")
+        if nm == "board" and brd and brd.get("outline_mm"):
+            # Cut to the case: what goes down is its outline, not its box.
+            sweep = slab(offset(face(brd["outline_mm"]), amount=-0.01, kind=Kind.INTERSECTION), bb.max.Z, H + 20 - bb.max.Z)
         if nm == "board" and brd and brd.get("mount") == "snap":
             # Its holes go down over the locating pegs: they are meant to.
             for h in brd["holes_mm"]:
                 sweep -= cyl(h, brd["hole_mm"] / 2, 0, H + 40)
-        v = (sweep & base).volume
+        v = common(sweep, base)
         if v > TOL:
             out["insertion"].append({"part": nm, "blocked_mm3": round(v, 3)})
     lid_group = [n for n, (_, _, g) in solids.items() if g == "lid"]
     below = [n for n, (_, _, g) in solids.items() if g in ("socket", "board", "wall")]
     for ln in lid_group:
         for bn in below:
-            v = (solids[ln][0] & solids[bn][0]).volume
+            v = common(solids[ln][0], solids[bn][0])
             if v > TOL:
                 out["lid"].append({"lid_part": ln, "hits": bn, "mm3": round(v, 3)})
     sc = c["screws"]
@@ -1842,7 +1854,7 @@ def checks(L, solids):
             out["screws"].append({"engagement_mm": round(engage, 3), "needs_mm": need})
     else:
         # The skirt should overlap the base by about its interference band, no more.
-        ov = (solids["case-lid"][0] & solids["case-base"][0]).volume
+        ov = common(solids["case-lid"][0], solids["case-base"][0])
         expected = fit_perimeter(c["outline_mm"]) * press["interference_mm"] * press["skirt_mm"]
         if ov > 3 * expected + 1:
             out["lid"].append({"lid_part": "case-lid", "hits": "case-base", "mm3": round(ov, 3), "expected_press_fit_mm3": round(expected, 3)})
@@ -3484,8 +3496,8 @@ status  = "assumed"
 """
 
 [templates."hardware/ratsnest.py"]
-source_version = "0.9.0"
-hash = "3b2c40fb1919ddfa9966bb8a8a1aa66a89ce7ed9b7f30d8ea50054f262929927"
+source_version = "0.9.1"
+hash = "bc35da8a958116933748882a9abf8d044d89a55e74109182ef9a58446f4f8af9"
 base_content = '''
 #!/usr/bin/env python3
 """The board as placed, with its ratsnest: hardware/build/review/ratsnest.svg.
@@ -3538,6 +3550,9 @@ def main() -> int:
     svg = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{(w + 4) * k:.0f}" height="{(h + 4) * k:.0f}" font-family="sans-serif">',
         '<rect width="100%" height="100%" fill="#fff"/>',
+        # The board's outline: its rectangle, or cut to the case (board.cut_mm).
+        (f'<polygon points="{" ".join(f"{X(x):.1f},{Y(y):.1f}" for x, y in board["outline_mm"])}" '
+         'fill="#e8f0e8" stroke="#000" stroke-width="2"/>') if board.get("outline_mm") else
         f'<rect x="{X(x0):.1f}" y="{Y(y1):.1f}" width="{w * k:.1f}" height="{h * k:.1f}" fill="#e8f0e8" stroke="#000" stroke-width="2"/>',
     ]
     nets: dict[str, list[tuple[float, float]]] = {}
@@ -3700,7 +3715,7 @@ ortools==9.15.6755
 
 [templates."hardware/route.py"]
 source_version = "0.9.1"
-hash = "679d87110ee366bf319cbf525ed995d23a1825816ee77512c107dd37e042d0f9"
+hash = "89a34424eae25e8bfa5a94be98860fe8405976d8a0aab5c270fe7a16c52a0cdc"
 base_content = '''
 #!/usr/bin/python3
 """hardware/generated/board.kicad_pcb → a routed, poured, DRC-checked board.
@@ -3737,6 +3752,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import subprocess
 import sys
@@ -3832,11 +3848,22 @@ def route(board: pcbnew.BOARD) -> None:
     # Four plain strips, not one frame with a hole: Freerouting 2.1's maze
     # search fails on a keep-out with a window (NullPointerException, and a
     # third of the connections left open on the same board).
+    # One strip per edge of the board's real outline — four for a rectangle,
+    # more for a board cut to its case (board.cut_mm) — each straddling its
+    # edge, so the inner half keeps tracks off it.
     edge = MM(0.5)
-    box = board.GetBoardEdgesBoundingBox()
-    l, t, r, b = box.GetLeft(), box.GetTop(), box.GetRight(), box.GetBottom()
+    outline = pcbnew.SHAPE_POLY_SET()
+    board.GetBoardPolygonOutlines(outline)
+    ring = outline.Outline(0)
+    pts = [(ring.CPoint(k).x, ring.CPoint(k).y) for k in range(ring.PointCount())]
     strips = []
-    for x0, y0, x1, y1 in ((l, t, r, t + edge), (l, b - edge, r, b), (l, t, l + edge, b), (r - edge, t, r, b)):
+    for k in range(len(pts)):
+        (ax, ay), (bx, by) = pts[k], pts[(k + 1) % len(pts)]
+        length = math.hypot(bx - ax, by - ay)
+        if length < 1:
+            continue
+        nx, ny = -(by - ay) / length * edge, (bx - ax) / length * edge
+        quad = [(ax + nx, ay + ny), (bx + nx, by + ny), (bx - nx, by - ny), (ax - nx, ay - ny)]
         strip = pcbnew.ZONE(board)
         strip.SetIsRuleArea(True)
         strip.SetDoNotAllowTracks(True)
@@ -3847,8 +3874,8 @@ def route(board: pcbnew.BOARD) -> None:
         strip.SetLayerSet(pcbnew.LSET.AllCuMask())
         o = strip.Outline()
         o.NewOutline()
-        for x, y in ((x0, y0), (x1, y0), (x1, y1), (x0, y1)):
-            o.Append(x, y)
+        for x, y in quad:
+            o.Append(int(round(x)), int(round(y)))
         board.Add(strip)
         strips.append(strip)
     best: tuple[int, str] | None = None
@@ -4564,12 +4591,12 @@ base_content = """
 [artifacts."hardware/generated/assembly.md"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "cb6392f5c9fb966287263a3339fbb3a73ffdd22fbaaa2c6efef8d20e5657036a"
+hash = "efd9de333e2b0cf8c49fb7089a6163a972af398e8708d6e48864d03f6700117c"
 
 [artifacts."hardware/generated/board.kicad_pcb"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "2dea892820f94a39a7fbad31bd2831fb953598b70c81150f6f971bcae210be5c"
+hash = "851780eb17fde73c2c07b11dffe15b6a921639ec2d55cc6b898e47e1cf4522cf"
 
 [artifacts."hardware/generated/board.kicad_sch"]
 pipeline = "hardware"
@@ -4589,12 +4616,12 @@ hash = "1298557c3a957cd5c625da6895558e94130edd8c6e06e93ea5fb1fc88013df29"
 [artifacts."hardware/generated/floor-model.json"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "997601ca93bf28c8e6edbbbaebc64c396506dbc1029a30d209d5e280a80f8cbb"
+hash = "4835974c22b538c344fd26c37d2d700aa8e0f83760a81ab259ef985d29d21acf"
 
 [artifacts."hardware/generated/floor.json"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "9035519920e9c814dc7d43ba1811668ddcc2d74802c4554467010cb8c763b21f"
+hash = "2d9fe102998e3412474f3a5ad6dc77bda71aad4bd40dfb1f12ccd0f69e28c885"
 
 [artifacts."hardware/generated/interface.json"]
 pipeline = "hardware"
@@ -4609,17 +4636,17 @@ hash = "6ddc6361d467c61216e4abbf84a846bff50488bf1a109999adbdb4672b7333ec"
 [artifacts."hardware/generated/layout.json"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "1da13d816d04a5bec903c44363c26b9a92d8afec3c2dc0a109ac2cbcb043c972"
+hash = "64ce5110803a1809bc80faa7210b7142007713519f519dd1789a4a1c74148c05"
 
 [artifacts."hardware/generated/placement-model.json"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "487f9e94bf6bda59f0a79ef01ad44ab0cd3a72b897eee792149b466f26bb016e"
+hash = "f19d86a0e8e1ed0b037a9ea183966903d79303a2ae345cb73f3584fc119a0d1f"
 
 [artifacts."hardware/generated/placement.json"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "8ae6cf48fce78a7e517cfe3b61b8d1c328f31768cfb232949c4d6f34bae4ebc9"
+hash = "4e9b09bb755bb527300482df4d0c4c49bc3b3ba9bcf79907a0be441ef1cb690f"
 
 [capabilities.firmware-rp2040]
 source = "built-in"
@@ -4695,7 +4722,7 @@ hash = "b262a7083e277ed417c399a56dc25386b7948daa7d9729ec76dc5839ce6b626a"
 pipelines = ["hardware"]
 
 [inputs."hardware/outline.svg"]
-hash = "54abc351034e73f7f3b15677c11743ac1b3858181e59a1b81120cd3d54e7194f"
+hash = "0507cf7150868a5a93cc03806b5e043a50df9f00d8934c43e05ddaa32939061e"
 pipelines = ["hardware"]
 
 [inputs."hardware/parts.lock"]
@@ -4703,5 +4730,5 @@ hash = "792edbe333edb73d259dbf466ca35c5acb60fd724eff5884c382e598f771549f"
 pipelines = ["hardware"]
 
 [inputs."hardware/product.toml"]
-hash = "a3a7d162d587d43a67be531fbdc8015cbbadba63a9677565c082805990c37725"
+hash = "52af90c3b00161a7d1df9c064727f766df40ad1de3e6ef76ba4a130951c97999"
 pipelines = ["hardware"]
