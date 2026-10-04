@@ -623,8 +623,8 @@ is a `pipelines/research.toml` with a `shell` executor calling Pandoc before it
 is ever a built-in.
 
 **State, 2026-10-04.** Items 1–2 done (the `research` SKILL.md says it is not
-built; Phase 14 carries its correction). Item 3 waits on one click by the
-owner: connect Zenodo before the 0.9.1 release (`v0.9.0` has no DOI). Item 4
+built; Phase 14 carries its correction). Item 3 done: Zenodo has been connected
+since `v0.9.0`, and each release from it on has a version DOI. Item 4
 in part: the engines spec's P7 numbers. Items 4–6 belong to the paper's own
 session, which starts from the owner's `.docx` template and prior paper
 (`docs/paper/README.md`) — so item 5 targets that template (Pandoc's

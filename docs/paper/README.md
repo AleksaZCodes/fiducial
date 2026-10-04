@@ -76,10 +76,11 @@ manufactured and tested.
 ## Citing the software
 
 Cite the **version DOI** of the release the paper describes (see
-`docs/specs/2026-10-02-one-release-per-platform-version.md`). `v0.9.0`
-was released before Zenodo was connected, so it has none: connect Zenodo,
-and the next release (`v0.9.1`, which carries the solvers, the set-point
-checks, prices and the cut board) mints one.
+`docs/specs/2026-10-02-one-release-per-platform-version.md`). Zenodo has
+been connected since `v0.9.0`, so every release from it on has a version
+DOI; the hardware work the paper describes is complete from `v0.9.2` (the
+solvers, set-point checks, prices and the cut board are in `v0.9.1`, and
+`v0.9.2` makes `--check` regenerate the hardware outputs).
 
 ## How the paper gets written (owner's plan, 2026-10-04)
 
