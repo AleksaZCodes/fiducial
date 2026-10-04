@@ -175,8 +175,14 @@ def route_once(board: pcbnew.BOARD) -> str:
     margin_clearances(dsn)
     jar = fetch()
     # Headless, no usage analytics, and a time budget per attempt.
+    #
+    # Fan-out first: a short escape from every SMD pad before the maze search.
+    # Without it, a 0.4 mm-pitch QFN beside its flash left one to four
+    # connections open in about half of all runs — the example's CI failed
+    # whenever four attempts in a row did. With it, eight runs of eight routed
+    # completely, in a quarter of the time.
     cmd = ["java", "-Djava.awt.headless=true", "-jar", str(jar), "--gui.enabled=false",
-           "--usage_and_diagnostic_data.disable_analytics=true",
+           "--usage_and_diagnostic_data.disable_analytics=true", "--router.fanout.enabled=true",
            "--router.optimizer.enabled=false", "--router.max_passes=200", "--router.job_timeout=00:02:00",
            "-de", str(dsn), "-do", str(ses), "-mt", "1"]
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=900)

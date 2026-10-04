@@ -238,6 +238,13 @@ Platform bugs the example found, each fixed and tested:
   rule; DRC checks the rule. Five re-routes of one placement then gave five
   different boards, all DRC-clean: `route.json` now records the placed
   board's hash and the routed copper's, so that difference is visible.
+- the example's CI then failed twice in nine runs with 2–3 connections open:
+  about half of all Freerouting runs left one to four open at the RP2040's
+  0.4 mm-pitch QFN and its flash, and a build failed when four attempts in
+  a row did. Neither the margin nor further completion passes changed that.
+  Freerouting's fan-out (an escape from every SMD pad before the maze
+  search) did: thirteen runs of thirteen routed completely, DRC-clean, in a
+  quarter of the time.
 
 - the first-product guide's captures walked through the deprecated `eda`;
   they are the hardware capability's now (still generated and CI-checked),
