@@ -251,6 +251,8 @@ fid graph
 $ fid graph
 pipeline: hardware (fid-hardware)
   → artifact: hardware/generated/layout.json
+  → artifact: hardware/generated/floor-model.json
+  → artifact: hardware/generated/floor.json
   → artifact: hardware/generated/placement-model.json
   → artifact: hardware/generated/placement.json
   → artifact: hardware/generated/bom.csv

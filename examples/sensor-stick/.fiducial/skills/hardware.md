@@ -173,8 +173,8 @@ listed under `unverified_dimensions`.
   it, and a plug on the lid fills the notch down to the window's top. A
   sealed case refuses the notch and keeps the socket behind the wall. Derive also fails if the window would cut a
   boss; the base rises so the window clears the lid seal. The window is not
-  sealed, and `why` says so. The floor search steps by `case.grid_mm`
-  (1 mm): set 0.5 when the board must stand closer to that wall.
+  sealed, and `why` says so. The floor is placed by the solver to a tenth
+  of a millimetre, so the board stands as close to that wall as it fits.
 
 **Wires are dressed, not drawn.** Each `[[wire]]` is routed by a grid search
 at its height: inside the cavity, round every boss, socket and part that
@@ -246,11 +246,16 @@ unless `board.size_mm` fixes it, and sectioned:
 | `board.edge_mm` | a clear strip round the edge, no parts in it, where tracks run the perimeter; the board grows by twice it |
 | `board.near = ["panel", "vent"]` | the board must reach under each of those lid parts (one, or a list), far enough in for the parts that are `near` it too — the panel's wire drops straight onto its pads, the sensor sits under its vent |
 
-**Placement** is a bounded search, not first-fit: each floor item tries its
-nearest spots and a spread of alternatives, and the arrangement with the least
-total distance from every `near` wins. `layout.json → why` says how far each
-one ended up from where it asked to be. Ties go to the arrangement whose
-board sits centred under what it reaches for.
+**On the floor, placement is solved too** (the same solver). fid works out,
+for each socket (either way round) and the board, the rectangles where its
+centre may sit inside the cavity, its wall's distance in — any outline shape —
+and writes them to `generated/floor-model.json`: every item and screw boss kept
+`clearance_mm` apart, each as close to its `near` as the rest allows (the
+board need only reach under its targets, and is centred on the first, other
+things equal). The answer, `generated/floor.json`, is continuous to a tenth
+of a millimetre and checked against the exact fit. `layout.json → why` says
+how far each one ended up from where it asked to be; when they cannot all
+fit, derive names which of them conflict.
 
 **On the board, placement is solved by a constraint solver** (OR-Tools
 CP-SAT, through `hardware/place.py`; spec 2026-10-01). Every rule in the

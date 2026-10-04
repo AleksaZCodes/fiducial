@@ -27,7 +27,6 @@ wall_mm      = 1.6
 floor_mm     = 2.0
 lid_mm       = 2.0
 clearance_mm = 0.3
-grid_mm      = 0.5   # the floor search's step: fine enough for the board to stand against the plug's wall
 
 [case.seal]
 kind = "none"            # indoors: a printed shell, no gasket

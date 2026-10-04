@@ -262,9 +262,10 @@ Not done:
   rectangular where it can, and be cut (a chamfer, a notch) where the case
   needs it: the outline offset inward by wall + clearance, intersected with
   the rectangle, written to `Edge.Cuts` and checked like the rest;
-- the floor search's 1 mm step (`case.grid_mm`) also held the board back;
-  the example sets 0.5. Floor placement on the solver (P2) makes it
-  continuous.
+- ~~the floor search's 1 mm step (`case.grid_mm`) also held the board back~~
+  — done 2026-10-04: the floor is on the solver (P2), continuous to a tenth;
+  the example's `grid_mm = 0.5` is gone and its mouth is 0.69 mm from the
+  face, closer than the workaround's 0.79.
 
 ### G4 · The renders
 
@@ -277,8 +278,7 @@ when convenient.
 - **`eda` capability:** deprecate (G2).
 - **One product's logo structure in the design capability.** Done (G3):
   `mark`, `letters` and an optional `accent`, with neutral fallback colours.
-- **Floor placement onto the solver** (engines spec P2). It is the last
-  bounded search, and it is why a board could not move under its vent.
+- **Floor placement onto the solver** (engines spec P2). Done 2026-10-04.
 - **Determinism:** CP-SAT placement is deterministic; Freerouting is not.
   Done: `route.json` records the placed and routed hashes. Hand routing
   (P4) remains the escape.

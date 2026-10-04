@@ -1,7 +1,7 @@
 # Hardware is solved by engines, not by a growing list of rules
 
 **Date:** 2026-10-01
-**Status:** accepted — P1 shipped (plus P3's conflict naming); P2, P4–P7 planned (see *Progress*)
+**Status:** accepted — P1–P4 and P6 shipped; P5 and P7 in *Progress*
 **Supersedes:** the placement half of `2026-09-30-hardware-is-a-capability.md`
 
 ---
@@ -200,6 +200,20 @@ Kept here so it survives a context reset. Update it with every commit.
   saved (KiCad 7's `fp_text reference` and KiCad 8's `property`), with
   routing left to the person: tracks and zones are not compared.
 
+- 2026-10-04 — **P2 done.** The case floor (sockets, either way round, and
+  the board) is a second model, `floor-model.json` → `floor.json`, solved by
+  the same `place.py`. The cavity can be any outline, so fid computes, per
+  item and turn, the rectangles where its centre fits (half-millimetre rows,
+  a tenth where they change, ends bisected to a hundredth) and the solver
+  chooses among them; two kinds were added for it, generic like the rest:
+  `inside` per turn as a set of centre rectangles, and `near` with slack per
+  axis (cover a point rather than centre on it). Screw bosses are obstacles
+  that need not clear each other. The bounded search and its anchors are
+  deleted; `case.grid_mm` no longer touches the floor. The answer is checked
+  against the exact fit. On the sensor stick the board now stands at its
+  exact limit (0.69 mm mouth, no workaround); a part that fits nowhere, and
+  two that fit apart but not together, fail naming them.
+
 ## Retrospective — 2026-10-01, before the paper
 
 What was slow, buggy or missing in today's work, and what was done about it.
@@ -224,8 +238,7 @@ renders 85 s; a changed placement model adds ~65 s of solving.
 Known, not fixed (in order of what bites first):
 1. **Renders are software WebGL** (~10 s a view). A GPU, or fewer shadow
    passes in `viewer.html`, would cut most of it; `SKIP_RENDER=1` skips them.
-2. **Floor placement is still the old bounded search** (P2). It is why the
-   board could not move up under the vent and the ring had to fit by lean.
+2. ~~Floor placement is still the old bounded search~~ — done 2026-10-04 (P2).
 3. **Freerouting is not deterministic**: the routed board differs run to
    run; the build retries until 0 open. Hand routing (P4) is the escape.
 4. **No "stay put" cost**: a re-solve may still move parts when it finds a

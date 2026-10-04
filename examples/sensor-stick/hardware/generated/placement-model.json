@@ -3,11 +3,11 @@
   "board": {
     "hi_mm": [
       31.0,
-      81.0
+      80.9
     ],
     "lo_mm": [
       5.0,
-      2.0
+      1.9
     ]
   },
   "effort": 10.0,
@@ -48,11 +48,11 @@
         "from": "usb: zone = \"usb\", its face 1.7 mm past the board edge (through_wall: as far as its pads allow)",
         "hi_mm": [
           29.7,
-          33.1
+          33.0
         ],
         "lo_mm": [
           6.3,
-          0.3
+          0.2
         ]
       },
       "rotations": [
@@ -224,11 +224,11 @@
         "from": "mcu: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -1258,11 +1258,11 @@
         "from": "ldo: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -1384,11 +1384,11 @@
         "from": "flash: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -1570,11 +1570,11 @@
         "from": "led: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -1692,11 +1692,11 @@
         "from": "xtal: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -1822,11 +1822,11 @@
         "from": "sensor: its chimney's ring, wholly on the board (sensor: zone = \"sensor\", board.edge_mm)",
         "hi_mm": [
           26.87,
-          76.87
+          76.77
         ],
         "lo_mm": [
           9.13,
-          49.9
+          49.8
         ]
       },
       "rotations": [
@@ -1984,11 +1984,11 @@
         "from": "c-1v1: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -2072,11 +2072,11 @@
         "from": "c-3v3: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -2160,11 +2160,11 @@
         "from": "c-dec: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -2248,11 +2248,11 @@
         "from": "c-dec: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -2336,11 +2336,11 @@
         "from": "c-dec: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -2424,11 +2424,11 @@
         "from": "c-dec: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -2512,11 +2512,11 @@
         "from": "c-dec: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -2600,11 +2600,11 @@
         "from": "c-led: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -2688,11 +2688,11 @@
         "from": "c-vbus: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -2776,11 +2776,11 @@
         "from": "c-xin: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -2864,11 +2864,11 @@
         "from": "c-xout: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -2952,11 +2952,11 @@
         "from": "r-cc1: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -3040,11 +3040,11 @@
         "from": "r-cc2: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -3128,11 +3128,11 @@
         "from": "r-dm: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -3216,11 +3216,11 @@
         "from": "r-dp: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -3304,11 +3304,11 @@
         "from": "r-scl: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -3392,11 +3392,11 @@
         "from": "r-sda: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -3480,11 +3480,11 @@
         "from": "r-xout: on the board, 0.8 mm in from its edge (board.size_mm, board.edge_mm)",
         "hi_mm": [
           29.7,
-          79.7
+          79.6
         ],
         "lo_mm": [
           6.3,
-          3.3
+          3.2
         ]
       },
       "rotations": [
@@ -3565,7 +3565,7 @@
       "to": {
         "at_mm": [
           18.0,
-          2.8
+          2.7
         ]
       },
       "weight": 1
@@ -3575,7 +3575,7 @@
       "to": {
         "at_mm": [
           18.0,
-          41.5
+          41.4
         ]
       },
       "weight": 1
@@ -3585,7 +3585,7 @@
       "to": {
         "at_mm": [
           18.0,
-          41.5
+          41.4
         ]
       },
       "weight": 1
@@ -3595,7 +3595,7 @@
       "to": {
         "at_mm": [
           18.0,
-          41.5
+          41.4
         ]
       },
       "weight": 1
@@ -4214,44 +4214,44 @@
       "from": "the board's hole at (3.5, 3.5) and its clearance (board.holes_mm, board.mount)",
       "hi_mm": [
         10.7,
-        7.7
+        7.6
       ],
       "lo_mm": [
         6.3,
-        3.3
+        3.2
       ]
     },
     {
       "from": "the board's hole at (22.5, 75.5) and its clearance (board.holes_mm, board.mount)",
       "hi_mm": [
         29.7,
-        79.7
+        79.6
       ],
       "lo_mm": [
         25.3,
-        75.3
+        75.2
       ]
     },
     {
       "from": "a snap hook's lip over the board edge (board.mount = \"snap\")",
       "hi_mm": [
         7.5,
-        45.5
+        45.4
       ],
       "lo_mm": [
         5.0,
-        37.5
+        37.4
       ]
     },
     {
       "from": "a snap hook's lip over the board edge (board.mount = \"snap\")",
       "hi_mm": [
         31.0,
-        45.5
+        45.4
       ],
       "lo_mm": [
         28.5,
-        37.5
+        37.4
       ]
     }
   ],

@@ -14,7 +14,9 @@ with a size and pads per allowed rotation and a region it must stay inside;
 fixed obstacles; and constraints of a few generic kinds. Every product rule
 in product.toml is one instance of a kind; no rule has code of its own here.
 
-  hard  inside     an item stays inside its region
+  hard  inside     an item stays inside its region — or, per turn, its centre
+                   inside one of a set of rectangles (`centres_mm`: the case
+                   floor, where fid has worked out where it fits the outline)
         no_overlap items and obstacles stay `gap_mm` apart
         fixed      an item's centre (or one coordinate of it) is given
         flush      an item touches one side of its region (a connector at
@@ -23,7 +25,8 @@ in product.toml is one instance of a kind; no rule has code of its own here.
                    under a vent's leaning chimney)
         apart      two items stay at least `mm` apart, edge to edge
   cost  near       an item (or one of its pads) as close as it can get to a
-                   point or to another item's pad, weighted
+                   point or to another item's pad, weighted; `slack_mm` per
+                   axis is free, `axes` may limit it to one
         net        a net's pads as close together as they can get: the
                    half-perimeter of their bounding box, weighted
         rotation   each turn but the first listed costs a little: ties go
@@ -99,6 +102,22 @@ def build(m: dict, explain: bool):
         y = md.NewIntVar(span[2], span[3], f"{iid}.y")
         # Twice the centre, in grid units: integer whatever the size's parity.
         cx2, cy2 = 2 * x + w, 2 * y + h
+        # Where the centre may be, per turn: a set of rectangles (the case
+        # floor, whose outline is any shape — fid works out where each item
+        # fits it). Rounded inward, so the solver never leaves them.
+        if any("centres_mm" in r for r in rots):
+            ok = guard(it.get("inside_from", f"{iid} inside its region"))
+            for bi, r in zip(b, rots):
+                boxes = r.get("centres_mm", [])
+                zs = [md.NewBoolVar("") for _ in boxes]
+                md.Add(sum(zs) == 1).OnlyEnforceIf([bi, ok])
+                for z, ((x0, y0), (x1, y1)) in zip(zs, boxes):
+                    md.Add(cx2 >= math.ceil(2 * (x0 - ox) / g - 1e-9)).OnlyEnforceIf(z)
+                    md.Add(cx2 <= math.floor(2 * (x1 - ox) / g + 1e-9)).OnlyEnforceIf(z)
+                    md.Add(cy2 >= math.ceil(2 * (y0 - oy) / g - 1e-9)).OnlyEnforceIf(z)
+                    md.Add(cy2 <= math.floor(2 * (y1 - oy) / g + 1e-9)).OnlyEnforceIf(z)
+                if not boxes:
+                    md.Add(bi == 0).OnlyEnforceIf(ok)
         reg = it.get("region")
         if reg:
             ok = guard(reg["from"])
@@ -152,15 +171,29 @@ def build(m: dict, explain: bool):
         for bi in b[1:]:
             costs.append((m["weights"]["rotation"], bi))
 
+    # Obstacles are fixed: they must stay clear of every item, not of each
+    # other — two screw bosses whose keep-outs touch are no contradiction.
+    # So they go in groups that do not overlap among themselves, each group
+    # with every item in one no-overlap (usually a single group).
+    groups: list[list[tuple]] = []
     for o in m.get("obstacles", []):
         (ox0, oy0), (ox1, oy1) = (o["lo_mm"][0] - ox, o["lo_mm"][1] - oy), (o["hi_mm"][0] - ox, o["hi_mm"][1] - oy)
-        lo_x, hi_x = units(ox0 - hg), units(ox1 + hg)
-        lo_y, hi_y = units(oy0 - hg), units(oy1 + hg)
-        # Present unless we are asking which declarations conflict.
-        on = guard(o.get("from", "an obstacle on the board"))
-        xs.append(md.NewOptionalIntervalVar(lo_x, hi_x - lo_x, hi_x, on, "obstacle.x"))
-        ys.append(md.NewOptionalIntervalVar(lo_y, hi_y - lo_y, hi_y, on, "obstacle.y"))
-    md.AddNoOverlap2D(xs, ys)
+        box = (units(ox0 - hg), units(ox1 + hg), units(oy0 - hg), units(oy1 + hg), o.get("from", "an obstacle on the board"))
+        clash = lambda a, c: a[0] < c[1] and c[0] < a[1] and a[2] < c[3] and c[2] < a[3]  # noqa: E731
+        for grp in groups:
+            if not any(clash(box, c) for c in grp):
+                grp.append(box)
+                break
+        else:
+            groups.append([box])
+    for grp in groups or [[]]:
+        gx, gy = list(xs), list(ys)
+        for lo_x, hi_x, lo_y, hi_y, why in grp:
+            # Present unless we are asking which declarations conflict.
+            on = guard(why)
+            gx.append(md.NewOptionalIntervalVar(lo_x, hi_x - lo_x, hi_x, on, "obstacle.x"))
+            gy.append(md.NewOptionalIntervalVar(lo_y, hi_y - lo_y, hi_y, on, "obstacle.y"))
+        md.AddNoOverlap2D(gx, gy)
 
     for a in m.get("apart", []):
         p, q, d = items[a["a"]], items[a["b"]], units(a["mm"])
@@ -178,18 +211,29 @@ def build(m: dict, explain: bool):
         it = items[ref["item"]]
         return it["pads"][ref["pad"]] if "pad" in ref else it["c2"]
 
-    def dist(a, b, tag: str):
-        """L1 distance between two points, as a variable the objective can weigh."""
+    def dist(a, b, tag: str, slack=(0.0, 0.0), axes="xy"):
+        """L1 distance between two points, as a variable the objective can weigh.
+
+        `slack` per axis is free: only what lies beyond it counts (an item
+        that need only cover a point, not centre on it)."""
         out = []
         for k in range(2):
+            if "xy"[k] not in axes:
+                continue
             v = md.NewIntVar(0, big, f"{tag}.{k}")
             md.AddAbsEquality(v, a[k] - b[k])
+            free = units(2 * slack[k])
+            if free > 0:
+                over = md.NewIntVar(0, big, f"{tag}.{k}.over")
+                md.AddMaxEquality(over, [v - free, 0])
+                v = over
             out.append(v)
-        return out[0] + out[1]
+        return sum(out)
 
     for n in m.get("near", []):
         frm = {"item": n["item"], **({"pad": n["pad"]} if "pad" in n else {})}
-        costs.append((n["weight"], dist(point(frm), point(n["to"]), f"near.{n['item']}")))
+        costs.append((n["weight"], dist(point(frm), point(n["to"]), f"near.{n['item']}",
+                                        n.get("slack_mm", (0.0, 0.0)), n.get("axes", "xy"))))
 
     for net in m.get("nets", []):
         ends = [point(e) for e in net["pads"]]

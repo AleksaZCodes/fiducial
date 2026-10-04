@@ -1,0 +1,14 @@
+{
+  "items": {
+    "board": {
+      "centre_mm": [
+        18.0,
+        41.4
+      ],
+      "rotation_deg": 0.0
+    }
+  },
+  "model_sha256": "997601ca93bf28c8e6edbbbaebc64c396506dbc1029a30d209d5e280a80f8cbb",
+  "objective": 2402,
+  "status": "feasible"
+}

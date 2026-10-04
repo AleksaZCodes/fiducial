@@ -69,7 +69,7 @@ The author's position, for the discussion section:
 
 ## Limits to state
 
-N = 1 product; floor placement still a bounded search; autorouting not
+N = 2 products (1 public); autorouting not
 deterministic; power-circuit values computed, not simulated; nothing yet
 manufactured and tested.
 

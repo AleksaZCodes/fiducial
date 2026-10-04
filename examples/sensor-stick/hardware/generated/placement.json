@@ -2,10 +2,10 @@
   "items": {
     "c-1v1": {
       "centre_mm": [
-        28.1,
-        26.95
+        27.35,
+        27.0
       ],
-      "rotation_deg": 0.0
+      "rotation_deg": 270.0
     },
     "c-3v3": {
       "centre_mm": [
@@ -16,38 +16,38 @@
     },
     "c-dec#1": {
       "centre_mm": [
-        27.35,
-        32.2
+        24.85,
+        36.1
       ],
       "rotation_deg": 270.0
     },
     "c-dec#2": {
-      "centre_mm": [
-        21.55,
-        37.9
-      ],
-      "rotation_deg": 270.0
-    },
-    "c-dec#3": {
       "centre_mm": [
         21.6,
         34.65
       ],
       "rotation_deg": 0.0
     },
+    "c-dec#3": {
+      "centre_mm": [
+        27.35,
+        32.2
+      ],
+      "rotation_deg": 270.0
+    },
     "c-dec#4": {
       "centre_mm": [
-        24.85,
-        32.2
+        21.65,
+        37.9
       ],
       "rotation_deg": 270.0
     },
     "c-dec#5": {
       "centre_mm": [
-        25.6,
-        35.45
+        24.85,
+        32.1
       ],
-      "rotation_deg": 0.0
+      "rotation_deg": 270.0
     },
     "c-led": {
       "centre_mm": [
@@ -65,21 +65,21 @@
     },
     "c-xin": {
       "centre_mm": [
-        16.1,
-        22.85
+        15.55,
+        21.8
       ],
-      "rotation_deg": 0.0
+      "rotation_deg": 270.0
     },
     "c-xout": {
       "centre_mm": [
-        11.65,
-        18.6
+        8.65,
+        23.5
       ],
       "rotation_deg": 270.0
     },
     "flash": {
       "centre_mm": [
-        23.5,
+        22.4,
         21.0
       ],
       "rotation_deg": 270.0
@@ -107,22 +107,22 @@
     },
     "r-cc1": {
       "centre_mm": [
-        19.6,
-        11.45
+        20.0,
+        11.35
       ],
       "rotation_deg": 180.0
     },
     "r-cc2": {
       "centre_mm": [
-        23.6,
-        11.45
+        24.0,
+        11.35
       ],
       "rotation_deg": 0.0
     },
     "r-dm": {
       "centre_mm": [
         24.85,
-        27.1
+        26.6
       ],
       "rotation_deg": 90.0
     },
@@ -135,10 +135,10 @@
     },
     "r-scl": {
       "centre_mm": [
-        19.05,
+        19.15,
         37.9
       ],
-      "rotation_deg": 90.0
+      "rotation_deg": 270.0
     },
     "r-sda": {
       "centre_mm": [
@@ -149,34 +149,34 @@
     },
     "r-xout": {
       "centre_mm": [
-        12.1,
-        24.25
+        11.8,
+        37.15
       ],
       "rotation_deg": 180.0
     },
     "sensor": {
       "centre_mm": [
         18.0,
-        75.25
+        75.15
       ],
       "rotation_deg": 270.0
     },
     "usb": {
       "centre_mm": [
         21.6,
-        5.0
+        4.9
       ],
       "rotation_deg": 0.0
     },
     "xtal": {
       "centre_mm": [
-        15.5,
-        19.4
+        12.1,
+        22.9
       ],
-      "rotation_deg": 180.0
+      "rotation_deg": 90.0
     }
   },
-  "model_sha256": "5c224204487862e6d8d9e6d0bac9d9438ec922259849842050f278dfd5131bb1",
-  "objective": 116649,
+  "model_sha256": "21580e4608e5b4541cf204bae9d2ff0b94bad8f9a08504731264d7a5fdf527f9",
+  "objective": 119520,
   "status": "feasible"
 }

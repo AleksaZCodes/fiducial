@@ -76,7 +76,6 @@ width_mm = 36.0
 
 [case]
 colour  = "#1d4ed8"          # translucent blue PETG: the LED shows through
-grid_mm = 0.5                # fine enough for the board to stand against the plug's wall
 
 [case.fasteners]
 closure = "press-fit"        # no screws
@@ -210,7 +209,7 @@ Each mistake was refused at the step that made it, by name.
 | checks | the socket blocked dropping the board in: a lip of wall over it | the notch began 0.5 mm inside the mouth, short of the wall's inner face | **platform**: a notch runs through the whole wall |
 | review | none: the notch stood open above the socket, a slot 7 mm tall | the lid's skirt was cut away there and nothing closed it | **platform**: a plug on the lid fills the notch down to the window |
 | doctor | `cad.py`, resolved to the platform's own version, reported as drift | a conflict moved the merge base but not the recorded hash | **platform**: both move |
-| derive | the mouth 1.19 mm behind the case's face | the floor search's 1 mm step, and the chamfer at the plug's end, held the board back | product: `grid_mm = 0.5`, a smaller chamfer. A board cut to follow the case is the platform's next step |
+| derive | the mouth 1.19 mm behind the case's face | the floor search's 1 mm step, and the chamfer at the plug's end, held the board back | **platform** (since): the floor is placed by the solver to a tenth of a millimetre, so the board stands against the wall (0.69 mm). Then: `grid_mm = 0.5` and a smaller chamfer in the product |
 | route | connections left open | 0.4 mm-pitch pins at 0.2 / 0.15 mm rules | product: 0.15 / 0.127 mm, JLCPCB's standard process |
 | checks | the lid's skirt cuts the board and its snap hooks | derive did not know about the skirt | **platform**: the base grows until the skirt clears |
 | firmware | `fiducial-protocol = "0.1"`, profiles ignored | stale firmware templates | **platform**: templates on the platform's version |
@@ -218,7 +217,7 @@ Each mistake was refused at the step that made it, by name.
 | doctor | the declaration and the firmware reported as drift | they were classed as platform-owned | **platform**: product-owned |
 | render | the case was another product's orange | a platform default copied from a product | **platform**: `case.colour`, a neutral default |
 
-Sixteen of the twenty-three were the platform's. Three no gate caught, all at
+Seventeen of the twenty-three were the platform's. Three no gate caught, all at
 the socket: facing inward, standing back from the case's face, and a slot
 left open above it. A person, or an agent
 asked to look, has to. Each platform bug was fixed in the platform,

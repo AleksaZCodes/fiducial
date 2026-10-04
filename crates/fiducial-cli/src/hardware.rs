@@ -136,8 +136,10 @@ pub struct Case {
     /// fit true.
     #[serde(default = "d_round")]
     pub round_mm: f64,
-    /// Placement search step. Every result passes the exact fit test; this only
-    /// sets how finely positions are tried.
+    /// Search step for what is still placed by search: parts on the lid,
+    /// holes along an edge, wires. The floor is placed by the solver, to a
+    /// tenth of a millimetre, whatever this is. Every result passes the exact
+    /// fit test; this only sets how finely positions are tried.
     #[serde(default = "d_step")]
     pub grid_mm: f64,
     #[serde(default)]
@@ -827,6 +829,177 @@ pub fn pads_symbol(n: usize) -> String {
 /// How far a placed rectangle misses its target point. With `margin` 0, centre
 /// to point; otherwise how far the point lies outside the rectangle shrunk by
 /// `margin` (0 once it is that far inside).
+/// Where a `size` rectangle's centre may be, `wall` inside `outline`: a set of
+/// rectangles of centres, each wholly feasible, for the solver to choose among.
+///
+/// Rows every half millimetre; along each row the feasible runs are found on
+/// a millimetre's scan and their ends bisected to a hundredth. Rows whose runs
+/// differ by no more than a tenth at either end become one rectangle (their
+/// intersection), so a straight wall is one rectangle and a chamfer a few.
+/// Every rectangle is inside the true region, give or take a tenth: the
+/// solver's answer is checked against the exact fit afterwards.
+fn feasible_centres(outline: &[P], size: P, wall: f64) -> Vec<(P, P)> {
+    const ROW: f64 = 0.5;
+    const SCAN: f64 = 1.0;
+    const TOL: f64 = 0.1;
+    let (lo, hi) = fit::bounds(outline);
+    let (x0, x1) = (lo.0 + wall + size.0 / 2.0, hi.0 - wall - size.0 / 2.0);
+    let (y0, y1) = (lo.1 + wall + size.1 / 2.0, hi.1 - wall - size.1 / 2.0);
+    if x0 > x1 || y0 > y1 {
+        return Vec::new();
+    }
+    let fits = |x: f64, y: f64| {
+        fit::rect_fits(
+            outline,
+            &Rect {
+                centre: (x, y),
+                size,
+            },
+            // A rectangle exactly at the wall distance fits.
+            wall - 1e-6,
+        )
+    };
+    // The boundary between an infeasible `out` and a feasible `inn`.
+    let edge = |y: f64, mut out: f64, mut inn: f64| {
+        for _ in 0..12 {
+            let mid = (out + inn) / 2.0;
+            if fits(mid, y) {
+                inn = mid;
+            } else {
+                out = mid;
+            }
+        }
+        inn
+    };
+    let cols = ((x1 - x0) / SCAN).floor() as usize;
+    let xs: Vec<f64> = (0..=cols)
+        .map(|k| x0 + k as f64 * SCAN)
+        .chain(((x1 - x0) % SCAN > 1e-9).then_some(x1))
+        .collect();
+    let runs_at = |y: f64| -> Vec<(f64, f64)> {
+        let ok: Vec<bool> = xs.iter().map(|&x| fits(x, y)).collect();
+        let mut runs = Vec::new();
+        let mut k = 0;
+        while k < xs.len() {
+            if !ok[k] {
+                k += 1;
+                continue;
+            }
+            let start = k;
+            while k + 1 < xs.len() && ok[k + 1] {
+                k += 1;
+            }
+            let a = if start == 0 {
+                xs[0]
+            } else {
+                edge(y, xs[start - 1], xs[start])
+            };
+            let b = if k + 1 == xs.len() {
+                xs[k]
+            } else {
+                edge(y, xs[k + 1], xs[k])
+            };
+            runs.push((a, b));
+            k += 1;
+        }
+        runs
+    };
+    let same = |p: &[(f64, f64)], q: &[(f64, f64)]| {
+        p.len() == q.len()
+            && p.iter()
+                .zip(q)
+                .all(|(u, v)| (u.0 - v.0).abs() <= TOL && (u.1 - v.1).abs() <= TOL)
+    };
+    // Coarse rows; between two that differ (a wall's slope, a region's
+    // start or end), fine rows a tenth apart, so the edge is found to that.
+    let rows = ((y1 - y0) / ROW).floor() as usize;
+    let coarse: Vec<f64> = (0..=rows)
+        .map(|k| y0 + k as f64 * ROW)
+        .chain(((y1 - y0) % ROW > 1e-9).then_some(y1))
+        .collect();
+    let mut runs_by_row: Vec<(f64, Vec<(f64, f64)>)> = Vec::new();
+    for (k, &y) in coarse.iter().enumerate() {
+        let runs = runs_at(y);
+        if let Some((py, prev)) = runs_by_row.last().cloned() {
+            if !same(&prev, &runs) {
+                let fine = ((y - py) / 0.1).round() as usize;
+                for f in 1..fine {
+                    let fy = py + f as f64 * (y - py) / fine as f64;
+                    runs_by_row.push((fy, runs_at(fy)));
+                }
+            }
+        }
+        let _ = k;
+        runs_by_row.push((y, runs));
+    }
+    // Rows into rectangles: extend while the run moves less than TOL at
+    // either end; otherwise close, and start the next from the band between.
+    // Each open rectangle: its span (the intersection so far), its rows'
+    // extent, the span it started with, and the last row's run.
+    struct Open {
+        a: f64,
+        b: f64,
+        y0: f64,
+        y1: f64,
+        a0: f64,
+        b0: f64,
+        last: (f64, f64),
+    }
+    let mut done: Vec<(P, P)> = Vec::new();
+    let mut open: Vec<Open> = Vec::new();
+    for (y, runs) in &runs_by_row {
+        let mut next = Vec::new();
+        for &(a, b) in runs {
+            match open.iter().position(|o| a <= o.last.1 && b >= o.last.0) {
+                Some(i) => {
+                    let o = open.remove(i);
+                    let (na, nb) = (o.a.max(a), o.b.min(b));
+                    if na - o.a0 <= TOL && o.b0 - nb <= TOL {
+                        next.push(Open {
+                            a: na,
+                            b: nb,
+                            y1: *y,
+                            last: (a, b),
+                            ..o
+                        });
+                    } else {
+                        done.push(((o.a, o.y0), (o.b, o.y1)));
+                        // The band between the two rows fits their common span.
+                        let (sa, sb) = (o.last.0.max(a), o.last.1.min(b));
+                        next.push(Open {
+                            a: sa,
+                            b: sb,
+                            y0: o.y1,
+                            y1: *y,
+                            a0: sa,
+                            b0: sb,
+                            last: (a, b),
+                        });
+                    }
+                }
+                None => next.push(Open {
+                    a,
+                    b,
+                    y0: *y,
+                    y1: *y,
+                    a0: a,
+                    b0: b,
+                    last: (a, b),
+                }),
+            }
+        }
+        for o in open.drain(..) {
+            done.push(((o.a, o.y0), (o.b, o.y1)));
+        }
+        open = next;
+    }
+    for o in open {
+        done.push(((o.a, o.y0), (o.b, o.y1)));
+    }
+    done.retain(|(l, h)| h.0 >= l.0 && h.1 >= l.1);
+    done
+}
+
 fn miss(r: &Rect, p: P, margin: f64) -> f64 {
     if margin <= 0.0 {
         return (r.centre.0 - p.0).hypot(r.centre.1 - p.1);
@@ -1381,6 +1554,8 @@ pub struct Solved {
     pub cost_violation: Option<String>,
     /// The placement model and the solver's answer to it, as committed.
     pub placement: Option<(String, String)>,
+    /// The same for the case floor: sockets and the board in the cavity.
+    pub floor: Option<(String, String)>,
 }
 
 pub struct BomLine {
@@ -2406,132 +2581,141 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
         cover.push(targets.first().map_or(0.0, |t| t.1));
         also.push(targets.iter().skip(1).copied().collect());
     }
+    // The floor, by the solver (spec 2026-10-01, P2): each item's centre in
+    // the rectangles where it fits the cavity (per turn), every item and
+    // screw boss `clr` apart, and each as close to what it is `near` as the
+    // rest allows. Continuous to a tenth of a millimetre; no search order,
+    // no step that holds a part back.
     let (blo, bhi) = fit::bounds(&outline);
-    let mut anchors = vec![fit::centroid(&outline)];
-    for fy in [0.2, 0.5, 0.8] {
-        for fx in [0.2, 0.5, 0.8] {
-            anchors.push((blo.0 + fx * (bhi.0 - blo.0), blo.1 + fy * (bhi.1 - blo.1)));
-        }
-    }
-    // Search: each item tries its nearest few fitting spots (and one per
-    // anchor, so a crowded preference can still escape), later items fit
-    // around earlier ones, and the arrangement with the least total distance
-    // from every preference wins. Bounded, deterministic, and it does not let
-    // the first item grab a spot that strands the rest.
-    struct Search<'a> {
-        outline: &'a [P],
-        items: &'a [(String, P, f64, Option<P>)],
-        cover: &'a [f64],
-        also: &'a [Vec<(P, f64)>],
-        anchors: &'a [P],
-        gap: f64,
-        step: f64,
-        budget: u32,
-        best: Option<(f64, Vec<Rect>)>,
-    }
-    impl Search<'_> {
-        fn go(&mut self, k: usize, placed: &mut Vec<Rect>, chosen: &mut Vec<Rect>, cost: f64) {
-            if self.best.as_ref().is_some_and(|b| cost >= b.0) {
-                return;
-            }
-            let Some((name, size, wall, pref)) = self.items.get(k) else {
-                self.best = Some((cost, chosen.clone()));
-                return;
-            };
-            // A socketed part may turn; the board does not.
-            let sizes: Vec<P> = if name.ends_with("socket") && size.0 != size.1 {
-                vec![*size, (size.1, size.0)]
+    let middle = fit::centroid(&outline);
+    let mut model_items: Vec<Value> = Vec::new();
+    let mut near_costs: Vec<Value> = Vec::new();
+    let ids: Vec<String> = items
+        .iter()
+        .enumerate()
+        .map(|(k, (name, ..))| {
+            if name == "board" {
+                "board".to_string()
             } else {
-                vec![*size]
-            };
-            let target = pref.unwrap_or(self.anchors[0]);
-            // The last item adds only its own distance, so its nearest spot is
-            // its best one; earlier items need alternatives across the floor.
-            // (Unless it only has to cover its target: then the nearest centre
-            // is not the nearest miss.)
-            let last = k + 1 == self.items.len() && self.cover[k] <= 0.0;
-            let (max, spacing) = if last { (1, 0.0) } else { (40, 6.0) };
-            let mut cands: Vec<(f64, Rect)> = Vec::new();
-            for sz in &sizes {
-                let mut rs = fit::place_rect_candidates(
-                    self.outline,
-                    *sz,
-                    *wall,
-                    placed,
-                    self.gap,
-                    target,
-                    self.step,
-                    max,
-                    spacing,
-                );
-                // A nearest-first scan that found nothing has tried the whole
-                // floor; anchors could only repeat it.
-                let escape = !last && !rs.is_empty();
-                for a in self.anchors.iter().filter(|_| escape) {
-                    rs.extend(fit::place_rect(
-                        self.outline,
-                        *sz,
-                        *wall,
-                        placed,
-                        self.gap,
-                        *a,
-                        self.step,
-                    ));
-                }
-                for r in rs {
-                    // A board that only has to reach under its targets still
-                    // centres on the first of them, other things equal.
-                    let centring = match pref {
-                        Some(p) if self.cover[k] > 0.0 => 0.1 * (r.centre.0 - p.0).abs(),
-                        _ => 0.0,
-                    };
-                    let d = centring
-                        + pref.map_or(0.0, |p| miss(&r, p, self.cover[k]))
-                        + self.also[k]
-                            .iter()
-                            .map(|(t, m)| miss(&r, *t, *m))
-                            .sum::<f64>();
-                    if !cands
-                        .iter()
-                        .any(|c| c.1.centre == r.centre && c.1.size == r.size)
-                    {
-                        cands.push((d, r));
-                    }
+                format!("s{k}")
+            }
+        })
+        .collect();
+    for (k, (name, size, wall, pref)) in items.iter().enumerate() {
+        let turns: Vec<(f64, P)> = if name.ends_with("socket") && size.0 != size.1 {
+            vec![(0.0, *size), (90.0, (size.1, size.0))]
+        } else {
+            vec![(0.0, *size)]
+        };
+        let rotations: Vec<Value> = turns
+            .iter()
+            .map(|(deg, sz)| {
+                let centres: Vec<Value> = feasible_centres(&outline, *sz, *wall)
+                    .iter()
+                    .map(|(l, h)| json!([[l.0, l.1], [h.0, h.1]]))
+                    .collect();
+                json!({ "deg": deg, "size_mm": [sz.0, sz.1], "centres_mm": centres })
+            })
+            .collect();
+        if rotations
+            .iter()
+            .all(|r| r["centres_mm"].as_array().is_none_or(|a| a.is_empty()))
+        {
+            bail!(
+                "these do not fit on the floor: {name} ({} × {} mm) fits nowhere inside the case, {} mm from its walls, either way round. Shrink it, or enlarge the outline.",
+                r3(size.0),
+                r3(size.1),
+                r3(*wall)
+            );
+        }
+        model_items.push(json!({
+            "id": ids[k],
+            "rotations": rotations,
+            "inside_from": format!("{name} inside the case, {} mm from its walls", r3(*wall)),
+        }));
+        // What it should be near: its centre, or — when it only has to reach
+        // under a target — anywhere it covers the target with the margin.
+        let slack = |m: f64| {
+            if m > 0.0 {
+                json!([(size.0 / 2.0 - m).max(0.0), (size.1 / 2.0 - m).max(0.0)])
+            } else {
+                json!([0.0, 0.0])
+            }
+        };
+        match pref {
+            Some(p) => {
+                // The first target outweighs the rest a little: between two
+                // targets every position costs the same, and the declared
+                // order says which one wins.
+                near_costs.push(json!({ "item": ids[k], "to": { "at_mm": [p.0, p.1] }, "weight": 12, "slack_mm": slack(cover[k]) }));
+                if cover[k] > 0.0 {
+                    // Other things equal, centred on it across.
+                    near_costs.push(json!({ "item": ids[k], "to": { "at_mm": [p.0, p.1] }, "weight": 1, "axes": "x" }));
                 }
             }
-            cands.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
-            for (d, r) in cands {
-                // Sorted nearest first: once one cannot beat the best, none can.
-                if self.budget == 0 || self.best.as_ref().is_some_and(|b| cost + d >= b.0) {
-                    return;
-                }
-                self.budget -= 1;
-                placed.push(r);
-                chosen.push(r);
-                self.go(k + 1, placed, chosen, cost + d);
-                chosen.pop();
-                placed.pop();
-            }
+            // Nothing asked: tidy, toward the middle.
+            None => near_costs.push(
+                json!({ "item": ids[k], "to": { "at_mm": [middle.0, middle.1] }, "weight": 1 }),
+            ),
+        }
+        for (t, m) in &also[k] {
+            near_costs.push(json!({ "item": ids[k], "to": { "at_mm": [t.0, t.1] }, "weight": 10, "slack_mm": slack(*m) }));
         }
     }
-    let mut search = Search {
-        outline: &outline,
-        items: &items,
-        cover: &cover,
-        also: &also,
-        anchors: &anchors,
-        gap: clr,
-        step: case.grid_mm,
-        budget: 4000,
-        best: None,
-    };
-    search.go(0, &mut boss_keepouts.clone(), &mut Vec::new(), 0.0);
-    let spots = search.best.map(|b| b.1).ok_or_else(|| {
+    let floor_model = json!({
+        "grid_mm": 0.1,
+        "gap_mm": clr,
+        "board": { "lo_mm": [blo.0, blo.1], "hi_mm": [bhi.0, bhi.1] },
+        "effort": 4.0,
+        "weights": { "rotation": 1 },
+        "items": model_items,
+        "obstacles": boss_keepouts.iter().map(|r| json!({
+            "lo_mm": [r.centre.0 - r.size.0 / 2.0, r.centre.1 - r.size.1 / 2.0],
+            "hi_mm": [r.centre.0 + r.size.0 / 2.0, r.centre.1 + r.size.1 / 2.0],
+            "from": "a screw boss",
+        })).collect::<Vec<_>>(),
+        "near": near_costs,
+    });
+    let floor_solved = crate::place::solve_at(
+        root,
+        &floor_model,
+        crate::place::FLOOR_ANSWER,
+        "floor items (sockets and board)",
+    )
+    .map_err(|e| {
         anyhow!(
-            "these do not fit on the floor together, beside the screw bosses: {}. Shrink one, or enlarge the outline.",
-            items.iter().map(|(n, s, _, _)| format!("{n} ({} × {} mm)", r3(s.0), r3(s.1))).collect::<Vec<_>>().join(", ")
+            "{e}\nthey are: {}",
+            items
+                .iter()
+                .map(|(n, s, _, _)| format!("{n} ({} × {} mm)", r3(s.0), r3(s.1)))
+                .collect::<Vec<_>>()
+                .join(", ")
         )
     })?;
+    let mut spots: Vec<Rect> = Vec::new();
+    for (k, (name, size, wall, _)) in items.iter().enumerate() {
+        let (c, deg) = floor_solved
+            .items
+            .get(&ids[k])
+            .copied()
+            .ok_or_else(|| anyhow!("the floor solver did not place {name}"))?;
+        let sz = if (deg - 90.0).abs() < 1e-6 {
+            (size.1, size.0)
+        } else {
+            *size
+        };
+        let r = Rect {
+            centre: c,
+            size: sz,
+        };
+        // The rectangles of centres are a hair inside the true region; this
+        // is the exact test, so an approximation that missed is a bug, loud.
+        if !fit::rect_fits(&outline, &r, *wall - 0.02) {
+            bail!("the floor solver put {name} at ({}, {}), which does not fit the cavity — a fid bug, please report it", r3(c.0), r3(c.1));
+        }
+        spots.push(r);
+    }
+    let floor = Some((floor_solved.model, floor_solved.answer));
     let placed: Vec<Rect> = boss_keepouts.iter().chain(&spots).copied().collect();
     for ((((name, _, _, pref), r), m), more) in items.iter().zip(&spots).zip(&cover).zip(&also) {
         if let Some(p) = pref {
@@ -4294,11 +4478,10 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
         if reach > most + 1e-9 {
             bail!(
                 "part `{}`: its mouth is {} mm behind the case's outer face, and a plug seats at most {most} mm deep — \
-                 add \"{side}\" to board.near (first) so the board reaches that wall, a finer case.grid_mm ({}) so it \
-                 can stand closer, size opening_mm for the plug's body so the plug goes into the wall, or declare recess_mm",
+                 add \"{side}\" to board.near (first) so the board reaches that wall, size opening_mm for the plug's \
+                 body so the plug goes into the wall, or declare recess_mm",
                 q.id,
-                r3(reach),
-                case.grid_mm
+                r3(reach)
             );
         }
         // Its mouth inside the wall, flush with the face: the window is then a
@@ -5307,6 +5490,7 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
         board: board_out,
         cost_violation,
         placement,
+        floor,
     })
 }
 
@@ -6247,6 +6431,10 @@ pub fn render_output(out: &str, product: &Product, solved: &Solved, root: &Path)
         .unwrap_or("");
     Ok(match file {
         "layout.json" => serde_json::to_string_pretty(&solved.layout)? + "\n",
+        "floor-model.json" | "floor.json" => match &solved.floor {
+            Some((model, answer)) => if file == "floor.json" { answer.clone() } else { model.clone() },
+            None => "{}\n".to_string(),
+        },
         "placement-model.json" | "placement.json" => match &solved.placement {
             Some((model, answer)) => if file == "placement.json" { answer.clone() } else { model.clone() },
             None => "{}\n".to_string(),
@@ -6264,13 +6452,38 @@ pub fn render_output(out: &str, product: &Product, solved: &Solved, root: &Path)
             derived
         }
         f if f.ends_with(".kicad_sch") => render_schematic(solved, root, &product.product.name)?,
-        other => bail!("fid-hardware: unknown output `{other}` (layout.json, placement-model.json, placement.json, bom.csv, assembly.md, interface.json, interface.ts, board.rs, *.kicad_pcb, *.kicad_sch)"),
+        other => bail!("fid-hardware: unknown output `{other}` (layout.json, floor-model.json, floor.json, placement-model.json, placement.json, bom.csv, assembly.md, interface.json, interface.ts, board.rs, *.kicad_pcb, *.kicad_sch)"),
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_floor_region_reaches_the_wall_to_a_tenth() {
+        // The sensor stick's cavity and board: the board's lowest centre is
+        // 1.9 mm from the wall plus half its height, 41.4 mm — not the next
+        // half-millimetre row.
+        let outline = [
+            (0.0, 82.8),
+            (0.0, 3.6),
+            (3.6, 0.0),
+            (32.4, 0.0),
+            (36.0, 3.6),
+            (36.0, 82.8),
+            (34.8, 84.0),
+            (1.2, 84.0),
+        ];
+        let rs = feasible_centres(&outline, (26.0, 79.0), 1.9);
+        let low = rs.iter().map(|(l, _)| l.1).fold(f64::INFINITY, f64::min);
+        let high = rs
+            .iter()
+            .map(|(_, h)| h.1)
+            .fold(f64::NEG_INFINITY, f64::max);
+        assert!((low - 41.4).abs() < 0.05, "{rs:?}");
+        assert!(high > 42.5, "{rs:?}");
+    }
 
     #[test]
     fn a_covered_target_costs_nothing_and_an_uncovered_one_its_gap() {
