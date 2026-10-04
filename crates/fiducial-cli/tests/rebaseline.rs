@@ -209,3 +209,45 @@ fn a_retired_template_stops_being_tracked_and_goes_only_if_unedited() {
     assert!(root.join(retired).exists());
     assert!(!std::fs::read_to_string(&lock).unwrap().contains(retired));
 }
+
+/// Accepting a fork moves only the hash. The merge base stays what the
+/// platform shipped, so the next upgrade folds an upstream change into the
+/// fork. Recording the fork itself as the base made that upgrade see no
+/// local change and take upstream whole — a product's CI fork lost its
+/// hardware and web jobs to a "merged cleanly".
+#[test]
+fn an_accepted_fork_survives_the_next_upgrade() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    let rel = "scripts/derive-logo.mjs";
+    let script = root.join(rel);
+    let shipped = std::fs::read_to_string(&script).unwrap();
+    std::fs::write(&script, format!("{shipped}\n// a fork I meant\n")).unwrap();
+    let lock_path = root.join("fiducial.lock");
+    let record = |lock: &toml::Value| lock["templates"][rel].clone();
+
+    let out = run(&root, &["rebaseline", rel]);
+    assert!(out.status.success(), "{}", text(&out));
+    let lock: toml::Value = toml::from_str(&std::fs::read_to_string(&lock_path).unwrap()).unwrap();
+    assert_eq!(
+        record(&lock)["base_content"].as_str(),
+        Some(shipped.as_str()),
+        "the merge base is still what the platform shipped"
+    );
+
+    // The platform moves on: its old version lacked the file's first line.
+    let older: String = shipped.lines().skip(1).map(|l| format!("{l}\n")).collect();
+    let mut lock = lock;
+    let rec = lock["templates"][rel].as_table_mut().unwrap();
+    rec.insert("base_content".into(), toml::Value::String(older));
+    rec.insert("source_version".into(), toml::Value::String("0.0.1".into()));
+    std::fs::write(&lock_path, toml::to_string(&lock).unwrap()).unwrap();
+
+    let out = run(&root, &["upgrade"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let after = std::fs::read_to_string(&script).unwrap();
+    assert!(
+        after.contains("// a fork I meant"),
+        "the fork survived:\n{after}"
+    );
+}
