@@ -521,6 +521,10 @@ pub(crate) fn install_added(
             println!("  ⚠ {rel}: exists on disk but is untracked — leaving it alone");
             continue;
         }
+        if let Some(own) = companion_of_own(root, lock, rel) {
+            println!("  · {rel}: not added — {own} is your own component");
+            continue;
+        }
         if !dry_run {
             let expanded = content
                 .replace("{{name}}", product_name)
@@ -531,6 +535,14 @@ pub(crate) fn install_added(
         added.push(key);
     }
     Ok(added)
+}
+
+/// A stock component's stylesheet, where the product wrote that component
+/// itself: `X.module.css` beside an `X.tsx` the platform does not track. Added,
+/// it would sit unused beside the product's own. Returns the component's path.
+pub fn companion_of_own(root: &Path, lock: &Lock, rel: &str) -> Option<String> {
+    let own = format!("{}.tsx", rel.strip_suffix(".module.css")?);
+    (root.join(&own).exists() && !lock.templates.contains_key(&own)).then_some(own)
 }
 
 fn load_or_new_lock(root: &Path) -> Result<Lock> {

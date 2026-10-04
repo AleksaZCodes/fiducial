@@ -305,13 +305,19 @@ Propagate platform updates into this product.
 3. TEMPLATE MERGE — 3-way-merges upstream template changes against local edits.
    fiducial.lock records the version each file came from; upgrade diffs upstream
    between that version and the new one and merges against local, surfacing
-   conflicts exactly like `git merge`.
+   conflicts exactly like `git merge`. A file of yours that you rewrote (most of
+   the template's lines gone) is not merged into: the change is reported and
+   `--upstream <path>` prints it. A package.json merges by dependency. A merge
+   that would repeat a block or break JSON/TOML is refused, not written; one
+   whose code you already have, comments aside, is left as yours.
 
 The model is identical to `rails app:update`.",
         after_long_help = "\
 EXAMPLES
   fid upgrade                 upgrade everything to the latest platform release
   fid upgrade --dry-run       show what would change without writing
+  fid upgrade --upstream design-system.md
+                              the platform's current version of a file you rewrote
   fid upgrade --portfolio     upgrade all products in the portfolio manifest
 
 STATUS
@@ -329,6 +335,10 @@ STATUS
         /// templates, no codemods, no other capability
         #[arg(long, value_name = "ID")]
         capability: Option<String>,
+        /// Print the platform's current version of one tracked file and exit —
+        /// what a file you rewrote would have received
+        #[arg(long, value_name = "PATH")]
+        upstream: Option<String>,
     },
 
     /// Emit the facts → pipelines → artifacts dependency graph
@@ -831,7 +841,11 @@ fn main() -> Result<()> {
             dry_run,
             portfolio,
             capability,
-        } => commands::upgrade::run(dry_run, portfolio, capability),
+            upstream,
+        } => match upstream {
+            Some(path) => commands::upgrade::print_upstream(&path),
+            None => commands::upgrade::run(dry_run, portfolio, capability),
+        },
         Commands::Graph { format } => commands::graph::run(&format),
         Commands::Release { action } => commands::release::run(action),
         Commands::Thesis { action, json } => commands::thesis::run(action, json),

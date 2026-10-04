@@ -29,6 +29,24 @@ use crate::{
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
+/// `fid upgrade --upstream <path>`: the platform's current version of a file
+/// this product tracks, expanded for this product — what an upgrade did not
+/// merge into a file the product rewrote.
+pub fn print_upstream(rel_path: &str) -> Result<()> {
+    let cwd = env::current_dir().context("getting current directory")?;
+    let root = Config::find_root(&cwd)?;
+    let cfg = Config::load(&root.join(CONFIG_FILE))?;
+    let rel = rel_path.trim_start_matches("./").replace('\\', "/");
+    let raw = templates::raw_for(&rel, &cfg.capabilities.enabled).ok_or_else(|| {
+        anyhow::anyhow!("`{rel}` is not a file the platform ships a template for")
+    })?;
+    print!(
+        "{}",
+        templates::expand(raw, &cfg.product.name, PLATFORM_VERSION)
+    );
+    Ok(())
+}
+
 /// `only`: refresh one capability's files and instructions and nothing else —
 /// no scaffold templates, no codemods, no other capability. A product mid-way
 /// through a platform migration can take one capability's fix without taking
@@ -110,6 +128,7 @@ pub fn run(dry_run: bool, portfolio: bool, only: Option<String>) -> Result<()> {
             match outcome {
                 TemplateOutcome::Clean(msg) => println!("  ✓ {rel_path}: {msg}"),
                 TemplateOutcome::Conflict(msg) => println!("  ⚠ {rel_path}: {msg}"),
+                TemplateOutcome::Kept(msg) => println!("  · {rel_path}: {msg}"),
             }
         } else {
             println!("  · {rel_path}: no upstream change");
@@ -245,6 +264,12 @@ pub fn run(dry_run: bool, portfolio: bool, only: Option<String>) -> Result<()> {
                 println!("  ⚠ {rel_path}: exists on disk but is untracked — leaving it alone");
                 continue;
             }
+            // A stylesheet for a component the product wrote itself is the
+            // stock component's, and would sit unused beside the product's.
+            if let Some(own) = capability::companion_of_own(&root, &lock, rel_path) {
+                println!("  · {rel_path}: not added — {own} is your own component");
+                continue;
+            }
 
             any_changes = true;
             if dry_run {
@@ -375,6 +400,9 @@ pub fn run(dry_run: bool, portfolio: bool, only: Option<String>) -> Result<()> {
 enum TemplateOutcome {
     Clean(String),
     Conflict(String),
+    /// A product-owned file the product rewrote: upstream changed, the file
+    /// was left as the product's. Reported, never merged.
+    Kept(String),
 }
 
 /// Does this file still carry unresolved conflict markers?
@@ -407,6 +435,244 @@ fn has_conflict_markers(text: &str) -> bool {
 /// Deliberately textual. Parsing both sides as TOML would be more precise and
 /// would also fail on the half-merged file this exists to catch, which is the
 /// wrong direction: the check has to work on output that may not parse.
+/// Settle each conflict hunk where one side already holds every line of the
+/// other: the product had already made the platform's change in its own words
+/// (or the platform's version is the product's plus more). `None` while any
+/// hunk is a real disagreement.
+fn resolve_contained(conflicted: &str) -> Option<String> {
+    use std::collections::HashSet;
+    let mut out: Vec<&str> = Vec::new();
+    let (mut ours, mut theirs): (Vec<&str>, Vec<&str>) = (Vec::new(), Vec::new());
+    let mut mode = 0; // 0 outside, 1 ours, 2 base, 3 theirs
+    for line in conflicted.split('\n') {
+        match (mode, line) {
+            (0, l) if l.starts_with("<<<<<<< ") => mode = 1,
+            (1, l) if l.starts_with("||||||| ") => mode = 2,
+            (1 | 2, l) if l.starts_with("=======") => mode = 3,
+            (3, l) if l.starts_with(">>>>>>> ") => {
+                let set = |v: &[&str]| -> HashSet<String> {
+                    v.iter()
+                        .map(|l| l.trim().to_string())
+                        .filter(|l| !l.is_empty())
+                        .collect()
+                };
+                let (o, t) = (set(&ours), set(&theirs));
+                if t.is_subset(&o) {
+                    out.append(&mut ours);
+                } else if o.is_subset(&t) {
+                    out.append(&mut theirs);
+                } else {
+                    return None;
+                }
+                ours.clear();
+                theirs.clear();
+                mode = 0;
+            }
+            (0, l) => out.push(l),
+            (1, l) => ours.push(l),
+            (2, _) => {}
+            (_, l) => theirs.push(l),
+        }
+    }
+    (mode == 0).then(|| out.join("\n"))
+}
+
+/// A three-way merge of a package.json by dependency. Upstream's added
+/// dependency is added, its new version taken where the product kept the old
+/// one, a dependency it dropped dropped where the product left it alone;
+/// everything else stays the product's text. `None` if any side does not
+/// parse, so the line merge decides instead.
+fn merge_package_json(base: &str, ours: &str, theirs: &str) -> Option<String> {
+    use serde_json::Value;
+    let (b, o, t): (Value, Value, Value) = (
+        serde_json::from_str(base).ok()?,
+        serde_json::from_str(ours).ok()?,
+        serde_json::from_str(theirs).ok()?,
+    );
+    let mut text = ours.to_string();
+    for section in ["dependencies", "devDependencies"] {
+        let map = |v: &Value| -> std::collections::BTreeMap<String, String> {
+            v[section]
+                .as_object()
+                .map(|m| {
+                    m.iter()
+                        .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_string())))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        let (bm, om, tm) = (map(&b), map(&o), map(&t));
+        let mut want = om.clone();
+        for (k, tv) in &tm {
+            match (bm.get(k), om.get(k)) {
+                (None, None) => {
+                    want.insert(k.clone(), tv.clone());
+                }
+                (Some(bv), Some(ov)) if bv == ov && tv != ov => {
+                    want.insert(k.clone(), tv.clone());
+                }
+                _ => {}
+            }
+        }
+        for (k, bv) in &bm {
+            if !tm.contains_key(k) && om.get(k) == Some(bv) {
+                want.remove(k);
+            }
+        }
+        if want == om {
+            continue;
+        }
+        // Rewrite only this section's body, in the product's indentation.
+        let head = format!("\"{section}\"");
+        let start = text.find(&head)?;
+        let open = start + text[start..].find('{')?;
+        let close = open + text[open..].find('}')?;
+        let indent = text[open + 1..close]
+            .lines()
+            .find(|l| !l.trim().is_empty())
+            .map(|l| l[..l.len() - l.trim_start().len()].to_string())
+            .unwrap_or_else(|| "    ".into());
+        let outer = indent.get(2..).unwrap_or("").to_string();
+        let body: Vec<String> = want
+            .iter()
+            .map(|(k, v)| {
+                format!(
+                    "{indent}{}: {}",
+                    Value::from(k.as_str()),
+                    Value::from(v.as_str())
+                )
+            })
+            .collect();
+        text = format!(
+            "{}{{\n{}\n{outer}{}",
+            &text[..open],
+            body.join(",\n"),
+            &text[close..]
+        );
+    }
+    serde_json::from_str::<Value>(&text).ok()?;
+    Some(text)
+}
+
+/// When a merge would conflict or is refused: does the product's file already
+/// carry every code change the platform made since the base — each line it
+/// added present, each it removed absent — so that only comments differ? Then
+/// there is nothing to merge: the file is kept, the base moves, and the
+/// platform's comments are one `--upstream` away. A product that had already
+/// made the platform's fix in its own words got conflicts over prose before.
+fn keep_if_nothing_to_add(
+    rel_path: &str,
+    base: &str,
+    local: &str,
+    upstream: &str,
+    lock: &mut Lock,
+    dry_run: bool,
+) -> Option<TemplateOutcome> {
+    use std::collections::HashSet;
+    let ext = rel_path.rsplit('.').next().unwrap_or("");
+    let slash = matches!(ext, "css" | "js" | "mjs" | "ts" | "tsx" | "jsx");
+    let hash = matches!(ext, "toml" | "yml" | "yaml" | "sh" | "py");
+    if !slash && !hash {
+        return None;
+    }
+    let code = |text: &str| -> HashSet<String> {
+        let mut t = text.to_string();
+        if slash {
+            while let Some(a) = t.find("/*") {
+                let b = t[a..].find("*/").map(|e| a + e + 2).unwrap_or(t.len());
+                t.replace_range(a..b, "");
+            }
+        }
+        t.lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .filter(|l| !(slash && l.starts_with("//")) && !(hash && l.starts_with('#')))
+            .map(String::from)
+            .collect()
+    };
+    let (b, o, u) = (code(base), code(local), code(upstream));
+    let added_here = u.difference(&b).all(|l| o.contains(l));
+    let removed_here = b.difference(&u).all(|l| !o.contains(l));
+    if !(added_here && removed_here) {
+        return None;
+    }
+    if !dry_run {
+        let record = lock.templates.get_mut(rel_path)?;
+        record.base_content = Some(upstream.to_string());
+        record.source_version = PLATFORM_VERSION.into();
+    }
+    Some(TemplateOutcome::Kept(format!(
+        "yours — it already has every code change in the platform's version; \
+         only comments differ (`fid upgrade --upstream {rel_path}` prints them)"
+    )))
+}
+
+/// Has the product rewritten this file, rather than edited it? Fewer than half
+/// of the base's non-blank lines survive in it.
+fn rewritten(base: &str, local: &str) -> bool {
+    use std::collections::HashSet;
+    let have: HashSet<&str> = local.lines().map(str::trim).collect();
+    let lines: Vec<&str> = base
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect();
+    if lines.is_empty() || base == local {
+        return false;
+    }
+    let kept = lines.iter().filter(|l| have.contains(*l)).count();
+    kept * 2 < lines.len()
+}
+
+/// Why a merge that diffy calls clean is not one: a JSON or TOML file that no
+/// longer parses, or a block of lines that ends up in it more often than in
+/// either side — a section pasted in twice.
+fn broken_merge(rel_path: &str, local: &str, upstream: &str, merged: &str) -> Option<String> {
+    if rel_path.ends_with(".json")
+        && serde_json::from_str::<serde_json::Value>(local).is_ok()
+        && serde_json::from_str::<serde_json::Value>(merged).is_err()
+    {
+        return Some("is not valid JSON".into());
+    }
+    if rel_path.ends_with(".toml")
+        && toml::from_str::<toml::Value>(local).is_ok()
+        && toml::from_str::<toml::Value>(merged).is_err()
+    {
+        return Some("is not valid TOML".into());
+    }
+    let blocks = |text: &str| -> std::collections::HashMap<String, usize> {
+        let lines: Vec<&str> = text.lines().map(str::trim).collect();
+        let mut n = std::collections::HashMap::new();
+        for w in lines.windows(3) {
+            if w.iter().all(|l| l.len() > 3) {
+                *n.entry(w.join("\n")).or_insert(0) += 1;
+            }
+        }
+        n
+    };
+    let (m, l, u) = (blocks(merged), blocks(local), blocks(upstream));
+    m.iter()
+        .find(|(k, &c)| {
+            c > 1
+                && c > l
+                    .get(*k)
+                    .copied()
+                    .unwrap_or(0)
+                    .max(u.get(*k).copied().unwrap_or(0))
+        })
+        .map(|(k, _)| {
+            format!(
+                "repeats a block that neither side repeats (\"{}\")",
+                k.lines()
+                    .next()
+                    .unwrap_or("")
+                    .chars()
+                    .take(60)
+                    .collect::<String>()
+            )
+        })
+}
+
 fn dropped_sections(rel_path: &str, local: &str, merged: &str) -> Option<String> {
     if rel_path != crate::config::CONFIG_FILE {
         return None;
@@ -519,8 +785,37 @@ fn merge_one_template(
         }
     };
 
+    // A product-owned file the product has rewritten is not merged into. Its
+    // base is the scaffold's prompt, its content is the product's own, and a
+    // line merge between them only produces noise: a real product's design
+    // system "merged cleanly" with the seed's grey palette pasted into it, and
+    // its own copy came back as conflicts it had to resolve, every one of them
+    // to its own side. Upstream's change is reported, the base moves so it is
+    // reported once, and `fid upgrade --upstream <path>` prints it.
+    if crate::ownership::of(rel_path).is_product() && rewritten(&base, &local) {
+        if !dry_run {
+            let record = lock.templates.get_mut(rel_path).unwrap();
+            record.base_content = Some(upstream.clone());
+            record.source_version = PLATFORM_VERSION.into();
+        }
+        return Ok(Some(TemplateOutcome::Kept(format!(
+            "yours, rewritten here; the platform's template changed and was not \
+             merged in — `fid upgrade --upstream {rel_path}` prints it"
+        ))));
+    }
+
     // 3-way merge: base=what-was-installed, ours=local-file, theirs=upstream.
-    let merged = diffy::merge(&base, &local, &upstream);
+    // A package.json merges by dependency, not by line; anything else by line,
+    // with a conflict whose one side already holds all of the other's lines
+    // settled to the fuller side.
+    let merged = match (rel_path.ends_with("package.json"))
+        .then(|| merge_package_json(&base, &local, &upstream))
+        .flatten()
+    {
+        Some(m) => Ok(m),
+        None => diffy::merge(&base, &local, &upstream)
+            .or_else(|conflict| resolve_contained(&conflict).ok_or(conflict)),
+    };
 
     match merged {
         Ok(clean) => {
@@ -553,6 +848,22 @@ fn merge_one_template(
                      against the platform template, then re-run"
                 ))));
             }
+            // "Clean" is diffy's word for "no overlapping hunk", not for a
+            // file that still works: it has pasted a section in twice, and a
+            // paragraph after the comment that held it closed. Refused, not
+            // written.
+            if let Some(why) = broken_merge(rel_path, &local, &upstream, &clean) {
+                if let Some(kept) =
+                    keep_if_nothing_to_add(rel_path, &base, &local, &upstream, lock, dry_run)
+                {
+                    return Ok(Some(kept));
+                }
+                return Ok(Some(TemplateOutcome::Conflict(format!(
+                    "REFUSED — the merge {why}. Nothing was written. Reconcile \
+                     {rel_path} by hand (`fid upgrade --upstream {rel_path}` prints \
+                     the platform's version), then re-run"
+                ))));
+            }
             if !dry_run {
                 std::fs::write(&local_path, &clean)
                     .with_context(|| format!("writing {rel_path}"))?;
@@ -566,6 +877,11 @@ fn merge_one_template(
             )))
         }
         Err(conflict) => {
+            if let Some(kept) =
+                keep_if_nothing_to_add(rel_path, &base, &local, &upstream, lock, dry_run)
+            {
+                return Ok(Some(kept));
+            }
             // Write conflict markers to the file — the human must resolve.
             if !dry_run {
                 std::fs::write(&local_path, &conflict)
@@ -615,6 +931,97 @@ mod stamp_tests {
         );
         assert_eq!(stamp_platform_version(&out, "0.9.1"), None);
         assert_eq!(stamp_platform_version("no such line\n", "0.9.1"), None);
+    }
+}
+
+#[cfg(test)]
+mod merge_tests {
+    use super::*;
+
+    // Each of these is a case a real product's first full upgrade hit.
+
+    #[test]
+    fn a_stock_stylesheet_is_not_added_beside_the_products_own_component() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("src/components");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("picker.tsx"), "mine").unwrap();
+        let mut lock = Lock::new();
+        let css = "src/components/picker.module.css";
+        assert_eq!(
+            capability::companion_of_own(tmp.path(), &lock, css).as_deref(),
+            Some("src/components/picker.tsx")
+        );
+        // The platform's own component: its stylesheet belongs with it.
+        lock.record("src/components/picker.tsx", b"mine", "0.1.0");
+        assert_eq!(capability::companion_of_own(tmp.path(), &lock, css), None);
+    }
+
+    #[test]
+    fn a_file_the_product_rewrote_is_told_apart_from_one_it_edited() {
+        let base = "a line\nb line\nc line\nd line\n";
+        assert!(rewritten(base, "something else entirely\nand more\n"));
+        assert!(!rewritten(base, "a line\nb line\nc line\nd line\nmine\n"));
+        assert!(!rewritten(base, base));
+    }
+
+    #[test]
+    fn a_clean_merge_that_pastes_a_block_twice_or_breaks_json_is_refused() {
+        let block = "one long line\ntwo long line\nthree long line\n";
+        let ours = format!("head\n{block}tail\n");
+        let twice = format!("head\n{block}{block}tail\n");
+        assert!(broken_merge("x.css", &ours, &ours, &twice).is_some());
+        assert!(broken_merge("x.css", &ours, &ours, &ours).is_none());
+        assert!(broken_merge("x.json", "{}", "{}", "{,}").is_some());
+    }
+
+    #[test]
+    fn a_conflict_one_side_already_contains_is_settled_to_the_fuller_side() {
+        let c = "a\n<<<<<<< ours\nmine\nshared\n||||||| original\nold\n=======\nshared\n>>>>>>> theirs\nz";
+        assert_eq!(resolve_contained(c).as_deref(), Some("a\nmine\nshared\nz"));
+        let real = "<<<<<<< ours\nmine\n||||||| original\nold\n=======\ntheirs\n>>>>>>> theirs";
+        assert_eq!(resolve_contained(real), None);
+    }
+
+    #[test]
+    fn a_package_json_merges_by_dependency_and_keeps_the_products_pins() {
+        let base = r#"{ "dependencies": { "next": "^15.0.0", "tokens": "*" } }"#;
+        let theirs =
+            r#"{ "dependencies": { "next": "^16.0.0", "tokens": "*", "added": "^1.0.0" } }"#;
+        let ours = "{\n  \"dependencies\": {\n    \"mine\": \"^2.0.0\",\n    \"next\": \"^15.0.0\",\n    \"tokens\": \"^0.2.0\"\n  }\n}\n";
+        let m = merge_package_json(base, ours, theirs).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&m).unwrap();
+        let d = &v["dependencies"];
+        assert_eq!(
+            d["next"], "^16.0.0",
+            "upstream's bump, where the product kept the old pin"
+        );
+        assert_eq!(d["tokens"], "^0.2.0", "the product's own pin stays");
+        assert_eq!(d["added"], "^1.0.0");
+        assert_eq!(d["mine"], "^2.0.0");
+    }
+
+    #[test]
+    fn a_file_that_already_has_upstreams_code_is_kept_when_only_comments_differ() {
+        let mut lock = Lock::new();
+        lock.record("m.css", b"a {}\n", "0.1.0");
+        let base = "a {}\n";
+        let upstream = "/* new note */\na {}\nb {}\n";
+        let ours = "/* my words */\na {}\nb {}\nc {}\n";
+        assert!(matches!(
+            keep_if_nothing_to_add("m.css", base, ours, upstream, &mut lock, true),
+            Some(TemplateOutcome::Kept(_))
+        ));
+        // Upstream removed a line the product still has: there is something to do.
+        assert!(keep_if_nothing_to_add(
+            "m.css",
+            "a {}\nold {}\n",
+            "a {}\nold {}\n",
+            "a {}\n",
+            &mut lock,
+            true
+        )
+        .is_none());
     }
 }
 
