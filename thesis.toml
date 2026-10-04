@@ -39,5 +39,5 @@ not_yet = [
   "Nothing built on it has been manufactured and tested on a bench.",
   "Two products end to end, one public; \"any\" is a claim about the method, not a measurement over many.",
   "Autorouting is not deterministic (made visible, and hand routing is gated); the board is always a rectangle.",
-  "Power circuits are computed, not simulated.",
+  "Resistive set points are solved and checked on every derive; nothing nonlinear or time-varying is simulated.",
 ]

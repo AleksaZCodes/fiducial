@@ -4533,7 +4533,7 @@ base_content = """
 [artifacts."hardware/generated/assembly.md"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "3c70229b439af5754f75916e37c29c02bbdf65b57af5f8303b41356bb7598a34"
+hash = "719a84d439366e18090daf72a8103b6c5ede80cdbeabb45bbc165677b8b9943f"
 
 [artifacts."hardware/generated/board.kicad_pcb"]
 pipeline = "hardware"
@@ -4578,7 +4578,7 @@ hash = "51f53e038fd9f74d51ca4acfe59a78ad2ef8d71d96f9df07b751ccfcfc2e492f"
 [artifacts."hardware/generated/layout.json"]
 pipeline = "hardware"
 source_version = "0.9.1"
-hash = "3cc680bc64327e9f94359e42fe555236c3b48389ad50951910222919f6dc2101"
+hash = "cd26ff5cda3ddc61f4d38a4b1a52d4586bc707a921e50b87459763a1c3168017"
 
 [artifacts."hardware/generated/placement-model.json"]
 pipeline = "hardware"
@@ -4664,5 +4664,5 @@ hash = "54abc351034e73f7f3b15677c11743ac1b3858181e59a1b81120cd3d54e7194f"
 pipelines = ["hardware"]
 
 [inputs."hardware/product.toml"]
-hash = "ce25b9686dbebd296a05c524f4d152a799cc22529efcaf2bfb31f483e1a317e7"
+hash = "b26fbe6f1dd27390cb79426ca87a607e8b231918f90d352279abf601508eff3f"
 pipelines = ["hardware"]

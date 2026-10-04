@@ -1981,6 +1981,75 @@ fn a_symbol_that_extends_another_is_vendored_whole() {
     );
 }
 
+/// A divider on the seed product: two resistors with real symbols, and a
+/// `[[check]]` on the node between them.
+fn divider_product(tmp: &Path, bottom: &str) -> std::path::PathBuf {
+    let root = scaffold(tmp);
+    let lib = tmp.join("symbols");
+    std::fs::create_dir_all(&lib).unwrap();
+    std::fs::write(
+        lib.join("Device.kicad_sym"),
+        r#"(kicad_symbol_lib (version 20220914)
+  (symbol "R" (in_bom yes) (on_board yes)
+    (property "Reference" "R" (at 0 0 0))
+    (property "Value" "R" (at 0 0 0))
+    (symbol "R_1_1"
+      (pin passive line (at 0 3.81 270) (length 1.27) (name "~" (effects)) (number "1" (effects)))
+      (pin passive line (at 0 -3.81 90) (length 1.27) (name "~" (effects)) (number "2" (effects)))))
+)
+"#,
+    )
+    .unwrap();
+    let p = root.join("hardware/product.toml");
+    let mut s = std::fs::read_to_string(&p).unwrap();
+    s.push_str(&format!(
+        "\n[[part]]\nid = \"r-top\"\nname = \"Divider top\"\nplace = \"board\"\nmount = \"smd\"\n\
+         body_mm = [2.0, 1.25, 0.6]\nsymbol = \"Device:R\"\nvalue = \"10k\"\npins = {{ 1 = \"VOUT\", 2 = \"FB\" }}\n\
+         \n[[part]]\nid = \"r-bot\"\nname = \"Divider bottom\"\nplace = \"board\"\nmount = \"smd\"\n\
+         body_mm = [2.0, 1.25, 0.6]\nsymbol = \"Device:R\"\nvalue = \"{bottom}\"\npins = {{ 1 = \"FB\", 2 = \"GND\" }}\n\
+         \n[[part]]\nid = \"r-load\"\nname = \"Load\"\nplace = \"board\"\nmount = \"smd\"\n\
+         body_mm = [2.0, 1.25, 0.6]\nsymbol = \"Device:R\"\nvalue = \"1k\"\npins = {{ 1 = \"VOUT\", 2 = \"GND\" }}\n\
+         \n[[check]]\nname = \"the feedback node sits at the reference\"\n\
+         drive = {{ VOUT = {{ volts = 3.3 }} }}\nexpect = {{ FB = [1.0, 1.1] }}\n"
+    ));
+    std::fs::write(&p, s).unwrap();
+    let out = Command::new("python3")
+        .args(["hardware/parts.py", "sync"])
+        .current_dir(&root)
+        .env("KICAD7_SYMBOL_DIR", &lib)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", text(&out));
+    root
+}
+
+#[test]
+fn a_set_point_is_solved_from_the_declared_resistors() {
+    // 3.3 V × 4.7 / 14.7 = 1.055 V: inside 1.0–1.1.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = divider_product(tmp.path(), "4.7k");
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let asm = std::fs::read_to_string(root.join("hardware/generated/assembly.md")).unwrap();
+    assert!(asm.contains("FB is 1.055 V, inside 1–1.1 V"), "{asm}");
+}
+
+#[test]
+fn a_set_point_out_of_its_window_fails_naming_it() {
+    // 3.3 V × 10 / 20 = 1.65 V: the wrong resistor, caught at derive.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = divider_product(tmp.path(), "10k");
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(!out.status.success());
+    assert!(
+        text(&out).contains(
+            "check `the feedback node sits at the reference`: FB is 1.650 V, outside 1–1.1 V"
+        ),
+        "{}",
+        text(&out)
+    );
+}
+
 #[test]
 fn the_case_colour_is_declared_and_checked() {
     let tmp = tempfile::tempdir().unwrap();

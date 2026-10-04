@@ -49,6 +49,11 @@ pub struct Product {
     pub parts: Vec<Part>,
     #[serde(default, rename = "wire")]
     pub wires: Vec<Wire>,
+    /// DC checks of the resistive set points (`crate::circuit`): nets driven,
+    /// nets measured, the window each must land in, solved from the
+    /// declared resistors and their nets on every derive.
+    #[serde(default, rename = "check")]
+    pub checks: Vec<crate::circuit::Check>,
     /// The microcontroller the firmware runs on. Its pins' nets become
     /// `hardware/generated/board.rs`: one macro per net, naming the pin.
     #[serde(default)]
@@ -5258,6 +5263,37 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
         .filter(|l| l.unit_cost.is_none())
         .map(|l| l.id.clone())
         .collect();
+    // The set points: the declared resistors, by their values and the nets
+    // their two pins are on (a `qty` of them in parallel), against each
+    // `[[check]]`. A miss fails the derive like any other contradiction.
+    if !p.checks.is_empty() {
+        let mut rs: Vec<crate::circuit::Resistor> = Vec::new();
+        for q in &p.parts {
+            let Some(ohms) = q.value.as_deref().and_then(crate::circuit::ohms) else {
+                continue;
+            };
+            let nets: Vec<&String> = q.pins.values().collect();
+            if nets.len() != 2 {
+                continue;
+            }
+            for _ in 0..q.qty.max(1) {
+                rs.push(crate::circuit::Resistor {
+                    part: q.id.clone(),
+                    a: nets[0].clone(),
+                    b: nets[1].clone(),
+                    ohms,
+                });
+            }
+        }
+        let (lines, failed) = crate::circuit::run(&rs, &p.checks)?;
+        if !failed.is_empty() {
+            bail!(
+                "set points out of their windows:\n  {}",
+                failed.join("\n  ")
+            );
+        }
+        why.extend(lines);
+    }
     let over = priced > p.cost.ceiling + 1e-9;
     let cost_violation = if over {
         Some(format!(

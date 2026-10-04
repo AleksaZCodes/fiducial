@@ -380,3 +380,24 @@ status    = "decided"
 
 [firmware]
 mcu = "mcu"
+
+# ── Set points, checked on every derive ──────────────────────────────────────
+# A USB-C source advertises its current with a pull-up on CC (5 V through
+# 56 / 22 / 10 kΩ); the sink's 5.1 kΩ pull-downs must put CC in the window the
+# USB Type-C spec gives for each (vRd-USB, vRd-1.5, vRd-3.0). Solved from the
+# resistors above and their nets: change a value or a net and this fails.
+
+[[check]]
+name   = "CC reads as a sink to a default-USB source"
+drive  = { CC1 = { volts = 5.0, ohms = 56000 }, CC2 = { volts = 5.0, ohms = 56000 } }
+expect = { CC1 = [0.25, 0.61], CC2 = [0.25, 0.61] }
+
+[[check]]
+name   = "CC reads as a sink to a 1.5 A source"
+drive  = { CC1 = { volts = 5.0, ohms = 22000 }, CC2 = { volts = 5.0, ohms = 22000 } }
+expect = { CC1 = [0.70, 1.16], CC2 = [0.70, 1.16] }
+
+[[check]]
+name   = "CC reads as a sink to a 3 A source"
+drive  = { CC1 = { volts = 5.0, ohms = 10000 }, CC2 = { volts = 5.0, ohms = 10000 } }
+expect = { CC1 = [1.31, 2.04], CC2 = [1.31, 2.04] }

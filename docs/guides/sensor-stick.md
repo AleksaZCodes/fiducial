@@ -121,9 +121,11 @@ fid derive                           # case, placed board, schematic, BOM, inter
 ```
 
 `resolve` reports each number verified, with the MPN and package LCSC gives
-it. `fid derive` solves the case around the parts and places the board with
-a constraint solver. `layout.json → why` says what set each size and
-position. `fid derive --check` fails from then on whenever an artifact no
+it. `fid derive` solves the case around the parts and places the board and
+the floor with a constraint solver. It also solves the three `[[check]]`s at
+the end of `product.toml`: the USB-C pull-downs against a default, 1.5 A and
+3 A source, each inside the window the Type-C spec gives. `layout.json → why`
+says what set each size and position, and what each check read. `fid derive --check` fails from then on whenever an artifact no
 longer matches the declaration.
 
 ### 5. Build, route, check, fab

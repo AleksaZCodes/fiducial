@@ -70,7 +70,7 @@ The author's position, for the discussion section:
 ## Limits to state
 
 N = 2 products (1 public); autorouting not
-deterministic; power-circuit values computed, not simulated; nothing yet
+deterministic; set points solved for DC only, nothing simulated in time; nothing yet
 manufactured and tested.
 
 ## Citing the software

@@ -1,7 +1,7 @@
 # Hardware is solved by engines, not by a growing list of rules
 
 **Date:** 2026-10-01
-**Status:** accepted — P1–P4 and P6 shipped; P5 and P7 in *Progress*
+**Status:** accepted — P1–P6 shipped (P5 re-scoped, see *Progress*); P7 in *Progress*
 **Supersedes:** the placement half of `2026-09-30-hardware-is-a-capability.md`
 
 ---
@@ -130,7 +130,7 @@ Order by cost of delay (MISSION 5c): what accrues debt first.
 | P2 | Same for the **case floor** (sockets + board) | the bounded floor search deleted; the reference product and the seed solve |
 | P3 | Infeasibility explained: the named minimal set of conflicting constraints | a test with two contradictory rules fails naming both |
 | P4 | Hand routing: `board.routing = "hand"` — the product keeps `hardware/board-routed.kicad_pcb`; the build checks footprints, positions and nets match the declaration, DRC passes, autorouter skipped | a test that a moved footprint fails |
-| P5 | ngspice check of the power circuit's set points | the reference product's harvester dividers verified in the build |
+| P5 | ~~ngspice~~ a DC check of declared set points, solved from the netlist (re-scoped 2026-10-04) | a wrong resistor fails derive by name; the example's USB-C CC windows checked |
 | P6 | The minimal showcase product (USB-C air-sensor stick: RP2040, SHT40, WS2812, USB-C through the wall; firmware + web over one protocol) | builds end to end in CI |
 | P7 | Paper evidence: rules → constraint instances, lines deleted, the reference product before/after | numbers in this file |
 
@@ -213,6 +213,18 @@ Kept here so it survives a context reset. Update it with every commit.
   against the exact fit. On the sensor stick the board now stands at its
   exact limit (0.69 mm mouth, no workaround); a part that fits nowhere, and
   two that fit apart but not together, fail naming them.
+
+- 2026-10-04 — **P5 done, re-scoped.** The power circuit's set points were
+  the reference product's regulator dividers; the public example has none,
+  but its USB-C pull-downs are a set point of the same kind (the CC voltage
+  a source reads must land in the Type-C spec's window for each source
+  current). So the check is generic: `[[check]]` drives nets and expects
+  others in a window, solved from the declared resistors by nodal analysis
+  on every derive, failing by name. A resistive DC network is a textbook
+  linear solve, kept in Rust as A* is for wires (`circuit.rs`); ngspice is
+  not needed for it, and it stays the engine for anything nonlinear or
+  transient, which no check can yet ask for. The example declares three
+  checks (default, 1.5 A and 3 A sources); a 22 kΩ in place of 5.1 kΩ fails.
 
 ## Retrospective — 2026-10-01, before the paper
 
