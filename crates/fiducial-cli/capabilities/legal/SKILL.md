@@ -19,7 +19,7 @@ fid derive --check            ← fails if it is missing or stale
 
 ```toml
 [legal]
-jurisdiction           = "EU"                      # EU | US | UK | other
+jurisdiction           = "EU"                      # EU | UK | US | RS | other
 data_protection_email  = "privacy@example.com"
 cookie_categories      = ["necessary"]             # necessary always included
 ```
@@ -36,6 +36,7 @@ Valid jurisdictions:
 | `EU` | privacy, terms, cookies, imprint, accessibility |
 | `UK` | privacy, terms, cookies, imprint, accessibility |
 | `US` | privacy, terms, cookies, accessibility |
+| `RS` | privacy, terms, cookies, accessibility (Serbia: no imprint requirement) |
 | `other` | privacy, terms, cookies |
 
 Valid cookie categories: `necessary` (always included), `analytics`, `marketing`,
