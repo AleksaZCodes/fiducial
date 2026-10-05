@@ -28,7 +28,7 @@ use embassy_rp::usb::{self, Driver};
 use embassy_time::Timer;
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use embassy_usb::{Builder, Config};
-use firmware_shared::messages::{reading::{COMFORTABLE_MAX, COMFORTABLE_MIN}, USB_PRODUCT_ID, USB_VENDOR_ID};
+use firmware_shared::messages::{reading::comfortable, Band, USB_PRODUCT_ID, USB_VENDOR_ID};
 use firmware_shared::{aht20, encode, encoded_len, reading};
 use smart_leds::RGB8;
 use static_cell::StaticCell;
@@ -42,12 +42,13 @@ bind_interrupts!(struct Irqs {
 });
 
 /// Dry is blue, comfortable green, damp red. The band is protocol.toml's,
-/// declared in %RH and generated in the reading's hundredths.
+/// declared in %RH and tested by the generated `comfortable()`, which the
+/// page's `readingBand()` mirrors.
 fn colour(r: aht20::Reading) -> RGB8 {
-    match r.centi_percent_rh {
-        COMFORTABLE_MIN..=COMFORTABLE_MAX => RGB8::new(0, 24, 0),
-        rh if rh < COMFORTABLE_MIN => RGB8::new(0, 0, 24),
-        _ => RGB8::new(24, 0, 0),
+    match comfortable(r.centi_percent_rh) {
+        Band::Inside => RGB8::new(0, 24, 0),
+        Band::Below => RGB8::new(0, 0, 24),
+        Band::Above => RGB8::new(24, 0, 0),
     }
 }
 
@@ -96,11 +97,11 @@ async fn main(_spawner: Spawner) {
         let _ = i2c.write_async(board::SENSOR_I2C_ADDRESS, board::SENSOR_INIT).await;
         let mut frame = [0u8; encoded_len(reading::LEN)];
         loop {
-            Timer::after_millis(1000 - aht20::MEASURE_MS).await;
+            Timer::after_millis(1000 - board::SENSOR_MEASURE_MS).await;
             if i2c.write_async(board::SENSOR_I2C_ADDRESS, board::SENSOR_MEASURE).await.is_err() {
                 continue;
             }
-            Timer::after_millis(aht20::MEASURE_MS).await;
+            Timer::after_millis(board::SENSOR_MEASURE_MS).await;
             let mut raw = [0u8; 7];
             if i2c.read_async(board::SENSOR_I2C_ADDRESS, &mut raw).await.is_err() {
                 continue;

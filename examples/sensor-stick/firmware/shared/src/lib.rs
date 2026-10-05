@@ -7,13 +7,11 @@ pub use fiducial_core::{version, DeviceId, VERSION};
 pub use fiducial_protocol::{encode, encoded_len, FrameDecoder};
 
 /// The AHT20 temperature and humidity sensor (Aosong), over I²C. Its
-/// address and command bytes are datasheet facts: `fid derive` writes them
-/// into hardware/generated/board.rs (`SENSOR_INIT`, `SENSOR_MEASURE`) from
-/// the platform's AHT20 profile, so they are not typed here.
+/// address, command bytes and measuring time are datasheet facts: `fid
+/// derive` writes them into hardware/generated/board.rs (`SENSOR_INIT`,
+/// `SENSOR_MEASURE`, `SENSOR_MEASURE_MS`) from the platform's AHT20 profile,
+/// so they are not typed here.
 pub mod aht20 {
-    /// Measurement time, ms (datasheet §5.4).
-    pub const MEASURE_MS: u64 = 80;
-
     /// One reading, in hundredths: 2153 is 21.53 °C, 4810 is 48.10 %RH.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct Reading {

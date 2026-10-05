@@ -4646,7 +4646,7 @@ hash = "9d35b60d5b2bf6a184cb5665ef3be762cb0e73315b981c7f5add739857470428"
 [artifacts."hardware/generated/board.rs"]
 pipeline = "hardware"
 source_version = "0.9.8"
-hash = "89d928d2a51dd81abdb033de35759817be2b09b2c475fd673b5e38824d5b4f5b"
+hash = "1f21abd3e19e85039610b9c7d7928012e0ffa1e80d7d7e37cd36bfa06feeb0d8"
 
 [artifacts."hardware/generated/bom.csv"]
 pipeline = "hardware"
@@ -4676,7 +4676,7 @@ hash = "6ddc6361d467c61216e4abbf84a846bff50488bf1a109999adbdb4672b7333ec"
 [artifacts."hardware/generated/layout.json"]
 pipeline = "hardware"
 source_version = "0.9.8"
-hash = "85890c345f240f81d06f697a38a99744d26ca662ab1a3e916c9ee6536227e7bc"
+hash = "4ba08389c4c7c778bf497eeb4eafff6a2fe36aff9f5562ea33f26bf08ef61d00"
 
 [artifacts."hardware/generated/placement-model.json"]
 pipeline = "hardware"
@@ -4691,12 +4691,12 @@ hash = "4e9b09bb755bb527300482df4d0c4c49bc3b3ba9bcf79907a0be441ef1cb690f"
 [artifacts."protocol/messages.rs"]
 pipeline = "protocol"
 source_version = "0.9.8"
-hash = "f1a126bb9ddd0b593d2f79afaa279fd1de222f151c19553c3e4ed705580cec2e"
+hash = "82422cab23b796e37dacd60f98ce071c7cf5f35d45b7f99ed6afa5ddf2eda22b"
 
 [artifacts."protocol/messages.ts"]
 pipeline = "protocol"
 source_version = "0.9.8"
-hash = "4ca94da07d289e2789d28be739dbbeeaea666bf2d0f192288a63dbbe3e3f516a"
+hash = "20db27fede8cd5d7c07725b2c2fe2051821f3127e25a562ed886e34124e72730"
 
 [capabilities.firmware-rp2040]
 source = "built-in"
@@ -4781,7 +4781,7 @@ hash = "792edbe333edb73d259dbf466ca35c5acb60fd724eff5884c382e598f771549f"
 pipelines = ["hardware"]
 
 [inputs."hardware/product.toml"]
-hash = "453a96610918fa55d1a9dd9585da37c8a86c6aabeda31e09ccf0b8b306126769"
+hash = "6321192148f5f4a4c6b3df960ae2829d1e1482ba0a421105adb8e33636b6d152"
 pipelines = ["hardware"]
 
 [inputs."protocol.toml"]

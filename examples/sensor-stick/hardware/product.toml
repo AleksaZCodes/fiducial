@@ -22,7 +22,7 @@ width_mm = 36.0          # wide enough for the board inside; the length follows 
 
 [case]
 process      = "fdm"
-colour       = "#1d4ed8"   # translucent blue PETG: the LED shows through the lid
+colour       = "#1d4ed8b3" # translucent blue PETG (alpha b3): the LED shows through the lid
 wall_mm      = 1.6
 floor_mm     = 2.0
 lid_mm       = 2.0

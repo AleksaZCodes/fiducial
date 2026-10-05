@@ -53,3 +53,17 @@ export function readingValues(m: Reading): Reading {
 export const READING_BANDS = {
   comfortable: { field: "centiPercentRh", min: 35.0, max: 60.0 },
 } as const
+
+/** Where a value, in its unit, falls against a band — bounds inside, compared in
+ * counts exactly as the firmware's `reading::<band>()` does. Test bands with this, not with min/max. */
+export function readingBand(band: keyof typeof READING_BANDS, value: number): Band {
+  switch (band) {
+    case "comfortable": {
+      const c = Math.round(value / 0.01)
+      return c < 3500 ? 'below' : c > 6000 ? 'above' : 'inside'
+    }
+  }
+}
+
+/** Where a value falls against a declared band. */
+export type Band = 'below' | 'inside' | 'above'

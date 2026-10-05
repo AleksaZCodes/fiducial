@@ -10,6 +10,15 @@
 pub const USB_VENDOR_ID: u16 = 0x2e8a;
 pub const USB_PRODUCT_ID: u16 = 0x000a;
 
+/// Where a value falls against a declared band. The bounds are inside —
+/// the page's `<message>Band` decides the same way, in the same counts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Band {
+    Below,
+    Inside,
+    Above,
+}
+
 /// One temperature and humidity reading, sent once a second.
 pub mod reading {
     pub const KIND: u8 = 1;
@@ -46,4 +55,16 @@ pub mod reading {
     /// Comfortable indoor humidity — `centi_percent_rh` from 35 to 60 %RH, inclusive, in counts.
     pub const COMFORTABLE_MIN: u16 = 3500;
     pub const COMFORTABLE_MAX: u16 = 6000;
+
+    /// Where `centi_percent_rh` falls against `comfortable`, bounds inside. Test the band with
+    /// this, not with the bounds: one rule, on both sides.
+    pub fn comfortable(counts: u16) -> super::Band {
+        if counts < COMFORTABLE_MIN {
+            super::Band::Below
+        } else if counts > COMFORTABLE_MAX {
+            super::Band::Above
+        } else {
+            super::Band::Inside
+        }
+    }
 }

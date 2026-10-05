@@ -3,7 +3,7 @@
 // protocol.toml and derived into protocol/messages.ts, the same table the
 // firmware's encoder (protocol/messages.rs) comes from.
 
-import { READING_BANDS, READING_UNITS, decodeReading, readingValues } from '../../protocol/messages.ts'
+import { READING_UNITS, decodeReading, readingBand, readingValues } from '../../protocol/messages.ts'
 
 export interface Reading {
   celsius: number
@@ -20,7 +20,6 @@ export function decode(payload: Uint8Array): Reading | null {
 
 /** What the page shows for a reading — and, inside the declared band, that it is comfortable (the LED is green then too). */
 export function show(r: Reading): string {
-  const { min, max } = READING_BANDS.comfortable
-  const comfortable = r.percentRh >= min && r.percentRh <= max ? ' · comfortable' : ''
+  const comfortable = readingBand('comfortable', r.percentRh) === 'inside' ? ' · comfortable' : ''
   return `${r.celsius.toFixed(1)} ${READING_UNITS.centiCelsius} · ${r.percentRh.toFixed(0)} ${READING_UNITS.centiPercentRh}${comfortable}`
 }

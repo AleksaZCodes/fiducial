@@ -5448,7 +5448,7 @@
     "base_height_mm": 13.5,
     "clearance_mm": 0.3,
     "closure": "press-fit",
-    "colour": "#1d4ed8",
+    "colour": "#1d4ed8b3",
     "floor_mm": 2.0,
     "hang": null,
     "lid_mm": 2.0,
