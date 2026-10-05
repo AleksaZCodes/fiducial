@@ -2,6 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { decode, show } from './reading.ts'
+import { READING_BANDS } from '../../protocol/messages.ts'
 
 test('the firmware layout decodes to degrees and percent', () => {
   // −12.34 °C, 48.10 %RH, as firmware/shared's round-trip test writes them.
@@ -21,7 +22,8 @@ test('the page shows a reading in its declared units, and its band', () => {
 })
 
 test('a bound is inside the band, as it is for the LED', () => {
-  assert.match(show({ celsius: 20, percentRh: 35 }), /comfortable$/)
-  assert.match(show({ celsius: 20, percentRh: 60 }), /comfortable$/)
-  assert.doesNotMatch(show({ celsius: 20, percentRh: 60.01 }), /comfortable$/)
+  const { min, max } = READING_BANDS.comfortable // fid: allow-band (the test reads the declared edges)
+  assert.match(show({ celsius: 20, percentRh: min }), /comfortable$/)
+  assert.match(show({ celsius: 20, percentRh: max }), /comfortable$/)
+  assert.doesNotMatch(show({ celsius: 20, percentRh: max + 0.01 }), /comfortable$/)
 })
