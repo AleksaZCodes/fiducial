@@ -6492,6 +6492,67 @@ fn peripheral(pin: &str) -> Option<String> {
     }
 }
 
+/// The directory firmware lives in, relative to the product root.
+pub const FIRMWARE_DIR: &str = "firmware";
+
+/// Places firmware names an MCU pin directly — `p.PIN_4`, `p.PA5` — instead of
+/// taking it through the derived `board.rs`.
+///
+/// A literal pin compiles before a pin moves and after it, so the move
+/// reaches every caller of `board::sensor_sda!(p)` and silently skips this
+/// one (the paper's study, case H8). The escape is explicit: a line that
+/// carries `fid: allow-pin` is a pin no declared net owns, on purpose.
+pub fn firmware_pin_literals(root: &Path, p: &Product) -> Vec<String> {
+    if p.firmware.is_none() {
+        return Vec::new();
+    }
+    let mut files = Vec::new();
+    collect_rs(&root.join(FIRMWARE_DIR), FIRMWARE_DIR, &mut files);
+    let mut found = Vec::new();
+    for rel in files {
+        let Ok(src) = std::fs::read_to_string(root.join(&rel)) else {
+            continue;
+        };
+        for (i, line) in src.lines().enumerate() {
+            if line.contains("fid: allow-pin") {
+                continue;
+            }
+            let code = line.split("//").next().unwrap_or("");
+            for tok in code.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_')) {
+                let gpio = tok.strip_prefix("PIN_").map(|n| format!("GPIO{n}"));
+                if peripheral(gpio.as_deref().unwrap_or(tok)).as_deref() == Some(tok) {
+                    found.push(format!(
+                        "  {rel}:{}: takes {tok} directly — take it through `board::<net>!(p)` \
+                         (hardware/generated/board.rs) so a moved pin moves it too, or mark the \
+                         line `// fid: allow-pin` if no declared net owns it",
+                        i + 1
+                    ));
+                }
+            }
+        }
+    }
+    found
+}
+
+fn collect_rs(dir: &Path, rel: &str, out: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut entries: Vec<_> = entries.flatten().collect();
+    entries.sort_by_key(|e| e.file_name());
+    for e in entries {
+        let name = e.file_name().to_string_lossy().to_string();
+        let child = format!("{rel}/{name}");
+        match e.file_type() {
+            Ok(t) if t.is_dir() && name != "target" && !name.starts_with('.') => {
+                collect_rs(&e.path(), &child, out)
+            }
+            Ok(t) if t.is_file() && name.ends_with(".rs") => out.push(child),
+            _ => {}
+        }
+    }
+}
+
 /// What firmware and web need from the hardware, and nothing else: the
 /// board's size, the sockets reached through the case, every net and the
 /// pins on it, and — with `[firmware]` — which I/O pin of the MCU each net is

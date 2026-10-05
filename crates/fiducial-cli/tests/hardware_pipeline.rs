@@ -1678,6 +1678,29 @@ fn a_moved_pin_reaches_the_firmware_and_a_renamed_net_breaks_code_still_using_it
     let out = firmware_compiles(&root, tmp.path(), "sensor_sda");
     assert!(out.status.success(), "{}", text(&out));
 
+    // Firmware that names a pin itself would compile through a move and miss
+    // it, so both derive and --check refuse it — naming file and line —
+    // unless the line says it is deliberate.
+    std::fs::create_dir_all(root.join("firmware/src")).unwrap();
+    let main = root.join("firmware/src/main.rs");
+    std::fs::write(&main, "fn f(p: P) {\n    let sda = p.PIN_4;\n}\n").unwrap();
+    for args in [
+        &["derive", "--check", "--pipeline", "hardware"][..],
+        &["derive", "--pipeline", "hardware"],
+    ] {
+        let out = fid(&root, args);
+        assert!(!out.status.success(), "a literal pin passed {args:?}");
+        assert!(
+            text(&out).contains("firmware/src/main.rs:2: takes PIN_4 directly"),
+            "{}",
+            text(&out)
+        );
+    }
+    std::fs::write(&main, "fn f(p: P) {\n    let sda = p.PIN_4; // fid: allow-pin\n    // p.PIN_9 in a comment is not code\n}\n").unwrap();
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    std::fs::remove_dir_all(root.join("firmware")).unwrap();
+
     // Swap the two pins in the declaration: the firmware follows, unedited.
     edit(
         &root,

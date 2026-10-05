@@ -657,6 +657,18 @@ fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
         if pipeline.executor == "fid-hardware" && issues.len() == before {
             issues.extend(hardware_drift(pipeline, root));
         }
+        if pipeline.executor == "fid-hardware" {
+            let decl = pipeline
+                .args
+                .first()
+                .map(|s| s.as_str())
+                .unwrap_or(crate::hardware::DECLARATION);
+            if let Ok(raw) = std::fs::read_to_string(root.join(decl)) {
+                if let Ok(product) = toml::from_str::<crate::hardware::Product>(&raw) {
+                    issues.extend(crate::hardware::firmware_pin_literals(root, &product));
+                }
+            }
+        }
         let skip = outputs_not_applicable(pipeline, root);
         for out in &pipeline.outputs {
             if skip.contains(out) {
@@ -760,6 +772,10 @@ fn run_fid_hardware(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     }
     if let Some(v) = solved.cost_violation {
         bail!("cost: {v}");
+    }
+    let literal = crate::hardware::firmware_pin_literals(working_dir, &product);
+    if !literal.is_empty() {
+        bail!("firmware names pins directly:\n{}", literal.join("\n"));
     }
     Ok(())
 }
