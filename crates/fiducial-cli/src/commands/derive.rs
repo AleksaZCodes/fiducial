@@ -2574,8 +2574,10 @@ fn run_fid_design(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         )
     })?;
 
-    let system = crate::design::parse(&md)
-        .with_context(|| format!("fid-design: `{source}` does not parse"))?;
+    // `{:#}` so the reason reaches the terminal: derive prints only the
+    // outermost message, and "does not parse" hid every rule `parse` holds.
+    let system =
+        crate::design::parse(&md).map_err(|e| anyhow::anyhow!("fid-design: `{source}`: {e:#}"))?;
 
     let pairs = system
         .check_contrast()
