@@ -80,7 +80,7 @@ nothing can be left behind.
 fid derive                                   # the gated artifacts
 python3 hardware/parts.py sync               # vendor symbols, footprints, models
 hardware/build.sh                            # route, solids, checks, fab files, renders
-(cd firmware && cargo build --release)       # the firmware (thumbv6m-none-eabi)
+(cd firmware/rp2040 && cargo build --release) # the firmware (thumbv6m-none-eabi)
 (cd firmware && cargo test -p firmware-shared --target x86_64-unknown-linux-gnu)
 node --experimental-strip-types --test web/src/reading.test.ts
 npx esbuild web/src/main.ts --bundle --format=esm --outfile=web/dist/main.js --tsconfig=web/tsconfig.json

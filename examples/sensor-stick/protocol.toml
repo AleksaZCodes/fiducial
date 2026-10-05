@@ -4,6 +4,13 @@
 # protocol/messages.ts (the page's side) from this table. A payload is the
 # `kind` byte, then each field, little-endian. Framing is fiducial-protocol's.
 
+# The IDs the stick enumerates with, and the page asks the browser for. One
+# number, two sides: declared here, generated into both. (Raspberry Pi's
+# vendor ID with its example product ID: replace both before shipping.)
+[usb]
+vendor_id  = 0x2e8a
+product_id = 0x000a
+
 [[message]]
 name   = "reading"
 kind   = 1
@@ -12,3 +19,13 @@ fields = [
   { name = "centi_celsius", type = "i16", doc = "Temperature, °C × 100", scale = 0.01, unit = "°C" },
   { name = "centi_percent_rh", type = "u16", doc = "Relative humidity, %RH × 100", scale = 0.01, unit = "%RH" },
 ]
+
+# Comfortable indoor humidity, in %RH: the LED is green inside it, blue below,
+# red above, and the page says "comfortable". Generated as counts for the
+# firmware (3500..=6000) and as %RH for the page, so neither converts by hand.
+[[band]]
+name  = "comfortable"
+field = "reading.centi_percent_rh"
+min   = 35.0
+max   = 60.0
+doc   = "Comfortable indoor humidity"

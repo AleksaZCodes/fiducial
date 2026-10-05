@@ -6,13 +6,12 @@
 pub use fiducial_core::{version, DeviceId, VERSION};
 pub use fiducial_protocol::{encode, encoded_len, FrameDecoder};
 
-/// The AHT20 temperature and humidity sensor (Aosong), over I²C.
+/// The AHT20 temperature and humidity sensor (Aosong), over I²C. Its
+/// address and command bytes are datasheet facts: `fid derive` writes them
+/// into hardware/generated/board.rs (`SENSOR_INIT`, `SENSOR_MEASURE`) from
+/// the platform's AHT20 profile, so they are not typed here.
 pub mod aht20 {
-    /// Calibrate, once after power-up (datasheet §5.4: wait 40 ms first).
-    pub const INIT: [u8; 3] = [0xBE, 0x08, 0x00];
-    /// Start a measurement; the result is ready 80 ms later.
-    pub const MEASURE: [u8; 3] = [0xAC, 0x33, 0x00];
-    /// Measurement time, ms.
+    /// Measurement time, ms (datasheet §5.4).
     pub const MEASURE_MS: u64 = 80;
 
     /// One reading, in hundredths: 2153 is 21.53 °C, 4810 is 48.10 %RH.

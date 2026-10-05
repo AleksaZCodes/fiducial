@@ -1,6 +1,10 @@
 // Derived by fid-protocol from protocol.toml — do not edit.
 // The firmware's protocol/messages.rs is derived from the same table.
 
+/** The USB IDs the device enumerates with: filter on these. */
+export const USB_VENDOR_ID = 0x2e8a
+export const USB_PRODUCT_ID = 0x000a
+
 /** One temperature and humidity reading, sent once a second. */
 export const READING_KIND = 1
 export const READING_LEN = 5
@@ -44,3 +48,8 @@ export function readingValues(m: Reading): Reading {
     centiPercentRh: m.centiPercentRh * 0.01,
   }
 }
+
+/** Named ranges, in each field's unit, inclusive — the firmware acts on the same. */
+export const READING_BANDS = {
+  comfortable: { field: "centiPercentRh", min: 35.0, max: 60.0 },
+} as const

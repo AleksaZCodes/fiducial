@@ -15,6 +15,7 @@ test('another kind of message is not a reading', () => {
   assert.equal(decode(new Uint8Array([1, 0, 0])), null)
 })
 
-test('the page shows a reading in its declared units', () => {
-  assert.equal(show({ celsius: -12.34, percentRh: 48.1 }), '-12.3 °C · 48 %RH')
+test('the page shows a reading in its declared units, and its band', () => {
+  assert.equal(show({ celsius: -12.34, percentRh: 48.1 }), '-12.3 °C · 48 %RH · comfortable')
+  assert.equal(show({ celsius: 21.5, percentRh: 72 }), '21.5 °C · 72 %RH')
 })

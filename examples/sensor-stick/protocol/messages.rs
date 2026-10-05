@@ -6,6 +6,10 @@
 //! from the same table, so the two cannot disagree.
 #![allow(dead_code)]
 
+/// The USB IDs the device enumerates with; the page filters on the same.
+pub const USB_VENDOR_ID: u16 = 0x2e8a;
+pub const USB_PRODUCT_ID: u16 = 0x000a;
+
 /// One temperature and humidity reading, sent once a second.
 pub mod reading {
     pub const KIND: u8 = 1;
@@ -38,4 +42,8 @@ pub mod reading {
             })
         }
     }
+
+    /// Comfortable indoor humidity — `centi_percent_rh` from 35 to 60 %RH, inclusive, in counts.
+    pub const COMFORTABLE_MIN: u16 = 3500;
+    pub const COMFORTABLE_MAX: u16 = 6000;
 }
