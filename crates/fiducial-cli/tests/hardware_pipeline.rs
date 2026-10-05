@@ -2402,3 +2402,42 @@ fn check_regenerates_hardware_outputs_rather_than_trusting_the_lock() {
         text(&out)
     );
 }
+
+/// A conflict in `fiducial.toml` is not written as markers: every command
+/// parses that file, so markers in it stop the very commands that would say
+/// what to resolve. Found re-baselining a product made with 0.9.4.
+#[test]
+fn an_upgrade_never_leaves_conflict_markers_in_the_declaration() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    let lock_path = root.join("fiducial.lock");
+    let lock = std::fs::read_to_string(&lock_path).unwrap();
+    let start = lock.find("[templates.\"fiducial.toml\"]").unwrap();
+    // To the end of its multi-line `base_content`, which has `[` lines of its own.
+    let open = start + lock[start..].find("base_content = \"\"\"").unwrap() + 18;
+    let end = open + lock[open..].find("\"\"\"").unwrap();
+    // The base, as an older template wrote it, on the very line `fid add`
+    // has since changed here: a true conflict.
+    let record = lock[start..end].replacen("enabled = []", "enabled = [1]", 1);
+    assert_ne!(record, lock[start..end], "the base carries the line");
+    std::fs::write(
+        &lock_path,
+        format!("{}{}{}", &lock[..start], record, &lock[end..]),
+    )
+    .unwrap();
+    let before = std::fs::read_to_string(root.join("fiducial.toml")).unwrap();
+
+    let out = fid(&root, &["upgrade"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(
+        text(&out).contains("fiducial.toml: yours"),
+        "{}",
+        text(&out)
+    );
+    assert_eq!(
+        std::fs::read_to_string(root.join("fiducial.toml")).unwrap(),
+        before
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+}

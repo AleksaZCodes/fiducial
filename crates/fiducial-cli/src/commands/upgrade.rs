@@ -882,6 +882,26 @@ fn merge_one_template(
             {
                 return Ok(Some(kept));
             }
+            // A declaration every command parses is never left holding
+            // markers: `fiducial.toml` with a conflict in it stops `fid
+            // derive`, `fid doctor` and this command alike, before any of them
+            // can say what to resolve. The product's file is its own; it is
+            // kept, the base moves so this is reported once, and the
+            // platform's version is one command away.
+            if crate::ownership::of(rel_path).is_product()
+                && (rel_path.ends_with(".toml") || rel_path.ends_with(".json"))
+            {
+                if !dry_run {
+                    let record = lock.templates.get_mut(rel_path).unwrap();
+                    record.base_content = Some(upstream.clone());
+                    record.source_version = PLATFORM_VERSION.into();
+                }
+                return Ok(Some(TemplateOutcome::Kept(format!(
+                    "yours — the platform's template changed lines you have changed \
+                     too, and a declaration is not left with conflict markers in it; \
+                     `fid upgrade --upstream {rel_path}` prints the template"
+                ))));
+            }
             // Write conflict markers to the file — the human must resolve.
             if !dry_run {
                 std::fs::write(&local_path, &conflict)
