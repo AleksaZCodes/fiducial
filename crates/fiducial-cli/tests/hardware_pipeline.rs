@@ -1699,6 +1699,26 @@ fn a_moved_pin_reaches_the_firmware_and_a_renamed_net_breaks_code_still_using_it
     std::fs::write(&main, "fn f(p: P) {\n    let sda = p.PIN_4; // fid: allow-pin\n    // p.PIN_9 in a comment is not code\n}\n").unwrap();
     let out = fid(&root, &["derive", "--pipeline", "hardware"]);
     assert!(out.status.success(), "{}", text(&out));
+    // An I²C address typed into a transfer, once a part declares its own.
+    let toml = std::fs::read_to_string(&p).unwrap();
+    std::fs::write(
+        &p,
+        toml.replacen("id = \"r-sda\"", "i2c_address = 0x38\nid = \"r-sda\"", 1),
+    )
+    .unwrap();
+    std::fs::write(
+        &main,
+        "fn f(i2c: I) {\n    i2c.write_async(0x39, &[0]);\n}\n",
+    )
+    .unwrap();
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(!out.status.success(), "a typed address passed");
+    assert!(
+        text(&out).contains("firmware/src/main.rs:2: addresses an I²C device as 0x39 directly"),
+        "{}",
+        text(&out)
+    );
+    std::fs::write(&p, toml).unwrap();
     std::fs::remove_dir_all(root.join("firmware")).unwrap();
 
     // Swap the two pins in the declaration: the firmware follows, unedited.

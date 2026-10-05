@@ -329,7 +329,8 @@ edit to it by hand before changing the declaration.
   that put it there.
 - **`i2c_address`.** A part's I²C address (`i2c_address = 0x38`) is declared
   on the part and derived into `board.rs` as `<PART>_I2C_ADDRESS`. Firmware
-  takes it from there and never types it.
+  takes it from there: an address typed into an I²C transfer
+  (`write_async(0x38, …)`) fails derive, unless marked `// fid: allow-address`.
 - **Pins go through `board.rs`.** Firmware that names a pin directly
   (`p.PIN_4`, `p.PA5`) fails derive and `--check`, naming file and line; a
   deliberate one is marked `// fid: allow-pin`.

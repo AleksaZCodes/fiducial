@@ -6607,6 +6607,7 @@ pub fn firmware_pin_literals(root: &Path, p: &Product) -> Vec<String> {
     if p.firmware.is_none() {
         return Vec::new();
     }
+    let addresses_declared = p.parts.iter().any(|q| q.i2c_address.is_some());
     let mut files = Vec::new();
     collect_rs(&root.join(FIRMWARE_DIR), FIRMWARE_DIR, &mut files);
     let mut found = Vec::new();
@@ -6619,6 +6620,36 @@ pub fn firmware_pin_literals(root: &Path, p: &Product) -> Vec<String> {
                 continue;
             }
             let code = line.split("//").next().unwrap_or("");
+            // An I²C address typed into a transfer — `write_async(0x38, …)`
+            // — instead of taken from a part's declared `i2c_address`.
+            if addresses_declared && !line.contains("fid: allow-address") {
+                for call in [
+                    "write(",
+                    "read(",
+                    "write_read(",
+                    "write_async(",
+                    "read_async(",
+                    "write_read_async(",
+                ] {
+                    let mut rest = code;
+                    while let Some(at) = rest.find(call) {
+                        let arg = rest[at + call.len()..].trim_start();
+                        if arg.starts_with("0x") || arg.starts_with("0X") {
+                            let lit: String = arg
+                                .chars()
+                                .take_while(|c| c.is_ascii_alphanumeric())
+                                .collect();
+                            found.push(format!(
+                                "  {rel}:{}: addresses an I²C device as {lit} directly — take it from \
+                                 `board::<PART>_I2C_ADDRESS` (the part's declared `i2c_address`), or \
+                                 mark the line `// fid: allow-address`",
+                                i + 1
+                            ));
+                        }
+                        rest = &rest[at + call.len()..];
+                    }
+                }
+            }
             for tok in code.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_')) {
                 let gpio = tok.strip_prefix("PIN_").map(|n| format!("GPIO{n}"));
                 if peripheral(gpio.as_deref().unwrap_or(tok)).as_deref() == Some(tok) {
