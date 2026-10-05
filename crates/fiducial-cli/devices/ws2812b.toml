@@ -1,0 +1,5 @@
+# Worldsemi WS2812B addressable RGB LED — datasheet, electrical
+# parameters: VDD 3.5–5.3 V.
+mpn    = "WS2812B"
+source = "WS2812B datasheet (Worldsemi), electrical parameters"
+supply = { pin = "VDD", min = 3.5, max = 5.3 }

@@ -24,6 +24,66 @@ pub const DECLARATION: &str = "protocol.toml";
 pub struct File {
     #[serde(default, rename = "message")]
     pub messages: Vec<Message>,
+    /// The USB IDs the device enumerates with and the page asks the browser
+    /// for: one number on two sides, so it is declared here with the rest of
+    /// the interface (the paper's round 4, case R20).
+    #[serde(default)]
+    pub usb: Option<Usb>,
+    /// Named ranges of a field, in its unit: the thresholds firmware and page
+    /// act on, declared once (case R14).
+    #[serde(default, rename = "band")]
+    pub bands: Vec<Band>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Usb {
+    pub vendor_id: u16,
+    pub product_id: u16,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Band {
+    /// `snake_case`; `COMFORTABLE_MIN` / `_MAX` in Rust.
+    pub name: String,
+    /// `<message>.<field>`.
+    pub field: String,
+    /// Inclusive bounds in the field's unit — `35.0` %RH, not `3500`.
+    pub min: f64,
+    pub max: f64,
+    #[serde(default)]
+    pub doc: String,
+}
+
+/// What a field name's leading SI prefix says one count is worth. A field
+/// called `centi_percent_rh` with `scale = 0.1` says two different things,
+/// and the page shows ten times the humidity (case R11).
+const PREFIXES: &[(&str, f64)] = &[
+    ("deci", 0.1),
+    ("centi", 0.01),
+    ("milli", 0.001),
+    ("micro", 0.000_001),
+    ("kilo", 1000.0),
+];
+
+/// The scale a field's name implies, when it starts with an SI prefix.
+fn implied_scale(name: &str) -> Option<(&'static str, f64)> {
+    let head = name.split('_').next()?;
+    PREFIXES.iter().find(|(p, _)| *p == head).copied()
+}
+
+/// A band bound in counts: the unit value divided by the field's scale.
+fn counts(f: &Field, v: f64) -> f64 {
+    v / f.scale.unwrap_or(1.0)
+}
+
+impl File {
+    fn field(&self, path: &str) -> Option<(&Message, &Field)> {
+        let (m, f) = path.split_once('.')?;
+        let m = self.messages.iter().find(|x| x.name == m)?;
+        Some((m, m.fields.iter().find(|x| x.name == f)?))
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -147,6 +207,50 @@ pub fn load(root: &Path, decl: &str) -> Result<File> {
                     m.name, f.name, f.ty
                 ));
             }
+            if let (Some((prefix, implied)), Some(scale)) = (implied_scale(&f.name), f.scale) {
+                if ((scale - implied) / implied).abs() > 1e-9 {
+                    problems.push(format!(
+                        "message `{}`: field `{}` has scale = {scale}, but its name says \
+                         {prefix} ({implied}) — rename the field or correct the scale",
+                        m.name, f.name
+                    ));
+                }
+            }
+        }
+    }
+    for (i, b) in file.bands.iter().enumerate() {
+        if !is_snake(&b.name) {
+            problems.push(format!("band `{}`: name must be snake_case", b.name));
+        }
+        if file.bands[..i]
+            .iter()
+            .any(|o| o.name == b.name && o.field.split('.').next() == b.field.split('.').next())
+        {
+            problems.push(format!("band `{}` is declared twice", b.name));
+        }
+        let Some((_, f)) = file.field(&b.field) else {
+            problems.push(format!(
+                "band `{}`: field = \"{}\" names no declared `<message>.<field>`",
+                b.name, b.field
+            ));
+            continue;
+        };
+        if b.min > b.max {
+            problems.push(format!(
+                "band `{}`: min {} is above max {}",
+                b.name, b.min, b.max
+            ));
+        }
+        if f.ty != "f32" {
+            for v in [b.min, b.max] {
+                let c = counts(f, v);
+                if (c - c.round()).abs() > 1e-6 {
+                    problems.push(format!(
+                        "band `{}`: {v} is {c} counts of `{}` — not a whole number",
+                        b.name, b.field
+                    ));
+                }
+            }
         }
     }
     if !problems.is_empty() {
@@ -177,6 +281,13 @@ pub fn render_rust(file: &File, decl: &str) -> String {
          //! from the same table, so the two cannot disagree.\n\
          #![allow(dead_code)]\n"
     );
+    if let Some(u) = &file.usb {
+        s.push_str(&format!(
+            "\n/// The USB IDs the device enumerates with; the page filters on the same.\n\
+             pub const USB_VENDOR_ID: u16 = {:#06x};\npub const USB_PRODUCT_ID: u16 = {:#06x};\n",
+            u.vendor_id, u.product_id
+        ));
+    }
     for m in &file.messages {
         let name = pascal(&m.name);
         let n = len(m);
@@ -228,7 +339,39 @@ pub fn render_rust(file: &File, decl: &str) -> String {
             ));
             at += t.size;
         }
-        s.push_str("            })\n        }\n    }\n}\n");
+        s.push_str("            })\n        }\n    }\n");
+        for b in file
+            .bands
+            .iter()
+            .filter(|b| b.field.split('.').next() == Some(&m.name))
+        {
+            let (_, f) = file.field(&b.field).unwrap();
+            let t = ty(&f.ty).unwrap();
+            let unit = f.unit.as_deref().unwrap_or("");
+            let lit = |v: f64| {
+                let c = counts(f, v);
+                if f.ty == "f32" {
+                    format!("{c:?}")
+                } else {
+                    format!("{}", c.round() as i64)
+                }
+            };
+            s.push_str(&format!(
+                "\n    /// {} — `{}` from {} to {} {unit}, inclusive, in counts.\n\
+                 \x20   pub const {}_MIN: {} = {};\n    pub const {}_MAX: {} = {};\n",
+                one_line(&b.doc, &b.name),
+                f.name,
+                b.min,
+                b.max,
+                b.name.to_ascii_uppercase(),
+                t.rust,
+                lit(b.min),
+                b.name.to_ascii_uppercase(),
+                t.rust,
+                lit(b.max),
+            ));
+        }
+        s.push_str("}\n");
     }
     s
 }
@@ -239,6 +382,13 @@ pub fn render_ts(file: &File, decl: &str) -> String {
         "// Derived by fid-protocol from {decl} — do not edit.\n\
          // The firmware's protocol/messages.rs is derived from the same table.\n"
     );
+    if let Some(u) = &file.usb {
+        s.push_str(&format!(
+            "\n/** The USB IDs the device enumerates with: filter on these. */\n\
+             export const USB_VENDOR_ID = {:#06x}\nexport const USB_PRODUCT_ID = {:#06x}\n",
+            u.vendor_id, u.product_id
+        ));
+    }
     for m in &file.messages {
         let name = pascal(&m.name);
         let upper = m.name.to_ascii_uppercase();
@@ -317,8 +467,216 @@ pub fn render_ts(file: &File, decl: &str) -> String {
             }
             s.push_str("  }\n}\n");
         }
+        let bands: Vec<&Band> = file
+            .bands
+            .iter()
+            .filter(|b| b.field.split('.').next() == Some(&m.name))
+            .collect();
+        if !bands.is_empty() {
+            s.push_str(&format!(
+                "\n/** Named ranges, in each field's unit, inclusive — the firmware acts on the same. */\nexport const {upper}_BANDS = {{\n"
+            ));
+            for b in bands {
+                let f = b.field.split_once('.').unwrap().1;
+                s.push_str(&format!(
+                    "  {}: {{ field: {:?}, min: {:?}, max: {:?} }},\n",
+                    camel(&b.name),
+                    camel(f),
+                    b.min,
+                    b.max
+                ));
+            }
+            s.push_str("} as const\n");
+        }
     }
     s
+}
+
+/// Where hand-written code compares a scaled field with a bare number, or
+/// types a USB ID, instead of using what this declaration generates.
+///
+/// `match r.centi_percent_rh { 35..=60 => … }` reads as percent and is
+/// hundredths of a percent (the paper's round 4, case R14); a band declared
+/// in the unit is converted once, here. `Config::new(0x1209, …)` in firmware
+/// beside `usbVendorId: 0x2e8a` on the page is the same number twice (R20).
+/// Zero means the same in every unit and is allowed. A line that means it says
+/// `// fid: allow-units` (or `allow-usb`).
+pub fn typed_literals(root: &Path, file: &File) -> Vec<String> {
+    let scaled: Vec<String> = file
+        .messages
+        .iter()
+        .flat_map(|m| m.fields.iter())
+        .filter(|f| f.scale.is_some())
+        .flat_map(|f| [f.name.clone(), camel(&f.name)])
+        .filter(|n| n.contains(|c: char| c == '_' || c.is_ascii_uppercase()))
+        .collect();
+    let mut files = Vec::new();
+    crate::i18n::collect_code(root, &mut files);
+    collect_ext(&root.join("firmware"), ".rs", &mut files);
+    files.sort();
+    files.dedup();
+    let mut out = Vec::new();
+    for path in files {
+        let rel = path
+            .strip_prefix(root)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        if rel.starts_with("protocol/") || rel.contains("/generated/") {
+            continue;
+        }
+        let Ok(src) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let mut in_match: Option<(String, i32)> = None;
+        for (i, line) in src.lines().enumerate() {
+            let code = strip_comment(line);
+            let at = format!("  {rel}:{}", i + 1);
+            if file.usb.is_some() && !line.contains("fid: allow-usb") {
+                let typed = [
+                    "Config::new(",
+                    "usbVendorId:",
+                    "vendorId:",
+                    "usbProductId:",
+                    "productId:",
+                ]
+                .iter()
+                .any(|k| {
+                    code.match_indices(k).any(|(j, _)| {
+                        code[j + k.len()..]
+                            .trim_start()
+                            .starts_with(|c: char| c.is_ascii_digit())
+                    })
+                });
+                if typed {
+                    out.push(format!(
+                        "{at}: types a USB ID — use USB_VENDOR_ID / USB_PRODUCT_ID from the \
+                         generated protocol, declared once in `[usb]`"
+                    ));
+                }
+            }
+            if line.contains("fid: allow-units") {
+                continue;
+            }
+            if let Some((field, depth)) = &mut in_match {
+                if let Some((pat, _)) = code.split_once("=>") {
+                    if has_nonzero_int(pat) {
+                        out.push(units_message(&at, field));
+                    }
+                }
+                *depth += brace_delta(code);
+                if *depth <= 0 {
+                    in_match = None;
+                }
+                continue;
+            }
+            for f in &scaled {
+                let dotted = format!(".{f}");
+                for (j, _) in code.match_indices(&dotted) {
+                    let after = &code[j + dotted.len()..];
+                    if after.starts_with(|c: char| c.is_alphanumeric() || c == '_') {
+                        continue;
+                    }
+                    if receiverless(&code[..j]).ends_with("match") {
+                        if code.trim_end().ends_with('{') {
+                            in_match = Some((f.clone(), brace_delta(code)));
+                        }
+                        continue;
+                    }
+                    let a = after.trim_start();
+                    let compared_after = ["<=", ">=", "==", "!=", "<", ">"]
+                        .iter()
+                        .find(|op| a.starts_with(**op))
+                        .is_some_and(|op| starts_nonzero_int(a[op.len()..].trim_start()));
+                    if compared_after || compared_before(&code[..j]) {
+                        out.push(units_message(&at, f));
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+fn units_message(at: &str, field: &str) -> String {
+    format!(
+        "{at}: compares `{field}` with a bare number — the field is in counts of its \
+         declared scale; declare the threshold as a [[band]] in protocol.toml and use \
+         the generated bound"
+    )
+}
+
+fn strip_comment(line: &str) -> &str {
+    line.split("//").next().unwrap_or(line)
+}
+
+fn brace_delta(s: &str) -> i32 {
+    s.chars().filter(|&c| c == '{').count() as i32 - s.chars().filter(|&c| c == '}').count() as i32
+}
+
+/// An integer literal other than zero: `35`, `3_500`, `0x10`.
+fn starts_nonzero_int(s: &str) -> bool {
+    let s = s.trim_start_matches('-');
+    let lit: String = s
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+        .collect();
+    lit.starts_with(|c: char| c.is_ascii_digit())
+        && lit
+            .trim_start_matches("0x")
+            .chars()
+            .any(|c| c.is_ascii_digit() && c != '0')
+}
+
+fn has_nonzero_int(pat: &str) -> bool {
+    let mut prev = ' ';
+    for (i, c) in pat.char_indices() {
+        if c.is_ascii_digit()
+            && !(prev.is_alphanumeric() || prev == '_')
+            && starts_nonzero_int(&pat[i..])
+        {
+            return true;
+        }
+        prev = c;
+    }
+    false
+}
+
+/// `35 < r.field`: a literal on the left of a comparison that ends here.
+fn compared_before(head: &str) -> bool {
+    let rest = receiverless(head);
+    ["<=", ">=", "==", "!=", "<", ">"].iter().any(|op| {
+        rest.strip_suffix(op).is_some_and(|lhs| {
+            let lhs = lhs.trim_end();
+            let start = lhs
+                .rfind(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+                .map_or(0, |k| k + 1);
+            starts_nonzero_int(&lhs[start..])
+        })
+    })
+}
+
+/// What comes before `r.field`, without the `r`.
+fn receiverless(head: &str) -> &str {
+    head.trim_end_matches(|c: char| c.is_alphanumeric() || c == '_' || c == '.')
+        .trim_end()
+}
+
+fn collect_ext(dir: &Path, ext: &str, out: &mut Vec<std::path::PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for e in entries.flatten() {
+        let p = e.path();
+        let name = e.file_name().to_string_lossy().to_string();
+        if p.is_dir() {
+            if name != "target" && !name.starts_with('.') {
+                collect_ext(&p, ext, out);
+            }
+        } else if name.ends_with(ext) {
+            out.push(p);
+        }
+    }
 }
 
 fn one_line(doc: &str, name: &str) -> String {
@@ -382,5 +740,101 @@ fields = [{ name = "y", type = "u8" }]
         assert!(e.contains("type `u24`"), "{e}");
         assert!(e.contains("kind 1 is already `a`'s"), "{e}");
         assert!(e.contains("`B`: name must be snake_case"), "{e}");
+    }
+
+    const SCALED: &str = r#"
+[usb]
+vendor_id  = 0x2e8a
+product_id = 0x000a
+
+[[message]]
+name = "reading"
+kind = 1
+fields = [
+  { name = "centi_celsius", type = "i16", scale = 0.01, unit = "°C" },
+  { name = "centi_percent_rh", type = "u16", scale = 0.01, unit = "%RH" },
+]
+
+[[band]]
+name  = "comfortable"
+field = "reading.centi_percent_rh"
+min   = 35.0
+max   = 60.0
+"#;
+
+    #[test]
+    fn a_scale_that_disagrees_with_the_fields_name_is_refused() {
+        let e = file(&SCALED.replace(
+            "type = \"u16\", scale = 0.01",
+            "type = \"u16\", scale = 0.1",
+        ))
+        .unwrap_err()
+        .to_string();
+        assert!(e.contains("its name says centi (0.01)"), "{e}");
+    }
+
+    #[test]
+    fn usb_ids_and_bands_reach_both_sides_in_their_own_terms() {
+        let f = file(SCALED).unwrap();
+        let rs = render_rust(&f, DECLARATION);
+        let ts = render_ts(&f, DECLARATION);
+        assert!(
+            rs.contains("pub const USB_VENDOR_ID: u16 = 0x2e8a;"),
+            "{rs}"
+        );
+        assert!(ts.contains("export const USB_VENDOR_ID = 0x2e8a"), "{ts}");
+        // Declared in %RH, generated in counts for the firmware...
+        assert!(
+            rs.contains("pub const COMFORTABLE_MIN: u16 = 3500;"),
+            "{rs}"
+        );
+        assert!(
+            rs.contains("pub const COMFORTABLE_MAX: u16 = 6000;"),
+            "{rs}"
+        );
+        // ...and in %RH for the page, which already shows values in units.
+        assert!(
+            ts.contains("comfortable: { field: \"centiPercentRh\", min: 35.0, max: 60.0 }"),
+            "{ts}"
+        );
+        let e = file(&SCALED.replace(
+            "field = \"reading.centi_percent_rh\"",
+            "field = \"reading.rh\"",
+        ))
+        .unwrap_err()
+        .to_string();
+        assert!(e.contains("names no declared"), "{e}");
+    }
+
+    #[test]
+    fn a_bare_number_against_a_scaled_field_or_a_typed_usb_id_is_named() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(DECLARATION), SCALED).unwrap();
+        let f = load(dir.path(), DECLARATION).unwrap();
+        let fw = dir.path().join("firmware/src");
+        std::fs::create_dir_all(&fw).unwrap();
+        let good = "fn colour(r: Reading) -> u8 {\n    match r.centi_percent_rh {\n        0..=reading::COMFORTABLE_MIN => 1,\n        _ => 2,\n    }\n}\nlet c = Config::new(USB_VENDOR_ID, USB_PRODUCT_ID);\nif r.centi_celsius < 0 { }\n";
+        std::fs::write(fw.join("main.rs"), good).unwrap();
+        assert!(
+            typed_literals(dir.path(), &f).is_empty(),
+            "{:?}",
+            typed_literals(dir.path(), &f)
+        );
+        let bad = "fn colour(r: Reading) -> u8 {\n    match r.centi_percent_rh {\n        0..=34 => 1,\n        35..=60 => 2,\n        _ => 3,\n    }\n}\nlet c = Config::new(0x1209, 0x0001);\nif 3_000 < r.centi_celsius { }\nlet hot = r.centi_celsius >= 3_000;\n";
+        std::fs::write(fw.join("main.rs"), bad).unwrap();
+        let found = typed_literals(dir.path(), &f);
+        assert_eq!(found.len(), 5, "{found:#?}");
+        assert!(
+            found
+                .iter()
+                .any(|m| m.contains("main.rs:8") && m.contains("USB")),
+            "{found:#?}"
+        );
+        std::fs::write(
+            dir.path().join("page.ts"),
+            "const s = await open({ filters: [{ usbVendorId: 0x2e8a }] })\nif (r.centiPercentRh > 6000) warn()\n",
+        )
+        .unwrap();
+        assert_eq!(typed_literals(dir.path(), &f).len(), 7);
     }
 }

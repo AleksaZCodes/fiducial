@@ -511,3 +511,57 @@ fn a_product_with_no_locales_is_not_nagged() {
         text(&out)
     );
 }
+
+/// `sr-RS` reads as tidy, and `Intl` takes it as Serbian in *Cyrillic*: a
+/// Latin-script site prints its months in the other alphabet (the paper's
+/// round 4, case R2). A tag names its own language, and its script where
+/// the language has more than one.
+#[test]
+fn a_locale_tag_that_leaves_the_script_to_a_guess_fails() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = localized_product(tmp.path());
+    edit_catalog(&root, "sr", |v| v["locale"]["tag"] = "sr-RS".into());
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success(), "sr-RS passed");
+    assert!(
+        text(&out).contains("messages/sr.json: `locale.tag` \"sr-RS\" does not say which script"),
+        "{}",
+        text(&out)
+    );
+    edit_catalog(&root, "sr", |v| v["locale"]["tag"] = "sr-Latn-RS".into());
+    assert!(run(&root, &["derive"]).status.success());
+}
+
+/// `l === "en"` is `[i18n]` written a second time, and the copy does not
+/// move when the default does (the paper's round 4, case R10).
+#[test]
+fn code_that_names_a_locale_directly_fails() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = localized_product(tmp.path());
+    let lib = root.join("src/lib");
+    std::fs::create_dir_all(&lib).unwrap();
+    let file = lib.join("href.ts");
+    std::fs::write(
+        &file,
+        "import { defaultLocale } from \"../generated/messages\";\n\
+         export const bare = (l: string) => l === defaultLocale;\n",
+    )
+    .unwrap();
+    assert!(run(&root, &["derive"]).status.success());
+    std::fs::write(&file, "export const bare = (l: string) => l === \"en\";\n").unwrap();
+    for args in [&["derive"][..], &["derive", "--check"]] {
+        let out = run(&root, args);
+        assert!(!out.status.success(), "a typed locale passed {args:?}");
+        assert!(
+            text(&out).contains("src/lib/href.ts:1: names the locale \"en\" directly"),
+            "{}",
+            text(&out)
+        );
+    }
+    std::fs::write(
+        &file,
+        "export const bare = (l: string) => l === \"en\"; // fid: allow-locale\n",
+    )
+    .unwrap();
+    assert!(run(&root, &["derive"]).status.success());
+}

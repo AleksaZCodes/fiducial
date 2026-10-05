@@ -183,6 +183,160 @@ pub fn compare(catalogs: &BTreeMap<String, Catalog>, default_locale: &str) -> Re
     Ok(findings)
 }
 
+/// Languages written in more than one script, where the region does not say
+/// which: `Intl` reads `sr-RS` as Serbian in Cyrillic, so a Latin-script site
+/// tagged `sr-RS` prints its dates and month names in the other alphabet.
+const MULTI_SCRIPT: &[&str] = &[
+    "az", "bs", "ff", "ha", "kk", "ks", "mn", "pa", "sd", "sh", "shi", "sr", "uz", "vai",
+];
+
+/// What is wrong with a catalog's `locale.tag`, the BCP 47 tag `Intl` is
+/// given for it. A catalog without one is fine; a tag that names the wrong
+/// language, leaves the script to a guess, or names a script the catalog is
+/// not written in is not.
+pub fn locale_tag_problems(locale: &str, catalog: &Catalog) -> Vec<String> {
+    let Some(tag) = catalog.get("locale.tag") else {
+        return Vec::new();
+    };
+    let subtags: Vec<&str> = tag.split('-').collect();
+    let well_formed = subtags
+        .iter()
+        .all(|s| (1..=8).contains(&s.len()) && s.chars().all(|c| c.is_ascii_alphanumeric()));
+    if !well_formed {
+        return vec![format!("`locale.tag` \"{tag}\" is not a BCP 47 tag")];
+    }
+    let mut out = Vec::new();
+    let lang = subtags[0].to_ascii_lowercase();
+    let code_lang = locale
+        .split(['-', '_'])
+        .next()
+        .unwrap_or(locale)
+        .to_ascii_lowercase();
+    if lang != code_lang {
+        out.push(format!(
+            "`locale.tag` \"{tag}\" is a tag for `{lang}`, but this is the `{locale}` catalog"
+        ));
+    }
+    let script = subtags
+        .get(1)
+        .filter(|s| s.len() == 4 && s.chars().all(|c| c.is_ascii_alphabetic()))
+        .map(|s| s.to_ascii_lowercase());
+    match script.as_deref() {
+        None if MULTI_SCRIPT.contains(&lang.as_str()) => out.push(format!(
+            "`locale.tag` \"{tag}\" does not say which script: `{lang}` is written in more \
+             than one, and `Intl` picks its default, not yours — write e.g. `{lang}-Latn` or `{lang}-Cyrl`"
+        )),
+        Some(s @ ("latn" | "cyrl")) => {
+            let (mut latin, mut cyrillic) = (0usize, 0usize);
+            for (key, value) in catalog {
+                if key.starts_with("locale.") {
+                    continue;
+                }
+                for c in value.chars().filter(|c| c.is_alphabetic()) {
+                    match c as u32 {
+                        0x0400..=0x04FF => cyrillic += 1,
+                        _ if c.is_ascii_alphabetic() || (0x00C0..=0x024F).contains(&(c as u32)) => latin += 1,
+                        _ => {}
+                    }
+                }
+            }
+            let (named, other, n, o) = if s == "latn" {
+                ("Latin", "Cyrillic", latin, cyrillic)
+            } else {
+                ("Cyrillic", "Latin", cyrillic, latin)
+            };
+            if o > n {
+                out.push(format!(
+                    "`locale.tag` \"{tag}\" names {named} script, but the catalog is written in {other}"
+                ));
+            }
+        }
+        _ => {}
+    }
+    out
+}
+
+/// Where code names a locale directly — `l === "en"`, `case "sr":` — instead
+/// of reading `defaultLocale` or `locales` from the generated module. The
+/// literal is a second copy of `[i18n]`, and it goes stale the day the
+/// default changes (the paper's round 4, case R10: English hard-coded as the
+/// unprefixed locale while the declared default was Serbian). A line that
+/// means it says `// fid: allow-locale`.
+pub fn locale_literals(root: &Path, locales: &[String]) -> Vec<String> {
+    let mut files = Vec::new();
+    collect_code(root, &mut files);
+    files.sort();
+    let mut out = Vec::new();
+    for path in files {
+        let Ok(src) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let rel = path
+            .strip_prefix(root)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        for (i, line) in src.lines().enumerate() {
+            let t = line.trim_start();
+            if line.contains("fid: allow-locale")
+                || t.starts_with("//")
+                || t.starts_with('*')
+                || t.starts_with("/*")
+            {
+                continue;
+            }
+            let code = line.split(" //").next().unwrap_or(line);
+            for l in locales {
+                let named = ['"', '\'', '`'].iter().any(|q| {
+                    let lit = format!("{q}{l}{q}");
+                    ["===", "!==", "==", "!="].iter().any(|op| {
+                        code.contains(&format!("{op} {lit}"))
+                            || code.contains(&format!("{op}{lit}"))
+                            || code.contains(&format!("{lit} {op}"))
+                            || code.contains(&format!("{lit}{op}"))
+                    }) || code.contains(&format!("case {lit}"))
+                });
+                if named {
+                    out.push(format!(
+                        "  {rel}:{}: names the locale \"{l}\" directly — compare with \
+                         `defaultLocale` or `locales` from the generated messages module, \
+                         which follow `[i18n]` (or mark the line `// fid: allow-locale`)",
+                        i + 1
+                    ));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Hand-written web code: scripts and components, not generated, not vendored.
+pub(crate) fn collect_code(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for e in entries.flatten() {
+        let path = e.path();
+        let name = e.file_name().to_string_lossy().to_string();
+        if path.is_dir() {
+            if !SKIPPED_DIRS.contains(&name.as_str())
+                && name != "generated"
+                && !name.starts_with('.')
+            {
+                collect_code(&path, out);
+            }
+        } else if !name.contains(".generated.")
+            && [
+                ".ts", ".tsx", ".js", ".jsx", ".mjs", ".svelte", ".vue", ".astro",
+            ]
+            .iter()
+            .any(|x| name.ends_with(x))
+        {
+            out.push(path);
+        }
+    }
+}
+
 /// A TypeScript module declaring the key union and each locale's catalog.
 pub fn render_typescript(
     catalogs: &BTreeMap<String, Catalog>,
@@ -252,6 +406,30 @@ fn ident(locale: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    fn tagged(tag: &str, text: &str) -> Catalog {
+        [
+            ("locale.tag".to_string(), tag.to_string()),
+            ("nav.home".to_string(), text.to_string()),
+        ]
+        .into_iter()
+        .collect()
+    }
+
+    #[test]
+    fn a_locale_tag_names_its_language_and_script() {
+        use super::locale_tag_problems as p;
+        assert!(p("sr", &tagged("sr-Latn-RS", "Početna strana")).is_empty());
+        assert!(p("en", &tagged("en-GB", "Home page")).is_empty());
+        assert!(p("zh", &tagged("zh-TW", "首頁")).is_empty());
+        // Serbian with no script: Intl picks Cyrillic for a Latin site.
+        assert!(p("sr", &tagged("sr-RS", "Početna strana"))[0].contains("which script"));
+        // A script the catalog is not written in.
+        assert!(p("sr", &tagged("sr-Cyrl-RS", "Početna strana"))[0].contains("written in Latin"));
+        // Another language's tag.
+        assert!(p("sr", &tagged("hr-HR", "Početna strana"))[0].contains("`hr`"));
+        assert!(!p("en", &tagged("en GB", "Home")).is_empty());
+    }
+
     // ── Hardcoded-string detection ───────────────────────────────────────────
 
     fn texts(src: &str) -> Vec<String> {

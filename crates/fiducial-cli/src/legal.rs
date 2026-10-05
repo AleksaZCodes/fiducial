@@ -643,6 +643,83 @@ fn page_content_sr(page: &str, categories: &[&str], cookie_list: &str) -> (Strin
     }
 }
 
+/// The consent rules, derived from `[legal] cookie_categories`: which
+/// categories exist, which need a yes, and what "nobody has been asked yet"
+/// means — no. The banner component draws the question; whether a category
+/// may be used is decided here, where an edit is a stale output rather than
+/// a quiet change of the law's default (the paper's round 4, case R7).
+pub fn render_consent_ts(legal: &crate::config::Legal) -> String {
+    let cats = legal.effective_categories();
+    let optional: Vec<&str> = cats.iter().copied().filter(|c| *c != "necessary").collect();
+    let quoted = |v: &[&str]| v.iter().map(|c| format!("{c:?}")).collect::<Vec<_>>();
+    format!(
+        r#"// Derived by fid-legal from [legal] cookie_categories in fiducial.toml — do not edit.
+//
+// Whether a cookie category may be used. Nothing optional is used before a
+// recorded yes: "nobody has been asked yet" and "the record is unreadable"
+// both mean no. The banner (components/cookie-consent.tsx) asks; this decides.
+
+export type CookieCategory = {union};
+
+/** Every declared category; `necessary` is always one. */
+export const COOKIE_CATEGORIES: readonly CookieCategory[] = [{all}];
+
+/** The categories a reader is asked about, in declared order. */
+export const OPTIONAL_CATEGORIES: readonly Exclude<CookieCategory, "necessary">[] = [{opt}];
+
+export const CONSENT_STORAGE_KEY = "cookie-consent";
+
+/** The declared set: a choice stored about a different set of categories is not a choice about this one. */
+export const CONSENT_VERSION = {version:?};
+
+export interface ConsentRecord {{
+  v: string;
+  /** ISO date the choice was made, so an audit can show when. */
+  at: string;
+  granted: CookieCategory[];
+}}
+
+/** The stored decision, or `null` when nobody has been asked yet. */
+export function cookieConsent(): ConsentRecord | null {{
+  if (typeof window === "undefined") return null;
+  try {{
+    const raw = window.localStorage.getItem(CONSENT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ConsentRecord;
+    if (parsed.v !== CONSENT_VERSION || !Array.isArray(parsed.granted)) return null;
+    return parsed;
+  }} catch {{
+    return null;
+  }}
+}}
+
+/** True when this category may be used: `necessary` always, any other only after a recorded yes. */
+export function hasConsent(category: CookieCategory): boolean {{
+  if (category === "necessary") return true;
+  return cookieConsent()?.granted.includes(category) ?? false;
+}}
+
+/** Record a choice. Storage denied means it applies to this page view only, and we ask again next time. */
+export function recordConsent(granted: readonly CookieCategory[]): void {{
+  const record: ConsentRecord = {{
+    v: CONSENT_VERSION,
+    at: new Date().toISOString(),
+    granted: ["necessary", ...granted.filter((c) => c !== "necessary")],
+  }};
+  try {{
+    window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(record));
+  }} catch {{
+    // The conservative failure: it never remembers a consent it could not record.
+  }}
+}}
+"#,
+        union = quoted(&cats).join(" | "),
+        all = quoted(&cats).join(", "),
+        opt = quoted(&optional).join(", "),
+        version = cats.join(","),
+    )
+}
+
 /// Generate `src/generated/legal.ts` from the declarations.
 ///
 /// `locales` is the full list from `[i18n]`; `default_locale` is the fallback.

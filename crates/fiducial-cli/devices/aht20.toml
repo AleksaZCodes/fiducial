@@ -1,0 +1,11 @@
+# Aosong AHT20 temperature and humidity sensor — datasheet §5.3, §5.4:
+# fixed 7-bit address 0x38; calibrate with 0xBE 0x08 0x00 (the AHT10's
+# 0xE1 is a different part's); measure with 0xAC 0x33 0x00.
+mpn         = "AHT20"
+source      = "AHT20 datasheet (Aosong), §5.3 and §5.4"
+i2c_address = 0x38
+supply      = { pin = "VDD", min = 2.0, max = 5.5 }
+
+[commands]
+init    = [0xBE, 0x08, 0x00]
+measure = [0xAC, 0x33, 0x00]

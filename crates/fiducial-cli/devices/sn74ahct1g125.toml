@@ -1,0 +1,13 @@
+# TI SN74AHCT1G125 single bus buffer, tri-state output — datasheet,
+# "Pin Functions": pin 1 is OE, active low (low = output on); VCC 4.5–5.5 V.
+mpn    = "SN74AHCT1G125"
+source = "SN74AHCT1G125 datasheet (Texas Instruments), Pin Functions; Recommended Operating Conditions"
+supply = { pin = "5", min = 4.5, max = 5.5 }
+
+[pins.1]
+name   = "OE"
+active = "low"
+role   = "enable"
+
+[pins.5]
+name = "VCC"

@@ -179,7 +179,10 @@ Then declare the pairs, in `fid:contrast`. **`fid derive` computes every one of
 them and fails if any falls under its minimum.** This is the rule that stopped
 being advice: a palette that has never been measured is a palette that fails on
 one of its pairs, and it is almost always `muted-foreground`. If a pair fails,
-change the colour — not the minimum. The minimum is the requirement.
+change the colour — not the minimum. The minimum is the requirement, and
+derive holds it: a pair's `min` may not go under the WCAG AA floor for its
+`kind` — 4.5 for `text` (the default), 3.0 for `large-text` and `non-text`.
+A pair that is not body-size text says which it is.
 
 State the prohibitions too. `"No blues or purples anywhere"` is a real
 constraint that does real work; "warm palette" is not.

@@ -734,8 +734,21 @@ fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
         if pipeline.executor == "fid-hardware" && issues.len() == before {
             issues.extend(hardware_drift(pipeline, root));
         }
+        if pipeline.executor == "fid-protocol" {
+            let decl = pipeline
+                .args
+                .first()
+                .map(String::as_str)
+                .unwrap_or(crate::protocol::DECLARATION);
+            if let Ok(file) = crate::protocol::load(root, decl) {
+                issues.extend(crate::protocol::typed_literals(root, &file));
+            }
+        }
         if pipeline.executor == "fid-i18n" {
             issues.extend(untranslated_values(pipeline, root));
+            if let Ok(config) = Config::load(&root.join(crate::config::CONFIG_FILE)) {
+                issues.extend(crate::i18n::locale_literals(root, &config.i18n.locales));
+            }
         }
         if pipeline.executor == "fid-hardware" {
             let decl = pipeline
@@ -1065,6 +1078,28 @@ fn run_fid_i18n(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         );
     }
 
+    let tag_problems: Vec<String> = catalogs
+        .iter()
+        .flat_map(|(locale, c)| {
+            crate::i18n::locale_tag_problems(locale, c)
+                .into_iter()
+                .map(move |m| format!("  {dir_name}/{locale}.json: {m}"))
+        })
+        .collect();
+    let named = crate::i18n::locale_literals(working_dir, &config.i18n.locales);
+    if !named.is_empty() {
+        bail!(
+            "fid-i18n: code names a locale directly, a second copy of `[i18n]`:\n{}",
+            named.join("\n")
+        );
+    }
+    if !tag_problems.is_empty() {
+        bail!(
+            "fid-i18n: a locale tag is wrong — dates, numbers and plurals would \
+             format for another language or script:\n{}",
+            tag_problems.join("\n")
+        );
+    }
     let findings = crate::i18n::compare(&catalogs, &default_locale)?;
 
     if findings.is_fatal() {
@@ -2503,6 +2538,13 @@ fn run_fid_protocol(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         .map(String::as_str)
         .unwrap_or(crate::protocol::DECLARATION);
     let file = crate::protocol::load(working_dir, decl)?;
+    let typed = crate::protocol::typed_literals(working_dir, &file);
+    if !typed.is_empty() {
+        bail!(
+            "fid-protocol: code types what `{decl}` declares:\n{}",
+            typed.join("\n")
+        );
+    }
     if pipeline.outputs.is_empty() {
         bail!("fid-protocol: no outputs declared (a `.rs` and/or a `.ts`)");
     }
@@ -2626,7 +2668,13 @@ fn run_fid_legal(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("creating parent for `{out}`"))?;
         }
-        std::fs::write(&abs, &rendered).with_context(|| format!("writing {out}"))?;
+        // `consent.ts` is the consent rules; any other output is the pages.
+        let content = if out.ends_with("consent.ts") {
+            crate::legal::render_consent_ts(legal)
+        } else {
+            rendered.clone()
+        };
+        std::fs::write(&abs, &content).with_context(|| format!("writing {out}"))?;
     }
 
     Ok(())

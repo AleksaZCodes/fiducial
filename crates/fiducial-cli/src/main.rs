@@ -9,6 +9,7 @@ mod commands;
 mod config;
 mod context;
 mod design;
+mod devices;
 mod guard;
 mod hardware;
 mod i18n;

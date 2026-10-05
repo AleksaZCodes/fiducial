@@ -379,6 +379,25 @@ fn require_capabilities(cap: &Capability, root: &Path) -> Result<()> {
     );
 }
 
+/// The default's catalog, for a locale that has none — except what says
+/// which language it is. A copied `locale.tag` of `en-GB` would format a
+/// German page's dates in British English; the copy names its own locale
+/// (`de`), and no flag, until someone writes them properly.
+fn seed_catalog(default_catalog: &str, locale: &str) -> String {
+    let Ok(mut v) = serde_json::from_str::<serde_json::Value>(default_catalog) else {
+        return default_catalog.to_string();
+    };
+    let Some(l) = v.get_mut("locale").and_then(|l| l.as_object_mut()) else {
+        return default_catalog.to_string();
+    };
+    for (k, val) in [("name", locale), ("tag", locale), ("region", "")] {
+        if l.contains_key(k) {
+            l.insert(k.to_string(), serde_json::Value::String(val.to_string()));
+        }
+    }
+    serde_json::to_string_pretty(&v).map_or_else(|_| default_catalog.to_string(), |s| s + "\n")
+}
+
 /// Bring `messages/` in line with a declared locale set.
 ///
 /// The `i18n` capability ships catalogs for the locales it seeds, and no more. A product
@@ -408,8 +427,9 @@ pub fn reconcile_i18n_catalogs(root: &Path, locales: &[String], default: &str) -
             continue;
         }
         let rel = format!("messages/{locale}.json");
-        write_file(root, &rel, &default_catalog)?;
-        lock.record(rel, default_catalog.as_bytes(), PLATFORM_VERSION);
+        let seeded = seed_catalog(&default_catalog, locale);
+        write_file(root, &rel, &seeded)?;
+        lock.record(rel, seeded.as_bytes(), PLATFORM_VERSION);
     }
 
     // Remove the shipped catalogs for locales this product does not declare.

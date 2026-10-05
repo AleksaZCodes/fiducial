@@ -24,7 +24,39 @@ Types: `u8`, `i8`, `u16`, `i16`, `u32`, `i32`, `f32`.
 
 A field may declare `scale` (what one count is worth: `0.01` for hundredths)
 and `unit` (`"°C"`). The web side then gets `READING_UNITS` and
-`readingValues(m)`, the fields in their units, so no page divides by hand.
+`readingValues(m)`, the fields in their units, so no page divides by hand. A
+name that starts with an SI prefix must agree with its scale:
+`centi_percent_rh` is `0.01`, and `scale = 0.1` there fails derive.
+
+Thresholds are declared too, in the field's unit, as named bands:
+
+```toml
+[[band]]
+name  = "comfortable"
+field = "reading.centi_percent_rh"
+min   = 35.0          # %RH, inclusive
+max   = 60.0
+```
+
+The firmware gets `reading::COMFORTABLE_MIN` / `_MAX` in counts (3500, 6000);
+the page gets `READING_BANDS.comfortable` in %RH. Comparing a scaled field
+with a bare number in code (`match r.centi_percent_rh { 35..=60 => … }`,
+`r.centiPercentRh > 6000`) fails derive and `--check`: the number is in one
+unit and the field in another. Zero is the same in every unit and is allowed;
+a deliberate line says `// fid: allow-units`.
+
+The USB IDs a device enumerates with, which its page filters on, are one
+number on two sides:
+
+```toml
+[usb]
+vendor_id  = 0x2e8a
+product_id = 0x000a
+```
+
+Both sides get `USB_VENDOR_ID` and `USB_PRODUCT_ID`. A literal ID in
+`Config::new(…)` or a `usbVendorId:` filter fails derive (`// fid: allow-usb`
+for a deliberate one).
 
 ## What is derived
 

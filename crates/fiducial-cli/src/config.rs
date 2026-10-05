@@ -885,6 +885,16 @@ impl Brand {
                 missing.join(", ")
             );
         }
+        // A domain is a host name, not a URL: the generators add the scheme,
+        // so `https://example.com` would come out as `https://https://…`.
+        if !is_host_name(self.domain.trim()) {
+            bail!(
+                "[brand] domain = \"{}\" is not a bare host name.\n\
+                 Write it as `example.com` — no scheme, path, port or spaces; \
+                 every page that links to the site adds `https://` itself.",
+                self.domain
+            );
+        }
         for (field, value) in [
             ("primary_color", self.primary_color()),
             ("background_color", self.background_color()),
@@ -895,6 +905,19 @@ impl Brand {
         }
         Ok(())
     }
+}
+
+/// `example.com`, `www.example.co.uk`: dot-separated labels of letters, digits
+/// and hyphens (any non-ASCII letter too, for an IDN), at least two of them.
+fn is_host_name(s: &str) -> bool {
+    let labels: Vec<&str> = s.split('.').collect();
+    labels.len() >= 2
+        && labels.iter().all(|l| {
+            !l.is_empty()
+                && !l.starts_with('-')
+                && !l.ends_with('-')
+                && l.chars().all(|c| c == '-' || c.is_alphanumeric())
+        })
 }
 
 /// `#` followed by exactly six hex digits.
@@ -1084,6 +1107,35 @@ mod brand_tests {
         assert_eq!(brand.primary_color(), "#0EA5E9");
         assert_eq!(brand.background_color(), "#0B1120");
         assert!(brand.validate().is_ok());
+    }
+
+    #[test]
+    fn a_domain_is_a_host_name_not_a_url() {
+        for bad in [
+            "https://example.com",
+            "example.com/",
+            "example",
+            "exa mple.com",
+            "example.com:443",
+        ] {
+            let b = Brand {
+                domain: bad.into(),
+                ..filled()
+            };
+            assert!(b.validate().is_err(), "{bad} passed");
+        }
+        for good in [
+            "example.com",
+            "www.example.co.uk",
+            "my-shop.rs",
+            "primer.срб",
+        ] {
+            let b = Brand {
+                domain: good.into(),
+                ..filled()
+            };
+            assert!(b.validate().is_ok(), "{good} failed");
+        }
     }
 
     #[test]

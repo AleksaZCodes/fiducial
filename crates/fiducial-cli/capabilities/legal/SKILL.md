@@ -129,7 +129,14 @@ only by typing its URL is one nobody has been given.
 
 ## Cookie consent
 
-`cookie-consent.tsx` stores a decision and nothing else. **It does not stop
+The rules are derived: `apps/web/src/generated/consent.ts` holds the declared
+categories, `hasConsent()` and `recordConsent()` — and with them the one
+default the law fixes, that **nobody asked yet means no**. It is an output, so
+an edit there fails `fid derive --check`; change `[legal] cookie_categories`
+instead. A choice stored about a different category set is discarded, because
+the version is the set.
+
+`cookie-consent.tsx` asks the question and stores a decision, and nothing else. **It does not stop
 anything from loading.** The product reads `hasConsent("analytics")` before it
 loads an analytics script, and that ordering is the entire compliance story: a
 banner shown over a tag that has already fired is a banner that has documented
