@@ -425,11 +425,11 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
 name = "fiducial"
-version = "0.9.8"
+version = "0.9.9"
 
 [[package]]
 name = "fiducial-adapters"
-version = "0.9.8"
+version = "0.9.9"
 dependencies = [
  "futures-core",
  "futures-util",
@@ -439,7 +439,7 @@ dependencies = [
 
 [[package]]
 name = "fiducial-cli"
-version = "0.9.8"
+version = "0.9.9"
 dependencies = [
  "anyhow",
  "chrono",
@@ -462,11 +462,11 @@ dependencies = [
 
 [[package]]
 name = "fiducial-core"
-version = "0.9.8"
+version = "0.9.9"
 
 [[package]]
 name = "fiducial-eda"
-version = "0.9.8"
+version = "0.9.9"
 dependencies = [
  "fiducial-geometry",
  "serde",
@@ -475,14 +475,14 @@ dependencies = [
 
 [[package]]
 name = "fiducial-geometry"
-version = "0.9.8"
+version = "0.9.9"
 dependencies = [
  "libm",
 ]
 
 [[package]]
 name = "fiducial-identity"
-version = "0.9.8"
+version = "0.9.9"
 dependencies = [
  "ed25519-dalek",
  "fiducial-core",
@@ -491,7 +491,7 @@ dependencies = [
 
 [[package]]
 name = "fiducial-mesh"
-version = "0.9.8"
+version = "0.9.9"
 dependencies = [
  "fiducial-geometry",
  "libm",
@@ -499,11 +499,11 @@ dependencies = [
 
 [[package]]
 name = "fiducial-model"
-version = "0.9.8"
+version = "0.9.9"
 
 [[package]]
 name = "fiducial-ota"
-version = "0.9.8"
+version = "0.9.9"
 dependencies = [
  "ed25519-dalek",
  "fiducial-protocol",
@@ -514,15 +514,15 @@ dependencies = [
 
 [[package]]
 name = "fiducial-protocol"
-version = "0.9.8"
+version = "0.9.9"
 
 [[package]]
 name = "fiducial-quantity"
-version = "0.9.8"
+version = "0.9.9"
 
 [[package]]
 name = "fiducial-sim"
-version = "0.9.8"
+version = "0.9.9"
 dependencies = [
  "rayon",
  "serde",
@@ -531,7 +531,7 @@ dependencies = [
 
 [[package]]
 name = "fiducial-tauri"
-version = "0.9.8"
+version = "0.9.9"
 dependencies = [
  "fiducial-protocol",
  "serde",
@@ -541,7 +541,7 @@ dependencies = [
 
 [[package]]
 name = "fiducial-wasm"
-version = "0.9.8"
+version = "0.9.9"
 dependencies = [
  "fiducial-core",
  "ts-rs",
