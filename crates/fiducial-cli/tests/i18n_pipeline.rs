@@ -197,28 +197,56 @@ fn reordered_placeholders_are_accepted() {
     );
 }
 
-/// An untranslated value is reported, and does **not** stop the build.
+/// An untranslated value is a warning while you work and a failure at the
+/// gate: `fid derive` reports it, `fid derive --check` refuses it, and a value
+/// that really is the same in every language is declared in `[i18n] same`.
 ///
-/// Failing here would block a legitimate proper noun. The finding is surfaced so
-/// a person looks — which is the half Ring of Pursuit was missing.
+/// It used to be reported only, so a Serbian sentence left in English passed
+/// every check (the paper's study, case W12).
 #[test]
-fn an_untranslated_value_is_reported_but_does_not_fail() {
+fn an_untranslated_value_warns_locally_and_fails_check_unless_declared_same() {
     let tmp = tempfile::tempdir().unwrap();
     let root = localized_product(tmp.path());
 
-    // Longer than the 12-character threshold, below which identical values are
-    // not even reported — "OK", "Email" and "Wi-Fi" are legitimately identical.
     edit_catalog(&root, "sr", |v| {
         v["cart"]["summary"] = serde_json::json!("{count} items, {total} total");
     });
 
     let out = run(&root, &["derive"]);
-    assert!(out.status.success(), "a proper noun must not block a build");
-    let output = text(&out);
     assert!(
-        output.contains("identical to sr") || output.contains("likely untranslated"),
-        "but it is reported: {output}"
+        out.status.success(),
+        "a seeded locale must not stop work: {}",
+        text(&out)
     );
+    assert!(text(&out).contains("likely untranslated"), "{}", text(&out));
+
+    let out = run(&root, &["derive", "--check"]);
+    assert!(
+        !out.status.success(),
+        "an untranslated value passed --check"
+    );
+    assert!(
+        text(&out).contains("`cart.summary` is identical to sr"),
+        "{}",
+        text(&out)
+    );
+
+    let p = root.join("fiducial.toml");
+    let toml = std::fs::read_to_string(&p).unwrap();
+    std::fs::write(
+        &p,
+        toml.replacen("[i18n]\n", "[i18n]\nsame = [\"cart.summary\"]\n", 1),
+    )
+    .unwrap();
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(
+        !text(&out).contains("likely untranslated"),
+        "{}",
+        text(&out)
+    );
+    let out = run(&root, &["derive", "--check"]);
+    assert!(out.status.success(), "{}", text(&out));
 }
 
 /// `fid derive --check` catches a hand-edited generated file.

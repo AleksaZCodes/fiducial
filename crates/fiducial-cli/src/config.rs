@@ -692,6 +692,11 @@ pub struct I18n {
         skip_serializing_if = "is_default_messages_dir"
     )]
     pub messages_dir: String,
+    /// Keys whose value is the same in every locale on purpose — a product
+    /// name, "Wi-Fi". Any other value identical to the default locale's is
+    /// untranslated, and `fid derive --check` refuses it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub same: Vec<String>,
 }
 
 fn is_default_messages_dir(dir: &str) -> bool {

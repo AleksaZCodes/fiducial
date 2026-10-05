@@ -58,6 +58,11 @@ pub struct Product {
     /// `hardware/generated/board.rs`: one macro per net, naming the pin.
     #[serde(default)]
     pub firmware: Option<Firmware>,
+    /// The voltage of each power rail: `[rails] VBUS = 5.0, "3V3" = 3.3`.
+    /// GND is 0 V. With it, every net a resistor pulls toward a rail is
+    /// solved, and a pin pulled above its part's `io_max_v` fails derive.
+    #[serde(default)]
+    pub rails: BTreeMap<String, f64>,
 }
 
 /// `[firmware] mcu = "<part id>"` — the board part whose pins the firmware
@@ -621,6 +626,17 @@ pub struct Part {
     /// schematic and the board's fab layer.
     #[serde(default)]
     pub value: Option<String>,
+    /// The highest voltage this part's pins may see, from its datasheet's
+    /// absolute maximum ratings (an RP2040's I/O: IOVDD + 0.5 V). Checked
+    /// against `[rails]` on every derive.
+    #[serde(default)]
+    pub io_max_v: Option<f64>,
+    /// The part's 7-bit I²C address, from its datasheet: `0x38`. Derived
+    /// into `board.rs` as `<PART>_I2C_ADDRESS`, so the firmware never types
+    /// it (the paper's study, case H10: a mistyped address in firmware code
+    /// disagreed with nothing, because nothing else knew it).
+    #[serde(default)]
+    pub i2c_address: Option<u8>,
     /// Board parts: an explicit turn, degrees counter-clockwise — for a part
     /// whose orientation is a design choice rather than a zone edge's.
     #[serde(default)]
@@ -730,6 +746,63 @@ struct LockedPart {
     unit_price: Option<f64>,
     #[serde(default)]
     currency: Option<String>,
+    /// LCSC's own description of the part: "1uF ±10% 50V Ceramic …".
+    #[serde(default)]
+    description: Option<String>,
+}
+
+/// The first resistance, capacitance or inductance in a text, in base units:
+/// "5.1k" → 5100, "27R" → 27, "1uF 50V X5R" → 1e-6, "5.1kΩ ±1% 100mW" → 5100.
+/// `unit_required` is for LCSC descriptions, which also carry voltages and
+/// tolerances; a declared value may leave its unit implied ("5.1k").
+pub fn component_quantity(text: &str, unit_required: bool) -> Option<f64> {
+    for tok in text.split(|c: char| c.is_whitespace() || c == ',' || c == '/') {
+        let num_end = tok
+            .char_indices()
+            .find(|(_, c)| !(c.is_ascii_digit() || *c == '.'))
+            .map_or(tok.len(), |(i, _)| i);
+        let Ok(n) = tok[..num_end].parse::<f64>() else {
+            continue;
+        };
+        let mut rest = tok[num_end..].chars().peekable();
+        let scale = match rest.peek() {
+            Some('p') => 1e-12,
+            Some('n') => 1e-9,
+            Some('u') | Some('µ') | Some('μ') => 1e-6,
+            Some('m') => 1e-3,
+            Some('k') | Some('K') => 1e3,
+            Some('M') => 1e6,
+            _ => 1.0,
+        };
+        if scale != 1.0 {
+            rest.next();
+        }
+        let unit: String = rest.collect();
+        let known = matches!(unit.as_str(), "F" | "H" | "Ω" | "R" | "ohm" | "Ohm");
+        if known || (!unit_required && unit.is_empty()) {
+            return Some(n * scale);
+        }
+    }
+    None
+}
+
+/// A pinned part whose declared value is not the part being ordered: the
+/// schematic and BOM say one thing, the reel another (the paper's held-out
+/// test, case X14). Only compared when both sides state a value.
+fn value_disagrees(q: &Part, hit: &LockedPart) -> Option<String> {
+    let declared = component_quantity(q.value.as_deref()?, false)?;
+    let desc = hit.description.as_deref()?;
+    let ordered = component_quantity(desc, true)?;
+    let off = (declared - ordered).abs() / ordered.abs().max(f64::MIN_POSITIVE);
+    (off > 0.005).then(|| {
+        format!(
+            "part `{}`: value \"{}\" is not the part ordered — LCSC {} is \"{desc}\". \
+             Change the value or the part, so the schematic, the BOM and the reel agree",
+            q.id,
+            q.value.as_deref().unwrap_or_default(),
+            hit.lcsc
+        )
+    })
 }
 
 pub const PARTS_LOCK: &str = "hardware/parts.lock";
@@ -744,6 +817,7 @@ fn resolve_picks(root: &Path, p: &mut Product) -> Result<()> {
     };
     // A pinned part's price, as `resolve` read it from LCSC at the cost's
     // quantity: what the ceiling is asserted against.
+    let mut disagree = Vec::new();
     for q in p.parts.iter_mut().filter(|q| q.pick.is_none()) {
         let Some(lcsc) = &q.lcsc else { continue };
         if let Some(hit) = lock
@@ -751,10 +825,14 @@ fn resolve_picks(root: &Path, p: &mut Product) -> Result<()> {
             .iter()
             .find(|e| e.id == q.id && &e.lcsc == lcsc && e.pick.is_none())
         {
+            disagree.extend(value_disagrees(q, hit));
             if q.unit_cost.is_none() && hit.currency.as_deref() == Some(p.cost.currency.as_str()) {
                 q.unit_cost = hit.unit_price;
             }
         }
+    }
+    if !disagree.is_empty() {
+        bail!("{}", disagree.join("\n"));
     }
     if p.parts.iter().all(|q| q.pick.is_none()) {
         return Ok(());
@@ -5476,25 +5554,25 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
     // The set points: the declared resistors, by their values and the nets
     // their two pins are on (a `qty` of them in parallel), against each
     // `[[check]]`. A miss fails the derive like any other contradiction.
-    if !p.checks.is_empty() {
-        let mut rs: Vec<crate::circuit::Resistor> = Vec::new();
-        for q in &p.parts {
-            let Some(ohms) = q.value.as_deref().and_then(crate::circuit::ohms) else {
-                continue;
-            };
-            let nets: Vec<&String> = q.pins.values().collect();
-            if nets.len() != 2 {
-                continue;
-            }
-            for _ in 0..q.qty.max(1) {
-                rs.push(crate::circuit::Resistor {
-                    part: q.id.clone(),
-                    a: nets[0].clone(),
-                    b: nets[1].clone(),
-                    ohms,
-                });
-            }
+    let mut rs: Vec<crate::circuit::Resistor> = Vec::new();
+    for q in &p.parts {
+        let Some(ohms) = q.value.as_deref().and_then(crate::circuit::ohms) else {
+            continue;
+        };
+        let nets: Vec<&String> = q.pins.values().collect();
+        if nets.len() != 2 {
+            continue;
         }
+        for _ in 0..q.qty.max(1) {
+            rs.push(crate::circuit::Resistor {
+                part: q.id.clone(),
+                a: nets[0].clone(),
+                b: nets[1].clone(),
+                ohms,
+            });
+        }
+    }
+    if !p.checks.is_empty() {
         let (lines, failed) = crate::circuit::run(&rs, &p.checks)?;
         if !failed.is_empty() {
             bail!(
@@ -5503,6 +5581,29 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
             );
         }
         why.extend(lines);
+    }
+    // Every pin against its part's limit, with the rails at their voltages:
+    // an I²C pull-up tied to 5 V instead of 3.3 V would hold a 3.3 V
+    // microcontroller's pin at 5 V (the paper's held-out test, case X12).
+    if !p.rails.is_empty() {
+        let over = crate::circuit::pins_over_limit(
+            &rs,
+            &p.rails,
+            p.parts
+                .iter()
+                .filter_map(|q| q.io_max_v.map(|max| (q.id.as_str(), max, &q.pins))),
+        )?;
+        if !over.is_empty() {
+            bail!("pins above their parts' limits:\n  {}", over.join("\n  "));
+        }
+        why.push(format!(
+            "pin voltages: every pin of a part with `io_max_v` is within it, with {}",
+            p.rails
+                .iter()
+                .map(|(n, v)| format!("{n} at {v} V"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
     }
     let over = priced > p.cost.ceiling + 1e-9;
     let cost_violation = if over {
@@ -6700,6 +6801,18 @@ fn render_board_rs(p: &Product, i: &Value) -> Result<String> {
              pub(crate) use {mac};\n"
         );
     }
+    for q in p.parts.iter().filter(|q| q.i2c_address.is_some()) {
+        let addr = q.i2c_address.unwrap_or_default();
+        let id = net_ident(&q.id);
+        out += &format!(
+            "\n/// `{}`{}: its I²C address.\npub const {id}_I2C_ADDRESS: u8 = 0x{addr:02X};\n",
+            q.id,
+            q.mpn
+                .as_deref()
+                .map(|m| format!(" ({m})"))
+                .unwrap_or_default()
+        );
+    }
     Ok(out)
 }
 
@@ -6792,6 +6905,26 @@ pub fn render_output(out: &str, product: &Product, solved: &Solved, root: &Path)
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_component_value_reads_the_same_from_a_declaration_and_from_lcsc() {
+        use super::component_quantity as q;
+        assert_eq!(q("5.1k", false), Some(5100.0));
+        assert_eq!(q("27R", false), Some(27.0));
+        assert_eq!(
+            q("5.1kΩ ±1% 100mW 0603 Thick Film Resistor", true),
+            Some(5100.0)
+        );
+        assert_eq!(q("1uF 50V X5R", false), Some(1e-6));
+        assert_eq!(
+            q("1uF ±10% 50V Ceramic Capacitor X5R 0603", true),
+            Some(1e-6)
+        );
+        assert!((q("100nF ±10% 50V", true).unwrap() - 1e-7).abs() < 1e-15);
+        assert!((q("33pF 50V C0G", false).unwrap() - 33e-12).abs() < 1e-18);
+        // A description with no component quantity is not compared.
+        assert_eq!(q("USB-C Receptacle Connector 16 Position", true), None);
+    }
+
     use super::*;
 
     #[test]

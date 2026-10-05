@@ -46,6 +46,13 @@ pub struct Field {
     pub ty: String,
     #[serde(default)]
     pub doc: String,
+    /// What one count is worth: `0.01` for a value sent in hundredths. The
+    /// web side's `<message>Values` applies it, so no page divides by hand.
+    #[serde(default)]
+    pub scale: Option<f64>,
+    /// The unit of the scaled value: `"°C"`, `"%RH"`.
+    #[serde(default)]
+    pub unit: Option<String>,
 }
 
 /// A field type: its size, its Rust type and the `DataView` accessor.
@@ -281,6 +288,35 @@ pub fn render_ts(file: &File, decl: &str) -> String {
             at += t.size;
         }
         s.push_str("  return p\n}\n");
+        if m.fields
+            .iter()
+            .any(|f| f.scale.is_some() || f.unit.is_some())
+        {
+            s.push_str(&format!(
+                "\n/** Each field's unit, as declared. */\nexport const {upper}_UNITS = {{\n"
+            ));
+            for f in &m.fields {
+                s.push_str(&format!(
+                    "  {}: {:?},\n",
+                    camel(&f.name),
+                    f.unit.clone().unwrap_or_default()
+                ));
+            }
+            s.push_str("} as const\n\n");
+            s.push_str(&format!(
+                "/** A `{}` in its units: each field times its declared scale. */\nexport function {}Values(m: {name}): {name} {{\n  return {{\n",
+                m.name,
+                camel(&m.name)
+            ));
+            for f in &m.fields {
+                let k = camel(&f.name);
+                match f.scale {
+                    Some(sc) => s.push_str(&format!("    {k}: m.{k} * {sc:?},\n")),
+                    None => s.push_str(&format!("    {k}: m.{k},\n")),
+                }
+            }
+            s.push_str("  }\n}\n");
+        }
     }
     s
 }

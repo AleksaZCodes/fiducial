@@ -166,10 +166,11 @@ pub fn compare(catalogs: &BTreeMap<String, Catalog>, default_locale: &str) -> Re
                     .push((*key).clone());
             }
 
-            // Short strings are often identical for good reasons — "OK",
-            // "Email", "Wi-Fi" — so only flag substantial ones, where identity
-            // much more often means forgotten.
-            if value == base_value && value.chars().count() > 12 {
+            // A value with almost no words — "OK", "{count}", "№" — is often
+            // identical for good reasons. Anything with four or more letters
+            // that matches the default is flagged; the ones that are right
+            // ("Wi-Fi", a product name) are declared in `[i18n] same`.
+            if value == base_value && value.chars().filter(|c| c.is_alphabetic()).count() >= 4 {
                 findings
                     .untranslated
                     .entry(locale.clone())

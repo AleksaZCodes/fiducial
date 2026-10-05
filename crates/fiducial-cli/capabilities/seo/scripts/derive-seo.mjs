@@ -153,18 +153,9 @@ const xmlOut = output("sitemap.xml");
 // product — whose brand pipeline says `apps/web/static/sitemap.xml` — so the
 // race this guard exists to prevent was left in place precisely where the
 // paths differ, which is where it was most likely to happen.
-const brandPipeline = existsSync(at("pipelines/brand.toml")) ? read("pipelines/brand.toml") : "";
-const brandSitemap = (parseToml(brandPipeline || "outputs = []").outputs ?? []).find((o) =>
-  o.endsWith("/sitemap.xml"),
-);
-if (brandSitemap) {
-  fail(
-    `pipelines/brand.toml still lists ${brandSitemap} as an output.\n` +
-      "  Remove that line: `seo` owns the sitemap now, because it is the one that\n" +
-      "  knows the routes. Two pipelines writing one artifact is a race decided by\n" +
-      "  pipeline name order.",
-  );
-}
+// brand's sitemap: `fid derive` skips it while this pipeline exists (brand's
+// one-line sitemap is for a product without routes), so there is one sitemap,
+// and it is this one.
 
 const prefix = (locale) => (locale === defaultLocale ? "" : `/${locale}`);
 const localized = (locale, path) => `${prefix(locale)}${path === "/" ? "" : path}` || "/";

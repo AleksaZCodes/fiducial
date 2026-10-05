@@ -266,6 +266,13 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
     lock.save(&root.join("fiducial.lock"))
         .context("writing fiducial.lock")?;
 
+    if cap.id == "content" {
+        reconcile_content_locales(root)?;
+    }
+    if cap.id == "seo" {
+        seed_page_metadata(root, product_name)?;
+    }
+
     println!("  ✓ {} installed", cap.id);
     if cap.guard_rules.is_empty() {
         println!("  ✓ no guard rules — this capability adds none");
@@ -431,6 +438,121 @@ pub fn reconcile_i18n_catalogs(root: &Path, locales: &[String], default: &str) -
 
     lock.save(&root.join("fiducial.lock"))
         .context("writing fiducial.lock")?;
+    Ok(())
+}
+
+/// Give every declared locale the sample entries the default locale has.
+///
+/// The `content` capability ships its sample post in one language. A product
+/// in two failed its first `fid derive`, correctly — an entry exists in every
+/// locale or in none — but on a file the platform itself wrote. Like a seeded
+/// catalog, the copy starts in the default's words, for a person to translate.
+pub fn reconcile_content_locales(root: &Path) -> Result<()> {
+    let Ok(config) = Config::load(&root.join(CONFIG_FILE)) else {
+        return Ok(());
+    };
+    let Ok(default) = config.i18n.default_locale() else {
+        return Ok(());
+    };
+    let default = default.to_string();
+    let content = root.join("content");
+    let Ok(collections) = std::fs::read_dir(&content) else {
+        return Ok(());
+    };
+    let mut lock = load_or_new_lock(root)?;
+    for coll in collections.flatten().filter(|e| e.path().is_dir()) {
+        let name = coll.file_name().to_string_lossy().to_string();
+        // The default locale's entries, or else whichever declared locale
+        // has some: the shipped sample is in one language, not necessarily
+        // the product's default.
+        let Some(src) = std::iter::once(&default)
+            .chain(config.i18n.locales.iter())
+            .map(|l| coll.path().join(l))
+            .find(|d| d.is_dir())
+        else {
+            continue;
+        };
+        let Ok(entries) = std::fs::read_dir(&src) else {
+            continue;
+        };
+        let files: Vec<_> = entries.flatten().filter(|e| e.path().is_file()).collect();
+        for locale in &config.i18n.locales {
+            if coll.path().join(locale).exists() {
+                continue;
+            }
+            for f in &files {
+                let body = std::fs::read_to_string(f.path())?;
+                let rel = format!(
+                    "content/{name}/{locale}/{}",
+                    f.file_name().to_string_lossy()
+                );
+                write_file(root, &rel, &body)?;
+                lock.record(rel, body.as_bytes(), PLATFORM_VERSION);
+            }
+        }
+    }
+    lock.save(&root.join("fiducial.lock"))
+        .context("writing fiducial.lock")?;
+    Ok(())
+}
+
+/// Give the home page the title and description `seo` needs, in every locale.
+///
+/// `seo` lists `/` and asks each catalog for `meta.title` and
+/// `meta.description`; nothing put them there, so a fresh product failed its
+/// first derive on keys it never wrote. The title is the product's name, the
+/// same in every language, so it is declared in `[i18n] same`; the
+/// description is written for English and Serbian and copied elsewhere,
+/// where `fid derive --check` asks for a translation.
+pub fn seed_page_metadata(root: &Path, product_name: &str) -> Result<()> {
+    let dir = root.join("messages");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Ok(());
+    };
+    let mut lock = load_or_new_lock(root)?;
+    let mut seeded = false;
+    for e in entries.flatten() {
+        let path = e.path();
+        if path.extension().is_none_or(|x| x != "json") {
+            continue;
+        }
+        let locale = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or_default()
+            .to_string();
+        let raw = std::fs::read_to_string(&path)?;
+        let json: serde_json::Value = serde_json::from_str(&raw)
+            .with_context(|| format!("messages/{locale}.json does not parse"))?;
+        if json.get("meta").is_some() {
+            continue;
+        }
+        let description = match locale.as_str() {
+            "sr" => format!("{product_name}, napravljeno uz Fiducial."),
+            _ => format!("{product_name}, built with Fiducial."),
+        };
+        let block = format!(
+            "\n  \"meta\": {{\n    \"title\": {},\n    \"description\": {}\n  }},",
+            serde_json::Value::String(product_name.to_string()),
+            serde_json::Value::String(description)
+        );
+        let Some(open) = raw.find('{') else { continue };
+        let body = format!("{}{}{}", &raw[..=open], block, &raw[open + 1..]);
+        let rel = format!("messages/{locale}.json");
+        write_file(root, &rel, &body)?;
+        lock.record(rel, body.as_bytes(), PLATFORM_VERSION);
+        seeded = true;
+    }
+    lock.save(&root.join("fiducial.lock"))
+        .context("writing fiducial.lock")?;
+    if seeded {
+        let path = root.join(CONFIG_FILE);
+        let raw = std::fs::read_to_string(&path)?;
+        let mut doc: toml_edit::DocumentMut =
+            raw.parse().context("fiducial.toml does not parse")?;
+        push_unique(&mut doc, "i18n", "same", &["meta.title".to_string()]);
+        std::fs::write(&path, doc.to_string())?;
+    }
     Ok(())
 }
 

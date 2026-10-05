@@ -342,6 +342,15 @@ fn segment_match(pat: &str, s: &str) -> bool {
 pub(crate) fn outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<String> {
     match pipeline.executor.as_str() {
         "fid-identity" => identity_outputs_not_applicable(pipeline, root),
+        // `seo` knows the routes, so it owns the sitemap; brand's one-line
+        // sitemap is for a product without it. Both writing one was a race
+        // a fresh product with every capability lost on its first derive.
+        "fid-brand" if root.join("pipelines/seo.toml").exists() => pipeline
+            .outputs
+            .iter()
+            .filter(|o| o.ends_with("sitemap.xml"))
+            .cloned()
+            .collect(),
         // The design capability is installed in every new product, because the
         // alternative to having a design system is having the default one. But
         // its output is a stylesheet, and a firmware-only product has nowhere
@@ -536,6 +545,73 @@ fn expected_output(pipeline: &Pipeline, root: &Path) -> Option<String> {
 ///
 /// Both executors are pure functions of committed declarations, so the honest
 /// check is to run them and compare — see [`expected_output`].
+/// Untranslated values, less the keys declared identical on purpose.
+fn untranslated_except_same(
+    findings: &crate::i18n::Findings,
+    same: &[String],
+) -> BTreeMap<String, Vec<String>> {
+    findings
+        .untranslated
+        .iter()
+        .map(|(l, keys)| {
+            (
+                l.clone(),
+                keys.iter()
+                    .filter(|k| !same.contains(k))
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .filter(|(_, keys)| !keys.is_empty())
+        .collect()
+}
+
+/// For `--check`: values a locale left identical to the default locale.
+///
+/// A Serbian sentence that is still the English one is complete in every
+/// structural sense, so nothing else notices it (the paper's study, case
+/// W12). It is a missing translation all the same (MISSION.md 1c). A value
+/// that really is the same everywhere is declared in `[i18n] same`.
+fn untranslated_values(pipeline: &Pipeline, root: &Path) -> Vec<String> {
+    let Ok(config) = Config::load(&root.join(crate::config::CONFIG_FILE)) else {
+        return Vec::new();
+    };
+    let dir = pipeline
+        .args
+        .first()
+        .cloned()
+        .unwrap_or_else(|| config.i18n.messages_dir().to_string());
+    let Ok(default_locale) = config.i18n.default_locale() else {
+        return Vec::new();
+    };
+    let mut catalogs = BTreeMap::new();
+    for f in expand_inputs(root, &[format!("{dir}/*.json")]) {
+        let path = root.join(&f);
+        let Some(locale) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        let Ok(c) = crate::i18n::load_catalog(&path) else {
+            return Vec::new();
+        };
+        catalogs.insert(locale.to_string(), c);
+    }
+    let Ok(findings) = crate::i18n::compare(&catalogs, default_locale) else {
+        return Vec::new();
+    };
+    untranslated_except_same(&findings, &config.i18n.same)
+        .into_iter()
+        .flat_map(|(locale, keys)| {
+            let dir = dir.clone();
+            keys.into_iter().map(move |k| {
+                format!(
+                    "  {dir}/{locale}.json: `{k}` is identical to {default_locale} — translate it, \
+                     or declare it in `[i18n] same` if it is the same in every language"
+                )
+            })
+        })
+        .collect()
+}
+
 fn outputs_with_moved_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
     let Some(expected) = expected_output(pipeline, root) else {
         return Vec::new();
@@ -657,6 +733,9 @@ fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
         // the outputs may not follow, and re-derive is the answer either way.
         if pipeline.executor == "fid-hardware" && issues.len() == before {
             issues.extend(hardware_drift(pipeline, root));
+        }
+        if pipeline.executor == "fid-i18n" {
+            issues.extend(untranslated_values(pipeline, root));
         }
         if pipeline.executor == "fid-hardware" {
             let decl = pipeline
@@ -1023,9 +1102,10 @@ fn run_fid_i18n(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         bail!(message);
     }
 
-    // Non-fatal findings are surfaced but do not stop the build — a legitimate
-    // "Wi-Fi" must not block anyone.
-    for (locale, keys) in &findings.untranslated {
+    // Untranslated values are a warning here and a failure in `--check`: a
+    // locale just seeded from the default is work in progress on a laptop,
+    // and never something a reader sees. See `untranslated_values`.
+    for (locale, keys) in &untranslated_except_same(&findings, &config.i18n.same) {
         println!(
             "\n    ⚠ {locale}: {} value(s) identical to {default_locale} — likely untranslated",
             keys.len()
@@ -1080,7 +1160,8 @@ fn run_fid_brand(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     }
     brand.validate()?;
 
-    for out in &pipeline.outputs {
+    let skip = outputs_not_applicable(pipeline, working_dir);
+    for out in pipeline.outputs.iter().filter(|o| !skip.contains(o)) {
         let path = Path::new(out);
         let name = path
             .file_name()
@@ -1249,7 +1330,10 @@ fn run_fid_deploy(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     let config = Config::load(&working_dir.join(crate::config::CONFIG_FILE))
         .context("fid-deploy needs [deploy] in fiducial.toml")?;
 
-    let vendor = config.adapters.get("deploy").unwrap_or("none");
+    // Installing this pipeline is choosing Cloudflare: a product that has not
+    // named a deploy vendor gets it, rather than failing its first derive on
+    // a setting the platform never wrote. An explicit other choice is refused.
+    let vendor = config.adapters.get("deploy").unwrap_or("cloudflare");
     if vendor != "cloudflare" {
         bail!(
             "fid-deploy: [adapters] deploy = \"{vendor}\" — this executor \

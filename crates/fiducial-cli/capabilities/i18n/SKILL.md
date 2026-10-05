@@ -136,6 +136,21 @@ may differ freely — only the set is checked.
 **5 · Never edit `src/generated/messages.ts`.** It is guard-blocked and
 overwritten. Change the catalog and run `fid derive`.
 
+## Untranslated values
+
+A value identical to the default locale's — a Serbian sentence still in
+English — is a warning while you work (`fid derive`) and a failure at the
+gate (`fid derive --check`). A value that really is the same in every
+language (a product name, "Wi-Fi") is declared, so the decision is written
+down:
+
+```toml
+[i18n]
+same = ["meta.title", "footer.brand"]
+```
+
+Values with fewer than four letters ("OK", "{count}") are not compared.
+
 ## Plurals
 
 **Serbian has three plural categories; English has two.**
