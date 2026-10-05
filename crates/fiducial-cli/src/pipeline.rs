@@ -41,6 +41,12 @@ pub struct Pipeline {
     /// one re-derives, and every output still matches its recorded hash. A
     /// built-in executor that knows what it read reports those files itself;
     /// this list is for a `shell` pipeline, which cannot.
+    ///
+    /// An entry is a path (`content.toml`), an optional path (`content.toml?`),
+    /// a pattern (`messages/*.json`, `content/**` — a file added or removed
+    /// under it is a changed input), or one key of a TOML file
+    /// (`fiducial.toml#i18n`), so that an edit to another section does not
+    /// make this pipeline stale.
     #[serde(default)]
     pub inputs: Vec<String>,
 }

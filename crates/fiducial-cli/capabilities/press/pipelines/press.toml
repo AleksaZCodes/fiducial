@@ -2,6 +2,8 @@ name     = "press"
 executor = "shell"
 args     = ["node", "scripts/derive-press.mjs"]
 outputs  = ["apps/web/src/generated/press.ts"]
+# What the script reads: an edit here, not re-derived, fails `fid derive --check`.
+inputs   = ["fiducial.toml#press", "fiducial.toml#brand", "fiducial.toml#i18n", "press/**"]
 
 # The press room, derived.
 #

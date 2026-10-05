@@ -96,8 +96,11 @@ fn run_derive(
         match run_pipeline_command(pipeline, &working_dir) {
             Ok(_) => {
                 println!(" ✓");
+                // Re-recorded from scratch: an input this run no longer reads
+                // (a deleted catalogue, a dropped favicon) must stop being one.
+                lock.forget_inputs_of(&pipeline.name);
                 for input in pipeline_inputs(pipeline, root) {
-                    match std::fs::read(root.join(&input)) {
+                    match read_input(root, &input) {
                         Ok(content) => lock.record_input(&input, &content, &pipeline.name),
                         Err(e) => {
                             eprintln!("  ⚠ could not read input `{input}`: {e}");
@@ -162,18 +165,163 @@ fn run_derive(
 /// the brand, not to the hardware. When the logo is redrawn the hardware
 /// outputs still match their own hashes; only the input record notices.
 pub(crate) fn pipeline_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
-    let mut inputs = pipeline.inputs.clone();
-    if pipeline.executor == "fid-hardware" {
-        let decl = pipeline
-            .args
-            .first()
-            .cloned()
-            .unwrap_or_else(|| crate::hardware::DECLARATION.to_string());
-        inputs.extend(crate::hardware::inputs(root, &decl));
-    }
+    let mut inputs = expand_inputs(root, &pipeline.inputs);
+    inputs.extend(executor_inputs(pipeline, root));
     inputs.sort();
     inputs.dedup();
     inputs
+}
+
+/// What a built-in executor reads, which it knows and a template should not
+/// have to restate.
+///
+/// Until 0.9.5 only `fid-hardware` reported its reads, so every other
+/// executor's outputs were checked against the lock but its declarations were
+/// not: a message catalogue or `[brand]` edited and never re-derived passed
+/// `--check`, and the stale sitemap or message module could merge. The
+/// drift-injection study for the paper found it (cases W2 and W7).
+fn executor_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
+    let cfg = |keys: &[&str]| -> Vec<String> {
+        keys.iter()
+            .map(|k| format!("{}#{k}", crate::config::CONFIG_FILE))
+            .collect()
+    };
+    let arg = |default: &str| {
+        pipeline
+            .args
+            .first()
+            .cloned()
+            .unwrap_or_else(|| default.to_string())
+    };
+    let config = || crate::config::Config::load(&root.join(crate::config::CONFIG_FILE)).ok();
+    match pipeline.executor.as_str() {
+        "fid-hardware" => crate::hardware::inputs(root, &arg(crate::hardware::DECLARATION)),
+        "fid-i18n" => {
+            let dir = pipeline.args.first().cloned().unwrap_or_else(|| {
+                config()
+                    .map(|c| c.i18n.messages_dir().to_string())
+                    .unwrap_or_else(|| "messages".to_string())
+            });
+            let mut v = cfg(&["i18n"]);
+            v.extend(expand_inputs(root, &[format!("{dir}/*.json")]));
+            v
+        }
+        "fid-brand" => {
+            let mut v = cfg(&["brand"]);
+            v.extend(config().and_then(|c| c.brand.favicon));
+            v
+        }
+        "fid-legal" => cfg(&["legal", "brand", "i18n"]),
+        "fid-deploy" => cfg(&["deploy", "adapters", "product.name"]),
+        "fid-identity" => cfg(&["identity", "adapters"]),
+        "fid-adapters" => cfg(&["adapters"]),
+        "fid-thesis" => {
+            let mut v = expand_inputs(root, &[format!("{}?", crate::thesis::THESIS_FILE)]);
+            v.extend(cfg(&["product.name"]));
+            v
+        }
+        "fid-design" => vec![arg("design-system.md")],
+        "fid-schema" => expand_inputs(root, &[format!("{}/*.sql", crate::schema::DIR)]),
+        "fid-mesh" => vec![arg("board/board.interface.json")],
+        _ => Vec::new(),
+    }
+}
+
+/// The bytes an input stands for. `file#a.b` is the value at key `a.b` of a
+/// TOML file — `fiducial.toml#brand` — so that a pipeline reading one section
+/// is not made stale by an edit to another (`fid add` rewrites the
+/// capability list on every install). A key that is absent reads as empty.
+pub(crate) fn read_input(root: &Path, input: &str) -> std::io::Result<Vec<u8>> {
+    let Some((file, key)) = input.split_once('#') else {
+        return std::fs::read(root.join(input));
+    };
+    let raw = std::fs::read_to_string(root.join(file))?;
+    let doc: toml::Value = toml::from_str(&raw)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    let found = key.split('.').try_fold(&doc, |v, k| v.get(k));
+    Ok(found
+        .map(|v| v.to_string())
+        .unwrap_or_default()
+        .into_bytes())
+}
+
+/// `inputs` entries as files, relative to the product root.
+///
+/// A plain path is kept as written, so a missing one is an error where it is
+/// read. A trailing `?` makes it optional. `*` matches within one path
+/// segment and `**` any number of segments; a pattern may match nothing, and
+/// a file added or removed under it is a changed input like an edited one.
+pub(crate) fn expand_inputs(root: &Path, patterns: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    for pattern in patterns {
+        let (pattern, optional) = match pattern.strip_suffix('?') {
+            Some(p) => (p, true),
+            None => (pattern.as_str(), false),
+        };
+        if !pattern.contains('*') {
+            if !optional || root.join(pattern).exists() {
+                out.push(pattern.to_string());
+            }
+            continue;
+        }
+        let segs: Vec<&str> = pattern.split('/').collect();
+        let fixed = segs.iter().take_while(|s| !s.contains('*')).count();
+        let base = segs[..fixed].join("/");
+        let mut files = Vec::new();
+        collect_files(&root.join(&base), &base, &mut files);
+        out.extend(
+            files
+                .into_iter()
+                .filter(|f| glob_match(&segs, &f.split('/').collect::<Vec<_>>())),
+        );
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+fn collect_files(dir: &Path, rel: &str, out: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let child = if rel.is_empty() {
+            name.clone()
+        } else {
+            format!("{rel}/{name}")
+        };
+        match entry.file_type() {
+            Ok(t) if t.is_dir() => collect_files(&entry.path(), &child, out),
+            Ok(t) if t.is_file() => out.push(child),
+            _ => {}
+        }
+    }
+}
+
+fn glob_match(pat: &[&str], path: &[&str]) -> bool {
+    match (pat.first(), path.first()) {
+        (None, None) => true,
+        (Some(&"**"), _) => {
+            glob_match(&pat[1..], path) || (!path.is_empty() && glob_match(pat, &path[1..]))
+        }
+        (Some(p), Some(s)) => segment_match(p, s) && glob_match(&pat[1..], &path[1..]),
+        _ => false,
+    }
+}
+
+fn segment_match(pat: &str, s: &str) -> bool {
+    match pat.split_once('*') {
+        None => pat == s,
+        Some((head, tail)) => {
+            let Some(rest) = s.strip_prefix(head) else {
+                return false;
+            };
+            (0..=rest.len())
+                .filter(|&i| rest.is_char_boundary(i))
+                .any(|i| segment_match(tail, &rest[i..]))
+        }
+    }
 }
 
 // ── Check mode ────────────────────────────────────────────────────────────────
@@ -456,8 +604,23 @@ fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
 
     for pipeline in pipelines {
         let before = issues.len();
-        for input in pipeline_inputs(pipeline, root) {
-            match (lock.inputs.get(&input), std::fs::read(root.join(&input))) {
+        let inputs = pipeline_inputs(pipeline, root);
+        // A file matched by a pattern when the pipeline ran and gone now (a
+        // deleted locale, a removed migration) is a changed input too.
+        for (path, rec) in &lock.inputs {
+            if rec.pipelines.contains(&pipeline.name)
+                && !inputs.contains(path)
+                && !root.join(path.split('#').next().unwrap_or(path)).exists()
+            {
+                issues.push(format!(
+                    "  {path}: read by `{}` when it last ran, and gone now — \
+                     its outputs may no longer follow (run `fid derive`)",
+                    pipeline.name
+                ));
+            }
+        }
+        for input in inputs {
+            match (lock.inputs.get(&input), read_input(root, &input)) {
                 (_, Err(e)) => issues.push(format!(
                     "  {input}: input to `{}` is unreadable — {e}",
                     pipeline.name
@@ -2396,4 +2559,92 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         bail!("pipeline `{}` exited with {}", pipeline.name, status);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod input_pattern_tests {
+    use super::expand_inputs;
+
+    fn tree(files: &[&str]) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        for f in files {
+            let p = dir.path().join(f);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, "x").unwrap();
+        }
+        dir
+    }
+
+    fn expand(dir: &tempfile::TempDir, pats: &[&str]) -> Vec<String> {
+        expand_inputs(
+            dir.path(),
+            &pats.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+        )
+    }
+
+    #[test]
+    fn a_star_stays_within_one_segment() {
+        let d = tree(&[
+            "messages/en.json",
+            "messages/sr.json",
+            "messages/old/en.json",
+            "messages/notes.md",
+        ]);
+        assert_eq!(
+            expand(&d, &["messages/*.json"]),
+            ["messages/en.json", "messages/sr.json"]
+        );
+    }
+
+    #[test]
+    fn a_double_star_crosses_segments() {
+        let d = tree(&[
+            "content/posts/en/a.md",
+            "content/posts/sr/a.md",
+            "content.toml",
+        ]);
+        assert_eq!(
+            expand(&d, &["content/**"]),
+            ["content/posts/en/a.md", "content/posts/sr/a.md"]
+        );
+    }
+
+    #[test]
+    fn a_pattern_may_match_nothing_and_an_optional_path_may_be_absent() {
+        let d = tree(&["fiducial.toml"]);
+        assert!(expand(&d, &["press/**", "content.toml?"]).is_empty());
+        assert_eq!(expand(&d, &["fiducial.toml?"]), ["fiducial.toml"]);
+    }
+
+    #[test]
+    fn a_section_input_reads_only_its_key() {
+        let d = tree(&[]);
+        std::fs::write(
+            d.path().join("fiducial.toml"),
+            "[brand]\ndomain = \"a.com\"\n[capabilities]\nenabled = [\"i18n\"]\n",
+        )
+        .unwrap();
+        let before = super::read_input(d.path(), "fiducial.toml#brand").unwrap();
+        std::fs::write(
+            d.path().join("fiducial.toml"),
+            "[brand]\ndomain = \"a.com\"\n[capabilities]\nenabled = [\"i18n\", \"seo\"]\n",
+        )
+        .unwrap();
+        assert_eq!(
+            super::read_input(d.path(), "fiducial.toml#brand").unwrap(),
+            before
+        );
+        assert!(super::read_input(d.path(), "fiducial.toml#press")
+            .unwrap()
+            .is_empty());
+        assert!(!super::read_input(d.path(), "fiducial.toml#brand.domain")
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn a_plain_path_is_kept_even_when_missing() {
+        let d = tree(&[]);
+        assert_eq!(expand(&d, &["content.toml"]), ["content.toml"]);
+    }
 }

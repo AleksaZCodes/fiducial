@@ -2,6 +2,8 @@ name     = "content"
 executor = "shell"
 args     = ["node", "scripts/derive-content.mjs"]
 outputs  = ["apps/web/src/generated/content.ts"]
+# What the script reads: an edit here, not re-derived, fails `fid derive --check`.
+inputs   = ["fiducial.toml#i18n", "content.toml", "content/**"]
 
 # content.toml + content/ → one typed module.
 #

@@ -2,6 +2,8 @@ name     = "cms"
 executor = "shell"
 args     = ["node", "scripts/derive-cms.mjs"]
 outputs  = ["tools/cms/config.yml"]
+# What the script reads: an edit here, not re-derived, fails `fid derive --check`.
+inputs   = ["fiducial.toml#cms", "fiducial.toml#i18n", "content.toml?", "press/**"]
 
 # The content editor's config, derived from the content model.
 #

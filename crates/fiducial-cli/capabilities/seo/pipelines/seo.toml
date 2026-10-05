@@ -6,6 +6,8 @@ outputs  = [
   "apps/web/src/generated/seo.json",
   "apps/web/public/sitemap.xml",
 ]
+# What the script reads: an edit here, not re-derived, fails `fid derive --check`.
+inputs   = ["fiducial.toml#seo", "fiducial.toml#i18n", "fiducial.toml#brand", "content.toml?", "messages/*.json", "content/**", "press/stories/**"]
 
 # These three paths are the declaration, not a restatement of one: the deriver
 # reads them out of this file and writes exactly what is listed here. So a
