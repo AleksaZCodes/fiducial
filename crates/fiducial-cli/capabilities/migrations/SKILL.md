@@ -29,6 +29,7 @@ const report = await new Migrator(db, migrations, { ledgerTable, dialect }).appl
 | `NNNN_slug.sql`, nothing else in `migrations/` | a `.sql` file that is not a migration is one that silently never runs |
 | No two migrations share a number | order is what makes a set replayable, and two files with one number have no order |
 | Never edit an applied migration | environments that ran it keep the old schema; new ones get the new one; neither can tell |
+| On SQLite (D1), every migration runs on SQLite | derive applies them all, in order, to an empty in-memory SQLite. Postgres syntax (`DEFAULT gen_random_uuid()`, `now()`) fails, and so does a type SQLite does not have (`UUID`, `TIMESTAMPTZ`), which it would silently store with a guessed affinity |
 
 The last is not enforceable at generation time — it depends on a live
 database — so the runner enforces it. `Migrator.apply()` refuses to run at all

@@ -340,7 +340,18 @@ edit to it by hand before changing the declaration.
   a part that never turns on. What you leave out, the profile fills in. Its
   command bytes reach `board.rs` as `<PART>_<COMMAND>` (`SENSOR_INIT`); a
   command written out by hand in firmware (`const INIT: [u8; 3] = [0xE1, …]`)
-  or typed into a transfer (`write(addr, &[0xE1, …])`) fails derive.
+  or typed into a transfer (`write(addr, &[0xE1, …])`) fails derive. Its waits
+  reach `board.rs` the same way (`SENSOR_MEASURE_MS`), and a firmware `const
+  MEASURE_MS: u64 = 8;` fails. An MCU that needs a crystal frequency (RP2040:
+  12 MHz on XIN) is checked against the frequency in the crystal's LCSC
+  description in `parts.lock`.
+- **Every pinned part is in `parts.lock`.** Once a product has a lock, a part
+  whose `lcsc` is not in it is one nobody checked against LCSC: derive fails
+  until `parts.py resolve` has read it.
+- **A light is seen.** A light inside the case (a profile that says so, or an
+  LED symbol) needs a translucent case — `colour = "#rrggbbaa"`, alpha under
+  `f0`, which the renders also draw see-through — or an opening
+  (`through_wall = true`).
 - **Every I²C line is pulled up.** A net on a pin called SDA or SCL needs a
   resistor to a supply rail; a bus line nothing pulls high never reads high.
   A copied pull-up that kept its source's net leaves its own line bare, and

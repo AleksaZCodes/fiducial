@@ -1,7 +1,13 @@
 # Raspberry Pi RP2040 — RP2040 datasheet, §5.5.3 "Pin specifications" and
 # §5.5.1 "Absolute maximum ratings": no pin above IOVDD + 0.5 V; IOVDD
-# 1.62–3.63 V. The I/O is not 5 V tolerant.
+# 1.62–3.63 V. The I/O is not 5 V tolerant. §2.16 "Crystal Oscillator":
+# the USB bootloader and the standard clock setup expect 12 MHz on XIN.
 mpn    = "RP2040"
-source = "RP2040 datasheet (Raspberry Pi Ltd), §5.5.1 and §5.5.3"
+source = "RP2040 datasheet (Raspberry Pi Ltd), §2.16, §5.5.1 and §5.5.3"
 supply = { pin = "IOVDD", min = 1.62, max = 3.63 }
 io_max_over_supply = 0.5
+
+[crystal]
+pin     = "XIN"
+hz      = 12_000_000
+because = "the USB bootloader and the 48 MHz USB clock are set up from 12 MHz; at any other frequency USB does not enumerate"

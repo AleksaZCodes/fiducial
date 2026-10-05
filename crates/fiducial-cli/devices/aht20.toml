@@ -9,3 +9,8 @@ supply      = { pin = "VDD", min = 2.0, max = 5.5 }
 [commands]
 init    = [0xBE, 0x08, 0x00]
 measure = [0xAC, 0x33, 0x00]
+
+# §5.4: wait 80 ms after `measure` before reading; earlier, the status
+# byte's busy bit is set and there is no reading.
+[timing]
+measure_ms = 80

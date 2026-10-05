@@ -136,6 +136,18 @@ fn ty(name: &str) -> Option<Ty> {
     }
 }
 
+/// The values an integer field type can carry.
+fn int_range(ty: &str) -> (f64, f64) {
+    match ty {
+        "u8" => (0.0, u8::MAX as f64),
+        "i8" => (i8::MIN as f64, i8::MAX as f64),
+        "u16" => (0.0, u16::MAX as f64),
+        "i16" => (i16::MIN as f64, i16::MAX as f64),
+        "u32" => (0.0, u32::MAX as f64),
+        _ => (i32::MIN as f64, i32::MAX as f64),
+    }
+}
+
 fn is_snake(s: &str) -> bool {
     s.chars().next().is_some_and(|c| c.is_ascii_lowercase())
         && s.chars()
@@ -250,6 +262,20 @@ pub fn load(root: &Path, decl: &str) -> Result<File> {
                         b.name, b.field
                     ));
                 }
+                // A bound the field cannot carry is a band no reading can
+                // reach — most often one written in counts, not in the unit
+                // (the paper's round 5, case M12).
+                let (lo, hi) = int_range(&f.ty);
+                if c < lo || c > hi {
+                    problems.push(format!(
+                        "band `{}`: {v}{} is {c} counts, outside what a {} holds ({lo}–{hi}) — \
+                         no reading can reach it. A band is written in the field's unit{}, not in counts",
+                        b.name,
+                        f.unit.as_deref().map(|u| format!(" {u}")).unwrap_or_default(),
+                        f.ty,
+                        f.unit.as_deref().map(|u| format!(" ({u})")).unwrap_or_default(),
+                    ));
+                }
             }
         }
     }
@@ -287,6 +313,14 @@ pub fn render_rust(file: &File, decl: &str) -> String {
              pub const USB_VENDOR_ID: u16 = {:#06x};\npub const USB_PRODUCT_ID: u16 = {:#06x};\n",
             u.vendor_id, u.product_id
         ));
+    }
+    if !file.bands.is_empty() {
+        s.push_str(
+            "\n/// Where a value falls against a declared band. The bounds are inside —\n\
+             /// the page's `<message>Band` decides the same way, in the same counts.\n\
+             #[derive(Debug, Clone, Copy, PartialEq, Eq)]\n\
+             pub enum Band {\n    Below,\n    Inside,\n    Above,\n}\n",
+        );
     }
     for m in &file.messages {
         let name = pascal(&m.name);
@@ -369,6 +403,20 @@ pub fn render_rust(file: &File, decl: &str) -> String {
                 b.name.to_ascii_uppercase(),
                 t.rust,
                 lit(b.max),
+            ));
+            let upper = b.name.to_ascii_uppercase();
+            s.push_str(&format!(
+                "\n    /// Where `{}` falls against `{}`, bounds inside. Test the band with\n\
+                 \x20   /// this, not with the bounds: one rule, on both sides.\n\
+                 \x20   pub fn {}(counts: {}) -> super::Band {{\n\
+                 \x20       if counts < {upper}_MIN {{\n\
+                 \x20           super::Band::Below\n\
+                 \x20       }} else if counts > {upper}_MAX {{\n\
+                 \x20           super::Band::Above\n\
+                 \x20       }} else {{\n\
+                 \x20           super::Band::Inside\n\
+                 \x20       }}\n    }}\n",
+                f.name, b.name, b.name, t.rust
             ));
         }
         s.push_str("}\n");
@@ -476,7 +524,7 @@ pub fn render_ts(file: &File, decl: &str) -> String {
             s.push_str(&format!(
                 "\n/** Named ranges, in each field's unit, inclusive — the firmware acts on the same. */\nexport const {upper}_BANDS = {{\n"
             ));
-            for b in bands {
+            for b in &bands {
                 let f = b.field.split_once('.').unwrap().1;
                 s.push_str(&format!(
                     "  {}: {{ field: {:?}, min: {:?}, max: {:?} }},\n",
@@ -487,7 +535,36 @@ pub fn render_ts(file: &File, decl: &str) -> String {
                 ));
             }
             s.push_str("} as const\n");
+            s.push_str(&format!(
+                "\n/** Where a value, in its unit, falls against a band — bounds inside, compared in\n * counts exactly as the firmware's `{}::<band>()` does. Test bands with this, not with min/max. */\n\
+                 export function {}Band(band: keyof typeof {upper}_BANDS, value: number): Band {{\n  switch (band) {{\n",
+                m.name,
+                camel(&m.name)
+            ));
+            for b in &bands {
+                let (_, f) = file.field(&b.field).unwrap();
+                let (v, lo, hi) = match (f.ty.as_str(), f.scale) {
+                    ("f32", _) | (_, None) => (
+                        "value".to_string(),
+                        format!("{:?}", b.min),
+                        format!("{:?}", b.max),
+                    ),
+                    (_, Some(sc)) => (
+                        format!("Math.round(value / {sc:?})"),
+                        format!("{}", counts(f, b.min).round() as i64),
+                        format!("{}", counts(f, b.max).round() as i64),
+                    ),
+                };
+                s.push_str(&format!(
+                    "    case {:?}: {{\n      const c = {v}\n      return c < {lo} ? 'below' : c > {hi} ? 'above' : 'inside'\n    }}\n",
+                    camel(&b.name)
+                ));
+            }
+            s.push_str("  }\n}\n");
         }
+    }
+    if !file.bands.is_empty() {
+        s.push_str("\n/** Where a value falls against a declared band. */\nexport type Band = 'below' | 'inside' | 'above'\n");
     }
     s
 }
@@ -555,6 +632,23 @@ pub fn typed_literals(root: &Path, file: &File) -> Vec<String> {
                     ));
                 }
             }
+            if !file.bands.is_empty() && !line.contains("fid: allow-band") {
+                let ts_bounds =
+                    code.contains("_BANDS") && (code.contains("min") || code.contains("max"));
+                let rs_bounds = file.bands.iter().any(|b| {
+                    let u = b.name.to_ascii_uppercase();
+                    [format!("{u}_MIN"), format!("{u}_MAX")]
+                        .iter()
+                        .any(|k| code.contains(k.as_str()) && !code.contains("use "))
+                });
+                if ts_bounds || rs_bounds {
+                    out.push(format!(
+                        "{at}: tests a band against its bounds by hand — call the generated \
+                         band function (`<message>Band(…)` on the page, `<message>::<band>(…)` in \
+                         firmware), so both sides agree on whether a bound is inside"
+                    ));
+                }
+            }
             if line.contains("fid: allow-units") {
                 continue;
             }
@@ -602,7 +696,7 @@ fn units_message(at: &str, field: &str) -> String {
     format!(
         "{at}: compares `{field}` with a bare number — the field is in counts of its \
          declared scale; declare the threshold as a [[band]] in protocol.toml and use \
-         the generated bound"
+         its generated band function"
     )
 }
 
@@ -804,6 +898,53 @@ max   = 60.0
         .unwrap_err()
         .to_string();
         assert!(e.contains("names no declared"), "{e}");
+        // One rule for "inside" on both sides, bounds included.
+        assert!(
+            rs.contains("pub fn comfortable(counts: u16) -> super::Band"),
+            "{rs}"
+        );
+        assert!(ts.contains("export function readingBand("), "{ts}");
+        assert!(
+            ts.contains("return c < 3500 ? 'below' : c > 6000 ? 'above' : 'inside'"),
+            "{ts}"
+        );
+        // A band written in counts is one no reading can reach.
+        let e = file(&SCALED.replace(
+            "min   = 35.0\nmax   = 60.0",
+            "min   = 3500.0\nmax   = 6000.0",
+        ))
+        .unwrap_err()
+        .to_string();
+        assert!(
+            e.contains("outside what a u16 holds") && e.contains("not in counts"),
+            "{e}"
+        );
+    }
+
+    #[test]
+    fn a_band_tested_against_its_bounds_by_hand_is_named() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(DECLARATION), SCALED).unwrap();
+        let f = load(dir.path(), DECLARATION).unwrap();
+        let web = dir.path().join("web/src");
+        std::fs::create_dir_all(&web).unwrap();
+        std::fs::write(
+            web.join("reading.ts"),
+            "const ok = readingBand('comfortable', v) === 'inside'\n",
+        )
+        .unwrap();
+        assert!(typed_literals(dir.path(), &f).is_empty());
+        std::fs::write(
+            web.join("reading.ts"),
+            "const { min, max } = READING_BANDS.comfortable\nconst ok = v > min && v < max\n",
+        )
+        .unwrap();
+        let found = typed_literals(dir.path(), &f);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(
+            found[0].contains("reading.ts:1") && found[0].contains("by hand"),
+            "{found:?}"
+        );
     }
 
     #[test]
@@ -813,7 +954,7 @@ max   = 60.0
         let f = load(dir.path(), DECLARATION).unwrap();
         let fw = dir.path().join("firmware/src");
         std::fs::create_dir_all(&fw).unwrap();
-        let good = "fn colour(r: Reading) -> u8 {\n    match r.centi_percent_rh {\n        0..=reading::COMFORTABLE_MIN => 1,\n        _ => 2,\n    }\n}\nlet c = Config::new(USB_VENDOR_ID, USB_PRODUCT_ID);\nif r.centi_celsius < 0 { }\n";
+        let good = "fn colour(r: Reading) -> u8 {\n    let band = reading::comfortable(r.centi_percent_rh);\n    match band {\n        Band::Inside => 1,\n        _ => 2,\n    }\n}\nlet c = Config::new(USB_VENDOR_ID, USB_PRODUCT_ID);\nif r.centi_celsius < 0 { }\n";
         std::fs::write(fw.join("main.rs"), good).unwrap();
         assert!(
             typed_literals(dir.path(), &f).is_empty(),

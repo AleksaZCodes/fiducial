@@ -179,3 +179,37 @@ fn a_migration_containing_a_backtick_still_generates_valid_typescript() {
     assert!(m.contains("\\`quoted\\`"), "{m}");
     assert!(m.contains("\\${not_interpolated}"), "{m}");
 }
+
+#[test]
+fn a_migration_the_database_cannot_run_fails_derive() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product(tmp.path());
+    // Postgres, for a product whose database is SQLite (the paper's round 5, M9).
+    migration(
+        &root,
+        "0001_sessions.sql",
+        "CREATE TABLE sessions (id UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    );
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success());
+    assert!(text(&out).contains("SQLite refuses it"), "{}", text(&out));
+    // It parses, but SQLite has no UUID type: it would guess an affinity.
+    migration(
+        &root,
+        "0001_sessions.sql",
+        "CREATE TABLE sessions (id UUID PRIMARY KEY);",
+    );
+    let out = run(&root, &["derive"]);
+    assert!(
+        text(&out).contains("sessions.id is typed `UUID`"),
+        "{}",
+        text(&out)
+    );
+    migration(
+        &root,
+        "0001_sessions.sql",
+        "CREATE TABLE sessions (id TEXT PRIMARY KEY);",
+    );
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "{}", text(&out));
+}

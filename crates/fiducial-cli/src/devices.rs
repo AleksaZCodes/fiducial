@@ -47,6 +47,25 @@ pub struct Profile {
     /// By pad number: the datasheet name and, for an enable, its sense.
     #[serde(default)]
     pub pins: BTreeMap<String, PinFact>,
+    /// Waits the part needs, milliseconds: `measure_ms`.
+    #[serde(default)]
+    pub timing: BTreeMap<String, u64>,
+    /// The part is a light: it has to be seen through the case.
+    #[serde(default)]
+    pub light: bool,
+    /// The crystal frequency the part is built around.
+    #[serde(default)]
+    pub crystal: Option<Crystal>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Crystal {
+    /// The pin the crystal drives.
+    pub pin: String,
+    pub hz: u64,
+    /// What breaks at any other frequency, for the message.
+    pub because: String,
 }
 
 #[derive(Debug, Deserialize)]

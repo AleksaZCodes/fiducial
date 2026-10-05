@@ -744,6 +744,9 @@ fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
                 issues.extend(crate::protocol::typed_literals(root, &file));
             }
         }
+        if pipeline.executor == "fid-legal" {
+            issues.extend(crate::legal::preticked_consent(root));
+        }
         if pipeline.executor == "fid-i18n" {
             issues.extend(untranslated_values(pipeline, root));
             if let Ok(config) = Config::load(&root.join(crate::config::CONFIG_FILE)) {
@@ -868,7 +871,7 @@ fn run_fid_hardware(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     }
     let literal = crate::hardware::firmware_pin_literals(working_dir, &product);
     if !literal.is_empty() {
-        bail!("firmware names pins directly:\n{}", literal.join("\n"));
+        bail!("firmware types what the board already declares (a pin, an address, a command or a wait):\n{}", literal.join("\n"));
     }
     Ok(())
 }
@@ -1975,6 +1978,21 @@ fn run_fid_identity(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
 /// so a set that cannot be applied safely fails here rather than at deploy.
 fn run_fid_schema(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     let migrations = crate::schema::discover(working_dir)?;
+    let config = Config::load(&working_dir.join(crate::config::CONFIG_FILE)).ok();
+    let sqlite = config.as_ref().is_none_or(|c| {
+        c.identity
+            .resolve_dialect(&c.adapters)
+            .is_ok_and(|d| d == crate::config::SqlDialect::Sqlite)
+    });
+    if sqlite {
+        let problems = crate::schema::sqlite_problems(&migrations);
+        if !problems.is_empty() {
+            bail!(
+                "fid-schema: the database is SQLite, and a migration is not:\n{}",
+                problems.join("\n")
+            );
+        }
+    }
 
     let target = output_with_extension(pipeline, "ts")
         .ok_or_else(|| anyhow::anyhow!("fid-schema: no `.ts` output declared for the manifest"))?;
@@ -2641,6 +2659,13 @@ fn run_fid_legal(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         );
     }
     legal.validate()?;
+    let preticked = crate::legal::preticked_consent(working_dir);
+    if !preticked.is_empty() {
+        bail!(
+            "fid-legal: consent must start unasked:\n{}",
+            preticked.join("\n")
+        );
+    }
 
     if config.i18n.is_empty() {
         bail!(

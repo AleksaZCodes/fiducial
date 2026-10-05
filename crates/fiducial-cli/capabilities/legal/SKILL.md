@@ -134,7 +134,11 @@ categories, `hasConsent()` and `recordConsent()` — and with them the one
 default the law fixes, that **nobody asked yet means no**. It is an output, so
 an edit there fails `fid derive --check`; change `[legal] cookie_categories`
 instead. A choice stored about a different category set is discarded, because
-the version is the set.
+the version is the set. **Every optional box starts unticked**: code that
+uses the consent module and starts its selection non-empty
+(`useState<CookieCategory[]>([...categories])`) or renders a box
+`defaultChecked` fails derive and `--check` — a pre-ticked box is not
+consent, and "Save" would record it as one.
 
 `cookie-consent.tsx` asks the question and stores a decision, and nothing else. **It does not stop
 anything from loading.** The product reads `hasConsent("analytics")` before it

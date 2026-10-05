@@ -81,6 +81,55 @@ impl Migration {
     }
 }
 
+/// SQLite's own column types. Any other name is accepted and silently mapped
+/// to an affinity: `UUID` and `TIMESTAMPTZ` become NUMERIC, which turns a
+/// value that looks like a number into one.
+const SQLITE_TYPES: [&str; 6] = ["INTEGER", "TEXT", "REAL", "BLOB", "NUMERIC", "ANY"];
+
+/// Apply every migration, in order, to an empty SQLite database — the engine
+/// the product runs on, not a list of words it does not know.
+///
+/// The paper's round 5, case M9: a migration written in Postgres for a D1
+/// product passed every gate, because nothing ran it until deploy.
+pub fn sqlite_problems(migrations: &[Migration]) -> Vec<String> {
+    let mut out = Vec::new();
+    let Ok(db) = rusqlite::Connection::open_in_memory() else {
+        return vec!["  could not open an in-memory SQLite database".into()];
+    };
+    for m in migrations {
+        if let Err(e) = db.execute_batch(&m.sql) {
+            out.push(format!("  {DIR}/{}: SQLite refuses it: {e}", m.file));
+            return out;
+        }
+        let tables: Vec<String> = db
+            .prepare(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+            )
+            .and_then(|mut q| q.query_map([], |r| r.get(0))?.collect())
+            .unwrap_or_default();
+        for table in tables {
+            let cols: Vec<(String, String)> = db
+                .prepare(&format!("PRAGMA table_info(\"{table}\")"))
+                .and_then(|mut q| q.query_map([], |r| Ok((r.get(1)?, r.get(2)?)))?.collect())
+                .unwrap_or_default();
+            for (col, ty) in cols {
+                let base = ty.split('(').next().unwrap_or("").trim().to_uppercase();
+                if !base.is_empty() && !SQLITE_TYPES.contains(&base.as_str()) {
+                    let line = format!(
+                        "  {DIR}/{}: {table}.{col} is typed `{ty}`, which SQLite does not have — \
+                         it stores it with a guessed affinity. Use INTEGER, TEXT, REAL, BLOB or NUMERIC.",
+                        m.file
+                    );
+                    if !out.contains(&line) && m.sql.contains(&ty) {
+                        out.push(line);
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
 /// Read and validate every migration in `root/migrations/`.
 ///
 /// Returns them in applied order. An empty or absent directory is not an

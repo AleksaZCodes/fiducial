@@ -133,8 +133,9 @@ pub struct Shape {
 pub struct Case {
     #[serde(default = "d_process")]
     pub process: String,
-    /// The printed case's colour, `#rrggbb` — the filament. The renders and
-    /// the viewer draw it; the lid a shade lighter. Unset: a neutral grey.
+    /// The printed case's colour, `#rrggbb` — the filament, or `#rrggbbaa`
+    /// for a translucent one. The renders and the viewer draw it; the lid a
+    /// shade lighter. Unset: a neutral grey.
     #[serde(default)]
     pub colour: Option<String>,
     pub wall_mm: f64,
@@ -641,6 +642,13 @@ pub struct Part {
     /// derived into `board.rs` as `<PART>_<COMMAND>`. Not declared.
     #[serde(skip)]
     pub commands: BTreeMap<String, Vec<u8>>,
+    /// Waits from the part's device profile, ms, derived into `board.rs` as
+    /// `<PART>_<NAME>`. Not declared.
+    #[serde(skip)]
+    pub timing: BTreeMap<String, u64>,
+    /// LCSC's description of the part ordered, from `parts.lock`. Not declared.
+    #[serde(skip)]
+    pub catalog: Option<String>,
     /// Board parts: an explicit turn, degrees counter-clockwise — for a part
     /// whose orientation is a design choice rather than a zone edge's.
     #[serde(default)]
@@ -793,6 +801,29 @@ pub fn component_quantity(text: &str, unit_required: bool) -> Option<f64> {
 /// A pinned part whose declared value is not the part being ordered: the
 /// schematic and BOM say one thing, the reel another (the paper's held-out
 /// test, case X14). Only compared when both sides state a value.
+/// The first frequency in a text, in hertz: "Crystal 12MHz ±10ppm" → 12e6,
+/// "32.768kHz" → 32768.
+pub fn frequency_hz(text: &str) -> Option<f64> {
+    let lower = text.to_ascii_lowercase();
+    for (unit, scale) in [("mhz", 1e6), ("khz", 1e3), ("hz", 1.0)] {
+        if let Some(at) = lower.find(unit) {
+            let num: String = lower[..at]
+                .trim_end()
+                .chars()
+                .rev()
+                .take_while(|c| c.is_ascii_digit() || *c == '.')
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
+            if let Ok(n) = num.parse::<f64>() {
+                return Some(n * scale);
+            }
+        }
+    }
+    None
+}
+
 fn value_disagrees(q: &Part, hit: &LockedPart) -> Option<String> {
     let declared = component_quantity(q.value.as_deref()?, false)?;
     let desc = hit.description.as_deref()?;
@@ -822,13 +853,26 @@ fn resolve_picks(root: &Path, p: &mut Product) -> Result<()> {
     // A pinned part's price, as `resolve` read it from LCSC at the cost's
     // quantity: what the ceiling is asserted against.
     let mut disagree = Vec::new();
+    // Once a product has a lock, a pinned part outside it is one nobody
+    // checked against LCSC: swapped in by hand, its description — and so
+    // its value and frequency — unknown (the paper's round 5, case M18).
+    let resolved = lock.part.iter().any(|e| e.pick.is_none());
     for q in p.parts.iter_mut().filter(|q| q.pick.is_none()) {
         let Some(lcsc) = &q.lcsc else { continue };
-        if let Some(hit) = lock
+        let hit = lock
             .part
             .iter()
-            .find(|e| e.id == q.id && &e.lcsc == lcsc && e.pick.is_none())
-        {
+            .find(|e| e.id == q.id && &e.lcsc == lcsc && e.pick.is_none());
+        if hit.is_none() && resolved {
+            disagree.push(format!(
+                "part `{}`: LCSC {lcsc} is not in {PARTS_LOCK} — a part nobody checked against \
+                 LCSC. Run `python3 hardware/parts.py resolve` so its catalog entry is checked \
+                 against what the board needs",
+                q.id
+            ));
+        }
+        if let Some(hit) = hit {
+            q.catalog = hit.description.clone();
             disagree.extend(value_disagrees(q, hit));
             if q.unit_cost.is_none() && hit.currency.as_deref() == Some(p.cost.currency.as_str()) {
                 q.unit_cost = hit.unit_price;
@@ -1710,14 +1754,71 @@ pub struct BomLine {
     pub datasheet: String,
 }
 
+/// A light inside a closed case is seen through a translucent case or a
+/// window, or not at all (the paper's round 5, case M19: the status LED,
+/// the stick's only output without a computer, behind matte black).
+///
+/// A part is a light when its device profile says so or its symbol is an
+/// LED; `through_wall` gives it an opening. A case is translucent when its
+/// colour says so — `#rrggbbaa`, alpha under `f0` — which is also how the
+/// renders draw it, so the picture and the check read the same declaration.
+fn hidden_lights(p: &Product) -> Result<()> {
+    let alpha = p
+        .case
+        .colour
+        .as_deref()
+        .and_then(|c| c.strip_prefix('#'))
+        .filter(|h| h.len() == 8)
+        .and_then(|h| u8::from_str_radix(&h[6..], 16).ok())
+        .unwrap_or(0xFF);
+    if alpha < 0xF0 {
+        return Ok(());
+    }
+    let mut hidden = Vec::new();
+    for q in p
+        .parts
+        .iter()
+        .filter(|q| q.place == "board" && !q.through_wall)
+    {
+        let profiled = q
+            .mpn
+            .as_deref()
+            .and_then(|m| crate::devices::for_mpn(m).ok().flatten())
+            .is_some_and(|d| d.light);
+        let led_symbol = q.symbol.as_deref().is_some_and(|s| {
+            let name = s.rsplit(':').next().unwrap_or(s).to_ascii_uppercase();
+            name == "LED" || name.starts_with("LED_")
+        });
+        if profiled || led_symbol {
+            hidden.push(format!("`{}`", q.id));
+        }
+    }
+    if !hidden.is_empty() {
+        bail!(
+            "{} {} inside the case, and the case is opaque (case.colour = {:?}) with no \
+             window over {it} — no one will see {it}.\n  Make the filament translucent \
+             (`#rrggbbaa`, e.g. \"#1d4ed8b3\"), or give the light an opening (`through_wall = true`).",
+            hidden.join(", "),
+            if hidden.len() == 1 { "is a light" } else { "are lights" },
+            p.case.colour.as_deref().unwrap_or("unset: neutral grey"),
+            it = if hidden.len() == 1 { "it" } else { "them" },
+        );
+    }
+    Ok(())
+}
+
 pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
     let case = &p.case;
     if let Some(c) = &case.colour {
         let hex = c.strip_prefix('#').unwrap_or("");
-        if hex.len() != 6 || !hex.chars().all(|ch| ch.is_ascii_hexdigit()) {
-            bail!("case.colour = \"{c}\" — a colour is `#rrggbb`, e.g. \"#2563eb\"");
+        if !matches!(hex.len(), 6 | 8) || !hex.chars().all(|ch| ch.is_ascii_hexdigit()) {
+            bail!(
+                "case.colour = \"{c}\" — a colour is `#rrggbb`, e.g. \"#2563eb\", or \
+                 `#rrggbbaa` for a translucent filament, e.g. \"#2563ebb3\""
+            );
         }
     }
+    hidden_lights(p)?;
     let clr = case.clearance_mm;
     let seal = &case.seal;
     let mut why: Vec<String> = Vec::new();
@@ -6553,6 +6654,7 @@ fn resolve_components(root: &Path, p: &mut Product) -> Result<()> {
 /// differently is refused, naming the datasheet.
 fn datasheet_checks(p: &mut Product) -> Result<()> {
     let mut problems = Vec::new();
+    let mut crystals = Vec::new();
     let rails = p.rails.clone();
     for q in &mut p.parts {
         let Some(mpn) = q.mpn.clone() else { continue };
@@ -6619,6 +6721,39 @@ fn datasheet_checks(p: &mut Product) -> Result<()> {
             }
         }
         q.commands = d.commands.clone();
+        q.timing = d.timing.clone();
+        if let Some(x) = &d.crystal {
+            if let Some(net) = d.net(&x.pin, &q.pins) {
+                crystals.push((
+                    q.id.clone(),
+                    mpn.clone(),
+                    net.clone(),
+                    x.hz,
+                    x.because.clone(),
+                    d.source.clone(),
+                ));
+            }
+        }
+    }
+    for (id, mpn, net, hz, because, source) in crystals {
+        for x in p
+            .parts
+            .iter()
+            .filter(|x| x.id != id && x.pins.values().any(|n| *n == net))
+        {
+            let Some(got) = x.catalog.as_deref().and_then(frequency_hz) else {
+                continue;
+            };
+            if (got - hz as f64).abs() > hz as f64 * 1e-4 {
+                problems.push(format!(
+                    "part `{id}` ({mpn}): `{}` on {net} runs at {} MHz, but it needs {} MHz — \
+                     {because} — {source}",
+                    x.id,
+                    got / 1e6,
+                    hz as f64 / 1e6
+                ));
+            }
+        }
     }
     problems.extend(unpulled_i2c(p));
     if !problems.is_empty() {
@@ -6774,6 +6909,14 @@ pub fn firmware_pin_literals(root: &Path, p: &Product) -> Vec<String> {
                 .map(move |c| (c.to_ascii_uppercase(), id.clone(), d.mpn.as_str()))
         })
         .collect();
+    let timings: Vec<(String, String, &str)> = profiles
+        .iter()
+        .flat_map(|(id, d)| {
+            d.timing
+                .keys()
+                .map(move |c| (c.to_ascii_uppercase(), id.clone(), d.mpn.as_str()))
+        })
+        .collect();
     let mut files = Vec::new();
     collect_rs(&root.join(FIRMWARE_DIR), FIRMWARE_DIR, &mut files);
     let mut found = Vec::new();
@@ -6847,6 +6990,20 @@ pub fn firmware_pin_literals(root: &Path, p: &Product) -> Vec<String> {
                 let typed = rest
                     .split_once('=')
                     .is_some_and(|(_, v)| v.trim_start().starts_with('['));
+                let number = rest
+                    .split_once('=')
+                    .is_some_and(|(_, v)| v.trim_start().starts_with(|c: char| c.is_ascii_digit()));
+                if let Some((_, id, mpn)) = timings.iter().find(|(c, _, _)| *c == name) {
+                    if number && !line.contains("fid: allow-timing") {
+                        found.push(format!(
+                            "  {rel}:{}: writes out {mpn}'s `{name}` wait by hand — use \
+                             `board::{}_{name}`, from the part's datasheet profile, or mark the \
+                             line `// fid: allow-timing`",
+                            i + 1,
+                            net_ident(id)
+                        ));
+                    }
+                }
                 if let Some((_, id, mpn)) = commands.iter().find(|(c, _, _)| *c == name) {
                     if typed && !line.contains("fid: allow-command") {
                         found.push(format!(
@@ -7054,6 +7211,16 @@ fn render_board_rs(p: &Product, i: &Value) -> Result<String> {
         );
     }
     for q in &p.parts {
+        for (name, ms) in &q.timing {
+            out += &format!(
+                "\n/// `{}` ({}): `{name}`, from its device profile.\n\
+                 pub const {}_{}: u64 = {ms};\n",
+                q.id,
+                q.mpn.as_deref().unwrap_or_default(),
+                net_ident(&q.id),
+                name.to_ascii_uppercase()
+            );
+        }
         for (name, bytes) in &q.commands {
             out += &format!(
                 "\n/// `{}` ({}): the `{name}` command, from its device profile.\n\

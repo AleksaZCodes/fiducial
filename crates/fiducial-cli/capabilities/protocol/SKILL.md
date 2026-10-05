@@ -39,7 +39,13 @@ max   = 60.0
 ```
 
 The firmware gets `reading::COMFORTABLE_MIN` / `_MAX` in counts (3500, 6000);
-the page gets `READING_BANDS.comfortable` in %RH. Comparing a scaled field
+the page gets `READING_BANDS.comfortable` in %RH. **Test a band with its
+generated function** — `reading::comfortable(counts)` in firmware,
+`readingBand('comfortable', value)` on the page, both returning below /
+inside / above with the bounds inside — not with the bounds: code that
+compares against a band's min or max by hand fails derive and `--check`
+(`// fid: allow-band` for a line that only shows them). A band bound the
+field's type cannot hold (a band written in counts, not in the unit) fails too. Comparing a scaled field
 with a bare number in code (`match r.centi_percent_rh { 35..=60 => … }`,
 `r.centiPercentRh > 6000`) fails derive and `--check`: the number is in one
 unit and the field in another. Zero is the same in every unit and is allowed;

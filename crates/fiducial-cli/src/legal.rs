@@ -648,6 +648,61 @@ fn page_content_sr(page: &str, categories: &[&str], cookie_list: &str) -> (Strin
 /// means — no. The banner component draws the question; whether a category
 /// may be used is decided here, where an edit is a stale output rather than
 /// a quiet change of the law's default (the paper's round 4, case R7).
+/// Code that starts a consent choice already made: a category list held in
+/// state that begins non-empty, or a box that begins ticked.
+///
+/// A pre-ticked box is not consent (CJEU, Planet49, C-673/17), and "Save"
+/// would record it as one. The paper's round 5, case M6, did exactly that to
+/// "save users a click". Only files that use the consent module are read.
+pub fn preticked_consent(root: &std::path::Path) -> Vec<String> {
+    let mut files = Vec::new();
+    crate::i18n::collect_code(root, &mut files);
+    files.sort();
+    let mut out = Vec::new();
+    for path in files {
+        let Ok(src) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        if !src.contains("generated/consent") {
+            continue;
+        }
+        let rel = path
+            .strip_prefix(root)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        for (i, line) in src.lines().enumerate() {
+            let t = line.trim_start();
+            if t.starts_with("//") || t.starts_with('*') || t.starts_with("/*") {
+                continue;
+            }
+            let code = line.split(" //").next().unwrap_or(line);
+            let starts_chosen = code.find("useState").is_some_and(|at| {
+                let call = &code[at..];
+                let typed_consent = call.contains("CookieCategory");
+                let init = call
+                    .find("(")
+                    .map(|o| call[o + 1..].trim_start())
+                    .unwrap_or("");
+                let empty = init.starts_with("[]") || init.starts_with("() => []");
+                let names_categories = init.to_lowercase().contains("categor");
+                (typed_consent && !empty) || names_categories
+            });
+            let ticked = code.contains("checked={true}")
+                || (code.contains("defaultChecked") && !code.contains("defaultChecked={false}"));
+            if starts_chosen || ticked {
+                out.push(format!(
+                    "  {rel}:{}: a consent choice starts already made — every optional \
+                     category starts off (`useState<CookieCategory[]>([])`); a pre-ticked \
+                     box is not consent, and \"Save\" would record it as one",
+                    i + 1
+                ));
+            }
+        }
+    }
+    out
+}
+
 pub fn render_consent_ts(legal: &crate::config::Legal) -> String {
     let cats = legal.effective_categories();
     let optional: Vec<&str> = cats.iter().copied().filter(|c| *c != "necessary").collect();
@@ -859,6 +914,27 @@ pub fn render_legal_ts(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_consent_choice_that_starts_made_is_named() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("apps/web/src/components");
+        std::fs::create_dir_all(&dir).unwrap();
+        let head = "import { type CookieCategory } from \"../generated/consent\";\n";
+        let ok = format!("{head}const [s, set] = useState<CookieCategory[]>([]);\n");
+        std::fs::write(dir.join("c.tsx"), &ok).unwrap();
+        assert!(preticked_consent(tmp.path()).is_empty());
+        for bad in [
+            "const [s, set] = useState<CookieCategory[]>([...categories]);",
+            "const [s, set] = useState(OPTIONAL_CATEGORIES);",
+            "<input type=\"checkbox\" defaultChecked />",
+        ] {
+            std::fs::write(dir.join("c.tsx"), format!("{head}{bad}\n")).unwrap();
+            let found = preticked_consent(tmp.path());
+            assert_eq!(found.len(), 1, "{bad}: {found:?}");
+            assert!(found[0].contains("c.tsx:2"), "{found:?}");
+        }
+    }
 
     fn test_brand() -> Brand {
         Brand {

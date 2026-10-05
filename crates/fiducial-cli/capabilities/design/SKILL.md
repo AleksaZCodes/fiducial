@@ -206,7 +206,8 @@ Three steps and not one, because under `chamfer` there is a hard geometric
 constraint a radius does not have: **a chamfer must stay under half the
 element's height**, or the two cuts on one edge meet and the box degenerates
 into a lozenge. A chip given the panel corner is not slightly wrong, it is a
-different shape.
+different shape. Derive holds it: under `chamfer`, a cut over half the role's
+smallest height (panel 2.5rem, control 1.125rem, chip 0.875rem) fails.
 
 `.cham` / `.cham-sm` / `.cham-xs` / `.cham-b` / `.cham-t` in the marks layer
 carry the chamfer. They are inert under `round`. `.cham-b` (the nav, cut along

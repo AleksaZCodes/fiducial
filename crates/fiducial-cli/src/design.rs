@@ -131,7 +131,46 @@ fn default_edge_weight() -> f64 {
     1.5
 }
 
+/// The smallest element each corner role is drawn on, in rem. The platform's
+/// components set these heights, so the platform — not the product — knows them.
+const ROLE_MIN_HEIGHT_REM: [(&str, f64); 3] = [("panel", 5.0), ("control", 2.25), ("chip", 1.75)];
+
 impl Shape {
+    /// Under `chamfer`, a cut deeper than half the element's height meets the
+    /// cut on the other end of the same edge and the box becomes a lozenge
+    /// (the paper's round 5, case M5). A round radius clamps itself; a clip
+    /// path does not.
+    fn check_cuts(&self) -> Result<()> {
+        if self.strategy != "chamfer" {
+            return Ok(());
+        }
+        for (role, height) in ROLE_MIN_HEIGHT_REM {
+            let value = match role {
+                "panel" => &self.panel,
+                "control" => &self.control,
+                _ => &self.chip,
+            };
+            let Some(cut) = value
+                .trim()
+                .strip_suffix("rem")
+                .and_then(|n| n.trim().parse::<f64>().ok())
+            else {
+                bail!("`fid:shape` {role} = \"{value}\" — write the cut in rem, e.g. \"0.5rem\"");
+            };
+            if cut > height / 2.0 {
+                bail!(
+                    "`fid:shape` {role} = \"{value}\" — a {role} can be as short as {height}rem, \
+                     and a cut deeper than half of that ({}rem) meets the opposite cut: \
+                     the element draws as a lozenge, not a box with cut corners.\n  \
+                     Keep {role} at or under {}rem.",
+                    height / 2.0,
+                    height / 2.0
+                );
+            }
+        }
+        Ok(())
+    }
+
     /// What `--radius` resolves to.
     ///
     /// Forced to 0 unless the strategy is `round`: under `chamfer` and `square`
@@ -366,6 +405,7 @@ pub fn parse(md: &str) -> Result<DesignSystem> {
             );
         }
     }
+    shape.check_cuts()?;
     // Optional: a product with no deck and no document needs no answer here.
     // A product that has one and does not declare it gets the default deck,
     // which is the thing this whole capability exists to prevent.
@@ -1304,6 +1344,18 @@ small = "eyebrow"
             r#"{ fg = "foreground", bg = "background", min = 3.0, kind = "non-text" },"#,
         );
         assert!(parse(&graphic).is_ok());
+    }
+
+    #[test]
+    fn a_chamfer_deeper_than_half_the_element_is_refused() {
+        let lozenge = DOC.replace(r#"chip = "0.5rem""#, r#"chip = "1rem""#);
+        let err = parse(&lozenge).unwrap_err().to_string();
+        assert!(
+            err.contains("chip = \"1rem\"") && err.contains("lozenge"),
+            "{err}"
+        );
+        let round = lozenge.replace(r#"strategy = "chamfer""#, r#"strategy = "round""#);
+        assert!(parse(&round).is_ok(), "a round radius clamps itself");
     }
 
     #[test]
