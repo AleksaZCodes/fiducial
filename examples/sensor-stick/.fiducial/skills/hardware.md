@@ -329,7 +329,22 @@ edit to it by hand before changing the declaration.
   that put it there.
 - **`i2c_address`.** A part's I²C address (`i2c_address = 0x38`) is declared
   on the part and derived into `board.rs` as `<PART>_I2C_ADDRESS`. Firmware
-  takes it from there and never types it.
+  takes it from there: an address typed into an I²C transfer
+  (`write_async(0x38, …)`) fails derive, unless marked `// fid: allow-address`.
+- **Device profiles: the datasheet, read once.** A part whose `mpn` the
+  platform has a profile for (RP2040, AHT20, SN74AHCT1G125, WS2812B so far) is
+  checked against its datasheet on every derive: its supply pin's rail must be
+  in range; its `io_max_v` may not exceed the datasheet's (an RP2040 on 3.3 V
+  is 3.8 V, not 5.5 — the limit is not a setting); its `i2c_address` must be
+  the datasheet's; an active-low enable tied high (or active-high tied low) is
+  a part that never turns on. What you leave out, the profile fills in. Its
+  command bytes reach `board.rs` as `<PART>_<COMMAND>` (`SENSOR_INIT`); a
+  command written out by hand in firmware (`const INIT: [u8; 3] = [0xE1, …]`)
+  or typed into a transfer (`write(addr, &[0xE1, …])`) fails derive.
+- **Every I²C line is pulled up.** A net on a pin called SDA or SCL needs a
+  resistor to a supply rail; a bus line nothing pulls high never reads high.
+  A copied pull-up that kept its source's net leaves its own line bare, and
+  derive names it.
 - **Pins go through `board.rs`.** Firmware that names a pin directly
   (`p.PIN_4`, `p.PA5`) fails derive and `--check`, naming file and line; a
   deliberate one is marked `// fid: allow-pin`.
