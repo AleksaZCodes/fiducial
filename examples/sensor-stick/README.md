@@ -33,6 +33,7 @@ Renders from `hardware/build.sh`, copied to `hardware/showcase/`.
 | [`hardware/vendor/`](hardware/vendor) | parts KiCad has no entry or no 3D model for, from LCSC's library (`parts.py fetch`), and the USB-C socket: KiCad's land pattern with LCSC's model on it, with where each came from |
 | [`firmware/rp2040/src/main.rs`](firmware/rp2040/src/main.rs), [`firmware/shared/src/lib.rs`](firmware/shared/src/lib.rs) | the firmware: read the sensor once a second, send the reading as a fiducial-protocol frame over USB serial, colour the LED |
 | [`web/src/`](web/src) | the page: connect over Web Serial, show the reading |
+| [`protocol.toml`](protocol.toml) | the reading's payload — its kind byte and fields — declared once for both sides of the USB link |
 
 ## What is derived from it
 
@@ -45,7 +46,8 @@ Renders from `hardware/build.sh`, copied to `hardware/showcase/`.
 | `hardware/generated/board.kicad_pcb`, `board.kicad_sch` | the board with every footprint placed and every pad on its net; the schematic |
 | `hardware/generated/bom.csv`, `assembly.md` | the bill of materials; the order it goes together in |
 | `hardware/generated/interface.ts` | the nets as a TypeScript type — the page imports it |
-| `hardware/generated/board.rs` | the firmware's pin map: `board::sensor_sda!(p)` is `p.PIN_4` — the firmware takes every pin through it |
+| `hardware/generated/board.rs` | the firmware's pin map: `board::sensor_sda!(p)` is `p.PIN_4` — the firmware takes every pin through it, and a pin named directly fails derive |
+| `protocol/messages.rs`, `protocol/messages.ts` | the reading's encoder for the firmware and decoder for the page, from the same table — they cannot disagree |
 | `hardware/generated/assembly.md` → why | the USB-C CC voltage each kind of source reads, solved from the pull-downs and checked against the Type-C spec's window — a wrong resistor fails derive |
 
 `hardware/build.sh` (built, checked, not committed): the routed and

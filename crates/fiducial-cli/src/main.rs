@@ -20,6 +20,7 @@ mod ownership;
 mod pipeline;
 mod place;
 mod prose;
+mod protocol;
 mod schema;
 mod security;
 mod templates;

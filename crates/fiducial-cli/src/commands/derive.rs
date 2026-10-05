@@ -221,6 +221,7 @@ fn executor_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
             v
         }
         "fid-design" => vec![arg("design-system.md")],
+        "fid-protocol" => vec![arg(crate::protocol::DECLARATION)],
         "fid-schema" => expand_inputs(root, &[format!("{}/*.sql", crate::schema::DIR)]),
         "fid-mesh" => vec![arg("board/board.interface.json")],
         _ => Vec::new(),
@@ -2409,6 +2410,29 @@ fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
 /// pairs and their minimums, and a palette that misses one fails here. That is
 /// the difference between a design system that documents a rule and one that
 /// holds it.
+/// `protocol.toml` in, one codec per side out: `.rs` for the firmware, `.ts`
+/// for the web. See `crate::protocol`.
+fn run_fid_protocol(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    let decl = pipeline
+        .args
+        .first()
+        .map(String::as_str)
+        .unwrap_or(crate::protocol::DECLARATION);
+    let file = crate::protocol::load(working_dir, decl)?;
+    if pipeline.outputs.is_empty() {
+        bail!("fid-protocol: no outputs declared (a `.rs` and/or a `.ts`)");
+    }
+    for out in &pipeline.outputs {
+        let content = match Path::new(out).extension().and_then(|e| e.to_str()) {
+            Some("rs") => crate::protocol::render_rust(&file, decl),
+            Some("ts") => crate::protocol::render_ts(&file, decl),
+            _ => bail!("fid-protocol: output `{out}` is neither `.rs` nor `.ts`"),
+        };
+        write_output(working_dir, out, &content)?;
+    }
+    Ok(())
+}
+
 fn run_fid_design(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     let source = pipeline
         .args
@@ -2555,12 +2579,13 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             "fid-schema" => return run_fid_schema(pipeline, working_dir),
             "fid-legal" => return run_fid_legal(pipeline, working_dir),
             "fid-design" => return run_fid_design(pipeline, working_dir),
+            "fid-protocol" => return run_fid_protocol(pipeline, working_dir),
             "fid-hardware" => return run_fid_hardware(pipeline, working_dir),
             other => bail!(
                 "unknown executor `{other}` \
                  (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n, fid-brand, \
                  fid-adapters, fid-deploy, fid-identity, fid-schema, fid-legal, fid-design, \
-                 fid-hardware)"
+                 fid-protocol, fid-hardware)"
             ),
         };
 

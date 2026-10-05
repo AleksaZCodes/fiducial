@@ -51,20 +51,18 @@ pub mod aht20 {
     }
 }
 
-/// A reading on the wire: the payload of one fiducial-protocol frame.
-/// `[1, celsius×100 as i16 LE, %RH×100 as u16 LE]` — five bytes, read by
-/// the web page with the same layout (`web/src/reading.ts`).
+/// The reading's payload, derived from `protocol.toml` with the web page's
+/// decoder (`protocol/messages.ts`): the layout is declared once, so the two
+/// sides cannot disagree.
+#[path = "../../../protocol/messages.rs"]
+pub mod messages;
+
 pub mod reading {
-    use super::aht20::Reading;
+    pub use crate::messages::reading::{KIND, LEN};
+    use crate::{aht20, messages::reading::Reading};
 
-    /// The payload's first byte: what kind of message this is.
-    pub const KIND: u8 = 1;
-    pub const LEN: usize = 5;
-
-    pub fn payload(r: Reading) -> [u8; LEN] {
-        let t = r.centi_celsius.to_le_bytes();
-        let h = r.centi_percent_rh.to_le_bytes();
-        [KIND, t[0], t[1], h[0], h[1]]
+    pub fn payload(r: aht20::Reading) -> [u8; LEN] {
+        Reading { centi_celsius: r.centi_celsius, centi_percent_rh: r.centi_percent_rh }.encode()
     }
 }
 
@@ -125,6 +123,7 @@ mod tests {
         let mut dec: FrameDecoder<64> = FrameDecoder::new();
         let got = wire[..n].iter().find_map(|b| dec.feed(*b).map(|p| p.to_vec()));
         assert_eq!(got.as_deref(), Some(&payload[..]));
-        assert_eq!(i16::from_le_bytes([payload[1], payload[2]]), -1234);
+        let back = messages::reading::Reading::decode(&payload).unwrap();
+        assert_eq!((back.centi_celsius, back.centi_percent_rh), (-1234, 4810));
     }
 }

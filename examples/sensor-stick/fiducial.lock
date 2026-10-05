@@ -489,7 +489,7 @@ _Add your project-specific setup instructions here._
 
 [templates."fiducial.toml"]
 source_version = "0.9.0"
-hash = "8a945ffa4327a8276cd1b8074256ce7619728e0bb3f26648fc399ec42f1d4334"
+hash = "290632b5c077530a7ab647ee12e2d797f251cfa83e4c4133f05df941a4a30026"
 base_content = """
 # fiducial.toml — updated by `fid add firmware-rp2040` (fiducial 0.9.0)
 
@@ -4484,6 +4484,25 @@ outputs  = [
 # a tool upgrade rather than on drift. The gate covers the text they come from.
 """
 
+[templates."pipelines/protocol.toml"]
+source_version = "0.9.5"
+hash = "fe39df38a1a46258ab59a254c5c5e9146142d2ad40efad7631cd2d00bcf6e5bc"
+base_content = """
+name     = "protocol"
+executor = "fid-protocol"
+# args = ["protocol.toml"]   # only to declare the messages somewhere else
+outputs  = ["protocol/messages.rs", "protocol/messages.ts"]
+
+# protocol.toml in, one codec per side out.
+#
+# The payload of a message — its kind byte and its fields, little-endian — is
+# a fact both sides of a link depend on. Written by hand in the firmware and
+# again in the web page, it drifts, and nothing but a test you remembered to
+# write notices. Declared once, both codecs are generated from the same table.
+#
+# Drop the `.rs` or the `.ts` output if the product has only one side.
+"""
+
 [templates."pipelines/thesis.toml"]
 source_version = "0.9.0"
 hash = "a5d4f4e2f603e00abf72064259499e83927725f1a5b3ad64f6b6762c7d46f81c"
@@ -4521,6 +4540,26 @@ outputs  = [
 # instead — flagging drift without rewriting. A generated region inside a
 # translated catalog would mean deriving every locale from an English sentence
 # through a pipeline that has no translator.
+"""
+
+[templates."protocol.toml"]
+source_version = "0.9.5"
+hash = "2141c13020f005d2481fad3063627f3237f3451d83e1608e19ee3463a19455f2"
+base_content = """
+# Every message this product's device and apps exchange, declared once.
+#
+# `fid derive` generates protocol/messages.rs (firmware) and
+# protocol/messages.ts (web) from this table. A payload is the `kind` byte,
+# then each field, little-endian. Types: u8, i8, u16, i16, u32, i32, f32.
+
+[[message]]
+name   = "status"
+kind   = 1
+doc    = "The device's status, sent once a second."
+fields = [
+  { name = "uptime_s", type = "u32", doc = "Seconds since power-on" },
+  { name = "battery_mv", type = "u16", doc = "Battery voltage, millivolts" },
+]
 """
 
 [templates."thesis.toml"]
@@ -4649,6 +4688,16 @@ pipeline = "hardware"
 source_version = "0.9.5"
 hash = "4e9b09bb755bb527300482df4d0c4c49bc3b3ba9bcf79907a0be441ef1cb690f"
 
+[artifacts."protocol/messages.rs"]
+pipeline = "protocol"
+source_version = "0.9.5"
+hash = "7781db96a39d28868eab4c15b95ff9860999ffcbc2987cce738886f9af13f0e2"
+
+[artifacts."protocol/messages.ts"]
+pipeline = "protocol"
+source_version = "0.9.5"
+hash = "693b82922532e6ec76c9e27d945b7269259292f8837fa7ccc82aa4f63e18ef94"
+
 [capabilities.firmware-rp2040]
 source = "built-in"
 source_version = "0.9.0"
@@ -4668,6 +4717,15 @@ declarations = [
     "hardware/product.toml",
 ]
 pipelines = ["pipelines/hardware.toml"]
+requires_adapters = []
+
+[capabilities.protocol]
+source = "built-in"
+source_version = "0.9.5"
+hash = "aea0ae06ad2949a3a575c44a5a99a17a46e15ef238ce93a56c13e0eabec0ee10"
+description = "Every message a device and its apps exchange, declared once → a Rust codec for the firmware, a TypeScript codec for the web"
+declarations = ["protocol.toml"]
+pipelines = ["pipelines/protocol.toml"]
 requires_adapters = []
 
 [inputs."fiducial.toml#product.name"]
@@ -4725,6 +4783,10 @@ pipelines = ["hardware"]
 [inputs."hardware/product.toml"]
 hash = "52af90c3b00161a7d1df9c064727f766df40ad1de3e6ef76ba4a130951c97999"
 pipelines = ["hardware"]
+
+[inputs."protocol.toml"]
+hash = "eb7dd946f551bbaaad67516a40bc85927b853c09e527fdf8ecb88aeb5e257cfa"
+pipelines = ["protocol"]
 
 [inputs."thesis.toml"]
 hash = "83ce126b85f53fb1260d46fc00ec0ebf39643b14bad6df9e33dfbf65a67b6479"

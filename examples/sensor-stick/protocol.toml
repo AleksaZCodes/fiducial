@@ -1,0 +1,14 @@
+# Every message the sensor stick and its web page exchange, declared once.
+#
+# `fid derive` generates protocol/messages.rs (the firmware's side) and
+# protocol/messages.ts (the page's side) from this table. A payload is the
+# `kind` byte, then each field, little-endian. Framing is fiducial-protocol's.
+
+[[message]]
+name   = "reading"
+kind   = 1
+doc    = "One temperature and humidity reading, sent once a second."
+fields = [
+  { name = "centi_celsius", type = "i16", doc = "Temperature, °C × 100" },
+  { name = "centi_percent_rh", type = "u16", doc = "Relative humidity, %RH × 100" },
+]
