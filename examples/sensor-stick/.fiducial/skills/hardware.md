@@ -314,6 +314,26 @@ could not solve is in `hardware/build/placement-model.json`; run
 `python3 hardware/place.py < hardware/build/placement-model.json` to try an
 edit to it by hand before changing the declaration.
 
+## Facts the electronics check for you
+
+- **`value` is checked against the part ordered.** A pinned part's `value`
+  ("1uF 50V X5R") must state the same resistance, capacitance or inductance as
+  LCSC's own description of its `lcsc` number in `hardware/parts.lock`; a
+  mismatch fails derive with both, so the schematic, the BOM and the reel
+  agree.
+- **`[rails]` and `io_max_v`.** Declare each rail's voltage
+  (`[rails] VBUS = 5.0, "3V3" = 3.3`) and, on a part, the highest voltage its
+  pins may see from its datasheet's absolute maximum ratings
+  (`io_max_v = 3.8`). Every net a resistor pulls toward a rail is solved, and
+  a pin above its part's limit fails derive, naming the net and the resistor
+  that put it there.
+- **`i2c_address`.** A part's I²C address (`i2c_address = 0x38`) is declared
+  on the part and derived into `board.rs` as `<PART>_I2C_ADDRESS`. Firmware
+  takes it from there and never types it.
+- **Pins go through `board.rs`.** Firmware that names a pin directly
+  (`p.PIN_4`, `p.PA5`) fails derive and `--check`, naming file and line; a
+  deliberate one is marked `// fid: allow-pin`.
+
 ## Drift you cannot see
 
 The declaration names SVG files it does not own — a logo belongs to the brand.

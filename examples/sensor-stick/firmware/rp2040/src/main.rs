@@ -89,16 +89,16 @@ async fn main(_spawner: Spawner) {
 
     let work = async {
         Timer::after_millis(40).await;
-        let _ = i2c.write_async(aht20::ADDRESS, aht20::INIT).await;
+        let _ = i2c.write_async(board::SENSOR_I2C_ADDRESS, aht20::INIT).await;
         let mut frame = [0u8; encoded_len(reading::LEN)];
         loop {
             Timer::after_millis(1000 - aht20::MEASURE_MS).await;
-            if i2c.write_async(aht20::ADDRESS, aht20::MEASURE).await.is_err() {
+            if i2c.write_async(board::SENSOR_I2C_ADDRESS, aht20::MEASURE).await.is_err() {
                 continue;
             }
             Timer::after_millis(aht20::MEASURE_MS).await;
             let mut raw = [0u8; 7];
-            if i2c.read_async(aht20::ADDRESS, &mut raw).await.is_err() {
+            if i2c.read_async(board::SENSOR_I2C_ADDRESS, &mut raw).await.is_err() {
                 continue;
             }
             let Some(r) = aht20::convert(&raw) else { continue };

@@ -22,6 +22,10 @@ fields = [
 A payload is the `kind` byte, then each field in order, little-endian.
 Types: `u8`, `i8`, `u16`, `i16`, `u32`, `i32`, `f32`.
 
+A field may declare `scale` (what one count is worth: `0.01` for hundredths)
+and `unit` (`"°C"`). The web side then gets `READING_UNITS` and
+`readingValues(m)`, the fields in their units, so no page divides by hand.
+
 ## What is derived
 
 | File | For | Gives |

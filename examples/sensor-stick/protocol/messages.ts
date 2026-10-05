@@ -30,3 +30,17 @@ export function encodeReading(m: Reading): Uint8Array {
   v.setUint16(3, m.centiPercentRh, true)
   return p
 }
+
+/** Each field's unit, as declared. */
+export const READING_UNITS = {
+  centiCelsius: "°C",
+  centiPercentRh: "%RH",
+} as const
+
+/** A `reading` in its units: each field times its declared scale. */
+export function readingValues(m: Reading): Reading {
+  return {
+    centiCelsius: m.centiCelsius * 0.01,
+    centiPercentRh: m.centiPercentRh * 0.01,
+  }
+}

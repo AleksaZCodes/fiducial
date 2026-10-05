@@ -1,8 +1,9 @@
-// A reading off the wire. The payload's layout is not written here: it is
-// declared once in protocol.toml and derived into protocol/messages.ts, the
-// same table the firmware's encoder (protocol/messages.rs) comes from.
+// A reading off the wire, and how the page shows it. The payload's layout,
+// scale and units are not written here: they are declared once in
+// protocol.toml and derived into protocol/messages.ts, the same table the
+// firmware's encoder (protocol/messages.rs) comes from.
 
-import { decodeReading } from '../../protocol/messages.ts'
+import { READING_UNITS, decodeReading, readingValues } from '../../protocol/messages.ts'
 
 export interface Reading {
   celsius: number
@@ -13,5 +14,11 @@ export interface Reading {
 export function decode(payload: Uint8Array): Reading | null {
   const r = decodeReading(payload)
   if (r === null) return null
-  return { celsius: r.centiCelsius / 100, percentRh: r.centiPercentRh / 100 }
+  const v = readingValues(r)
+  return { celsius: v.centiCelsius, percentRh: v.centiPercentRh }
+}
+
+/** What the page shows for a reading. */
+export function show(r: Reading): string {
+  return `${r.celsius.toFixed(1)} ${READING_UNITS.centiCelsius} · ${r.percentRh.toFixed(0)} ${READING_UNITS.centiPercentRh}`
 }

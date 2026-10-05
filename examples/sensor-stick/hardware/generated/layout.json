@@ -5819,7 +5819,8 @@
     "check `CC reads as a sink to a 1.5 A source`: CC1 is 0.941 V, inside 0.7–1.16 V (solved from the declared resistors)",
     "check `CC reads as a sink to a 1.5 A source`: CC2 is 0.941 V, inside 0.7–1.16 V (solved from the declared resistors)",
     "check `CC reads as a sink to a 3 A source`: CC1 is 1.689 V, inside 1.31–2.04 V (solved from the declared resistors)",
-    "check `CC reads as a sink to a 3 A source`: CC2 is 1.689 V, inside 1.31–2.04 V (solved from the declared resistors)"
+    "check `CC reads as a sink to a 3 A source`: CC2 is 1.689 V, inside 1.31–2.04 V (solved from the declared resistors)",
+    "pin voltages: every pin of a part with `io_max_v` is within it, with 1V1 at 1.1 V, 3V3 at 3.3 V, VBUS at 5 V"
   ],
   "wires": []
 }

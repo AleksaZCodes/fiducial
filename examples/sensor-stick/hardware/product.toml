@@ -162,6 +162,7 @@ mpn       = "RP2040"
 lcsc      = "C2040"
 datasheet = "https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf"
 pins      = { IOVDD = "3V3", USB_VDD = "3V3", ADC_AVDD = "3V3", VREG_IN = "3V3", VREG_VOUT = "1V1", DVDD = "1V1", GND = "GND", TESTEN = "GND", USB_DP = "USB_DP_MCU", USB_DM = "USB_DM_MCU", XIN = "XIN", XOUT = "XOUT", QSPI_SS = "QSPI_SS", QSPI_SCLK = "QSPI_SCLK", QSPI_SD0 = "QSPI_SD0", QSPI_SD1 = "QSPI_SD1", QSPI_SD2 = "QSPI_SD2", QSPI_SD3 = "QSPI_SD3", GPIO4 = "SENSOR_SDA", GPIO5 = "SENSOR_SCL", GPIO16 = "LED_DIN" }
+io_max_v  = 3.8          # RP2040 datasheet, absolute maximum: IOVDD + 0.5 V
 status    = "decided"
 
 [[part]]
@@ -321,6 +322,7 @@ mpn       = "AHT20"
 lcsc      = "C2757850"
 pins      = { VDD = "3V3", GND = "GND", SDA = "SENSOR_SDA", SCL = "SENSOR_SCL" }
 status    = "decided"
+i2c_address = 0x38       # AHT20 datasheet: fixed 7-bit address
 
 [[part]]
 id        = "r-sda"
@@ -409,6 +411,15 @@ status    = "decided"
 
 [firmware]
 mcu = "mcu"
+
+# ── Rails, and what each pin can take ────────────────────────────────────────
+# Every net a resistor pulls toward a rail is solved at these voltages, and a
+# pin above its part's `io_max_v` fails derive: a pull-up moved to VBUS would
+# hold the RP2040's 3.3 V I/O at 5 V.
+[rails]
+VBUS  = 5.0
+"3V3" = 3.3
+"1V1" = 1.1
 
 # ── Set points, checked on every derive ──────────────────────────────────────
 # A USB-C source advertises its current with a pull-up on CC (5 V through

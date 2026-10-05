@@ -9,6 +9,6 @@ name   = "reading"
 kind   = 1
 doc    = "One temperature and humidity reading, sent once a second."
 fields = [
-  { name = "centi_celsius", type = "i16", doc = "Temperature, °C × 100" },
-  { name = "centi_percent_rh", type = "u16", doc = "Relative humidity, %RH × 100" },
+  { name = "centi_celsius", type = "i16", doc = "Temperature, °C × 100", scale = 0.01, unit = "°C" },
+  { name = "centi_percent_rh", type = "u16", doc = "Relative humidity, %RH × 100", scale = 0.01, unit = "%RH" },
 ]

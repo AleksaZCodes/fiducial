@@ -4631,7 +4631,7 @@ base_content = """
 [artifacts."hardware/generated/assembly.md"]
 pipeline = "hardware"
 source_version = "0.9.6"
-hash = "efd9de333e2b0cf8c49fb7089a6163a972af398e8708d6e48864d03f6700117c"
+hash = "57c58d2f7fe980dd767c04b3d13f8c88c14fcabaeaa86d9557ec435297656056"
 
 [artifacts."hardware/generated/board.kicad_pcb"]
 pipeline = "hardware"
@@ -4646,7 +4646,7 @@ hash = "9d35b60d5b2bf6a184cb5665ef3be762cb0e73315b981c7f5add739857470428"
 [artifacts."hardware/generated/board.rs"]
 pipeline = "hardware"
 source_version = "0.9.6"
-hash = "bf7afda3e9e69a60c7bcf51ef7e89fb7ebcbe1783706436ff7809e9f8bc6d7c1"
+hash = "0e32ad68c8f25ad1992051b701e432efba9d94cb10352d4feccba744ea581e46"
 
 [artifacts."hardware/generated/bom.csv"]
 pipeline = "hardware"
@@ -4676,7 +4676,7 @@ hash = "6ddc6361d467c61216e4abbf84a846bff50488bf1a109999adbdb4672b7333ec"
 [artifacts."hardware/generated/layout.json"]
 pipeline = "hardware"
 source_version = "0.9.6"
-hash = "ec7ea557cbeb5e68a80d88d19f3dfc61c9f21cdff63bd3e564d1b8bc08ccb33a"
+hash = "85890c345f240f81d06f697a38a99744d26ca662ab1a3e916c9ee6536227e7bc"
 
 [artifacts."hardware/generated/placement-model.json"]
 pipeline = "hardware"
@@ -4696,7 +4696,7 @@ hash = "7781db96a39d28868eab4c15b95ff9860999ffcbc2987cce738886f9af13f0e2"
 [artifacts."protocol/messages.ts"]
 pipeline = "protocol"
 source_version = "0.9.6"
-hash = "693b82922532e6ec76c9e27d945b7269259292f8837fa7ccc82aa4f63e18ef94"
+hash = "bf951315921cf4e8700fec068047c6d47b46dc75f0ada66d11170846f37092bc"
 
 [capabilities.firmware-rp2040]
 source = "built-in"
@@ -4781,11 +4781,11 @@ hash = "792edbe333edb73d259dbf466ca35c5acb60fd724eff5884c382e598f771549f"
 pipelines = ["hardware"]
 
 [inputs."hardware/product.toml"]
-hash = "52af90c3b00161a7d1df9c064727f766df40ad1de3e6ef76ba4a130951c97999"
+hash = "453a96610918fa55d1a9dd9585da37c8a86c6aabeda31e09ccf0b8b306126769"
 pipelines = ["hardware"]
 
 [inputs."protocol.toml"]
-hash = "eb7dd946f551bbaaad67516a40bc85927b853c09e527fdf8ecb88aeb5e257cfa"
+hash = "d423de8742b672ddfd58fe4482b0a3239aa9ba81354b336ebd2485cf8ca80f87"
 pipelines = ["protocol"]
 
 [inputs."thesis.toml"]

@@ -31,3 +31,6 @@ macro_rules! sensor_sda {
     };
 }
 pub(crate) use sensor_sda;
+
+/// `sensor` (AHT20): its I²C address.
+pub const SENSOR_I2C_ADDRESS: u8 = 0x38;

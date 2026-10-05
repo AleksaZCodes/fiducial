@@ -8,8 +8,6 @@ pub use fiducial_protocol::{encode, encoded_len, FrameDecoder};
 
 /// The AHT20 temperature and humidity sensor (Aosong), over I²C.
 pub mod aht20 {
-    /// Its fixed I²C address.
-    pub const ADDRESS: u8 = 0x38;
     /// Calibrate, once after power-up (datasheet §5.4: wait 40 ms first).
     pub const INIT: [u8; 3] = [0xBE, 0x08, 0x00];
     /// Start a measurement; the result is ready 80 ms later.
