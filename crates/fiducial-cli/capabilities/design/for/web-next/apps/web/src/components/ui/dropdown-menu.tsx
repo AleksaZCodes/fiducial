@@ -1,7 +1,7 @@
 "use client"
 
-import * as React from "react"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
+import type * as React from "react"
 import { IconPlaceholder } from "@/components/icon-placeholder"
 import { cn } from "@/lib/utils"
 
