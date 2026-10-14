@@ -1,0 +1,22 @@
+# The product is one pnpm workspace, rooted here.
+#
+# It used to live at `apps/web/pnpm-workspace.yaml`, which made the web app a
+# workspace of its own. In a product that already had a root workspace (fon),
+# running pnpm from `apps/web` then started a second install with its own
+# lockfile and its own `node_modules`, and failed on the install scripts the
+# root had allowed. One root, every app under it.
+#
+# A product that already has this file keeps its own: `fid add` and
+# `fid upgrade` never overwrite a file the platform did not write.
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Since pnpm 10 a dependency's install script does not run unless it is
+# allowed, and pnpm 11 fails the install — and then refuses `pnpm build`,
+# `pnpm dev` and every other script — while one is undecided. Biome's
+# postinstall only checks that its platform binary landed, so it is allowed.
+# `allowBuilds` (pnpm 10.26+) replaced `onlyBuiltDependencies`, which pnpm 11
+# ignores.
+allowBuilds:
+  "@biomejs/biome": true

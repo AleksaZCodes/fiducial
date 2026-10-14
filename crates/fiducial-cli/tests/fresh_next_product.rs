@@ -185,9 +185,36 @@ fn every_import_the_app_makes_is_declared_or_shipped() {
         declared("tailwindcss") && declared("@tailwindcss/postcss") && declared("@types/react-dom"),
         "{pkg}"
     );
+    let workspace = std::fs::read_to_string(root.join("pnpm-workspace.yaml"))
+        .expect("pnpm 11 refuses every script until Biome's install script is decided");
     assert!(
-        web.join("pnpm-workspace.yaml").exists(),
-        "pnpm 11 refuses every script until Biome's install script is decided"
+        workspace.contains("allowBuilds") && workspace.contains("\"apps/*\""),
+        "{workspace}"
+    );
+    assert!(
+        !web.join("pnpm-workspace.yaml").exists(),
+        "a second workspace root inside apps/web makes pnpm install there separately"
+    );
+}
+
+/// A product that is already a pnpm workspace keeps its own root file.
+///
+/// fon's root `pnpm-workspace.yaml` lists its packages and the install scripts
+/// it has vetted (esbuild, workerd). Writing the template over it would drop
+/// both — so `fid add` keeps a file the platform did not write.
+#[test]
+fn an_existing_root_workspace_is_kept() {
+    let tmp = tempfile::tempdir().unwrap();
+    assert!(run(tmp.path(), &["new", "p"]).status.success());
+    let root = tmp.path().join("p");
+    let own = "packages:\n  - \"apps/*\"\nallowBuilds:\n  esbuild: true\n";
+    std::fs::write(root.join("pnpm-workspace.yaml"), own).unwrap();
+    assert!(run(&root, &["add", "design"]).status.success());
+    let out = run(&root, &["add", "app", "next"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert_eq!(
+        std::fs::read_to_string(root.join("pnpm-workspace.yaml")).unwrap(),
+        own
     );
 }
 
