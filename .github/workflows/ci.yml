@@ -286,24 +286,23 @@ jobs:
       - name: fid doctor (a product the platform scaffolded and the person edited is not drift)
         run: fid doctor
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: vendored KiCad components match the declaration
-        run: python3 hardware/parts.py check
-
-      # Freerouting, which route.py fetches and pins by hash, needs Java 21.
+      # Freerouting, which route.py fetches and pins by hash, needs Java 21. The
+      # runner's default `java` is older; this puts 21 first on PATH, and
+      # setup.sh then finds it and installs none.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
 
-      - name: install build123d + KiCad
-        run: |
-          pip install -r hardware/requirements.txt
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends kicad
+      # The same script a person runs on their own machine: KiCad from apt,
+      # hardware/.venv with pcbnew visible and requirements.txt installed.
+      # CI used to do this inline, so the only description of the toolchain
+      # was this YAML.
+      - name: hardware toolchain (hardware/setup.sh)
+        run: hardware/setup.sh
+
+      - name: vendored KiCad components match the declaration
+        run: hardware/.venv/bin/python hardware/parts.py check
 
       - name: build (fails unless the board routes, passes DRC and the product goes together)
         run: SKIP_RENDER=1 hardware/build.sh

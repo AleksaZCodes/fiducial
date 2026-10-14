@@ -2,10 +2,10 @@
 # hardware/product.toml → everything a manufacturer and a reviewer need.
 #
 #   fid derive --pipeline hardware       solve (gated): layout, BOM, board, schematic
-#   python3 hardware/ratsnest.py         the placement and its ratsnest → build/review/ratsnest.svg
-#   /usr/bin/python3 hardware/route.py   route, pour and DRC the board (KiCad's own Python)
-#   python3 hardware/cad.py              solids + fit/assembly checks → hardware/build/
-#   python3 hardware/fab.py              Gerbers + zip, assembly BOM, CPL → build/fab/
+#   $PY hardware/ratsnest.py             the placement and its ratsnest → build/review/ratsnest.svg
+#   $PY hardware/route.py                route, pour and DRC the board (KiCad's pcbnew)
+#   $PY hardware/cad.py                  solids + fit/assembly checks → hardware/build/
+#   $PY hardware/fab.py                  Gerbers + zip, assembly BOM, CPL → build/fab/
 #   kicad-cli                            board STEP and the schematic PDF
 #   node hardware/render.mjs             review pack → hardware/build/review/
 #
@@ -14,22 +14,41 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# One interpreter for every step: `FID_PYTHON`, else the environment
+# `hardware/setup.sh` makes, else `python3`. It used to be `python3` for most
+# steps and `/usr/bin/python3` for routing — two interpreters with two sets of
+# packages, and the requirements pip-installed into a system Python that
+# Ubuntu 23.04+ refuses to install into.
+if [ -n "${FID_PYTHON:-}" ]; then
+  PY=$FID_PYTHON
+elif [ -x hardware/.venv/bin/python ]; then
+  PY=hardware/.venv/bin/python
+else
+  PY=python3
+fi
+export FID_PYTHON=$PY
+
+hardware/setup.sh --check || {
+  echo "run hardware/setup.sh first — it installs what is missing" >&2
+  exit 1
+}
+
 fid derive --pipeline hardware
-python3 hardware/ratsnest.py
+$PY hardware/ratsnest.py
 
 pcb=hardware/generated/board.kicad_pcb
 rm -f hardware/build/copper.json
 if [ -f "$pcb" ] && [ "${SKIP_ROUTE:-0}" != "1" ]; then
-  /usr/bin/python3 hardware/route.py
+  $PY hardware/route.py
   pcb=hardware/build/board-routed.kicad_pcb
 fi
 
-python3 hardware/cad.py
+$PY hardware/cad.py
 
 if [ -f "$pcb" ]; then
   # Gerbers, drill, gerbers.zip, assembly BOM and placement (CPL), and the
   # list of parts an assembly service cannot source yet: hardware/build/fab/.
-  python3 hardware/fab.py
+  $PY hardware/fab.py
   kicad-cli pcb export step --subst-models -f -o hardware/build/board.step "$pcb"
 fi
 sch=hardware/generated/board.kicad_sch

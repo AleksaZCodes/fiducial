@@ -247,9 +247,11 @@ fn check_tools(cfg: &Config, reports: &mut Vec<String>, ok: &mut Vec<String>) {
     }
 
     let mut missing: Vec<String> = Vec::new();
+    let mut short: std::collections::BTreeSet<String> = Default::default();
     for (tool, wanted_by) in &needed {
         if which(tool).is_none() {
             missing.push(format!("`{tool}` — needed by {}", wanted_by.join(", ")));
+            short.extend(wanted_by.iter().cloned());
         }
     }
 
@@ -258,6 +260,17 @@ fn check_tools(cfg: &Config, reports: &mut Vec<String>, ok: &mut Vec<String>) {
     } else {
         for m in missing {
             reports.push(format!("not on PATH: {m}"));
+        }
+        // Saying what is absent without saying how to get it sent people to
+        // read CI's YAML. A capability that ships a `setup.sh` is the answer:
+        // the directory is the declaration, so no manifest key is needed.
+        for id in short {
+            let Some(cap) = crate::capability::find(&id) else {
+                continue;
+            };
+            if let Some(setup) = cap.templates.iter().find(|f| f.path.ends_with("/setup.sh")) {
+                reports.push(format!("  `{}` installs what {id} needs", setup.path));
+            }
         }
     }
 }

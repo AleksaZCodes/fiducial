@@ -80,7 +80,7 @@ pub fn solve_at(root: &Path, model: &Value, answer_path: &str, what: &str) -> Re
             // another model), so a small change moves little.
             let hint = previous.map(|v| v["items"].clone()).unwrap_or(Value::Null);
             let input = serde_json::to_string(&json!({ "model": model, "hint": hint }))?;
-            let mut v = run(&input)?;
+            let mut v = run(root, &input)?;
             v["model_sha256"] = json!(stamp);
             v
         }
@@ -157,13 +157,22 @@ pub fn solve_at(root: &Path, model: &Value, answer_path: &str, what: &str) -> Re
     })
 }
 
-/// The interpreter: `FID_PYTHON`, else `python3`.
-fn python() -> String {
-    std::env::var("FID_PYTHON").unwrap_or_else(|_| "python3".into())
+/// The interpreter: `FID_PYTHON`, else the environment `hardware/setup.sh`
+/// makes (which has ortools), else `python3`. The same order `build.sh` uses,
+/// so the solver and the build never run on two different Pythons.
+fn python(root: &Path) -> String {
+    if let Ok(py) = std::env::var("FID_PYTHON") {
+        return py;
+    }
+    let venv = root.join("hardware/.venv/bin/python");
+    if venv.exists() {
+        return venv.to_string_lossy().into_owned();
+    }
+    "python3".into()
 }
 
-fn run(input: &str) -> Result<Value> {
-    let py = python();
+fn run(root: &Path, input: &str) -> Result<Value> {
+    let py = python(root);
     let mut child = Command::new(&py)
         .arg("-c")
         .arg(PLACE_PY)

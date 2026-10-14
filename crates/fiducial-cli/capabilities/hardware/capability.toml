@@ -5,5 +5,7 @@ description = "A physical product declared once: outline, regions, parts, mounts
 # model runs hardware/place.py, which needs python3 with ortools.
 # They are what turns the gated layout into things a manufacturer and a person
 # can use — the solid model (build123d, on python3), the board's fab outputs
-# (kicad-cli), and the review renders (node, with `three` and `playwright-core`).
-requires_tools = ["python3", "kicad-cli", "node"]
+# (kicad-cli), the router (java, for Freerouting), and the review renders
+# (node, with `three` and `playwright-core`). `hardware/setup.sh` installs all
+# but node, and `fid doctor` names it when any of these is missing.
+requires_tools = ["python3", "kicad-cli", "java", "node"]
