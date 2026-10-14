@@ -195,6 +195,12 @@ fn every_import_the_app_makes_is_declared_or_shipped() {
         !web.join("pnpm-workspace.yaml").exists(),
         "a second workspace root inside apps/web makes pnpm install there separately"
     );
+    let biome = std::fs::read_to_string(root.join("biome.json"))
+        .expect("without a Biome config, `pnpm lint` runs on Biome's defaults and fails (#99)");
+    assert!(
+        biome.contains("\"indentWidth\": 2") && biome.contains("**/generated/**"),
+        "{biome}"
+    );
 }
 
 /// A product that is already a pnpm workspace keeps its own root file.
@@ -282,4 +288,26 @@ fn next_without_design_is_refused_with_the_fix() {
     let out = run(&tmp.path().join("p"), &["add", "app", "next"]);
     assert!(!out.status.success());
     assert!(text(&out).contains("design"), "{}", text(&out));
+}
+
+/// No `{{placeholder}}` reaches a product, however it is spaced.
+///
+/// Formatting the templates with Biome turned `{{version}}` in JSX text into
+/// `{{ version }}` — an object literal to the formatter — which `fid` did not
+/// expand, and the app stopped typechecking. Every placeholder the expander
+/// knows is checked for, with any whitespace inside the braces.
+#[test]
+fn no_template_placeholder_survives_into_a_product() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path(), &["add", "app", "next"]);
+    for (path, body) in web_files(&root) {
+        for name in ["name", "version", "principles"] {
+            let squeezed: String = body.split_whitespace().collect();
+            assert!(
+                !squeezed.contains(&format!("{{{{{name}}}}}")),
+                "{} still holds the `{name}` placeholder",
+                path.display()
+            );
+        }
+    }
 }

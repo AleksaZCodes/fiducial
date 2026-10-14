@@ -1,4 +1,4 @@
-import { type Locale } from "@/generated/messages";
+import type { Locale } from "@/generated/messages";
 import { formatContentDate } from "@/lib/intl";
 import Link from "next/link";
 import styles from "./entry-cards.module.css";

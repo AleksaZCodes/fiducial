@@ -219,26 +219,29 @@ fn rewrite_imports(source: &str, lib: &Library, icons: &[String]) -> String {
         .map(str::to_string)
         .collect();
 
-    let added: Vec<String> = lib
-        .imports
-        .iter()
-        .map(|(module, fixed)| {
-            let names = if fixed.is_empty() {
-                icons.join(", ")
-            } else {
-                fixed.join(", ")
-            };
-            format!("import {{ {names} }} from \"{module}\"{end}")
-        })
-        .collect();
-
-    let at = lines
-        .iter()
-        .rposition(|l| l.trim_start().starts_with("import "))
-        .map(|i| i + 1)
-        .unwrap_or(0);
-    for (i, line) in added.into_iter().enumerate() {
-        lines.insert(at + i, line);
+    // Each import goes where Biome's `organizeImports` would put it — sorted
+    // by module path, names sorted inside the braces — so a product's
+    // `pnpm lint` passes on the file as written, whichever library it chose.
+    // Appending after the last import read as unsorted for every library.
+    let mut sorted_icons: Vec<&str> = icons.iter().map(String::as_str).collect();
+    sorted_icons.sort_unstable();
+    for (module, fixed) in lib.imports {
+        let names = if fixed.is_empty() {
+            sorted_icons.join(", ")
+        } else {
+            fixed.join(", ")
+        };
+        let line = format!("import {{ {names} }} from \"{module}\"{end}");
+        let imports: Vec<usize> = (0..lines.len())
+            .filter(|&i| lines[i].trim_start().starts_with("import "))
+            .collect();
+        let at = imports
+            .iter()
+            .copied()
+            .find(|&i| sort_key(&lines[i]).is_some_and(|k| k > sort_key(&line).unwrap()))
+            .or_else(|| imports.last().map(|i| i + 1))
+            .unwrap_or(0);
+        lines.insert(at, line);
     }
 
     let mut joined = lines.join("\n");
@@ -246,6 +249,17 @@ fn rewrite_imports(source: &str, lib: &Library, icons: &[String]) -> String {
         joined.push('\n');
     }
     joined
+}
+
+/// The key Biome 1.9 sorts a one-line import by: its module path, with
+/// relative paths after everything else. `None` for a line it cannot read.
+fn sort_key(line: &str) -> Option<(bool, String)> {
+    let from = line.rsplit_once(" from ")?.1;
+    let module = from
+        .trim()
+        .trim_end_matches(';')
+        .trim_matches(|c| c == '"' || c == '\'');
+    Some((module.starts_with('.'), module.to_string()))
 }
 
 /// One JSX attribute: its name, and its value as written (`"…"` or `{…}`), or
@@ -425,7 +439,7 @@ export function A() {
         );
         assert!(out.contains(r#"import { HugeiconsIcon } from "@hugeicons/react";"#));
         assert!(out.contains(
-            r#"import { Tick02Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";"#
+            r#"import { ArrowRight01Icon, Tick02Icon } from "@hugeicons/core-free-icons";"#
         ));
     }
 

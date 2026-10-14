@@ -60,6 +60,10 @@ for lib in $icons; do
     cd apps/web
     "${pnpm[@]}" install --fetch-timeout 300000
     "${pnpm[@]}" run typecheck
+    # The app's own lint script, over the templates as installed (#99): it
+    # failed on every fresh product, because the platform shipped no Biome
+    # config and nothing here ran it.
+    "${pnpm[@]}" run lint
     "${pnpm[@]}" run build
 
     # Installing and building must not have rewritten a file the platform

@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useId, useRef, useState } from "react";
 // A CSS module, not a global stylesheet: Next.js only allows global CSS from
 // the root layout, so a template that imported one would fail to build in the
 // product that installed it and nowhere else.
 import styles from "./mobile-menu.module.css";
-import { useEffect, useId, useRef, useState } from "react";
 
 /**
  * The nav links on a narrow screen, in a sheet that slides in from the right.
@@ -85,6 +85,7 @@ export function MobileMenu({
         </svg>
       </button>
 
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: the click is a backdrop dismissal; its keyboard equivalent is Escape, which <dialog> handles natively and reports through onClose. */}
       <dialog
         ref={dialog}
         className={styles.sheet}
