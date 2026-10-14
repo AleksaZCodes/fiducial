@@ -289,3 +289,25 @@ fn next_without_design_is_refused_with_the_fix() {
     assert!(!out.status.success());
     assert!(text(&out).contains("design"), "{}", text(&out));
 }
+
+/// No `{{placeholder}}` reaches a product, however it is spaced.
+///
+/// Formatting the templates with Biome turned `{{version}}` in JSX text into
+/// `{{ version }}` — an object literal to the formatter — which `fid` did not
+/// expand, and the app stopped typechecking. Every placeholder the expander
+/// knows is checked for, with any whitespace inside the braces.
+#[test]
+fn no_template_placeholder_survives_into_a_product() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path(), &["add", "app", "next"]);
+    for (path, body) in web_files(&root) {
+        for name in ["name", "version", "principles"] {
+            let squeezed: String = body.split_whitespace().collect();
+            assert!(
+                !squeezed.contains(&format!("{{{{{name}}}}}")),
+                "{} still holds the `{name}` placeholder",
+                path.display()
+            );
+        }
+    }
+}
