@@ -149,8 +149,8 @@ product actually needs.
 | `research` | declares `paper`; seeds a `fiducial.toml` block | `fid add capability research` |
 | `seo` | declares `seo`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability seo` |
 | `tauri` | 5 template file(s); guard rules | `fid add capability tauri` |
-| `web-next` | 12 template file(s); guard rules | `fid add capability web-next` |
-| `web-svelte` | 10 template file(s); guard rules | `fid add capability web-svelte` |
+| `web-next` | 13 template file(s); guard rules | `fid add capability web-next` |
+| `web-svelte` | 11 template file(s); guard rules | `fid add capability web-svelte` |
 | `worker-cloudflare` | 1 template file(s); guard rules | `fid add capability worker-cloudflare` |
 <!-- fid:end capabilities -->
 
