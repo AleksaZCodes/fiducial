@@ -1,2 +1,13 @@
 description = "Next.js web app with Turborepo wiring, Biome, and Changesets"
 guard_rules = ["no-unpinned-cli-fetch"]
+
+# The app's stylesheet is written against the design system. `globals.css`
+# imports `tokens.css` (derived by the design pipeline) and `marks.css`
+# (installed by `design`), and the components it expects — button, card,
+# dropdown — arrive with `design` too. Without it the first `next build` fails
+# on a missing import.
+#
+# This held implicitly while `fid new` installed `design` into every product.
+# When `fid new` became minimal, nothing declared the dependency, and a
+# minimal product with `fid add app next` stopped building. So it is declared.
+requires_capabilities = ["design"]

@@ -1,7 +1,6 @@
 import { cn } from "@/lib/utils";
+import { Button as ButtonPrimitive } from "@base-ui/react/button";
 import { type VariantProps, cva } from "class-variance-authority";
-import { Slot } from "radix-ui";
-import type * as React from "react";
 
 /**
  * Button — shadcn/ui's, with the corner and the surface swapped.
@@ -23,13 +22,23 @@ import type * as React from "react";
  *     so no call site passes `size-4` by hand and gets it wrong.
  *   · `has-[>svg]:px-3` — an icon-bearing button gets tighter padding, because
  *     an icon is optically wider than the space a letter would take.
- *   · `asChild` / `Slot.Root` — the reason a link can be a button without a
- *     `<button>` wrapped in an `<a>`, which is invalid HTML and a real
- *     screen-reader bug.
+ *   · `render` — the reason a link can be a button without a `<button>`
+ *     wrapped in an `<a>`, which is invalid HTML and a real screen-reader
+ *     bug: `<Button render={<a href="/x" />} nativeButton={false}>`. The
+ *     `nativeButton={false}` is not optional — without it Base UI gives the
+ *     anchor button semantics it does not have.
  *
  * Writing this component from scratch would have meant re-deriving all of that
  * and getting some of it wrong. That is the whole argument for starting from
  * the real thing.
+ *
+ * ## The primitive is Base UI
+ *
+ * It started as shadcn's Radix button (`Slot` / `asChild`). Fiducial's React
+ * components sit on Base UI, so it is now shadcn's `base-*` button: Base UI's
+ * `Button` with `render` in place of `asChild`, which is what
+ * `npx shadcn add button` writes under this app's `base-vega` style. The
+ * classes below are unchanged by that — only the element underneath moved.
  *
  * ## What the first product changed, and why it had to change
  *
@@ -101,16 +110,10 @@ function Button({
   className,
   variant = "default",
   size = "default",
-  asChild = false,
   ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean;
-  }) {
-  const Comp = asChild ? Slot.Root : "button";
-
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
   return (
-    <Comp
+    <ButtonPrimitive
       data-slot="button"
       data-variant={variant}
       data-size={size}

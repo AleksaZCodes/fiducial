@@ -1,0 +1,11 @@
+# pnpm settings for this app. pnpm reads them from here even with no
+# `packages:` list.
+#
+# Since pnpm 10 a dependency's install script does not run unless it is
+# allowed, and pnpm 11 fails the install — and then refuses `pnpm build`,
+# `pnpm dev` and every other script — while one is undecided. Biome's
+# postinstall only checks that its platform binary landed, so it is allowed.
+# `allowBuilds` (pnpm 10.26+) replaced `onlyBuiltDependencies`, which pnpm 11
+# ignores.
+allowBuilds:
+  "@biomejs/biome": true

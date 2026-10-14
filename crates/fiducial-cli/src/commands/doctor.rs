@@ -437,6 +437,12 @@ fn check_lock(
         }
     };
 
+    // Retirement is per product: a path one capability gave up may still be
+    // shipped by another this product has.
+    let enabled = Config::load(&root.join(crate::config::CONFIG_FILE))
+        .map(|c| c.capabilities.enabled)
+        .unwrap_or_default();
+
     ok.push(format!(
         "fiducial.lock valid  ({} template(s) tracked, {} migration(s) applied)",
         lock.templates.len(),
@@ -470,6 +476,7 @@ fn check_lock(
         if let Some((_, why)) = crate::templates::RETIRED_TEMPLATES
             .iter()
             .find(|(p, _)| *p == key)
+            .filter(|(p, _)| crate::templates::raw_for(p, &enabled).is_none())
         {
             drifted.push(format!(
                 "{rel}: the platform no longer ships it ({why}). `fid upgrade` stops \
@@ -502,7 +509,7 @@ fn check_lock(
 }
 
 fn check_upstream_templates(
-    _root: &Path,
+    root: &Path,
     cfg: &Config,
     lock: &Lock,
     warnings: &mut Vec<String>,
@@ -519,6 +526,15 @@ fn check_upstream_templates(
             Some(r) => r,
             None => continue, // Path not in registry.
         };
+        // As this product would receive it — icons in its declared library.
+        let raw = match templates::for_product(root, raw) {
+            Ok(r) => r,
+            Err(e) => {
+                warnings.push(format!("{rel_path}: {e}"));
+                continue;
+            }
+        };
+        let raw = raw.as_ref();
         // Compared at the version the product recorded, not at this binary's:
         // otherwise every template carrying a `{{version}}` stamp reads as
         // drift the moment the platform version moves. See

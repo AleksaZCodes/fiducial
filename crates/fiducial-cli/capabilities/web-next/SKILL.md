@@ -9,10 +9,11 @@ is installed. Read it once at session start; do not re-derive it.
 
 ## What this capability adds
 
-A Next.js 15 (App Router) web application at `apps/web/`, wired into the
+A Next.js 16 (App Router) web application at `apps/web/`, wired into the
 Turborepo pipeline. It uses:
 
-- **Next.js 15** with the App Router and React Server Components
+- **Next.js 16** with the App Router and React Server Components
+- **Tailwind CSS 4** through `@tailwindcss/postcss` (`postcss.config.mjs`)
 - **Biome** for formatting and linting (no ESLint, no Prettier)
 - **TypeScript** (strict mode)
 - **pnpm** as the package manager
@@ -48,33 +49,37 @@ apps/web/src/app/
 Declare in `apps/web/.env.local` (git-ignored). Prefix with `NEXT_PUBLIC_` to
 expose to the browser. Never commit secrets — use the declared secret store.
 
-## Components (registry model — shadcn conventions)
+## Components (registry model — shadcn conventions, Base UI underneath)
 
-Components are **copy-in**, not installed as a package dependency. Use `fid add component`
-to copy into `apps/web/src/components/ui/`:
+Components are **copy-in**, not installed as a package dependency — either the
+platform's (`fid add component <name>`) or shadcn's (`npx shadcn add <name>`),
+both into `apps/web/src/components/ui/`:
 
 ```sh
 fid add component button
 fid add component card
 fid add component badge
-fid add component dialog    # requires: pnpm add @base-ui/react
+fid add component dialog
 ```
 
-**Convention (shadcn-compatible):**
-- All components use **Tailwind utility classes**, `cn()` (clsx + tailwind-merge),
-  and `cva` (class-variance-authority). Same conventions as shadcn/ui.
-- Simple components (button, card, badge) use native HTML — no headless library.
-- Complex components (dialog, popover, menu) use **Base UI**
-  (`@base-ui/react`) internally instead of Radix. The external API
-  matches shadcn exactly; only the internal primitive layer differs.
-- `components.json` is scaffolded at `apps/web/components.json` and configures
-  the shadcn registry aliases (`@/components/ui`, `@/lib/utils`, etc.).
+**Convention:**
+- Tailwind utility classes, `cn()` from `@/lib/utils` (clsx + tailwind-merge,
+  shipped with this app), and `cva` for variants. The same conventions as
+  shadcn/ui.
+- **The primitive layer is Base UI (`@base-ui/react`), never Radix.** Do not add
+  `radix-ui` or any `@radix-ui/*` package. `components.json` declares the
+  `base-vega` style, so `npx shadcn add` writes Base UI components too.
+  Composition is `render`, not `asChild`.
+- **Icons come from the library the product chose**, declared once as
+  `iconLibrary` in `components.json` — `lucide`, `tabler`, `hugeicons`,
+  `phosphor` or `remixicon`. Choose it with
+  `fid add app next --icons <library>` (lucide when omitted); change it later
+  with `npx shadcn migrate icons --from <old> --to <new>`, then `fid upgrade`.
+  Platform components are written with `<IconPlaceholder>` and rewritten for
+  the declared library when they are installed.
 
-The web app already has `clsx`, `tailwind-merge`, and `class-variance-authority`
-in its `package.json`. For dialog, add Base UI:
-```sh
-pnpm add @base-ui/react --filter @{{name}}/web
-```
+`@base-ui/react`, `clsx`, `tailwind-merge` and `class-variance-authority` are
+already in the app's `package.json`.
 
 After copying, components are yours — edit freely. `fid upgrade` proposes upstream
 changes via 3-way merge (same mechanism as all other template files).

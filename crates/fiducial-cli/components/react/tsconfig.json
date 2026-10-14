@@ -10,8 +10,12 @@
   // copy that was checked imported `./lib/utils` and passed. A typecheck that
   // only ever ran against a file nobody ships is worse than none.
   //
-  // `@/lib/utils` is the alias a product resolves through its own tsconfig; it
-  // is mapped here to the same file so both ends agree.
+  // `@/lib/utils` is the alias a product resolves through its own tsconfig. The
+  // file it names ships in the web-next template, which is its one declaration
+  // (`fid add component` embeds the same bytes), so it is mapped there. That
+  // file sits outside this package's node_modules, so `clsx` and
+  // `tailwind-merge` are mapped to the copies installed here — otherwise the
+  // check would fail on resolution rather than on anything the file says.
   "compilerOptions": {
     "target": "ES2020",
     "module": "ESNext",
@@ -20,8 +24,13 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "paths": { "@/*": ["./*"] }
+    "paths": {
+      "@/lib/utils": ["../../capabilities/web-next/apps/web/src/lib/utils.ts"],
+      "clsx": ["./node_modules/clsx"],
+      "tailwind-merge": ["./node_modules/tailwind-merge"],
+      "@/*": ["./*"]
+    }
   },
-  "include": ["**/*.ts", "**/*.tsx"],
+  "include": ["**/*.ts", "**/*.tsx", "../../capabilities/web-next/apps/web/src/lib/utils.ts"],
   "exclude": ["node_modules"]
 }

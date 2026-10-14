@@ -6,7 +6,7 @@ re-derive it.
 
 ## Platform
 
-Built on [Fiducial](https://github.com/AleksaZCodes/fiducial) 0.9.4.
+Built on [Fiducial](https://github.com/AleksaZCodes/fiducial) 0.9.5.
 
 - `fid dash` — one read-only view of this product's state; start here
 - `fid doctor` — check for drift before starting work
@@ -175,6 +175,15 @@ Shell is still right for what shell is for — the build, the tests, `git`, `fid
 a one-off `wc -l`. Reach for a scripting language when the task is genuinely a
 program: parsing JSON to answer a question, arithmetic over a data file,
 generating a fixture. Not to perform an edit.
+
+## Current docs before code
+
+Before writing against any library with a versioned API — Next.js, Base UI,
+Tailwind, pnpm, Embassy, Tauri, anything — fetch its current docs with
+context7, and check the version this product pins first. The `fiducial`
+plugin's `context7` skill has the how, and what to do when context7 is down:
+say so, then go to the registry or the installed package's types — never to
+memory.
 
 ## Capability instructions
 

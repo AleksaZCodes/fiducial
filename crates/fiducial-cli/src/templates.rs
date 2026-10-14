@@ -174,10 +174,20 @@ pub const RENAMED_TEMPLATES: &[(&str, &str)] = &[
 /// that `fid upgrade` restores it, which it cannot. A whole `fid upgrade`
 /// drops the record and removes the file **only when it is unmodified** — an
 /// edited copy is the product's now, and stays.
-pub const RETIRED_TEMPLATES: &[(&str, &str)] = &[(
-    ".github/workflows/claude-review.yml",
-    "review is on request (`fiducial-review`, `/code-review`), not a CI job on every pull request",
-)];
+///
+/// A path is retired only for a product in which no installed capability still
+/// ships it — `board/page.tsx` left web-next for `eda`, and a product with
+/// both keeps it.
+pub const RETIRED_TEMPLATES: &[(&str, &str)] = &[
+    (
+        ".github/workflows/claude-review.yml",
+        "review is on request (`fiducial-review`, `/code-review`), not a CI job on every pull request",
+    ),
+    (
+        "apps/web/src/app/board/page.tsx",
+        "the PCB viewer page ships with `eda` now, not with every Next app — it imported `@fiducial/viewer3d-react`, which no website declared",
+    ),
+];
 
 // ── Lookup ────────────────────────────────────────────────────────────────────
 
@@ -240,7 +250,7 @@ pub fn raw_for(rel_path: &str, enabled: &[String]) -> Option<&'static str> {
         let Some(cap) = crate::capability::find(id) else {
             continue;
         };
-        let Some(content) = capability_file(cap, rel_path) else {
+        let Some(content) = capability_file(cap, rel_path, enabled) else {
             continue;
         };
         match found {
@@ -255,6 +265,7 @@ pub fn raw_for(rel_path: &str, enabled: &[String]) -> Option<&'static str> {
 fn capability_file(
     cap: &'static crate::capability::Capability,
     rel_path: &str,
+    enabled: &[String],
 ) -> Option<&'static str> {
     use crate::capability::Declaration;
 
@@ -271,6 +282,37 @@ fn capability_file(
                 .find(|f| f.path == rel_path)
                 .map(|f| f.content.as_str())
         })
+        // `for/<id>/` templates, for the capabilities this product has. Without
+        // this a file installed that way had no upstream at all: `fid upgrade`
+        // reported "no upstream change" on every one of them forever, which is
+        // how design's Radix button stayed Radix in products after the
+        // template moved to Base UI.
+        .or_else(|| {
+            cap.conditional_templates
+                .iter()
+                .filter(|(target, _)| enabled.iter().any(|id| id == *target))
+                .flat_map(|(_, entries)| entries.iter())
+                .find(|f| f.path == rel_path)
+                .map(|f| f.content.as_str())
+        })
+}
+
+/// A raw template as it reads in *this* product, before `{{…}}` expansion.
+///
+/// Today that means icons: a template written with `<IconPlaceholder>` becomes
+/// imports from the library the product declared (see `icons`). Every path
+/// that writes a template into a product or compares one against it — install,
+/// backfill, doctor, upgrade — goes through here, because a comparison that
+/// skipped it would see every rewritten icon as upstream drift.
+pub fn for_product<'a>(
+    root: &std::path::Path,
+    raw: &'a str,
+) -> anyhow::Result<std::borrow::Cow<'a, str>> {
+    if !crate::icons::uses_placeholders(raw) {
+        return Ok(std::borrow::Cow::Borrowed(raw));
+    }
+    let lib = crate::icons::configured(root)?;
+    Ok(std::borrow::Cow::Owned(crate::icons::transform(raw, lib)?))
 }
 
 /// Expand `{{name}}` and `{{version}}` placeholders in a raw template.

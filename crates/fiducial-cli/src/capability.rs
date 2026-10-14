@@ -116,6 +116,21 @@ pub fn find(id: &str) -> Option<&'static Capability> {
 /// 3. Add capability id to `fiducial.toml [capabilities]`.
 /// 4. Merge capability guard rules into `fiducial.toml [guard]`.
 pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> {
+    install_with(cap, root, product_name, None)
+}
+
+/// [`install`], with the product's icon library chosen at the same time.
+///
+/// The choice is written into `components.json` after this capability's own
+/// files and *before* other capabilities' `for/<id>/` templates are backfilled,
+/// because those are the files that carry `<IconPlaceholder>`: declared any
+/// later, they would already have been rewritten for the default.
+pub fn install_with(
+    cap: &Capability,
+    root: &Path,
+    product_name: &str,
+    icon_library: Option<&'static crate::icons::Library>,
+) -> Result<()> {
     println!("✦ fid add {} — installing into {}", cap.id, root.display());
     if let Some(why) = &cap.deprecated {
         eprintln!("  ⚠ `{}` is deprecated: {why}", cap.id);
@@ -180,6 +195,7 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
             _ => None,
         })
         .collect();
+    let mut uses_icons = false;
     for FileEntry { path: rel, content } in files {
         // A declaration is the product's, not the capability's: the seed is
         // there so a fresh install derives, and nothing more. When the product
@@ -193,7 +209,7 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
             println!("  kept   {rel} (already declared by this product)");
             continue;
         }
-        let expanded = content
+        let expanded = crate::templates::for_product(root, content)?
             .replace("{{name}}", product_name)
             .replace("{{version}}", PLATFORM_VERSION);
         write_file(root, rel, &expanded)?;
@@ -202,6 +218,7 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
             expanded.as_bytes(),
             PLATFORM_VERSION,
         );
+        uses_icons |= crate::icons::uses_placeholders(content);
     }
 
     // The other direction: capabilities already installed may have been
@@ -210,7 +227,16 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
     // in, which is the kind of state nobody can reason about later — install
     // `i18n` then `web-svelte` and you get the picker; the other order and you
     // silently do not.
-    backfill_conditional_templates(root, &cap.id, &already_installed, &mut lock, product_name)?;
+    if let Some(lib) = icon_library {
+        crate::icons::declare(root, lib)?;
+        println!("  ✓ iconLibrary = {} (apps/web/components.json)", lib.id);
+    }
+
+    uses_icons |=
+        backfill_conditional_templates(root, &cap.id, &already_installed, &mut lock, product_name)?;
+    if uses_icons {
+        add_icon_packages(root)?;
+    }
 
     // 2. SKILL.md → a vendor-neutral path, plus a pointer for Claude Code.
     //
@@ -262,6 +288,18 @@ pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> 
         },
     );
 
+    // The templates just written are this binary's, so they already contain
+    // every migration this capability has ever had. Recording those as applied
+    // is a fact about the files, not an assumption: without it a capability
+    // added after `fid new` reported each of its historical migrations as
+    // pending, and `fid upgrade` "applied" them to modify nothing.
+    for m in crate::migration::BUILTIN_MIGRATIONS {
+        let owner = m.id.split('/').next().unwrap_or("");
+        if owner == cap.id && !lock.applied_migrations.iter().any(|a| a == m.id) {
+            lock.applied_migrations.push(m.id.to_string());
+        }
+    }
+
     // Persist updated lock.
     lock.save(&root.join("fiducial.lock"))
         .context("writing fiducial.lock")?;
@@ -292,7 +330,8 @@ fn backfill_conditional_templates(
     already_installed: &[String],
     lock: &mut Lock,
     product_name: &str,
-) -> Result<()> {
+) -> Result<bool> {
+    let mut uses_icons = false;
     let mut unresolvable: Vec<&str> = Vec::new();
     for installed_id in already_installed {
         let Some(other) = find(installed_id) else {
@@ -307,7 +346,8 @@ fn backfill_conditional_templates(
             entries.len()
         );
         for FileEntry { path: rel, content } in entries {
-            let expanded = content
+            uses_icons |= crate::icons::uses_placeholders(content);
+            let expanded = crate::templates::for_product(root, content)?
                 .replace("{{name}}", product_name)
                 .replace("{{version}}", PLATFORM_VERSION);
             write_file(root, rel, &expanded)?;
@@ -323,6 +363,19 @@ fn backfill_conditional_templates(
             "  ! could not check {} for `{new_id}` templates — \
              re-run `fid add capability <id> --from <source>` if it ships any",
             unresolvable.join(", ")
+        );
+    }
+    Ok(uses_icons)
+}
+
+/// A template written with `<IconPlaceholder>` now imports from the product's
+/// icon library, so that library has to be a dependency of the app.
+pub(crate) fn add_icon_packages(root: &Path) -> Result<()> {
+    let lib = crate::icons::configured(root)?;
+    for name in crate::icons::ensure_packages(root, lib)? {
+        println!(
+            "  added  {name} to apps/web/package.json (iconLibrary = {})",
+            lib.id
         );
     }
     Ok(())
@@ -526,11 +579,14 @@ pub(crate) fn install_added(
             continue;
         }
         if !dry_run {
-            let expanded = content
+            let expanded = crate::templates::for_product(root, content)?
                 .replace("{{name}}", product_name)
                 .replace("{{version}}", PLATFORM_VERSION);
             write_file(root, rel, &expanded)?;
             lock.record(key.clone(), expanded.as_bytes(), PLATFORM_VERSION);
+            if crate::icons::uses_placeholders(content) {
+                add_icon_packages(root)?;
+            }
         }
         added.push(key);
     }

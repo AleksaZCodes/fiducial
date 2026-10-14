@@ -89,7 +89,8 @@ fn derive_generates_a_typed_key_union() {
     let tmp = tempfile::tempdir().unwrap();
     let root = localized_product(tmp.path());
 
-    let generated = std::fs::read_to_string(root.join("src/generated/messages.ts")).unwrap();
+    let generated =
+        std::fs::read_to_string(root.join("apps/web/src/generated/messages.ts")).unwrap();
     assert!(generated.contains("export type MessageKey"));
     assert!(generated.contains(r#"| "action.save""#), "{generated}");
     assert!(generated.contains("export const sr"));
@@ -233,7 +234,7 @@ fn check_catches_a_hand_edited_generated_module() {
     );
 
     std::fs::write(
-        root.join("src/generated/messages.ts"),
+        root.join("apps/web/src/generated/messages.ts"),
         "export type MessageKey = \"i.edited.this.by.hand\"\n",
     )
     .unwrap();
