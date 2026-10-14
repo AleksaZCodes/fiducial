@@ -1,6 +1,6 @@
 # Skill: firmware-rp2040
 
-**Capability:** `firmware-rp2040` · **Platform:** Fiducial 0.9.7
+**Capability:** `firmware-rp2040` · **Platform:** Fiducial 0.9.8
 
 ---
 

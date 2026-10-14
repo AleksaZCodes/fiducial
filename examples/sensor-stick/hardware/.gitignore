@@ -1,3 +1,5 @@
 # Built by hardware/build.sh from the generated files: never committed.
 build/
 __pycache__/
+# Made by hardware/setup.sh on each machine.
+.venv/
