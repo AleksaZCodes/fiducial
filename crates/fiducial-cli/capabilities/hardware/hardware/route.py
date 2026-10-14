@@ -438,21 +438,44 @@ def main() -> int:
     # has already refused it unless its parts, nets and outline are still the
     # declaration's. Nothing to route; the same rules and DRC decide it.
     hand = board_decl().get("routing", "auto") == "hand"
+    out = BUILD / "board-routed.kicad_pcb"
+
+    def finished(board: pcbnew.BOARD) -> tuple[pcbnew.BOARD, dict]:
+        board.Save(str(out))
+        board = pcbnew.LoadBoard(str(out))
+        pcbnew.ZONE_FILLER(board).Fill(board.Zones())
+        return board, drc(board, BUILD / "drc.rpt")
+
     if hand:
         if not HAND.exists():
             raise SystemExit(f"board.routing = \"hand\" and there is no {HAND.relative_to(ROOT)}")
         board = pcbnew.LoadBoard(str(HAND))
         rules(board)
+        board, verdict = finished(board)
     else:
-        board = pcbnew.LoadBoard(str(SRC))
-        rules(board)
-        route(board)
-        pour(board)
-    out = BUILD / "board-routed.kicad_pcb"
-    board.Save(str(out))
-    board = pcbnew.LoadBoard(str(out))
-    pcbnew.ZONE_FILLER(board).Fill(board.Zones())
-    verdict = drc(board, BUILD / "drc.rpt")
+        # Freerouting works to a time budget, so the same placement routes
+        # differently from run to run (#100) — and `route` retries only while
+        # a connection is open. A complete route that DRC then fails used to be
+        # the verdict on the first try: three CI runs of one board gave three
+        # coppers, and one of them three violations. Judge each attempt by the
+        # whole verdict instead, and keep the best.
+        best: tuple[int, bytes, dict] | None = None
+        for attempt in range(ATTEMPTS):
+            board = pcbnew.LoadBoard(str(SRC))
+            rules(board)
+            route(board)
+            pour(board)
+            board, verdict = finished(board)
+            faults = verdict["unconnected"] + verdict["violations"]
+            if best is None or faults < best[0]:
+                best = (faults, out.read_bytes(), verdict)
+            if faults == 0:
+                break
+            print(f"DRC attempt {attempt + 1}: {verdict['violations']} violation(s), "
+                  f"{verdict['unconnected']} unconnected — routing again")
+        if best[0] != 0:
+            out.write_bytes(best[1])
+            board, verdict = finished(pcbnew.LoadBoard(str(out)))
     verdict["tracks"] = sum(1 for t in board.GetTracks() if t.GetClass() != "PCB_VIA")
     verdict["vias"] = sum(1 for t in board.GetTracks() if t.GetClass() == "PCB_VIA")
     verdict["router"] = f"by hand ({HAND.relative_to(ROOT)})" if hand else f"Freerouting {FREEROUTING}"
