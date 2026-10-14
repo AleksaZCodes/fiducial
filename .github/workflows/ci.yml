@@ -736,6 +736,38 @@ jobs:
       - name: The migration runner, on a real database
         run: pnpm --filter @fiducial/adapters test
 
+  # ── web-next-scaffold: a fresh Next product builds ────────────────────────
+  #
+  # The web templates were never compiled anywhere: every Rust test read them as
+  # text, so a product scaffolded on 2026-10-13 could not run `next build` —
+  # Radix imports with no Radix, no `@/lib/utils`, no Tailwind, an i18n module
+  # written where nothing imported it, and pnpm 11 refusing every script. This
+  # scaffolds the product a person gets (design + next + i18n + brand), once per
+  # icon library the platform's components are rewritten for, and runs the real
+  # install, typecheck and build. See scripts/verify-web-next.sh.
+  web-next-scaffold:
+    name: web-next (a fresh product installs, typechecks, builds)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build the fid binary
+        run: cargo build -p fiducial-cli --bin fid
+
+      - name: Scaffold, install, typecheck, build — every icon library
+        run: scripts/verify-web-next.sh
+        env:
+          ICONS: lucide tabler hugeicons phosphor remixicon
+
   # ── portfolio: workbench v1 ───────────────────────────────────────────────
   #
   # Phase 17. `fid dash --portfolio` aggregates multiple product repos from a

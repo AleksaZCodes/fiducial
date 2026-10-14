@@ -115,7 +115,9 @@ fn install_svelte(name: &str, root: &Path, lock: &mut Lock, version: &str) -> Re
 
 // ── Embedded component sources ────────────────────────────────────────────────
 
-const UTILS_TS: &str = include_str!("../../components/react/lib/utils.ts");
+// One declaration: the web-next template ships it, and `fid add component`
+// bootstraps the same bytes into a product whose app predates it.
+const UTILS_TS: &str = include_str!("../../capabilities/web-next/apps/web/src/lib/utils.ts");
 
 fn react_source(name: &str) -> Result<&'static str> {
     match name {

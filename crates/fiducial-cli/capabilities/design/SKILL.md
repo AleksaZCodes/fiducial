@@ -43,9 +43,9 @@ write are the parts that are invisible when they are wrong:
 - `aria-invalid` wired to a visible state
 - `disabled` that is unclickable and not merely faded
 - icons that do not swallow the click meant for the control
-- `asChild`, so a link that looks like a button is an `<a>` and not a
+- `render`, so a link that looks like a button is an `<a>` and not a
   `<button>` inside an `<a>` — which is invalid HTML and a real screen-reader
-  bug
+  bug (`<Button render={<a href="/x" />} nativeButton={false}>`)
 
 Nobody re-derives that list from memory and gets all of it. A generated
 component that skips them looks finished and is not, and the gap is only found
@@ -56,9 +56,42 @@ So: upstream for the mechanism, this product for the taste. Every adapted file
 must say at its top what it kept from upstream and what it changed, because the
 next person to open it needs to know which lines are load-bearing.
 
-This capability ships `button.tsx` and `card.tsx` already adapted, plus a
-`components.json` pointing shadcn at the product's aliases and stylesheet. Add
-any further components with the CLI and adapt them the same way.
+This capability ships `button.tsx`, `card.tsx` and `dropdown-menu.tsx` already
+adapted. The `components.json` they rely on comes with the web app (`fid add
+app next`), and points shadcn at the product's aliases and stylesheet. Add any
+further components with the CLI and adapt them the same way.
+
+### The primitive layer is Base UI. Never Radix.
+
+Every React component in a Fiducial product sits on Base UI
+(`@base-ui/react`). `components.json` declares a `base-*` style (`base-vega`),
+so `npx shadcn add` already writes the Base UI version of each component — do
+not change the style to a `radix-*` one, and do not add `radix-ui` or any
+`@radix-ui/*` package. One primitive layer means one composition model
+(`render`, not `asChild`), one set of state attributes (`data-open`, not
+`data-[state=open]`), and one dependency to keep current.
+
+Porting a Radix component: shadcn publishes the mapping —
+`npx skills add shadcn/ui@migrate-radix-to-base` — and the short version is
+`asChild` → `render` (plus `nativeButton={false}` when it renders a non-button),
+`data-[state=open]` → `data-open`, and a menu's `Content` → `Positioner` +
+`Popup`.
+
+### Icons come from the library the product chose
+
+The icon library is a choice, declared once as `iconLibrary` in
+`apps/web/components.json`: `lucide`, `tabler`, `hugeicons`, `phosphor` or
+`remixicon`. `fid add app next --icons <library>` sets it (lucide when
+omitted), and both `npx shadcn add` and the platform's own components follow
+it. Import icons from that library and no other.
+
+The components this capability ships are written with `<IconPlaceholder>` —
+one icon name per library, as shadcn's registry writes them — and `fid add` /
+`fid upgrade` rewrite each into an import from the declared library, adding
+its package to `apps/web/package.json`. A product file never contains a
+placeholder. To switch libraries later:
+`npx shadcn migrate icons --from <old> --to <new>` in `apps/web`, then
+`fid upgrade`.
 
 ### What "adapt" means here, concretely
 

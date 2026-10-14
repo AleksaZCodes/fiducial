@@ -231,7 +231,7 @@ numbering is unchanged._
 | `pipelines/enclosure.toml` shipped by `fid add eda`; outputs tracked in `fiducial.lock` | ✅ |
 | Watertightness test — every undirected edge shared by exactly 2 triangles (both board and enclosure meshes) | ✅ |
 | `crates/fiducial-cli/tests/enclosure_pipeline.rs` — 5 end-to-end tests: `fid new` → `add eda` → `derive` → STL/GLB validity, geometry tracks declaration, tolerance changes output, `--check` catches tampering, missing outline errors | ✅ |
-| Marketing page — `apps/web/src/app/board/page.tsx` in `web-next` renders the generated GLB via `BoardViewer` | ✅ |
+| Marketing page — `apps/web/src/app/board/page.tsx` renders the generated GLB via `BoardViewer`; shipped by `eda` for `web-next` (`eda/for/web-next/`) since 0.9.5 — it was in every Next app until then, importing a package none of them declared | ✅ |
 | `@fiducial/board-schema` mirrors `Outline` + validation; 5 new tests | ✅ |
 | CI: `mesh-gen` job runs the end-to-end enclosure pipeline test | ✅ |
 

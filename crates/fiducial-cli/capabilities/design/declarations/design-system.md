@@ -359,7 +359,7 @@ stylesheet (composition):
 
 **Start from shadcn/ui and adapt.** `npx shadcn@latest add <name>`, then change
 the corner and the surface; change nothing else. Focus rings, `aria-invalid`,
-disabled semantics, icon sizing and `asChild` come from upstream and stay as
+disabled semantics, icon sizing and `render` composition come from upstream and stay as
 upstream ships them — they are the parts that are invisible when wrong, and
 nobody re-derives the whole list from memory. `button.tsx` and `card.tsx`
 arrive already adapted; see the capability's SKILL.md for exactly which three

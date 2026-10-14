@@ -83,9 +83,10 @@ fn a_next_product_gets_the_react_picker_and_no_svelte() {
     assert!(run(tmp.path(), &["new", "p"]).status.success(), "fid new");
     let root = tmp.path().join("p");
 
+    // `design` first: web-next requires it (its stylesheet imports design's).
+    assert!(run(&root, &["add", "design"]).status.success());
     assert!(run(&root, &["add", "app", "next"]).status.success());
     assert!(run(&root, &["add", "i18n"]).status.success());
-    assert!(run(&root, &["add", "design"]).status.success());
 
     assert!(
         root.join(REACT_PICKER).exists(),
