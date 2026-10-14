@@ -806,7 +806,26 @@ fn merge_one_template(
     let local = match std::fs::read_to_string(&local_path) {
         Ok(c) => c,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            // File was deleted locally — restore from upstream.
+            // A product-owned file the product deleted was deleted on purpose:
+            // fon removed the scaffold's `app/layout.tsx` and `app/page.tsx`
+            // because its pages live in `(en)/` and `(sr)/` route groups, each
+            // with its own root layout. Restoring them the first time their
+            // template changed put a third root layout into a working app.
+            // The deletion is the product's answer. The record stays — it is
+            // how a later step knows the file was declined rather than new,
+            // and would otherwise add it right back — with its base moved on,
+            // so this upstream change is reported once and not again.
+            if crate::ownership::of(rel_path).is_product() {
+                if !dry_run {
+                    let record = lock.templates.get_mut(rel_path).unwrap();
+                    record.base_content = Some(upstream.clone());
+                    record.source_version = PLATFORM_VERSION.into();
+                }
+                return Ok(Some(TemplateOutcome::Kept(
+                    "deleted here, and it is the product's — not restored".into(),
+                )));
+            }
+            // A platform-owned file deleted locally is restored from upstream.
             if !dry_run {
                 if let Some(parent) = local_path.parent() {
                     std::fs::create_dir_all(parent)?;
