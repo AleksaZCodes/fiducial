@@ -40,8 +40,8 @@ silently unavailable rather than an error.
 ## MCP servers available here
 
 - **`mcp__plugin_github_github__*`** — GitHub API: PRs, issues, branches, files
-- **`mcp__context7__*`** — live library documentation (see `AGENTS.md` for when
-  you are required to use it)
+- **`mcp__context7__*`** — live library documentation (the plugin's `context7`
+  skill says when it is required, and what to do when it fails to connect)
 - **`mcp__ide__getDiagnostics`** — current IDE errors and warnings
 - **`DesignSync`** — read and write claude.ai design-system projects. Needs
   `/design-login` first.
@@ -49,9 +49,15 @@ silently unavailable rather than an error.
 ## The plugin this repo publishes
 
 `.claude-plugin/plugin.json` ships the `fiducial` plugin: the `PreToolUse` guard
-hook (`fid guard-check` before every Bash call) and the `/fiducial:*` commands.
-Scaffolded products activate it through a six-line block in
-`.claude/settings.json`.
+hook (`fid guard-check` before every Bash call), the `/fiducial:*` commands, and
+the skills under `skills/` (`context7`). Scaffolded products activate it through
+a six-line block in `.claude/settings.json`.
+
+`/fiducial:platform` injects `fid doctor` and `fiducial.toml` with `!` blocks
+rather than asking the model to run and read them: the harness runs those at
+load, so the command costs no tool round trips. Keep it that way — it is
+invoked at the start of most product sessions, and the rules it might be
+tempted to restate already live in the product's `AGENTS.md`.
 
 Capability skills (`.claude/skills/*.md`) are installed by `fid add` and
 overwritten on every `fid upgrade` — they are platform-owned, so do not edit

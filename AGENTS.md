@@ -141,15 +141,11 @@ generating a fixture. Not to perform an edit.
 
 ### context7 (live documentation)
 
-Before writing code against any named library — Embassy, wasm-bindgen, wasm-pack,
-Turborepo, Changesets, Tauri, probe-rs, Next.js, SvelteKit, and anything else with a
-versioned API — fetch current docs via context7. Training data goes stale; library
-feature names change. The Phase 2 Embassy renames (`arch-cortex-m` → `platform-cortex-m`,
-`integrated-timers` removed, `embassy-rp` jumping from 0.3 to 0.10) cost a full
-trial-and-error loop because context7 was not used. That is avoidable.
-
-Step 1: `resolve-library-id` with the library name and a topic query.
-Step 2: `query-docs` with the returned ID and a specific question.
+Before writing code against any library with a versioned API, fetch current docs
+via context7. **The rule, its reasons and its fallback live in one place:
+[`skills/context7/SKILL.md`](skills/context7/SKILL.md)** — shipped by the
+`fiducial` plugin, so every product's agents get it too. It used to live only
+here, which meant agents working in a product never saw it.
 
 ### Claude Code skills
 
@@ -285,6 +281,32 @@ fails on a fresh machine and looks like a code problem rather than a missing
 **What a cloud session does not get, by design:** `.claude/settings.local.json`
 is gitignored because it holds personal tool permissions. Its absence means more
 permission prompts, not a broken environment.
+
+### Disk and memory: what a session leaves behind
+
+A build here is not small, and nothing cleans up after it on its own:
+
+| What | Size | Where |
+|---|---|---|
+| `target/` in the main checkout | ~20 GB after a few weeks | grows with every profile, toolchain and feature set built |
+| `target/` in each git worktree | ~5 GB per worktree | a worktree gets its **own** `target/`, rebuilt from cold |
+| a scaffolded product with `node_modules` | ~0.5–1 GB each | `scripts/verify-web-next.sh` makes one per icon library |
+| a pnpm store | 1–3 GB | wherever `--store-dir` or the default puts it |
+
+Two rules follow:
+
+- **Put scratch builds on disk, not in `/tmp`.** On some machines (WSL among
+  them) `/tmp` is a RAM-backed tmpfs a few GB in size. Scaffolds, pnpm stores and
+  build output there are held in memory; filling it starves the processes
+  running the session, and the symptom is a session that dies mid-build, not an
+  out-of-space error. `verify-web-next.sh` uses `mktemp -d`, so point it at disk
+  with `TMPDIR=$PWD/target/tmp scripts/verify-web-next.sh`.
+- **A worktree is removed when its branch is pushed.** `git worktree remove
+  <path>` deletes it, `target/` and all; `git worktree prune` clears records of
+  ones already gone. Before ending a session that created worktrees or large
+  scratch trees, remove them, and run `cargo clean` in a checkout whose
+  `target/` has grown past what the next build needs. Everything in it is
+  derived; the cost of deleting it is one cold build.
 
 ## The `fid` commands
 
@@ -426,7 +448,7 @@ not keep. This table is generated from the registry that enforces that rule:
 | File | Invoked as (Claude Code) | Does |
 |---|---|---|
 | `commands/harvest.md` | `/fiducial:harvest` | Translate an existing codebase into reusable assets — extra… |
-| `commands/platform.md` | `/fiducial:platform` | Load Fiducial platform context — run at session start in an… |
+| `commands/platform.md` | `/fiducial:platform` | A Fiducial product's state in one step — `fid doctor`'s ver… |
 | `crates/fiducial-cli/capabilities/*/SKILL.md` | installed per capability | How to use that capability |
 <!-- fid:end skills -->
 
