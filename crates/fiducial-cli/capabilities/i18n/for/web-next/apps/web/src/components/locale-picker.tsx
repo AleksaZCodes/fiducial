@@ -1,8 +1,8 @@
 "use client";
 
-import { Menu } from "@base-ui/react/menu";
 import { type Locale, locales, messages } from "@/generated/messages";
 import { queryLocaleHref } from "@/lib/locale-href";
+import { Menu } from "@base-ui/react/menu";
 import * as Flags from "country-flag-icons/react/3x2";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";

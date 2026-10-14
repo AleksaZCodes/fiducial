@@ -11,21 +11,21 @@
  *   pnpm add @fiducial/viewer3d-react three
  */
 
-'use client'
+"use client";
 
-import { BoardViewer } from '@fiducial/viewer3d-react'
+import { BoardViewer } from "@fiducial/viewer3d-react";
 
 export default function BoardPage() {
   return (
     <main
       style={{
-        maxWidth: '64rem',
-        margin: '0 auto',
-        padding: 'var(--fiducial-spacing-8, 2rem)',
+        maxWidth: "64rem",
+        margin: "0 auto",
+        padding: "var(--fiducial-spacing-8, 2rem)",
       }}
     >
-      <h1 style={{ marginBottom: 'var(--fiducial-spacing-2, 0.5rem)' }}>The case</h1>
-      <p style={{ marginBottom: 'var(--fiducial-spacing-6, 1.5rem)', opacity: 0.8 }}>
+      <h1 style={{ marginBottom: "var(--fiducial-spacing-2, 0.5rem)" }}>The case</h1>
+      <p style={{ marginBottom: "var(--fiducial-spacing-6, 1.5rem)", opacity: 0.8 }}>
         A sealed two-part case generated directly from the board outline — base, gasket, and lid.
         Drag to orbit, scroll to zoom.
       </p>
@@ -34,14 +34,16 @@ export default function BoardPage() {
         src="/case.glb"
         width={800}
         height={500}
-        style={{ borderRadius: 'var(--fiducial-radius-lg, 0.5rem)', overflow: 'hidden' }}
+        style={{ borderRadius: "var(--fiducial-radius-lg, 0.5rem)", overflow: "hidden" }}
       />
 
-      <p style={{ marginTop: 'var(--fiducial-spacing-4, 1rem)', fontSize: '0.875rem', opacity: 0.7 }}>
+      <p
+        style={{ marginTop: "var(--fiducial-spacing-4, 1rem)", fontSize: "0.875rem", opacity: 0.7 }}
+      >
         Wall thickness, board clearance, and gasket fit are all derived from the manufacturing
         tolerance class declared alongside the outline — change the process and the geometry
         follows. The gasket prints in TPU; the base and lid print rigid.
       </p>
     </main>
-  )
+  );
 }

@@ -11,17 +11,12 @@ export default function Home() {
       </h1>
       <p style={{ color: "var(--muted-foreground)" }}>
         Built on{" "}
-        <a
-          href="https://github.com/AleksaZCodes/fiducial"
-          style={{ color: "var(--primary)" }}
-        >
+        <a href="https://github.com/AleksaZCodes/fiducial" style={{ color: "var(--primary)" }}>
           Fiducial
         </a>{" "}
-        {{version}}.
+        {{ version }}.
       </p>
-      {!status.ok && (
-        <p style={{ color: "var(--destructive)" }}>{status.error}</p>
-      )}
+      {!status.ok && <p style={{ color: "var(--destructive)" }}>{status.error}</p>}
     </main>
   );
 }

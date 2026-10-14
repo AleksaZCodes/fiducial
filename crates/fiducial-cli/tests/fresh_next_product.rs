@@ -195,6 +195,12 @@ fn every_import_the_app_makes_is_declared_or_shipped() {
         !web.join("pnpm-workspace.yaml").exists(),
         "a second workspace root inside apps/web makes pnpm install there separately"
     );
+    let biome = std::fs::read_to_string(root.join("biome.json"))
+        .expect("without a Biome config, `pnpm lint` runs on Biome's defaults and fails (#99)");
+    assert!(
+        biome.contains("\"indentWidth\": 2") && biome.contains("**/generated/**"),
+        "{biome}"
+    );
 }
 
 /// A product that is already a pnpm workspace keeps its own root file.

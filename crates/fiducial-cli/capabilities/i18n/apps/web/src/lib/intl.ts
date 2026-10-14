@@ -24,16 +24,16 @@
  */
 
 import {
+  type Money,
+  type TimeZone,
+  pluralCategory as cldrPluralCategory,
+  selectPlural as cldrSelectPlural,
   formatDate as fmtDate,
   formatDateTime as fmtDateTime,
   formatList as fmtList,
   formatMoney as fmtMoney,
   formatNumber as fmtNumber,
   formatRelativeTime as fmtRelative,
-  type Money,
-  pluralCategory as cldrPluralCategory,
-  selectPlural as cldrSelectPlural,
-  type TimeZone,
 } from "@fiducial/i18n";
 import { type Locale, messages } from "../generated/messages";
 
