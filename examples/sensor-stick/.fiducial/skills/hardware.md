@@ -353,9 +353,22 @@ look at what moved, re-render, and show it.
 
 ## Tools
 
-`python3` + `pip install -r hardware/requirements.txt` (build123d on
-OpenCascade: real B-rep, real STEP), KiCad ≥ 7 (`kicad-cli`, and its
-`pcbnew` Python module, which `route.py` runs under `/usr/bin/python3`), Java
-17+ for Freerouting (fetched once into `build/tools/` and pinned by hash), and `node` with
-`three` and `playwright-core` for the renders; set `CHROMIUM_PATH` if
-Playwright has no browser of its own. None of them is needed by the gate.
+**Run `hardware/setup.sh` once per machine.** It is what CI runs, and it
+installs (apt, or Homebrew on macOS) and verifies:
+
+- KiCad (7 or later; 9 on current Ubuntu): `kicad-cli`, and the `pcbnew` Python module `route.py` drives;
+- Java 21, for Freerouting (fetched once into `build/tools/`, pinned by hash);
+- `hardware/.venv`: the system Python with its site-packages, so pcbnew is
+  importable, plus `requirements.txt` (build123d on OpenCascade for real B-rep
+  and STEP, ortools for placement, pypdf).
+
+`hardware/setup.sh --check` verifies without installing; `build.sh` runs it
+first and stops with what is missing. Every Python step — `build.sh`'s, and
+the solver `fid derive` runs when the placement model changes — uses
+`hardware/.venv/bin/python` when it exists (`FID_PYTHON` overrides). Never
+`pip install` into the system Python: Ubuntu 23.04+ refuses it, and a second
+interpreter is how the route and the solids end up on different packages.
+
+`node` with `three` and `playwright-core` renders the review pack; set
+`CHROMIUM_PATH` if Playwright has no browser of its own. None of this is
+needed by the gate: `fid derive --check` runs on the committed answers.
