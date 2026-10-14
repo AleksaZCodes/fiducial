@@ -11,5 +11,6 @@
   "keywords": ["fiducial", "guard", "scaffold", "cross-platform", "firmware", "web"],
   "category": "developer-tools",
   "commands": ["./commands/"],
+  "skills": ["./skills/"],
   "strict": false
 }
