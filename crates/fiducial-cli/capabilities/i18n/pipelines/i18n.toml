@@ -1,11 +1,11 @@
 name     = "i18n"
 executor = "fid-i18n"
 # args = ["messages"]   # only to override [i18n] messages_dir
-outputs  = ["src/generated/messages.ts"]
+outputs  = ["apps/web/src/generated/messages.ts"]
 
 # Message catalogs in, typed keys out.
 #
-# `messages/<locale>.json` is the declaration. `src/generated/messages.ts` is
+# `messages/<locale>.json` is the declaration. `apps/web/src/generated/messages.ts` is
 # derived from it and must never be hand-edited — it is guard-blocked and
 # rewritten on every `fid derive`.
 #
@@ -17,5 +17,10 @@ outputs  = ["src/generated/messages.ts"]
 # failing — a value identical to the default (likely untranslated) and a key the
 # default does not have (likely leftover).
 #
-# The default locale comes from [i18n] in fiducial.toml. Change `outputs` to put
-# the generated module where your app imports from.
+# The default locale comes from [i18n] in fiducial.toml.
+#
+# The output is where this capability's own `intl.ts`, `locale-href.ts` and
+# locale pickers import it from — `apps/web/src/generated/`. It used to be
+# `src/generated/` at the product root, which nothing imported, so every
+# product that installed i18n beside a web app failed to typecheck until it
+# hand-edited this line. Change it only if your app lives somewhere else.

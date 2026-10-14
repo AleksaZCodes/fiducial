@@ -45,6 +45,19 @@ EXAMPLES
             long_help = "Application type to scaffold. Run `fid add app --help` for the full list."
         )]
         target: String,
+
+        /// Icon library for a `next` app: lucide | tabler | hugeicons | phosphor | remixicon
+        #[arg(
+            long,
+            value_name = "LIBRARY",
+            long_help = "The icon library this app's components import from, for `next`.\n\
+                         One of: lucide, tabler, hugeicons, phosphor, remixicon. Default: lucide.\n\n\
+                         Recorded as `iconLibrary` in apps/web/components.json — the file the\n\
+                         shadcn CLI reads too — and every platform component that shows an icon\n\
+                         is written for it. To change it later:\n\
+                         `npx shadcn migrate icons --from <old> --to <new>`, then `fid upgrade`."
+        )]
+        icons: Option<String>,
     },
 
     /// Add a bounded-context module (Rust + TS)
@@ -406,7 +419,7 @@ never at the branch name — so the same lock installs the same capability."
 
 pub fn run(target: AddTarget) -> Result<()> {
     match target {
-        AddTarget::App { target } => add_app(&target),
+        AddTarget::App { target, icons } => add_app(&target, icons.as_deref()),
         AddTarget::Module { name } => add_module(&name),
         AddTarget::Firmware { target } => add_firmware(&target),
         AddTarget::Component { name, framework } => {
@@ -461,7 +474,19 @@ fn install_external(id: &str, spec: &str) -> Result<()> {
     Ok(())
 }
 
-fn add_app(target: &str) -> Result<()> {
+fn add_app(target: &str, icons: Option<&str>) -> Result<()> {
+    let icon_library = match icons {
+        None => None,
+        Some(_) if target != "next" => bail!(
+            "--icons applies to `fid add app next`; `{target}` has no shadcn components.json to record it in"
+        ),
+        Some(id) => Some(crate::icons::find(id).ok_or_else(|| {
+            anyhow::anyhow!(
+                "unknown icon library `{id}`. Supported: {}",
+                crate::icons::ids().join(", ")
+            )
+        })?),
+    };
     let cap_id = match target {
         "next" => "web-next",
         "svelte" => "web-svelte",
@@ -481,7 +506,7 @@ fn add_app(target: &str) -> Result<()> {
              Run `fid add app --help` for details."
         ),
     };
-    install_capability(cap_id)
+    install_capability_with(cap_id, icon_library)
 }
 
 fn add_firmware(target: &str) -> Result<()> {
@@ -527,12 +552,26 @@ fn add_module(name: &str) -> Result<()> {
 
 /// Install a capability by id into the current product.
 pub fn install_capability(cap_id: &str) -> Result<()> {
+    install_capability_with(cap_id, None)
+}
+
+fn install_capability_with(
+    cap_id: &str,
+    icon_library: Option<&'static crate::icons::Library>,
+) -> Result<()> {
     let cwd = env::current_dir().context("getting current directory")?;
     let root = Config::find_root(&cwd)?;
     let cfg = Config::load(&root.join(CONFIG_FILE))?;
 
     // Already installed?
     if cfg.capabilities.enabled.contains(&cap_id.to_string()) {
+        if icon_library.is_some() {
+            bail!(
+                "`{cap_id}` is already installed, so --icons would not reach the files it \
+                 already wrote. Change iconLibrary with \
+                 `npx shadcn migrate icons --from <old> --to <new>` in apps/web, then `fid upgrade`."
+            );
+        }
         println!(
             "  ✓ `{cap_id}` is already installed in `{}`.",
             cfg.product.name
@@ -550,5 +589,5 @@ pub fn install_capability(cap_id: &str) -> Result<()> {
         )
     })?;
 
-    capability::install(def, &root, &cfg.product.name)
+    capability::install_with(def, &root, &cfg.product.name, icon_library)
 }

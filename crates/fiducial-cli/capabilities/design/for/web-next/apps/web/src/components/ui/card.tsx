@@ -1,5 +1,6 @@
 import * as React from "react"
-import { Slot } from "radix-ui"
+import { mergeProps } from "@base-ui/react/merge-props"
+import { useRender } from "@base-ui/react/use-render"
 import { cn } from "@/lib/utils"
 
 /**
@@ -26,30 +27,39 @@ import { cn } from "@/lib/utils"
  *     taste, and it is why it is written down in three files.
  */
 /**
- * `asChild` is an addition, not an adaptation.
+ * `render` is an addition, not an adaptation.
  *
  * Upstream's Card is always a `<div>`. A card inside an `<ol>` or a `<ul>` has
  * to be an `<li>` — a `<div>` between a list and its items breaks the list in
  * the accessibility tree, and a screen reader stops announcing "4 items". So
- * Card takes `asChild` and renders through a Slot, exactly as Button already
- * does. The list markup on the landing page is the reason this exists.
+ * Card takes a `render` prop, the same composition Button has:
+ * `<Card render={<li />}>`. The list markup on the landing page is the reason
+ * this exists.
+ *
+ * It was `asChild` through a Radix `Slot`; Fiducial's components sit on Base
+ * UI, whose `useRender` is the equivalent.
  */
 function Card({
   className,
-  asChild = false,
+  render,
   ...props
-}: React.ComponentProps<"div"> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot.Root : "div"
-  return (
-    <Comp
-      data-slot="card"
-      className={cn(
-        "cham flex flex-col gap-6 py-6 text-card-foreground",
-        className
-      )}
-      {...props}
-    />
-  )
+}: useRender.ComponentProps<"div">) {
+  return useRender({
+    defaultTagName: "div",
+    render,
+    props: mergeProps<"div">(
+      {
+        className: cn(
+          "cham flex flex-col gap-6 py-6 text-card-foreground",
+          className
+        ),
+      },
+      props
+    ),
+    // `useRender` writes state as data attributes: this is `data-slot="card"`,
+    // the same way shadcn's Base UI badge sets its slot.
+    state: { slot: "card" },
+  })
 }
 
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {

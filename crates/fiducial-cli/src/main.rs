@@ -12,6 +12,7 @@ mod design;
 mod guard;
 mod hardware;
 mod i18n;
+mod icons;
 mod kicad;
 mod legal;
 mod lock;

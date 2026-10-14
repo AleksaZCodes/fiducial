@@ -22,7 +22,7 @@ use std::env;
 use crate::{
     capability::{self, PLATFORM_VERSION},
     config::{Config, CONFIG_FILE},
-    lock,
+    icons, lock,
     lock::{Lock, LOCK_FILE},
     migration, templates,
 };
@@ -42,7 +42,11 @@ pub fn print_upstream(rel_path: &str) -> Result<()> {
     })?;
     print!(
         "{}",
-        templates::expand(raw, &cfg.product.name, PLATFORM_VERSION)
+        templates::expand(
+            &templates::for_product(&root, raw)?,
+            &cfg.product.name,
+            PLATFORM_VERSION
+        )
     );
     Ok(())
 }
@@ -178,7 +182,11 @@ pub fn run(dry_run: bool, portfolio: bool, only: Option<String>) -> Result<()> {
 
             // Install the new path from the current template.
             if let Some(template) = templates::raw_for(new, &cfg.capabilities.enabled) {
-                let content = templates::expand(template, &cfg.product.name, PLATFORM_VERSION);
+                let content = templates::expand(
+                    &templates::for_product(&root, template)?,
+                    &cfg.product.name,
+                    PLATFORM_VERSION,
+                );
                 if let Some(parent) = new_path.parent() {
                     std::fs::create_dir_all(parent)
                         .with_context(|| format!("creating parent for `{new}`"))?;
@@ -209,6 +217,7 @@ pub fn run(dry_run: bool, portfolio: bool, only: Option<String>) -> Result<()> {
         .copied()
         .filter(|_| scope.is_none())
         .filter(|(old, _)| lock.templates.contains_key(*old))
+        .filter(|(old, _)| templates::raw_for(old, &enabled).is_none())
         .collect();
     if !retired.is_empty() {
         println!("  Retired by the platform");
@@ -277,7 +286,14 @@ pub fn run(dry_run: bool, portfolio: bool, only: Option<String>) -> Result<()> {
                 continue;
             }
 
-            let content = templates::expand(template, &cfg.product.name, PLATFORM_VERSION);
+            let content = templates::expand(
+                &templates::for_product(&root, template)?,
+                &cfg.product.name,
+                PLATFORM_VERSION,
+            );
+            if icons::uses_placeholders(template) {
+                capability::add_icon_packages(&root)?;
+            }
             if let Some(parent) = dest.parent() {
                 std::fs::create_dir_all(parent)
                     .with_context(|| format!("creating parent for `{rel_path}`"))?;
@@ -308,6 +324,19 @@ pub fn run(dry_run: bool, portfolio: bool, only: Option<String>) -> Result<()> {
             let verb = if dry_run { "would add" } else { "added" };
             println!("  ✓ {verb}: {rel} (new in `{cap_id}`)");
         }
+    }
+
+    // ── 1d. The icon library those templates now import ──────────────────────
+    // A merge can bring icons into a file that had none — Radix's dropdown
+    // imported lucide by hand, the Base UI one is rewritten for the declared
+    // library — so the library's packages are ensured after every write above,
+    // not only at install.
+    let tracked_icons = lock
+        .templates
+        .keys()
+        .any(|rel| templates::raw_for(rel, &enabled).is_some_and(icons::uses_placeholders));
+    if tracked_icons && !dry_run {
+        capability::add_icon_packages(&root)?;
     }
 
     // ── 2. Codemods ───────────────────────────────────────────────────────────
@@ -721,6 +750,8 @@ fn merge_one_template(
             return Ok(None);
         }
     };
+    let raw = templates::for_product(root, raw)?;
+    let raw = raw.as_ref();
     let upstream = templates::expand(raw, product_name, PLATFORM_VERSION);
 
     // Base content from lock (what was installed).
