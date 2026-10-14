@@ -187,6 +187,10 @@ pub const RETIRED_TEMPLATES: &[(&str, &str)] = &[
         "apps/web/src/app/board/page.tsx",
         "the PCB viewer page ships with `eda` now, not with every Next app — it imported `@fiducial/viewer3d-react`, which no website declared",
     ),
+    (
+        "apps/web/pnpm-workspace.yaml",
+        "the workspace is rooted at the product root now — a second one in apps/web made pnpm start a separate install there, with its own lockfile",
+    ),
 ];
 
 // ── Lookup ────────────────────────────────────────────────────────────────────

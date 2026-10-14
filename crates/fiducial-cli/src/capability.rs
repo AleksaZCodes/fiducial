@@ -209,6 +209,17 @@ pub fn install_with(
             println!("  kept   {rel} (already declared by this product)");
             continue;
         }
+        // The same reasoning for any file the platform never wrote. A product
+        // that is already a pnpm workspace has its own root
+        // `pnpm-workspace.yaml`, listing its own packages and the install
+        // scripts it has vetted; `fid add app next` writing the template over
+        // it would have dropped both. `fid upgrade` already leaves such a file
+        // alone ("exists on disk but is untracked"); install now agrees.
+        let key = rel.replace('\\', "/");
+        if root.join(rel).exists() && !lock.templates.contains_key(&key) {
+            println!("  kept   {rel} (already here, and not the platform's)");
+            continue;
+        }
         let expanded = crate::templates::for_product(root, content)?
             .replace("{{name}}", product_name)
             .replace("{{version}}", PLATFORM_VERSION);
