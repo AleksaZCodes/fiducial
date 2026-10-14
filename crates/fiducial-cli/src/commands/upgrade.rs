@@ -241,6 +241,18 @@ pub fn run(dry_run: bool, portfolio: bool, only: Option<String>) -> Result<()> {
             }
             if path.exists() && unmodified {
                 std::fs::remove_file(&path).with_context(|| format!("removing {old}"))?;
+                // And the directories it leaves empty: retiring
+                // `apps/web/src/app/board/page.tsx` left `board/` behind,
+                // which Next still treats as a route segment. `remove_dir`
+                // refuses a non-empty directory, so this stops at the first
+                // one that holds anything of the product's.
+                let mut dir = path.parent();
+                while let Some(d) = dir.filter(|d| *d != root.as_path()) {
+                    if std::fs::remove_dir(d).is_err() {
+                        break;
+                    }
+                    dir = d.parent();
+                }
             }
             lock.templates.remove(*old);
             println!("  ✓ {old}: no longer tracked ({why}); {fate}");
@@ -815,6 +827,17 @@ fn merge_one_template(
             return Err(e).with_context(|| format!("reading {rel_path}"));
         }
     };
+    // The "Built on Fiducial X." line is moved to this version by step 4 of
+    // every upgrade, after the merge. Merging first set the product's old
+    // stamp against the template's new one — a conflict on a line both sides
+    // were about to agree on — and step 4 then stamped the line inside the
+    // markers, so the conflict read as two identical sides. Stamp the product's
+    // copy first and the line merges like any change both sides made.
+    let local = if matches!(rel_path, "AGENTS.md" | "README.md") {
+        stamp_platform_version(&local, PLATFORM_VERSION).unwrap_or(local)
+    } else {
+        local
+    };
 
     // A product-owned file the product has rewritten is not merged into. Its
     // base is the scaffold's prompt, its content is the product's own, and a
@@ -962,6 +985,27 @@ mod stamp_tests {
         );
         assert_eq!(stamp_platform_version(&out, "0.9.1"), None);
         assert_eq!(stamp_platform_version("no such line\n", "0.9.1"), None);
+    }
+
+    /// fon, 0.9.4 → 0.9.6: the base said 0.9.3, the product's copy 0.9.4 (the
+    /// previous upgrade's stamp) and the template 0.9.6. Merged as read, that
+    /// is a conflict on the one line every upgrade rewrites anyway. Stamped
+    /// first, as `merge_one_template` now does, both sides agree on it.
+    #[test]
+    fn an_old_built_on_stamp_does_not_conflict_with_the_new_one() {
+        let line = |v: &str| {
+            format!("# fon\n\nBuilt on [Fiducial](https://github.com/AleksaZCodes/fiducial) {v}.\n\nfon's own notes.\n")
+        };
+        let base = line("0.9.3");
+        let local = line("0.9.4");
+        let upstream = line("0.9.6");
+        assert!(
+            diffy::merge(&base, &local, &upstream).is_err(),
+            "the bug, as it was"
+        );
+
+        let stamped = stamp_platform_version(&local, "0.9.6").unwrap();
+        assert_eq!(diffy::merge(&base, &stamped, &upstream).unwrap(), upstream);
     }
 }
 
