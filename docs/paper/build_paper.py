@@ -36,318 +36,378 @@ AUTHOR = [
     "ORCID: 0009-0004-1535-1839",
 ]
 
+import json as _json
+import re as _re
+from pathlib import Path as _Path
+
+_HERE = _Path(__file__).resolve().parent
+_RESULTS = _json.loads((_HERE / "markers/results.json").read_text())
+_SUM = _RESULTS["summary"]
+_BY_ID = {r["id"]: r for r in _RESULTS["results"]}
+VERSION = _re.search(r'^version\s*=\s*"([^"]+)"',
+                     (_HERE.parents[1] / "Cargo.toml").read_text(), _re.M).group(1)
+
+_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
+          8: "eight", 9: "nine", 10: "ten", 20: "twenty"}
+
+
+def _count(gate):
+    """How many markers a gate caught first."""
+    return sum(1 for r in _RESULTS["results"]
+               if not r["control"] and r["caught_by"] and r["caught_by"][0] == gate)
+
+
+_GATE = {"derive": "derive", "--check": "--check", "firmware build": "compiler",
+         "firmware tests": "firmware test", "web test": "page test", "type check": "type check"}
+
+
+def _now(mid):
+    """The first gate that caught it: once derive fails, --check fails too,
+    so naming the second says nothing new."""
+    by = [_GATE[g] for g in _BY_ID[mid]["caught_by"] if g in _GATE]
+    return by[0] if by else "not caught"
+
+
+_C1 = _BY_ID["C1"]
+PINMOVE = (f"{len([f for f in _C1['changed'] if '/generated/' in f])} generated files "
+           f"rewritten in {round(next(g['seconds'] for g in _C1['gates'] if g['gate'] == 'derive'))} s")
+
+ALL_CAUGHT = _SUM["markers_caught"] == _SUM["markers"]
+CONTROLS_OK = _SUM["controls_passed"] == _SUM["controls"]
+
 ABSTRACT = (
     "This paper presents Fiducial, an open-source platform for building "
-    "products that span several disciplines – a printed case, a circuit "
-    "board, firmware and a web application – with AI coding agents. Every "
-    "fact about the product is declared once in typed files, every artifact "
-    "is derived from those files by one command, and a continuous-integration "
-    "gate fails when an artifact no longer follows from its declaration. Hard "
-    "problems such as part placement, routing and solid modelling are handed "
-    "to established engines. A public example, a USB-C temperature and "
-    "humidity stick, is carried from one declaration to a routed board, a "
-    "checked case, firmware and a web page. When 20 realistic mistakes were "
-    "injected into two products, the gates caught 15 of them before merge."
+    "products that span software and hardware – a web application, firmware, "
+    "a circuit board and a printed case – with AI coding agents. It gives "
+    "every product the same structure: each fact is declared once in typed "
+    "files, every artifact that depends on it is derived by one command, and "
+    "checks on every commit refuse anything that no longer follows from its "
+    "declaration. Hard problems such as part placement and solid modelling "
+    "are handed to established engines, so the platform grows by "
+    "declarations rather than by special cases. To test it, 20 realistic "
+    "mistakes were injected into two products. The first run caught 15. Each "
+    "miss was turned into a general rule, and the current version catches "
+    f"{_SUM['markers_caught']} of the 20 while letting every correct change "
+    "through."
 )
 
 KEYWORDS = (
-    "AI agents, single source of truth, hardware–software co-design, "
-    "constraint solving, PCB automation, continuous integration"
+    "AI agents, single source of truth, code generation, consistency "
+    "checking, hardware–software co-design, continuous integration"
 )
 
+_first = _count("derive")
+_check = _count("--check")
+_consumers = _SUM["markers_caught"] - _first - _check
+
 # ("h1", text) | ("h2", text) | ("p", text) | ("fig", file[@inches], caption)
-# | ("table", caption, header, rows)
+# | ("table", caption, header, rows, widths) — a row that is a str is a group
 BODY = [
     ("h1", "Introduction"),
     ("p",
      "While building Outreach [1], an off-grid messaging system made of "
      "radios, gateways, a companion app and printed cases, the author ran "
-     "into the same problem more than once. The radio firmware and the app "
-     "disagreed on the layout of a Bluetooth message, and a printed case did "
-     "not fit the board it was made for. Neither part was wrong on its own. "
-     "Each was designed in its own tool, the facts they shared were copied by "
-     "hand, and one copy changed while the other did not. The mistake showed "
-     "up only when the parts were put together."),
+     "into the same problem more than once. The firmware and the app "
+     "disagreed on the layout of a message, and a printed case did not fit "
+     "the board it was made for. Neither part was wrong on its own. The facts "
+     "they shared were copied by hand between different tools, one copy "
+     "changed, and the mistake showed up only when the parts were put "
+     "together."),
     ("p",
-     "AI coding agents [2], [3] now write a large part of the code in a "
-     "project. That makes each copy faster to write, but it does not remove "
-     "the copies. An agent working in the firmware repository does not know "
-     "that the board changed, and an agent working on the case does not know "
-     "which connector the board uses. Writing disconnected copies faster only "
-     "gives an inconsistent product sooner."),
+     "This is how most products are built, and AI coding agents [2], [3] make "
+     "it faster without making it safer. An agent is quick inside one "
+     "codebase but knows nothing about the others: the agent writing the "
+     "firmware does not know the board changed, and the one writing the web "
+     "page does not know the firmware did. Every project also invents its own "
+     "layout, scripts and habits, so each new product starts from scratch and "
+     "every agent has to learn it again."),
     ("p",
-     "Fiducial [4] was made to solve this from the other side: each fact is "
-     "declared once, and everything that needs it is derived from it. The "
-     "case, the board, the firmware’s pin map and the web page’s types are "
-     "all outputs of the same declaration, regenerated by one command and "
-     "checked by one gate (Fig. 1). Agents, and the person working with them, "
-     "edit the declarations and never the outputs."),
-    ("fig", "fig1-one-declaration.jpg",
-     "One declaration, four disciplines. The sensor’s data line is declared "
-     "on GPIO4 once; fid derive places and routes the board, builds the case "
-     "around it, and writes the firmware pin map and the web types from the "
-     "same line."),
+     "Fiducial [4] takes the opposite approach. Every product is built the "
+     "same way, in one repository, around one rule: each fact is declared "
+     "once, and everything that needs it is derived from it and checked "
+     "(Fig. 1). People and agents edit the declarations, never the outputs. "
+     "This paper explains the idea, how the platform is put together and "
+     "why, and how its checks hold up against mistakes made on purpose."),
+    ("fig", "fig1-one-fact.png",
+     "One fact in four places. (a) Copied by hand: one copy changes and "
+     "nothing notices. (b) Declared once: every copy is derived from it and "
+     "checked on every commit."),
 
-    ("h1", "System Overview and Implementation"),
+    ("h1", "The Idea"),
     ("p",
-     "Fiducial is a command-line tool, fid, written in Rust, together with 22 "
-     "capabilities – packaged pipelines for hardware, firmware (RP2040 and "
-     "STM32), web frameworks, translations, design systems, legal pages, "
-     "deployment and more. A product turns on the capabilities it needs in "
-     "its fiducial.toml file. The platform is organised in five layers, shown "
-     "in Fig. 2."),
-    ("fig", "fig2-layers.jpg@2.9",
-     "The five layers of Fiducial. Agents read one shared context and edit "
-     "declarations, capabilities derive the artifacts, engines solve the hard "
-     "problems, and gates stop drift from being merged."),
+     "A product is a set of facts – which pin a sensor is on, what a button "
+     "says in each language, the brand colour, the size of the board – and a "
+     "set of artifacts that use them: code, schematics, translations, web "
+     "pages, case models. Most bugs between disciplines come from one fact "
+     "being written in more than one artifact. Fiducial removes that with "
+     "three rules."),
+    ("p",
+     "Declare once. Every fact has exactly one place where it is written, a "
+     "typed text file that a person or an agent edits."),
+    ("p",
+     "Derive everything else. One deterministic command, fid derive, "
+     "generates every artifact that depends on a fact. Generated files are "
+     "never edited by hand."),
+    ("p",
+     "Check every change. On every commit, checks confirm that every artifact "
+     "still follows from its declarations and that the declarations make "
+     "sense. A failure names the declaration at fault."),
+    ("p",
+     "None of these rules is new on its own. Model-driven engineering "
+     "generates code from models [5], and Nix identifies every build by a "
+     "hash of its inputs [6]. What Fiducial adds is applying them across "
+     "every discipline of one product at once, in plain files that coding "
+     "agents read and write well, with the checks – not the agent’s good "
+     "behaviour – as what makes the result reliable."),
+
+    ("h1", "How It Is Built"),
+    ("h2", "One Structure for Every Product"),
+    ("p",
+     "fid new creates a product repository with a fixed layout, and fid add "
+     "turns on capabilities: packaged pipelines for web frameworks, "
+     "translations, content, search metadata, legal pages, design systems, "
+     "databases, deployment, device messages, firmware for two microcontroller "
+     "families, and hardware – 23 in all. Two products built with Fiducial look the same, "
+     "so knowing one means knowing the others, and a new product starts from "
+     "working, checked parts instead of an empty folder. Every product also "
+     "carries an AGENTS.md file [7] and one instruction file per capability, "
+     "so any agent starts from the same context. A newer platform version "
+     "comes in with one command, fid upgrade, which keeps the product’s own "
+     "edits."),
     ("h2", "Declarations"),
     ("p",
-     "A declaration is a typed text file kept in version control. Plain text "
-     "was chosen over a modelling tool because it is what coding agents read "
-     "and write best, and because every change then shows up in a normal "
-     "code review. For hardware, the declaration is hardware/product.toml: "
-     "the outline of the product, its case, and every part with an orderable "
-     "LCSC number [5], a KiCad symbol and footprint [6], and the net each pin "
-     "connects to. Placement intent is declared too – which zone a part "
-     "belongs to, what it must be near or away from, and which part a vent "
-     "seals over. Translations are declared once per language in "
-     "messages/<locale>.json, and page metadata and colour contrast in the "
-     "same way. A declaration only states facts. Nothing in it says where a "
-     "resistor sits or how a trace runs."),
-    ("h2", "Derivation and the Lock File"),
+     "Declarations are typed text files in version control: messages/"
+     "<language>.json for every user-visible string, fiducial.toml for pages "
+     "and brand, design-system.md for colours and the contrast they must "
+     "reach, protocol.toml for the messages a device sends, and "
+     "hardware/product.toml for the parts of a physical product and how they "
+     "connect. Plain text was chosen over a modelling tool because it is what "
+     "coding agents handle best, and because every change then goes through "
+     "a normal code review. A declaration states a fact and nothing more. It "
+     "does not say where the sitemap lists a page or which way a trace runs."),
+    ("h2", "Derivation"),
     ("p",
-     "fid derive runs the pipeline of every enabled capability in order. Each "
-     "one reads declarations and writes artifacts. The hardware pipeline "
-     "alone writes the placement, the KiCad board and schematic, the bill of "
-     "materials, the assembly order, a layout file that records why each "
-     "position was chosen, the firmware pin map (board.rs) and the web types "
-     "(interface.ts). The SHA-256 hash of every input and output is written "
-     "to fiducial.lock, the same idea as a package manager’s lock file or "
-     "Nix’s hashed builds [7]. Derivation is deterministic: run twice on the "
-     "same inputs, it writes the same bytes. Without that, comparing hashes "
-     "would mean nothing, so it was kept as a hard requirement throughout."),
-    ("h2", "Engines Behind Contracts"),
+     "fid derive runs every enabled pipeline. Each one reads the declarations "
+     "it needs and writes its artifacts: a typed message module, a sitemap, a "
+     "database migration, a firmware pin map, TypeScript types, a circuit "
+     "board. Every pipeline lists the files it reads and writes, and the "
+     "SHA-256 hash of each is stored in a lock file. Derivation is "
+     "deterministic, so the same inputs always give the same bytes; without "
+     "that, comparing hashes would mean nothing. This requirement decided "
+     "more than one design choice: the placement solver, for example, runs "
+     "on a single thread, because with several it gave different answers to "
+     "the same problem."),
+    ("h2", "Checks"),
     ("p",
-     "The first version placed parts on the board with a hand-written search, "
-     "and every new product requirement added another rule to it. The rules "
-     "started to interact, and the code grew faster than the products. This "
-     "was replaced: every hard problem now goes to an established engine, and "
-     "Fiducial only owns the contract, the file that describes the problem. "
-     "Part placement is a constraint model solved by CP-SAT from Google "
-     "OR-Tools [8], and every placement rule is one of eight generic kinds "
-     "(inside, no-overlap, fixed, flush, within, apart, near and net). The "
-     "case is modelled in build123d on the OpenCascade kernel [9], which also "
-     "checks that the board fits and the lid closes. KiCad lays out the board "
-     "and runs its design-rule check (DRC), and Freerouting [10] routes it. A "
-     "small nodal solver checks resistive set points against declared "
-     "windows, such as the CC voltages of USB Type-C [11]."),
+     "The checks are of three kinds (Fig. 2). Freshness: fid derive --check "
+     "fails when a declaration changed without its outputs being regenerated, "
+     "or when an output was edited by hand. Rules inside derivation: every "
+     "language must have every string, every page needs a title, every colour "
+     "pair must reach its contrast, circuit voltages must fall inside their "
+     "windows, the parts must cost less than a declared limit, and the board "
+     "must fit its case. Consumers: compilers and type checkers read the "
+     "derived files, so code that still uses a renamed fact stops compiling. "
+     "All of them run in continuous integration on every commit. A failure "
+     "names the file and the declaration at fault, which is the kind of "
+     "signal an agent needs to fix its own mistake."),
+    ("fig", "fig2-loop.png@2.9",
+     "How a change moves through Fiducial. Declarations are edited, "
+     "derivation produces the artifacts and hands hard problems to "
+     "established engines, and the checks either let the change through or "
+     "return a message naming the declaration at fault."),
+    ("h2", "Hard Problems Go to Engines"),
     ("p",
-     "When two declarations contradict each other, the placement model has no "
-     "solution, and the solver reports the smallest set of declarations that "
-     "cannot all hold, written in the product’s own terms (Fig. 3, case 3). "
-     "The person then decides which one to relax."),
-    ("h2", "Gates"),
+     "Some derivations are real engineering problems: where to put the parts "
+     "on a board, how to route it, how to build a case around it. The first "
+     "version placed parts with a hand-written search, and every new product "
+     "added another special rule. The rules began to interact, and the code "
+     "grew faster than the products. So the structure changed: the platform "
+     "writes the problem down in a fixed format and hands it to an "
+     "established engine – the CP-SAT constraint solver [8] for placement, "
+     "the OpenCascade kernel through build123d [9] for the case, and KiCad "
+     "[10] for the board and its design-rule check. Every placement rule "
+     "became one of eight generic kinds, and a new requirement became a new "
+     "declaration instead of new code. When declarations contradict each "
+     "other, the solver names the smallest set that cannot all hold."),
+    ("h2", "Mistakes Become Rules"),
     ("p",
-     "fid derive --check recomputes the hashes and fails if an input changed "
-     "since its outputs were derived, or if an output was edited by hand. It "
-     "runs in continuous integration on every commit, so a stale artifact "
-     "cannot be merged. Derivation also checks the product itself: the case "
-     "must fit the board, the board must pass DRC with zero violations, the "
-     "set points must be inside their windows, every language must have every "
-     "string, and the parts must cost less than a declared ceiling. Finally, "
-     "the firmware compiler and the web type checker read derived files, so "
-     "renaming a fact breaks every place that still uses the old name. Fig. 3 "
-     "shows three real failures from the example product."),
-    ("fig", "fig3-gates.jpg",
-     "Three gate failures on the example product: an edit whose outputs were "
-     "not re-derived, a 22 kΩ resistor in place of 5.1 kΩ, and two placement "
-     "declarations that contradict each other."),
-    ("h2", "Working with AI Agents"),
-    ("p",
-     "Every product has an AGENTS.md file [12] and one instruction file per "
-     "capability, so any agent – Claude Code, Codex, Cursor or others – "
-     "starts from the same context. fid dash --json gives an agent the "
-     "current state of the product, and a hook that runs before every shell "
-     "command stops an agent from editing a derived file. The rule given to "
-     "agents is that a mistake is fixed in the layer that owns the fact: a "
-     "wrong pin in the declaration, a wrong derivation in the platform, and "
-     "never in the output. Fiducial itself was built this way."),
+     "Two habits keep the platform growing in the right direction. Agents "
+     "fix a problem in the layer that owns the fact – a wrong pin in the "
+     "declaration, a wrong derivation in the platform – and never in a "
+     "generated file. And when a mistake gets past the checks, it is not "
+     "patched for that one case; it becomes a general rule that holds for "
+     "every product. Section V shows what that looks like."),
 
-    ("h1", "Worked Example: Sensor Stick"),
+    ("h1", "Example: A Sensor Stick"),
     ("p",
-     "The first product Fiducial was used on is private, so a public example "
-     "was built in the repository to show the whole chain on something anyone "
-     "can inspect: a USB-C stick that reports room temperature and humidity "
-     "to a web page (Fig. 4). It was kept small and cheap on purpose, but it "
-     "still has every discipline: an RP2040 microcontroller [13] with its "
-     "crystal and QSPI flash, an AHT20 sensor [14], a WS2812B status LED "
-     "behind a 5 V buffer, a 3.3 V regulator and a USB-C socket – 23 parts on "
-     "the board, USD 4.74 per board at five boards."),
-    ("fig", "fig4-sensor-stick.jpg",
-     "The sensor stick, derived from one declaration: (a) the routed board in "
-     "its base, with the sensor alone at the far end, away from the "
-     "regulator’s heat; (b) the closed case, 36 × 84 × 15.5 mm; (c) exploded "
-     "view; (d) the routed copper."),
+     "To show the whole chain on something anyone can inspect, the "
+     "repository contains a public example: a USB-C stick that reports "
+     "temperature and humidity to a web page (Fig. 3). It is small on "
+     "purpose, but it has every discipline: a printed case, a routed "
+     "two-layer board with 23 parts, Rust firmware and a web page. The person "
+     "writes the product declaration, an outline drawing, the firmware and "
+     "the page. Fiducial derives the rest, including the files a board house "
+     "needs to make it."),
+    ("fig", "fig3-sensor-stick.png",
+     "The sensor stick, derived from its declaration: (a) the closed case, "
+     "36 × 84 mm; (b) the routed board inside it, with the sensor at the far "
+     "end under its vent."),
     ("p",
-     "The person writes product.toml, an outline drawing, the firmware and "
-     "the page, and Fiducial derives the rest. The board is sized from the "
-     "area of its parts (26 × 79 mm, two layers), placed by CP-SAT from 80 "
-     "constraint instances of six kinds, routed, and passes DRC. The case is "
-     "built around the board, with a window where the socket meets the wall "
-     "and a vent sealed over the sensor. The sensor sits at the far end, away "
-     "from the regulator, because a humidity sensor next to a warm part "
-     "measures the part and not the room."),
-    ("p",
-     "The firmware is written in Rust on Embassy [15] and takes every pin "
-     "through the derived board.rs. Pins are given as macros rather than "
-     "numbers, because in Embassy every pin is its own type: if a pin is "
-     "moved to one the chip’s I²C cannot use, the firmware stops compiling "
-     "instead of failing on the bench. The page reads the sensor over the Web "
-     "Serial API [16] and imports the derived interface.ts. A fabrication "
-     "pipeline writes the Gerber files, the assembly bill of materials and "
-     "the placement file a board house needs."),
+     "The message the stick sends is declared once as well, and both the "
+     "firmware’s encoder and the page’s decoder are generated from it. That "
+     "closes the exact gap met in Outreach, where the two sides were written "
+     "separately. Moving the sensor’s data line to another pin is one "
+     "changed line. Until the product is re-derived, the check fails; after "
+     "fid derive, the board, the schematic, the firmware’s pin map and the "
+     "page’s types all follow, and the firmware and the page need no edit. If "
+     "the new pin is one the chip’s I²C bus cannot use, the firmware stops "
+     "compiling, because in Embassy [11] every pin is its own type."),
 
-    ("h1", "Results"),
-    ("h2", "Measurements"),
+    ("h1", "Evaluation"),
+    ("h2", "Development"),
     ("p",
-     "Fiducial was developed over four weeks (repository created on "
-     "6 September 2026, release 0.9.4 on 4 October 2026) by one person "
-     "working with AI agents: 195 commits on the main branch through 55 "
-     "merged pull requests, about 60,000 lines of Rust, 12,000 of TypeScript "
-     "and 6,000 of Python. It was used on two products, the public sensor "
-     "stick and a private one whose design is not shown. Table I summarises "
-     "the measurements."),
+     "Fiducial was built over six weeks, from 6 September to 15 October 2026, "
+     "by one person working with AI agents: about 240 commits and 68 merged "
+     "pull requests, with about 65,000 lines of Rust, 9,000 of TypeScript and "
+     "6,000 of Python. It has been used on two products, the sensor stick and "
+     "a private one. Table I lists measurements from both."),
     ("table", "Measured Results", ("Measure", "Result"), [
-        ("Placement rule kinds",
-         "8; none added for either product after the switch to the solver"),
-        ("Constraint instances",
-         "80 of 6 kinds (sensor stick); 78 of 7 kinds (private product)"),
-        ("Connection length (private)",
-         "−13 % vs. hand-written search; a further −10 % with a warm start"),
-        ("Board, sensor stick", "26 × 79 mm, 2 layers, 0 DRC violations"),
-        ("Parts cost", "USD 4.74 per board at 5; ceiling USD 15"),
-        ("One-line pin move", "8 derived files rewritten in 31 s"),
-        ("Contradictions", "reported as a minimal set of named declarations"),
-    ]),
-    ("p",
-     "To measure how a change spreads, the sensor’s data line was moved from "
-     "GPIO4 to GPIO8, one line in the declaration. Before deriving, --check "
-     "failed the build (Fig. 3, case 1). A single fid derive then rewrote "
-     "eight derived files in 31 s on a cloud container, among them the board, "
-     "the schematic, the firmware pin map and the web types. The firmware and "
-     "the page needed no edit."),
-    ("p",
-     "Two findings changed the platform during this work. CP-SAT run with "
-     "several worker threads gave different answers on the same input, even "
-     "with deterministic time limits. Since every artifact is checked by "
-     "hash, placement now runs on one worker with large-neighbourhood search, "
-     "which repeats exactly and, starting from the previous answer, also "
-     "found shorter connections. Freerouting is not deterministic either, so "
-     "the routed board is checked (DRC passes and the nets match the "
-     "declaration) rather than compared byte for byte, and a product can "
-     "keep a hand-routed board that the build checks against its "
-     "declaration."),
+        ("Placement rule kinds", "8; none added for either product"),
+        ("Sensor stick board", "26 × 79 mm, 2 layers, 0 DRC errors"),
+        ("Sensor stick parts", "USD 4.74 per board at 5 (limit USD 15)"),
+        ("One pin moved", PINMOVE),
+        ("Placement, private product",
+         "13 % shorter connections than the hand-written search"),
+        ("Contradictions", "named as the smallest conflicting set"),
+    ], (1700, 3080)),
     ("h2", "Injected Mistakes"),
     ("p",
-     "The measurements show that derivation works when it is used correctly. "
-     "To see what happens when a person or an agent makes the mistakes that "
-     "cause drift, 20 realistic mistakes were injected into two products, one "
-     "at a time, and the gates were run in the same order as in CI. The "
-     "products were the sensor stick and a fresh test product in English and "
-     "Serbian with ten software capabilities turned on. Three correct changes "
-     "and two no-change controls checked that the gates do not fail without "
-     "a reason. Everything ran on release 0.9.4. Table II lists the "
-     "mistakes."),
-    ("table", "Injected Mistakes and Where They Were Caught",
-     ("Area", "Mistake", "Caught by"), [
-        ("i18n", "String added in English only", "derive: missing in sr"),
-        ("i18n", "English string edited, not re-derived", "not caught"),
-        ("i18n", "Derived message module edited by hand", "--check"),
-        ("content", "Post published in English only", "derive: missing in sr"),
-        ("SEO", "Page without title or description", "derive: no metadata"),
-        ("brand", "Domain changed, not re-derived", "not caught"),
-        ("deploy", "Derived Worker config edited by hand", "--check"),
-        ("design", "Text below 4.5 : 1 contrast", "derive: palette check"),
-        ("database", "Applied migration edited", "--check"),
-        ("i18n", "Serbian string left in English", "not caught"),
-        ("hardware", "Sensor pin moved, not re-derived", "--check"),
-        ("firmware", "Derived pin map edited by hand", "--check, compiler"),
-        ("circuit", "USB-C pull-down 5.1 kΩ → 22 kΩ", "derive: set points"),
-        ("placement", "Sensor zone contradicts its vent", "derive: conflict"),
-        ("cost", "Ceiling lowered to USD 3", "derive: cost ceiling"),
-        ("interface", "Net renamed, code not updated", "compiler, type check"),
-        ("firmware", "Pin used as a number, then moved", "not caught"),
-        ("protocol", "Reading fields swapped in firmware", "hand-written test"),
-        ("firmware", "Sensor I²C address mistyped", "not caught"),
-        ("mechanical", "Case narrowed 36 → 28 mm", "derive: does not fit"),
-    ]),
+     "Checks are only worth having if they catch the mistakes people "
+     "actually make. To measure that, the test follows the idea of mutation "
+     "testing [12]: inject a realistic mistake, run the checks, and see "
+     "whether they notice. Twenty mistakes were chosen to cover the eight "
+     "kinds of drift met while building Fiducial and its products (Table "
+     "II): ten in a fresh web product in English and Serbian with ten "
+     "software capabilities, and ten in the sensor stick’s hardware, firmware "
+     "and interface. Each is applied to a clean copy, the checks run in the "
+     "same order as in CI – derive, --check, the firmware build and tests, "
+     "the page’s test and type check – and the copy is reset. Three correct "
+     "changes and two runs with no change test the other direction: that the "
+     "checks do not fail without a reason. The test is a script in the "
+     "repository and runs with one command."),
     ("p",
-     "Fifteen of the twenty were caught before merge: eight by checks during "
-     "derivation, five by --check, and two by the compiler, the type checker "
-     "or a test. Every message named the file and the declaration at fault, "
-     "as in Fig. 3. Every gate answered in under a second, except the "
-     "placement contradiction, which took 15 s because the solver has to "
-     "prove that no placement exists. The correct changes passed every gate "
-     "and the controls changed nothing."),
+     "On release 0.9.4 the checks caught 15 of the 20. The five misses were "
+     "not random: each was a fact the platform did not yet own. Two "
+     "declarations edited without re-deriving went unnoticed, because only "
+     "the hardware pipeline listed the files it read. Firmware that named a "
+     "pin by its number kept compiling after the pin moved. A mistyped sensor "
+     "address existed only in the firmware. A Serbian string left in English "
+     "passed every structural check. And the firmware and the page "
+     "disagreeing on a message layout was caught only by a hand-written "
+     "test."),
+    ("table", "Injected Mistakes, by Kind of Drift", ("Mistake", "0.9.4", "Now"), "TABLE2",
+     (2560, 1100, 1100)),
+    ("p", "SECONDRUN"),
+    ("fig", "fig4-failures.png",
+     "Two failures from the test, as the person or agent sees them: (a) a "
+     "string added in English only; (b) firmware that names a pin directly "
+     "instead of taking it from the declaration."),
     ("p",
-     "The five misses are as useful as the catches. Two of them, a string and "
-     "a domain edited without re-deriving, came from a gap in Fiducial "
-     "itself: the software pipelines do not list the files they read, so "
-     "--check compared the outputs with the lock but did not notice the "
-     "changed input. The hardware pipeline lists its inputs, which is why the "
-     "same mistake there was caught. This gap was found by the test and is "
-     "still open. Another miss was firmware that uses a pin number directly "
-     "instead of board.rs: it compiles before and after the pin moves, "
-     "because derivation only protects the code that uses it. The last two "
-     "were facts that were never declared or that need judgment: a mistyped "
-     "sensor address exists only in the firmware, and a Serbian string that "
-     "is really English passes every structural check. The swapped reading "
-     "fields were caught only by a hand-written test, because the message "
-     "layout is still written twice, in the firmware and in the page – the "
-     "same mistake that started this work in Outreach."),
+     "The twenty were written by the author, who also wrote the platform, "
+     "so they may favour what it was built to catch. Later rounds of "
+     "mistakes, written separately from the platform’s code, found further "
+     "gaps – among them a unit mismatch between firmware and page, an I²C "
+     "line with no pull-up resistor, and cookie consent that started with a "
+     "choice already made – and each was again turned into a rule."),
 
     ("h1", "Discussion"),
     ("p",
-     "Better models move the line between what a person has to check and "
-     "what can be left to the agent, but they do not remove it. A "
-     "probabilistic system cannot be guaranteed to be correct, or to match "
-     "what the product needs, and even a deterministic tool is only right "
-     "about what it was told. Fiducial is the layer that keeps that "
-     "randomness bounded: the declarations are the constraints, derivation is "
-     "repeatable, and the gates refuse drift. During this work the gates "
-     "caught every disagreement between artifacts, and the person still had "
-     "to judge what no gate could: a parts catalogue that changed its format "
-     "overnight, a text match that read “±0.1 %” as “1 %”, a sensor that had "
-     "to be moved away from the board’s heat, and a case that its board did "
-     "not fit until the board was cut to the case."),
+     "Better models move the line between what a person must check and what "
+     "can be left to an agent, but they do not remove it. A probabilistic "
+     "system cannot be guaranteed to be correct, and even a deterministic "
+     "tool is only right about what it was told. Fiducial bounds that "
+     "uncertainty: declarations are the constraints, derivation is "
+     "repeatable, and the checks refuse drift. The person still judges what "
+     "no check can. During this work that meant a parts catalogue that "
+     "changed format overnight, a text match that read “±0.1 %” as “1 %”, "
+     "and a sensor that had to be moved away from the board’s heat."),
     ("p",
-     "The approach is built around the product rather than around one "
-     "codebase. Separate repositories, each with an agent that knows only its "
-     "own part, give separate designs. One declaration read by every agent "
-     "gives one product."),
+     "The main lesson is about structure more than any one tool. Keeping "
+     "every discipline in one repository with one shape made the product "
+     "something an agent can see whole, and turning each escaped mistake "
+     "into a rule made the checks stronger with use."),
     ("p",
      "The evidence has clear limits. Only two products were built, one of "
-     "them public. The injected mistakes were chosen by the author, who also "
-     "wrote the platform. Set points are checked at DC only, and nothing is "
-     "simulated in time. Autorouting is not deterministic. Most importantly, "
-     "neither product has been manufactured and tested yet: everything here "
-     "is designed and checked, not built."),
+     "them public, and neither has been manufactured and tested yet. The test "
+     "measures the checks, not whether agents working with Fiducial make "
+     "fewer mistakes than agents working without it. Circuit checks are DC "
+     "only, and autorouting is not deterministic, so a routed board is "
+     "checked rather than compared byte for byte."),
 
     ("h1", "Conclusion"),
     ("p",
-     "Fiducial shows that declaring each fact once, deriving every artifact "
-     "from it and gating the result lets one person working with AI agents "
-     "keep a case, a board, firmware and a web application in agreement. "
-     "Handing hard problems to proven engines kept the platform small, since "
-     "new requirements became new declarations instead of new rules. Of 20 "
-     "injected mistakes, 15 were caught before merge, and the five that were "
-     "not point to the next steps: track the inputs of every pipeline, "
-     "declare message layouts once for firmware and web, and stop code from "
-     "using pin numbers directly. Next, the sensor stick will be manufactured "
-     "and tested on a bench, and the approach will be tried on products built "
-     "by people other than the author. The platform and the example are open "
-     "source [4]."),
+     "Fiducial gives a product one structure across software and hardware: "
+     "each fact declared once, everything else derived, and every change "
+     "checked. That makes development quicker, because a new product starts "
+     "from working parts and a change is made in one place, and more "
+     "reliable, because a mistake is caught with a message that names its "
+     "cause. Twenty injected mistakes found five gaps in the first run; once "
+     "each became a general rule, "
+     + ("all twenty are caught" if ALL_CAUGHT
+        else f"{_SUM['markers_caught']} of the twenty are caught")
+     + ". The next steps are to manufacture the sensor stick and to compare "
+     "agents working with and without the platform on the same tasks. The "
+     "platform and the example are open source [4]."),
 ]
+
+# Table II: the twenty, grouped by the kind of drift each one tests, with
+# what caught it on 0.9.4 (the first run) and on this version.
+_GROUPS = [
+    ("Stale output", [("W2", "English string edited, not re-derived", "not caught"),
+                      ("W6", "Domain changed, not re-derived", "not caught"),
+                      ("H1", "Sensor pin moved, not re-derived", "--check")]),
+    ("Generated file edited", [("W3", "Message module edited", "--check"),
+                               ("W7", "Worker config edited", "--check"),
+                               ("W9", "Applied migration edited", "--check"),
+                               ("H2", "Firmware pin map edited", "--check"),
+                               ("H8", "Message layout changed in firmware", "test only")]),
+    ("Incomplete declaration", [("W1", "String added in English only", "derive"),
+                                ("W4", "Post published in English only", "derive"),
+                                ("W5", "Page without a title", "derive")]),
+    ("Declaration breaks a rule", [("W8", "Text below 4.5 : 1 contrast", "derive"),
+                                   ("H3", "USB-C pull-down 5.1 → 22 kΩ", "derive"),
+                                   ("H5", "Cost limit lowered to USD 3", "derive")]),
+    ("Declarations conflict", [("H4", "Sensor zone contradicts its vent", "derive"),
+                               ("H10", "Case narrowed 36 → 28 mm", "derive")]),
+    ("Code out of date", [("H6", "Net renamed, code not updated", "compiler")]),
+    ("Declaration bypassed", [("H7", "Pin named by number, then moved", "not caught"),
+                              ("H9", "Sensor address typed in firmware", "not caught")]),
+    ("Copied, not translated", [("W10", "Serbian string left in English", "not caught")]),
+]
+TABLE2 = []
+for group, rows in _GROUPS:
+    TABLE2.append(group)
+    for mid, mistake, first in rows:
+        TABLE2.append((mistake, first, _now(mid)))
+
+_c1 = _BY_ID.get("C1")
+_c1_derive = next((g["seconds"] for g in _c1["gates"] if g["gate"] == "derive"), None) if _c1 else None
+SECONDRUN = (
+    "Each miss became a general rule: every pipeline lists its inputs; "
+    "firmware that names a pin or an I²C address directly is refused; the "
+    "sensor’s address is declared with the part and derived into the "
+    "firmware; a translation identical to the default language fails unless "
+    "it is declared the same on purpose; and every message is declared once, "
+    "with both sides’ code generated. On the current version, "
+    + (f"all {_WORDS.get(_SUM['markers'], _SUM['markers'])} mistakes are caught"
+       if ALL_CAUGHT else f"{_SUM['markers_caught']} of the {_SUM['markers']} mistakes are caught")
+    + f": {_WORDS.get(_first, _first)} during derivation, {_WORDS.get(_check, _check)} by "
+    f"--check and {_WORDS.get(_consumers, _consumers)} by the compiler. "
+    + ("Every correct change passes and the runs with no change leave every file as it was. "
+       if CONTROLS_OK else
+       f"{_SUM['controls_passed']} of the {_SUM['controls']} correct or unchanged runs pass. ")
+    + "Every failure names the file and the declaration at fault (Fig. 4)."
+)
 
 REFERENCES = [
     "A. Zdravković, Đ. Jovanović and P. Šubarević, “Outreach: Modular "
@@ -356,36 +416,27 @@ REFERENCES = [
     "Claude Code documentation. Available at: "
     "https://docs.anthropic.com/en/docs/claude-code",
     "OpenAI Codex. Available at: https://openai.com/codex/",
-    "A. Zdravković, Fiducial, release 0.9.4, 2026. Available at: "
-    "https://github.com/AleksaZCodes/fiducial/releases/tag/v0.9.4",
-    "LCSC Electronics component catalogue. Available at: "
-    "https://www.lcsc.com/",
-    "KiCad EDA. Available at: https://www.kicad.org/",
+    f"A. Zdravković, Fiducial, release {VERSION}, 2026. Available at: "
+    "https://github.com/AleksaZCodes/fiducial",
+    "D. C. Schmidt, “Guest editor’s introduction: Model-driven "
+    "engineering,” Computer, vol. 39, no. 2, pp. 25–31, 2006.",
     "E. Dolstra, M. de Jonge and E. Visser, “Nix: A safe and policy-free "
     "system for software deployment,” in Proc. LISA, 2004, pp. 79–92.",
+    "AGENTS.md, a format for guiding coding agents. Available at: "
+    "https://agents.md/",
     "L. Perron and F. Didier, CP-SAT, Google OR-Tools. Available at: "
     "https://developers.google.com/optimization/cp/cp_solver",
     "build123d, a Python CAD library on the OpenCascade kernel. Available "
     "at: https://github.com/gumyr/build123d",
-    "Freerouting, an open-source PCB autorouter. Available at: "
-    "https://github.com/freerouting/freerouting",
-    "USB Type-C Cable and Connector Specification, USB Implementers Forum. "
-    "Available at: https://www.usb.org/usb-type-cr-cable-and-connector-"
-    "specification",
-    "AGENTS.md, a format for guiding coding agents. Available at: "
-    "https://agents.md/",
-    "RP2040 datasheet, Raspberry Pi Ltd. Available at: "
-    "https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf",
-    "AHT20 humidity and temperature sensor datasheet, Aosong. Available at: "
-    "https://asairsensors.com/wp-content/uploads/2021/09/Data-Sheet-AHT20-"
-    "Humidity-and-Temperature-Sensor-ASAIR-V1.0.03.pdf",
+    "KiCad EDA. Available at: https://www.kicad.org/",
     "Embassy, an async framework for embedded Rust. Available at: "
     "https://embassy.dev/",
-    "Web Serial API reference. Available at: "
-    "https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API",
+    "R. A. DeMillo, R. J. Lipton and F. G. Sayward, “Hints on test data "
+    "selection: Help for the practicing programmer,” Computer, vol. 11, "
+    "no. 4, pp. 34–41, 1978.",
 ]
 
-FIG_WIDTH = Inches(3.375)  # one column, as in the template's own figures
+FIG_WIDTH = Inches(3.15)  # the text column is 3.19 in; anything wider is cut at its edge
 
 d = docx.Document(TEMPLATE)
 styles = {s.name.lower(): s for s in d.styles}
@@ -484,12 +535,13 @@ def keep_with_next(p):
     p.paragraph_format.keep_with_next = True
 
 
-def add_table(caption, header, rows):
+def add_table(caption, header, rows, widths):
+    """A table; a row that is a plain string is a group heading across it.
+
+    Widths are twips; the two-column body is 4860 twips (3.375 in) wide, and
+    cell margins take what the widths leave."""
     keep_with_next(para("table head", caption))
     ncols = len(header)
-    # Twips; the two-column body is 4860 twips (3.375 in) wide; cell margins
-    # take the rest.
-    widths = {2: (1600, 3180), 3: (1000, 2220, 1560)}[ncols]
     t = d.add_table(rows=1 + len(rows), cols=ncols)
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
     tblPr = t._tbl.tblPr
@@ -503,6 +555,14 @@ def add_table(caption, header, rows):
         gc.set(qn("w:w"), str(w))
     for row_i, values in enumerate([header] + list(rows)):
         cells = t.rows[row_i].cells
+        if isinstance(values, str):
+            cell = cells[0].merge(cells[-1])
+            p = cell.paragraphs[0]
+            p.style = style("table copy")
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            r = p.add_run(values)
+            r.italic = True
+            continue
         for col_i, value in enumerate(values):
             cell = cells[col_i]
             tcPr = cell._tc.get_or_add_tcPr()
@@ -515,7 +575,8 @@ def add_table(caption, header, rows):
             p = cell.paragraphs[0]
             p.style = style("table col head" if row_i == 0 else "table copy")
             p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            p.add_run(value)
+            # "--check" must not break at its hyphens.
+            p.add_run(value.replace("--", "\u2011\u2011"))
     b = OxmlElement("w:tblBorders")
     for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
         e = OxmlElement("w:" + edge)
@@ -537,7 +598,7 @@ for item in BODY:
     elif kind == "h2":
         keep_with_next(para("Heading 2", item[1]))
     elif kind == "p":
-        para("Body Text", item[1])
+        para("Body Text", SECONDRUN if item[1] == "SECONDRUN" else item[1])
     elif kind == "fig":
         _, name, caption = item
         p = para("Body Text", align=WD_ALIGN_PARAGRAPH.CENTER)
@@ -551,7 +612,8 @@ for item in BODY:
         keep_with_next(p)
         para("Slika", caption)
     elif kind == "table":
-        add_table(*item[1:])
+        caption, header, rows, widths = item[1:]
+        add_table(caption, header, TABLE2 if rows == "TABLE2" else rows, widths)
 
 keep_with_next(para("Heading 1", "References"))
 for ref in REFERENCES:

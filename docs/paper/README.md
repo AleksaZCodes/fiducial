@@ -84,17 +84,25 @@ solvers, set-point checks, prices and the cut board are in `v0.9.1`, and
 
 ## The paper
 
-Written 2026-10-15 for IEEESTEC 2026, on the conference template and in the
-voice of the author's IEEESTEC 2025 paper (Outreach):
+For IEEESTEC 2026, on the conference template, in the voice of the author's
+IEEESTEC 2025 paper (Outreach). It cites release 0.9.11.
 
-- `Fiducial_Zdravkovic_Aleksa.docx` / `.pdf` — the paper as sent.
-- `figures/` — its four figures (from the 2026-10-04 drafts).
+- `Fiducial_Zdravkovic_Aleksa.docx` / `.pdf` — the paper.
+- `markers/run.py` — the injected-mistake test: 20 mistakes in eight kinds
+  of drift (10 software, 10 hardware, firmware and interface) and 5
+  controls, each applied to a clean copy with the gates run in CI's order.
+  `python3 docs/paper/markers/run.py` writes `results.json` and
+  `results.md`. On 0.9.4, 15 of the 20 were caught; on 0.9.11 all 20 are,
+  and every control passes.
+- `figures/make_figures.py` — the four figures. Fig. 4 is read from
+  `markers/results.json`, so it shows the gates' real output.
 - `build_paper.py` — writes the text into the template:
-  `python3 build_paper.py OUTREACH.docx figures OUT.docx`, where the
-  template is the Outreach `.doc` converted to `.docx` (it is not in this
+  `python3 build_paper.py OUTREACH.docx figures OUT.docx`. Table II, the
+  counts in Section V and the pin-move row of Table I are read from
+  `markers/results.json`, so the paper cannot say something the last run did
+  not. The template is the Outreach `.doc` converted to `.docx` (not in this
   repository: it holds the earlier paper and its co-authors' details). The
   PDF is exported from the `.docx`.
 
-The evaluation is the measurements and the 20-mistake injection test run on
-`v0.9.4`; the input-tracking gap that test found in the software pipelines
-is still open.
+Rerun the test, then the figures, then the paper, whenever the platform
+changes what a gate catches.

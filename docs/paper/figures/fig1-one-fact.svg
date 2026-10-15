@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="816" viewBox="0 0 1000 816">
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#1a1a1a"/>
+  </marker>
+  <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#b3261e"/>
+  </marker>
+</defs>
+<rect width="1000" height="816" fill="white"/>
+<text x="20" y="54" font-family="Liberation Serif" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">(a)</text>
+<rect x="70" y="131.0" width="290" height="116" fill="white" stroke="#1a1a1a" stroke-width="2.2"/>
+<text x="215" y="179.0" font-family="Liberation Serif" font-size="34" fill="#1a1a1a" text-anchor="middle" font-weight="normal" font-style="normal">SDA pin</text>
+<text x="215" y="225.0" font-family="Liberation Mono" font-size="32" fill="#1a1a1a" text-anchor="middle" font-weight="normal" font-style="normal">GPIO 4</text>
+<rect x="560" y="30" width="400" height="66" fill="white" stroke="#1a1a1a" stroke-width="2.2"/>
+<text x="580" y="74" font-family="Liberation Serif" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">schematic</text>
+<text x="940" y="74" font-family="Liberation Mono" font-size="32" fill="#1a1a1a" text-anchor="end" font-weight="normal" font-style="normal">GPIO 4</text>
+<line x1="360" y1="189.0" x2="556" y2="63.0" stroke="#1a1a1a" stroke-width="2.2" marker-end="url(#a)"/>
+<rect x="560" y="114" width="400" height="66" fill="white" stroke="#1a1a1a" stroke-width="2.2"/>
+<text x="580" y="158" font-family="Liberation Serif" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">board</text>
+<text x="940" y="158" font-family="Liberation Mono" font-size="32" fill="#1a1a1a" text-anchor="end" font-weight="normal" font-style="normal">GPIO 4</text>
+<line x1="360" y1="189.0" x2="556" y2="147.0" stroke="#1a1a1a" stroke-width="2.2" marker-end="url(#a)"/>
+<rect x="560" y="198" width="400" height="66" fill="white" stroke="#b3261e" stroke-width="2.2"/>
+<text x="580" y="242" font-family="Liberation Serif" font-size="34" fill="#b3261e" text-anchor="start" font-weight="normal" font-style="normal">firmware</text>
+<text x="940" y="242" font-family="Liberation Mono" font-size="32" fill="#b3261e" text-anchor="end" font-weight="normal" font-style="normal">GPIO 8</text>
+<line x1="360" y1="189.0" x2="556" y2="231.0" stroke="#1a1a1a" stroke-width="2.2" marker-end="url(#a)"/>
+<rect x="560" y="282" width="400" height="66" fill="white" stroke="#1a1a1a" stroke-width="2.2"/>
+<text x="580" y="326" font-family="Liberation Serif" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">web page</text>
+<text x="940" y="326" font-family="Liberation Mono" font-size="32" fill="#1a1a1a" text-anchor="end" font-weight="normal" font-style="normal">GPIO 4</text>
+<line x1="360" y1="189.0" x2="556" y2="315.0" stroke="#1a1a1a" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="20" y="442" font-family="Liberation Serif" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">(b)</text>
+<rect x="70" y="519.0" width="290" height="116" fill="#f2f2f2" stroke="#1a1a1a" stroke-width="2.2"/>
+<text x="215" y="567.0" font-family="Liberation Serif" font-size="34" fill="#1a1a1a" text-anchor="middle" font-weight="normal" font-style="normal">declaration</text>
+<text x="215" y="613.0" font-family="Liberation Mono" font-size="32" fill="#1a1a1a" text-anchor="middle" font-weight="normal" font-style="normal">GPIO 4</text>
+<rect x="560" y="418" width="400" height="66" fill="white" stroke="#1a1a1a" stroke-width="2.2"/>
+<text x="580" y="462" font-family="Liberation Serif" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">schematic</text>
+<text x="940" y="462" font-family="Liberation Mono" font-size="32" fill="#1a1a1a" text-anchor="end" font-weight="normal" font-style="normal">GPIO 4</text>
+<line x1="360" y1="577.0" x2="556" y2="451.0" stroke="#1a1a1a" stroke-width="2.2" marker-end="url(#a)"/>
+<rect x="560" y="502" width="400" height="66" fill="white" stroke="#1a1a1a" stroke-width="2.2"/>
+<text x="580" y="546" font-family="Liberation Serif" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">board</text>
+<text x="940" y="546" font-family="Liberation Mono" font-size="32" fill="#1a1a1a" text-anchor="end" font-weight="normal" font-style="normal">GPIO 4</text>
+<line x1="360" y1="577.0" x2="556" y2="535.0" stroke="#1a1a1a" stroke-width="2.2" marker-end="url(#a)"/>
+<rect x="560" y="586" width="400" height="66" fill="white" stroke="#1a1a1a" stroke-width="2.2"/>
+<text x="580" y="630" font-family="Liberation Serif" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">firmware</text>
+<text x="940" y="630" font-family="Liberation Mono" font-size="32" fill="#1a1a1a" text-anchor="end" font-weight="normal" font-style="normal">GPIO 4</text>
+<line x1="360" y1="577.0" x2="556" y2="619.0" stroke="#1a1a1a" stroke-width="2.2" marker-end="url(#a)"/>
+<rect x="560" y="670" width="400" height="66" fill="white" stroke="#1a1a1a" stroke-width="2.2"/>
+<text x="580" y="714" font-family="Liberation Serif" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">web page</text>
+<text x="940" y="714" font-family="Liberation Mono" font-size="32" fill="#1a1a1a" text-anchor="end" font-weight="normal" font-style="normal">GPIO 4</text>
+<line x1="360" y1="577.0" x2="556" y2="703.0" stroke="#1a1a1a" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="215" y="677.0" font-family="Liberation Mono" font-size="30" fill="#1a1a1a" text-anchor="middle" font-weight="normal" font-style="normal">fid derive</text>
+<line x1="560" y1="758" x2="960" y2="758" stroke="#1a1a1a" stroke-width="2.2"/>
+<text x="760" y="798" font-family="Liberation Serif" font-size="32" fill="#1a1a1a" text-anchor="middle" font-weight="normal" font-style="italic">checked on every commit</text>
+</svg>
