@@ -310,7 +310,7 @@ hashed into the lock too, and `--check` names the one that moved.
 Executors are `shell` and `cargo-test` — which need no platform change at all —
 plus the in-process ones (`fid-validate`, `fid-mesh`, `fid-i18n`, `fid-brand`,
 `fid-thesis`, `fid-deploy`, `fid-identity`, `fid-adapters`, `fid-schema`,
-`fid-legal`, `fid-design`, `fid-hardware`). Reach for `shell` first; a new in-process executor
+`fid-legal`, `fid-design`, `fid-protocol`, `fid-hardware`). Reach for `shell` first; a new in-process executor
 is warranted only when the work is genuinely a Rust library call rather than a
 tool invocation.
 

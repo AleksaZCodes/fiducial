@@ -482,7 +482,16 @@ fn check_lock(
         // `fiducial.lock` keys are forward-slashed; a Windows path is not.
         let key = rel.replace('\\', "/");
 
-        if crate::ownership::of(&key).is_product() {
+        // A file a capability names as its declaration is the product's by
+        // definition: editing it is how the product states its facts. The
+        // list above is for scaffolded files no capability claims; without
+        // this, every new capability's declaration (`protocol.toml`) read as
+        // drift until someone remembered to add it there too.
+        let declared = lock
+            .capabilities
+            .values()
+            .any(|c| c.declarations.contains(&key));
+        if declared || crate::ownership::of(&key).is_product() {
             owned_edits += 1;
             continue;
         }

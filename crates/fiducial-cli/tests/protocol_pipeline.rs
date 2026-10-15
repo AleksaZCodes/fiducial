@@ -123,3 +123,16 @@ fn the_generated_rust_compiles_and_round_trips() {
     assert!(out.status.success(), "{}", text(&out));
     assert!(Command::new(&bin).status().unwrap().success());
 }
+
+#[test]
+fn editing_the_declaration_is_not_drift() {
+    // `protocol.toml` is the product's to write — `product()` replaces the
+    // scaffold with its own messages. `fid doctor` read that as a
+    // platform-owned file edited by hand until a capability's declarations
+    // counted as the product's.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product(tmp.path());
+    let out = fid(&root, &["doctor"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(!text(&out).contains("protocol.toml: modified since scaffold"));
+}
