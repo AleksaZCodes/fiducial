@@ -12,7 +12,7 @@ it is designed, checked and orderable.
 
 ## Part 1 · Build it
 
-You need `fid` (`cargo install fiducial-cli`), Python 3.11+, KiCad 7 or later
+You need `fid` (`cargo install fiducial-cli`), Python 3.11+, KiCad 9
 (for `kicad-cli` and its libraries), Java 21 (Freerouting, fetched and
 pinned by the build), Rust with the `thumbv6m-none-eabi` target, and Node.
 

@@ -6,9 +6,13 @@
 #
 # What it sets up, and why each piece:
 #
-#   KiCad      `kicad-cli` (fab outputs, STEP, schematic PDF) and the `pcbnew`
+#   KiCad 9    `kicad-cli` (fab outputs, STEP, schematic PDF) and the `pcbnew`
 #              Python module route.py drives. pcbnew is built against the
 #              system Python, so it comes from the system package manager.
+#              Exactly one major version: route.py drives pcbnew's Python API,
+#              which changes between majors. On Ubuntu it comes from KiCad's
+#              own PPA, because the distribution's version is whatever that
+#              release shipped (7 on 24.04, 9 on 26.04).
 #   Java 21    Freerouting, which route.py fetches once and pins by hash.
 #   .venv      hardware/.venv — the system Python *with* its site-packages
 #              (so pcbnew is importable) plus requirements.txt: build123d,
@@ -23,13 +27,25 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# The KiCad major this toolchain is written against. The one declaration:
+# the install and the check below both read it.
+KICAD_MAJOR=9
+
 CHECK_ONLY=0
 [ "${1:-}" = "--check" ] && CHECK_ONLY=1
 VENV=hardware/.venv
 
+kicad_ok() {
+  kicad-cli version 2>/dev/null | head -1 | grep -q "^${KICAD_MAJOR}\."
+}
+
 missing() {
   local m=()
-  command -v kicad-cli >/dev/null || m+=("kicad-cli (KiCad)")
+  if ! command -v kicad-cli >/dev/null; then
+    m+=("kicad-cli (KiCad ${KICAD_MAJOR})")
+  elif ! kicad_ok; then
+    m+=("KiCad ${KICAD_MAJOR} (found $(kicad-cli version 2>/dev/null | head -1))")
+  fi
   if command -v java >/dev/null; then
     local v
     v=$(java -version 2>&1 | sed -n 's/.*version "\([0-9]*\).*/\1/p' | head -1)
@@ -38,7 +54,12 @@ missing() {
     m+=("java 21+")
   fi
   if [ -x "$VENV/bin/python" ]; then
-    "$VENV/bin/python" -c "import pcbnew" 2>/dev/null || m+=("pcbnew in $VENV")
+    if "$VENV/bin/python" -c "import pcbnew" 2>/dev/null; then
+      "$VENV/bin/python" -c "import pcbnew, sys; sys.exit(not pcbnew.Version().startswith('${KICAD_MAJOR}.'))" 2>/dev/null ||
+        m+=("pcbnew ${KICAD_MAJOR} in $VENV (found $("$VENV/bin/python" -c "import pcbnew; print(pcbnew.Version())" 2>/dev/null))")
+    else
+      m+=("pcbnew in $VENV")
+    fi
     "$VENV/bin/python" -c "import build123d, ortools, pypdf" 2>/dev/null ||
       m+=("requirements.txt in $VENV")
   else
@@ -64,9 +85,18 @@ case "$(uname -s)" in
   Linux)
     if command -v apt-get >/dev/null; then
       need=()
-      command -v kicad-cli >/dev/null || need+=(kicad)
+      kicad_ok || need+=(kicad)
       java -version 2>&1 | grep -qE 'version "(2[1-9]|[3-9][0-9])' || need+=(openjdk-21-jre-headless)
       python3 -c "import venv, ensurepip" 2>/dev/null || need+=(python3-venv)
+      # Ubuntu's own kicad package is whichever major that release shipped;
+      # KiCad's PPA pins the major. Elsewhere (Debian), apt's version stands
+      # and the check below says if it is the wrong one.
+      if [[ " ${need[*]} " == *" kicad "* ]] && grep -q '^ID=ubuntu' /etc/os-release 2>/dev/null; then
+        echo "adding ppa:kicad/kicad-${KICAD_MAJOR}.0-releases (needs sudo)"
+        command -v add-apt-repository >/dev/null ||
+          { sudo apt-get update -qq && sudo apt-get install -y -qq software-properties-common; }
+        sudo add-apt-repository -y "ppa:kicad/kicad-${KICAD_MAJOR}.0-releases"
+      fi
       if [ ${#need[@]} -gt 0 ]; then
         echo "installing: ${need[*]} (apt, needs sudo)"
         sudo apt-get update -qq
@@ -75,13 +105,15 @@ case "$(uname -s)" in
       # pcbnew is built for the distribution's Python; the venv must be too.
       base_python=/usr/bin/python3
     else
-      echo "No apt-get here. Install KiCad 9, Java 21 and Python 3 with venv support" >&2
+      echo "No apt-get here. Install KiCad ${KICAD_MAJOR}, Java 21 and Python 3 with venv support" >&2
       echo "from your distribution, then re-run this script." >&2
       exit 1
     fi
     ;;
   Darwin)
     command -v brew >/dev/null || { echo "Install Homebrew first: https://brew.sh" >&2; exit 1; }
+    # The cask is KiCad's current release; the check below catches the day
+    # that stops being ${KICAD_MAJOR}.
     command -v kicad-cli >/dev/null || brew install --cask kicad
     java -version 2>&1 | grep -qE 'version "(2[1-9]|[3-9][0-9])' || brew install openjdk@21
     # KiCad on macOS ships its own Python, and pcbnew lives in it.

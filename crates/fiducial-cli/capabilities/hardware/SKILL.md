@@ -356,7 +356,7 @@ look at what moved, re-render, and show it.
 **Run `hardware/setup.sh` once per machine.** It is what CI runs, and it
 installs (apt, or Homebrew on macOS) and verifies:
 
-- KiCad (7 or later; 9 on current Ubuntu): `kicad-cli`, and the `pcbnew` Python module `route.py` drives;
+- KiCad 9, exactly (`KICAD_MAJOR` in `setup.sh`; on Ubuntu from KiCad's PPA): `kicad-cli`, and the `pcbnew` Python module `route.py` drives — its Python API changes between majors;
 - Java 21, for Freerouting (fetched once into `build/tools/`, pinned by hash);
 - `hardware/.venv`: the system Python with its site-packages, so pcbnew is
   importable, plus `requirements.txt` (build123d on OpenCascade for real B-rep
