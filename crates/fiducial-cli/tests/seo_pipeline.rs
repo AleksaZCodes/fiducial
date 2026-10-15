@@ -345,18 +345,17 @@ fn the_seo_pipeline_does_not_write_another_pipelines_artifact() {
 
 // ── The handover off `brand` ────────────────────────────────────────────────
 
-/// Two pipelines owning one artifact is refused whatever directory they spell.
+/// Brand steps aside for `seo`, whatever directory the sitemap is spelled at.
 ///
-/// The guard used to match the literal `apps/web/public/sitemap.xml`, so it was
-/// silent for a product whose pipelines say `static/` — which is every product
-/// that had to edit the paths, and therefore the population most likely to have
-/// left both owners in place.
+/// Both pipelines listing a sitemap used to be refused, which made a fresh
+/// product with both capabilities fail its first derive on files the platform
+/// wrote. Now brand's one-line sitemap is not applicable while `seo` exists,
+/// so there is one owner and one file — even at a non-Next.js path.
 #[test]
-fn both_pipelines_owning_the_sitemap_is_refused() {
+fn brand_steps_aside_for_seos_sitemap() {
     let tmp = tempfile::tempdir().unwrap();
     let root = seo_product(tmp.path());
 
-    // Hand it back to brand, at a path that is not the Next.js one.
     edit_line(
         &root,
         "pipelines/seo.toml",
@@ -372,12 +371,18 @@ fn both_pipelines_owning_the_sitemap_is_refused() {
     write(&root, "pipelines/brand.toml", &brand);
 
     let out = run(&root, &["derive"]);
-    assert!(!out.status.success(), "should refuse: {}", text(&out));
-    let said = text(&out);
+    assert!(out.status.success(), "{}", text(&out));
+    let lock = read(&root, "fiducial.lock");
+    let entry = lock
+        .split("[artifacts.\"apps/web/static/sitemap.xml\"]")
+        .nth(1)
+        .expect("the sitemap is tracked");
     assert!(
-        said.contains("sitemap.xml") && said.contains("brand.toml"),
-        "names the file and the pipeline to edit: {said}"
+        entry.trim_start().starts_with("pipeline = \"seo\""),
+        "seo owns the sitemap: {entry}"
     );
+    let out = run(&root, &["derive", "--check"]);
+    assert!(out.status.success(), "{}", text(&out));
 }
 
 // ── The pages declaration ───────────────────────────────────────────────────

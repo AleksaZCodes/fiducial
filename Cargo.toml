@@ -39,6 +39,8 @@ rust-version = "1.82"
 # `postcard` without `std`, its dev-dependencies need it with). So each crate
 # still writes `features = [...]`, and only the version is inherited.
 [workspace.dependencies]
+# SQLite, bundled: derive runs a product's migrations on the engine it ships on.
+rusqlite   = { version = "0.32", features = ["bundled"] }
 # Serialization — the wire and schema contracts.
 serde      = { version = "1", default-features = false }
 serde_json = { version = "1" }

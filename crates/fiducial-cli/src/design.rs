@@ -131,7 +131,46 @@ fn default_edge_weight() -> f64 {
     1.5
 }
 
+/// The smallest element each corner role is drawn on, in rem. The platform's
+/// components set these heights, so the platform — not the product — knows them.
+const ROLE_MIN_HEIGHT_REM: [(&str, f64); 3] = [("panel", 5.0), ("control", 2.25), ("chip", 1.75)];
+
 impl Shape {
+    /// Under `chamfer`, a cut deeper than half the element's height meets the
+    /// cut on the other end of the same edge and the box becomes a lozenge
+    /// (the paper's round 5, case M5). A round radius clamps itself; a clip
+    /// path does not.
+    fn check_cuts(&self) -> Result<()> {
+        if self.strategy != "chamfer" {
+            return Ok(());
+        }
+        for (role, height) in ROLE_MIN_HEIGHT_REM {
+            let value = match role {
+                "panel" => &self.panel,
+                "control" => &self.control,
+                _ => &self.chip,
+            };
+            let Some(cut) = value
+                .trim()
+                .strip_suffix("rem")
+                .and_then(|n| n.trim().parse::<f64>().ok())
+            else {
+                bail!("`fid:shape` {role} = \"{value}\" — write the cut in rem, e.g. \"0.5rem\"");
+            };
+            if cut > height / 2.0 {
+                bail!(
+                    "`fid:shape` {role} = \"{value}\" — a {role} can be as short as {height}rem, \
+                     and a cut deeper than half of that ({}rem) meets the opposite cut: \
+                     the element draws as a lozenge, not a box with cut corners.\n  \
+                     Keep {role} at or under {}rem.",
+                    height / 2.0,
+                    height / 2.0
+                );
+            }
+        }
+        Ok(())
+    }
+
     /// What `--radius` resolves to.
     ///
     /// Forced to 0 unless the strategy is `round`: under `chamfer` and `square`
@@ -159,6 +198,26 @@ pub struct ContrastPair {
     /// What the pair is, for the failure message.
     #[serde(default)]
     pub note: Option<String>,
+    /// `text` (the default), `large-text` or `non-text`: which WCAG floor
+    /// `min` may not go under — 4.5, 3.0 and 3.0.
+    #[serde(default)]
+    pub kind: Option<String>,
+}
+
+impl ContrastPair {
+    /// The lowest `min` WCAG 2.2 AA allows for this kind of pair.
+    fn floor(&self) -> Result<f64> {
+        match self.kind.as_deref().unwrap_or("text") {
+            "text" => Ok(4.5),
+            "large-text" | "non-text" => Ok(3.0),
+            k => bail!(
+                "contrast pair {} on {} has kind = \"{k}\"; \
+                 it is one of text, large-text, non-text",
+                self.fg,
+                self.bg
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -328,6 +387,25 @@ pub fn parse(md: &str) -> Result<DesignSystem> {
         Some(b) => toml::from_str(b).context("parsing the `fid:contrast` block")?,
         None => ContrastBlock::default(),
     };
+    // A minimum is a WCAG level, not a dial. Lowering it until a colour
+    // passes is the one fix the measurement cannot see (the paper's round 4,
+    // case R8), so the floor belongs to the platform, not the product.
+    for pair in &contrast.pairs {
+        let floor = pair.floor()?;
+        if pair.min < floor {
+            bail!(
+                "contrast pair {} on {} has min = {} — under the {floor} WCAG AA \
+                 floor for {}.\n  If a pair fails, change the colour, not the minimum. \
+                 A pair that is not body-size text says so with \
+                 kind = \"large-text\" or kind = \"non-text\" (floor 3.0).",
+                pair.fg,
+                pair.bg,
+                pair.min,
+                pair.kind.as_deref().unwrap_or("text")
+            );
+        }
+    }
+    shape.check_cuts()?;
     // Optional: a product with no deck and no document needs no answer here.
     // A product that has one and does not declare it gets the default deck,
     // which is the thing this whole capability exists to prevent.
@@ -1251,6 +1329,33 @@ small = "eyebrow"
                 || err.contains("The minimum is the requirement"),
             "{err}"
         );
+    }
+
+    #[test]
+    fn a_minimum_lowered_under_the_wcag_floor_is_refused() {
+        let lowered = DOC.replace(
+            r#"{ fg = "foreground", bg = "background", min = 4.5 },"#,
+            r#"{ fg = "foreground", bg = "background", min = 3.0 },"#,
+        );
+        let err = parse(&lowered).unwrap_err().to_string();
+        assert!(err.contains("under the 4.5 WCAG AA floor"), "{err}");
+        let graphic = DOC.replace(
+            r#"{ fg = "foreground", bg = "background", min = 4.5 },"#,
+            r#"{ fg = "foreground", bg = "background", min = 3.0, kind = "non-text" },"#,
+        );
+        assert!(parse(&graphic).is_ok());
+    }
+
+    #[test]
+    fn a_chamfer_deeper_than_half_the_element_is_refused() {
+        let lozenge = DOC.replace(r#"chip = "0.5rem""#, r#"chip = "1rem""#);
+        let err = parse(&lozenge).unwrap_err().to_string();
+        assert!(
+            err.contains("chip = \"1rem\"") && err.contains("lozenge"),
+            "{err}"
+        );
+        let round = lozenge.replace(r#"strategy = "chamfer""#, r#"strategy = "round""#);
+        assert!(parse(&round).is_ok(), "a round radius clamps itself");
     }
 
     #[test]

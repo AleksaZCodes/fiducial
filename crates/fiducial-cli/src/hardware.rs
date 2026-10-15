@@ -58,6 +58,11 @@ pub struct Product {
     /// `hardware/generated/board.rs`: one macro per net, naming the pin.
     #[serde(default)]
     pub firmware: Option<Firmware>,
+    /// The voltage of each power rail: `[rails] VBUS = 5.0, "3V3" = 3.3`.
+    /// GND is 0 V. With it, every net a resistor pulls toward a rail is
+    /// solved, and a pin pulled above its part's `io_max_v` fails derive.
+    #[serde(default)]
+    pub rails: BTreeMap<String, f64>,
 }
 
 /// `[firmware] mcu = "<part id>"` — the board part whose pins the firmware
@@ -128,8 +133,9 @@ pub struct Shape {
 pub struct Case {
     #[serde(default = "d_process")]
     pub process: String,
-    /// The printed case's colour, `#rrggbb` — the filament. The renders and
-    /// the viewer draw it; the lid a shade lighter. Unset: a neutral grey.
+    /// The printed case's colour, `#rrggbb` — the filament, or `#rrggbbaa`
+    /// for a translucent one. The renders and the viewer draw it; the lid a
+    /// shade lighter. Unset: a neutral grey.
     #[serde(default)]
     pub colour: Option<String>,
     pub wall_mm: f64,
@@ -621,6 +627,28 @@ pub struct Part {
     /// schematic and the board's fab layer.
     #[serde(default)]
     pub value: Option<String>,
+    /// The highest voltage this part's pins may see, from its datasheet's
+    /// absolute maximum ratings (an RP2040's I/O: IOVDD + 0.5 V). Checked
+    /// against `[rails]` on every derive.
+    #[serde(default)]
+    pub io_max_v: Option<f64>,
+    /// The part's 7-bit I²C address, from its datasheet: `0x38`. Derived
+    /// into `board.rs` as `<PART>_I2C_ADDRESS`, so the firmware never types
+    /// it (the paper's study, case H10: a mistyped address in firmware code
+    /// disagreed with nothing, because nothing else knew it).
+    #[serde(default)]
+    pub i2c_address: Option<u8>,
+    /// Command bytes from the part's device profile (`crate::devices`),
+    /// derived into `board.rs` as `<PART>_<COMMAND>`. Not declared.
+    #[serde(skip)]
+    pub commands: BTreeMap<String, Vec<u8>>,
+    /// Waits from the part's device profile, ms, derived into `board.rs` as
+    /// `<PART>_<NAME>`. Not declared.
+    #[serde(skip)]
+    pub timing: BTreeMap<String, u64>,
+    /// LCSC's description of the part ordered, from `parts.lock`. Not declared.
+    #[serde(skip)]
+    pub catalog: Option<String>,
     /// Board parts: an explicit turn, degrees counter-clockwise — for a part
     /// whose orientation is a design choice rather than a zone edge's.
     #[serde(default)]
@@ -730,6 +758,86 @@ struct LockedPart {
     unit_price: Option<f64>,
     #[serde(default)]
     currency: Option<String>,
+    /// LCSC's own description of the part: "1uF ±10% 50V Ceramic …".
+    #[serde(default)]
+    description: Option<String>,
+}
+
+/// The first resistance, capacitance or inductance in a text, in base units:
+/// "5.1k" → 5100, "27R" → 27, "1uF 50V X5R" → 1e-6, "5.1kΩ ±1% 100mW" → 5100.
+/// `unit_required` is for LCSC descriptions, which also carry voltages and
+/// tolerances; a declared value may leave its unit implied ("5.1k").
+pub fn component_quantity(text: &str, unit_required: bool) -> Option<f64> {
+    for tok in text.split(|c: char| c.is_whitespace() || c == ',' || c == '/') {
+        let num_end = tok
+            .char_indices()
+            .find(|(_, c)| !(c.is_ascii_digit() || *c == '.'))
+            .map_or(tok.len(), |(i, _)| i);
+        let Ok(n) = tok[..num_end].parse::<f64>() else {
+            continue;
+        };
+        let mut rest = tok[num_end..].chars().peekable();
+        let scale = match rest.peek() {
+            Some('p') => 1e-12,
+            Some('n') => 1e-9,
+            Some('u') | Some('µ') | Some('μ') => 1e-6,
+            Some('m') => 1e-3,
+            Some('k') | Some('K') => 1e3,
+            Some('M') => 1e6,
+            _ => 1.0,
+        };
+        if scale != 1.0 {
+            rest.next();
+        }
+        let unit: String = rest.collect();
+        let known = matches!(unit.as_str(), "F" | "H" | "Ω" | "R" | "ohm" | "Ohm");
+        if known || (!unit_required && unit.is_empty()) {
+            return Some(n * scale);
+        }
+    }
+    None
+}
+
+/// A pinned part whose declared value is not the part being ordered: the
+/// schematic and BOM say one thing, the reel another (the paper's held-out
+/// test, case X14). Only compared when both sides state a value.
+/// The first frequency in a text, in hertz: "Crystal 12MHz ±10ppm" → 12e6,
+/// "32.768kHz" → 32768.
+pub fn frequency_hz(text: &str) -> Option<f64> {
+    let lower = text.to_ascii_lowercase();
+    for (unit, scale) in [("mhz", 1e6), ("khz", 1e3), ("hz", 1.0)] {
+        if let Some(at) = lower.find(unit) {
+            let num: String = lower[..at]
+                .trim_end()
+                .chars()
+                .rev()
+                .take_while(|c| c.is_ascii_digit() || *c == '.')
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
+            if let Ok(n) = num.parse::<f64>() {
+                return Some(n * scale);
+            }
+        }
+    }
+    None
+}
+
+fn value_disagrees(q: &Part, hit: &LockedPart) -> Option<String> {
+    let declared = component_quantity(q.value.as_deref()?, false)?;
+    let desc = hit.description.as_deref()?;
+    let ordered = component_quantity(desc, true)?;
+    let off = (declared - ordered).abs() / ordered.abs().max(f64::MIN_POSITIVE);
+    (off > 0.005).then(|| {
+        format!(
+            "part `{}`: value \"{}\" is not the part ordered — LCSC {} is \"{desc}\". \
+             Change the value or the part, so the schematic, the BOM and the reel agree",
+            q.id,
+            q.value.as_deref().unwrap_or_default(),
+            hit.lcsc
+        )
+    })
 }
 
 pub const PARTS_LOCK: &str = "hardware/parts.lock";
@@ -744,17 +852,35 @@ fn resolve_picks(root: &Path, p: &mut Product) -> Result<()> {
     };
     // A pinned part's price, as `resolve` read it from LCSC at the cost's
     // quantity: what the ceiling is asserted against.
+    let mut disagree = Vec::new();
+    // Once a product has a lock, a pinned part outside it is one nobody
+    // checked against LCSC: swapped in by hand, its description — and so
+    // its value and frequency — unknown (the paper's round 5, case M18).
+    let resolved = lock.part.iter().any(|e| e.pick.is_none());
     for q in p.parts.iter_mut().filter(|q| q.pick.is_none()) {
         let Some(lcsc) = &q.lcsc else { continue };
-        if let Some(hit) = lock
+        let hit = lock
             .part
             .iter()
-            .find(|e| e.id == q.id && &e.lcsc == lcsc && e.pick.is_none())
-        {
+            .find(|e| e.id == q.id && &e.lcsc == lcsc && e.pick.is_none());
+        if hit.is_none() && resolved {
+            disagree.push(format!(
+                "part `{}`: LCSC {lcsc} is not in {PARTS_LOCK} — a part nobody checked against \
+                 LCSC. Run `python3 hardware/parts.py resolve` so its catalog entry is checked \
+                 against what the board needs",
+                q.id
+            ));
+        }
+        if let Some(hit) = hit {
+            q.catalog = hit.description.clone();
+            disagree.extend(value_disagrees(q, hit));
             if q.unit_cost.is_none() && hit.currency.as_deref() == Some(p.cost.currency.as_str()) {
                 q.unit_cost = hit.unit_price;
             }
         }
+    }
+    if !disagree.is_empty() {
+        bail!("{}", disagree.join("\n"));
     }
     if p.parts.iter().all(|q| q.pick.is_none()) {
         return Ok(());
@@ -1628,14 +1754,71 @@ pub struct BomLine {
     pub datasheet: String,
 }
 
+/// A light inside a closed case is seen through a translucent case or a
+/// window, or not at all (the paper's round 5, case M19: the status LED,
+/// the stick's only output without a computer, behind matte black).
+///
+/// A part is a light when its device profile says so or its symbol is an
+/// LED; `through_wall` gives it an opening. A case is translucent when its
+/// colour says so — `#rrggbbaa`, alpha under `f0` — which is also how the
+/// renders draw it, so the picture and the check read the same declaration.
+fn hidden_lights(p: &Product) -> Result<()> {
+    let alpha = p
+        .case
+        .colour
+        .as_deref()
+        .and_then(|c| c.strip_prefix('#'))
+        .filter(|h| h.len() == 8)
+        .and_then(|h| u8::from_str_radix(&h[6..], 16).ok())
+        .unwrap_or(0xFF);
+    if alpha < 0xF0 {
+        return Ok(());
+    }
+    let mut hidden = Vec::new();
+    for q in p
+        .parts
+        .iter()
+        .filter(|q| q.place == "board" && !q.through_wall)
+    {
+        let profiled = q
+            .mpn
+            .as_deref()
+            .and_then(|m| crate::devices::for_mpn(m).ok().flatten())
+            .is_some_and(|d| d.light);
+        let led_symbol = q.symbol.as_deref().is_some_and(|s| {
+            let name = s.rsplit(':').next().unwrap_or(s).to_ascii_uppercase();
+            name == "LED" || name.starts_with("LED_")
+        });
+        if profiled || led_symbol {
+            hidden.push(format!("`{}`", q.id));
+        }
+    }
+    if !hidden.is_empty() {
+        bail!(
+            "{} {} inside the case, and the case is opaque (case.colour = {:?}) with no \
+             window over {it} — no one will see {it}.\n  Make the filament translucent \
+             (`#rrggbbaa`, e.g. \"#1d4ed8b3\"), or give the light an opening (`through_wall = true`).",
+            hidden.join(", "),
+            if hidden.len() == 1 { "is a light" } else { "are lights" },
+            p.case.colour.as_deref().unwrap_or("unset: neutral grey"),
+            it = if hidden.len() == 1 { "it" } else { "them" },
+        );
+    }
+    Ok(())
+}
+
 pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
     let case = &p.case;
     if let Some(c) = &case.colour {
         let hex = c.strip_prefix('#').unwrap_or("");
-        if hex.len() != 6 || !hex.chars().all(|ch| ch.is_ascii_hexdigit()) {
-            bail!("case.colour = \"{c}\" — a colour is `#rrggbb`, e.g. \"#2563eb\"");
+        if !matches!(hex.len(), 6 | 8) || !hex.chars().all(|ch| ch.is_ascii_hexdigit()) {
+            bail!(
+                "case.colour = \"{c}\" — a colour is `#rrggbb`, e.g. \"#2563eb\", or \
+                 `#rrggbbaa` for a translucent filament, e.g. \"#2563ebb3\""
+            );
         }
     }
+    hidden_lights(p)?;
     let clr = case.clearance_mm;
     let seal = &case.seal;
     let mut why: Vec<String> = Vec::new();
@@ -5476,25 +5659,25 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
     // The set points: the declared resistors, by their values and the nets
     // their two pins are on (a `qty` of them in parallel), against each
     // `[[check]]`. A miss fails the derive like any other contradiction.
-    if !p.checks.is_empty() {
-        let mut rs: Vec<crate::circuit::Resistor> = Vec::new();
-        for q in &p.parts {
-            let Some(ohms) = q.value.as_deref().and_then(crate::circuit::ohms) else {
-                continue;
-            };
-            let nets: Vec<&String> = q.pins.values().collect();
-            if nets.len() != 2 {
-                continue;
-            }
-            for _ in 0..q.qty.max(1) {
-                rs.push(crate::circuit::Resistor {
-                    part: q.id.clone(),
-                    a: nets[0].clone(),
-                    b: nets[1].clone(),
-                    ohms,
-                });
-            }
+    let mut rs: Vec<crate::circuit::Resistor> = Vec::new();
+    for q in &p.parts {
+        let Some(ohms) = q.value.as_deref().and_then(crate::circuit::ohms) else {
+            continue;
+        };
+        let nets: Vec<&String> = q.pins.values().collect();
+        if nets.len() != 2 {
+            continue;
         }
+        for _ in 0..q.qty.max(1) {
+            rs.push(crate::circuit::Resistor {
+                part: q.id.clone(),
+                a: nets[0].clone(),
+                b: nets[1].clone(),
+                ohms,
+            });
+        }
+    }
+    if !p.checks.is_empty() {
         let (lines, failed) = crate::circuit::run(&rs, &p.checks)?;
         if !failed.is_empty() {
             bail!(
@@ -5503,6 +5686,29 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
             );
         }
         why.extend(lines);
+    }
+    // Every pin against its part's limit, with the rails at their voltages:
+    // an I²C pull-up tied to 5 V instead of 3.3 V would hold a 3.3 V
+    // microcontroller's pin at 5 V (the paper's held-out test, case X12).
+    if !p.rails.is_empty() {
+        let over = crate::circuit::pins_over_limit(
+            &rs,
+            &p.rails,
+            p.parts
+                .iter()
+                .filter_map(|q| q.io_max_v.map(|max| (q.id.as_str(), max, &q.pins))),
+        )?;
+        if !over.is_empty() {
+            bail!("pins above their parts' limits:\n  {}", over.join("\n  "));
+        }
+        why.push(format!(
+            "pin voltages: every pin of a part with `io_max_v` is within it, with {}",
+            p.rails
+                .iter()
+                .map(|(n, v)| format!("{n} at {v} V"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
     }
     let over = priced > p.cost.ceiling + 1e-9;
     let cost_violation = if over {
@@ -6442,6 +6648,182 @@ fn resolve_components(root: &Path, p: &mut Product) -> Result<()> {
     Ok(())
 }
 
+/// Every part with a device profile against its datasheet, and every I²C
+/// bus against the rule that it is pulled up. What the product leaves out
+/// (an `io_max_v`, an address) the profile fills in; what it declares
+/// differently is refused, naming the datasheet.
+fn datasheet_checks(p: &mut Product) -> Result<()> {
+    let mut problems = Vec::new();
+    let mut crystals = Vec::new();
+    let rails = p.rails.clone();
+    for q in &mut p.parts {
+        let Some(mpn) = q.mpn.clone() else { continue };
+        let Some(d) = crate::devices::for_mpn(&mpn)? else {
+            continue;
+        };
+        let says = |what: String| format!("part `{}` ({mpn}): {what} — {}", q.id, d.source);
+        if let Some(a) = d.i2c_address {
+            match q.i2c_address {
+                Some(b) if b != a => problems.push(says(format!(
+                    "i2c_address = 0x{b:02X}, but the datasheet's address is 0x{a:02X}"
+                ))),
+                _ => q.i2c_address = Some(a),
+            }
+        }
+        if let Some(sup) = &d.supply {
+            let rail = d
+                .net(&sup.pin, &q.pins)
+                .and_then(|n| rails.get(n).map(|v| (n.clone(), *v)));
+            if let Some((net, v)) = &rail {
+                if *v < sup.min - 1e-9 || *v > sup.max + 1e-9 {
+                    problems.push(says(format!(
+                        "its supply pin {} is on {net} at {v} V, outside {}–{} V",
+                        sup.pin, sup.min, sup.max
+                    )));
+                }
+                if let Some(over) = d.io_max_over_supply {
+                    let limit = ((v + over) * 1000.0).round() / 1000.0;
+                    match q.io_max_v {
+                        Some(m) if m > limit + 1e-9 => problems.push(says(format!(
+                            "io_max_v = {m} V, but no pin may go above {} + {over} = {limit} V \
+                             with {} on {net} — the limit is the datasheet's, not a setting",
+                            v, sup.pin
+                        ))),
+                        Some(_) => {}
+                        None => q.io_max_v = Some(limit),
+                    }
+                }
+            }
+        }
+        for (pad, f) in &d.pins {
+            if f.role.as_deref() != Some("enable") {
+                continue;
+            }
+            let Some(net) = d.net(pad, &q.pins) else {
+                continue;
+            };
+            let Some(v) = crate::devices::level(net, &rails) else {
+                continue;
+            };
+            let low_active = f.active.as_deref() == Some("low");
+            if (low_active && v > 0.0) || (!low_active && v == 0.0) {
+                problems.push(says(format!(
+                    "pin {pad} ({}, active {}) is tied to {net}: the part is never enabled — \
+                     tie it {} or drive it",
+                    f.name,
+                    if low_active { "low" } else { "high" },
+                    if low_active {
+                        "to ground"
+                    } else {
+                        "to its supply"
+                    }
+                )));
+            }
+        }
+        q.commands = d.commands.clone();
+        q.timing = d.timing.clone();
+        if let Some(x) = &d.crystal {
+            if let Some(net) = d.net(&x.pin, &q.pins) {
+                crystals.push((
+                    q.id.clone(),
+                    mpn.clone(),
+                    net.clone(),
+                    x.hz,
+                    x.because.clone(),
+                    d.source.clone(),
+                ));
+            }
+        }
+    }
+    for (id, mpn, net, hz, because, source) in crystals {
+        for x in p
+            .parts
+            .iter()
+            .filter(|x| x.id != id && x.pins.values().any(|n| *n == net))
+        {
+            let Some(got) = x.catalog.as_deref().and_then(frequency_hz) else {
+                continue;
+            };
+            if (got - hz as f64).abs() > hz as f64 * 1e-4 {
+                problems.push(format!(
+                    "part `{id}` ({mpn}): `{}` on {net} runs at {} MHz, but it needs {} MHz — \
+                     {because} — {source}",
+                    x.id,
+                    got / 1e6,
+                    hz as f64 / 1e6
+                ));
+            }
+        }
+    }
+    problems.extend(unpulled_i2c(p));
+    if !problems.is_empty() {
+        bail!("{}", problems.join("\n"));
+    }
+    Ok(())
+}
+
+/// I²C lines with no pull-up. The bus is open-drain: nothing drives a line
+/// high but a resistor to a supply, so a line without one never reads high
+/// and the bus never works. A line is a net on a pin called SDA or SCL; a
+/// pull-up is a two-pin resistor between it and a rail (`[rails]`, or the
+/// board's `power_nets` other than ground). In the paper's round 4 a copied
+/// pull-up kept its source's net, and SCL was left with none (R18).
+fn unpulled_i2c(p: &Product) -> Vec<String> {
+    let is_bus_pin = |k: &str| {
+        let k = k.to_ascii_uppercase();
+        let k = k.trim_start_matches("I2C_").trim_start_matches("I2C");
+        ["SDA", "SCL"].iter().any(|b| {
+            k.strip_prefix(b)
+                .is_some_and(|r| r.chars().all(|c| c.is_ascii_digit()))
+        })
+    };
+    let supplies: Vec<String> = if p.rails.is_empty() {
+        p.board
+            .power_nets
+            .clone()
+            .into_iter()
+            .filter(|n| crate::devices::level(n, &BTreeMap::new()).is_none())
+            .collect()
+    } else {
+        p.rails
+            .iter()
+            .filter(|(_, v)| **v > 0.0)
+            .map(|(n, _)| n.clone())
+            .collect()
+    };
+    if supplies.is_empty() {
+        return Vec::new();
+    }
+    let mut lines: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for q in &p.parts {
+        for (k, net) in &q.pins {
+            if is_bus_pin(k) {
+                lines.entry(net.as_str()).or_default().push(q.id.as_str());
+            }
+        }
+    }
+    let pulled = |net: &str| {
+        p.parts.iter().any(|q| {
+            q.value.as_deref().and_then(crate::circuit::ohms).is_some()
+                && q.pins.len() == 2
+                && q.pins.values().any(|n| n == net)
+                && q.pins.values().any(|n| supplies.contains(n))
+        })
+    };
+    lines
+        .into_iter()
+        .filter(|(net, _)| !pulled(net))
+        .map(|(net, on)| {
+            format!(
+                "I²C line {net} (on {}) has no pull-up resistor to a supply — an open-drain \
+                 line nothing pulls high never reads high; add one, or check a copied \
+                 resistor's nets",
+                on.join(", ")
+            )
+        })
+        .collect()
+}
+
 /// Parse and solve the declaration at `root/decl`.
 pub fn load(root: &Path, decl: &str) -> Result<(Product, Solved)> {
     let raw =
@@ -6451,6 +6833,7 @@ pub fn load(root: &Path, decl: &str) -> Result<(Product, Solved)> {
     let mut product: Product = toml::from_str(&raw).map_err(|e| anyhow!("{decl}: {e}"))?;
     resolve_components(root, &mut product).map_err(|e| anyhow!("{decl}: {e:#}"))?;
     resolve_picks(root, &mut product).map_err(|e| anyhow!("{decl}: {e:#}"))?;
+    datasheet_checks(&mut product).map_err(|e| anyhow!("{decl}: {e:#}"))?;
     let solved = solve(root, &product).map_err(|e| anyhow!("{decl}: {e:#}"))?;
     Ok((product, solved))
 }
@@ -6489,6 +6872,182 @@ fn peripheral(pin: &str) -> Option<String> {
             Some(pin.to_string())
         }
         _ => None,
+    }
+}
+
+/// The directory firmware lives in, relative to the product root.
+pub const FIRMWARE_DIR: &str = "firmware";
+
+/// Places firmware names an MCU pin directly — `p.PIN_4`, `p.PA5` — instead of
+/// taking it through the derived `board.rs`.
+///
+/// A literal pin compiles before a pin moves and after it, so the move
+/// reaches every caller of `board::sensor_sda!(p)` and silently skips this
+/// one (the paper's study, case H8). The escape is explicit: a line that
+/// carries `fid: allow-pin` is a pin no declared net owns, on purpose.
+pub fn firmware_pin_literals(root: &Path, p: &Product) -> Vec<String> {
+    if p.firmware.is_none() {
+        return Vec::new();
+    }
+    // The device profiles of the parts on this board: their commands are
+    // derived into board.rs, so a byte sequence typed in firmware is a copy.
+    let profiles: Vec<(String, crate::devices::Profile)> = p
+        .parts
+        .iter()
+        .filter_map(|q| {
+            let d = crate::devices::for_mpn(q.mpn.as_deref()?).ok()??;
+            Some((q.id.clone(), d))
+        })
+        .collect();
+    let addresses_declared = p.parts.iter().any(|q| q.i2c_address.is_some())
+        || profiles.iter().any(|(_, d)| d.i2c_address.is_some());
+    let commands: Vec<(String, String, &str)> = profiles
+        .iter()
+        .flat_map(|(id, d)| {
+            d.commands
+                .keys()
+                .map(move |c| (c.to_ascii_uppercase(), id.clone(), d.mpn.as_str()))
+        })
+        .collect();
+    let timings: Vec<(String, String, &str)> = profiles
+        .iter()
+        .flat_map(|(id, d)| {
+            d.timing
+                .keys()
+                .map(move |c| (c.to_ascii_uppercase(), id.clone(), d.mpn.as_str()))
+        })
+        .collect();
+    let mut files = Vec::new();
+    collect_rs(&root.join(FIRMWARE_DIR), FIRMWARE_DIR, &mut files);
+    let mut found = Vec::new();
+    for rel in files {
+        let Ok(src) = std::fs::read_to_string(root.join(&rel)) else {
+            continue;
+        };
+        for (i, line) in src.lines().enumerate() {
+            if line.contains("fid: allow-pin") {
+                continue;
+            }
+            let code = line.split("//").next().unwrap_or("");
+            // An I²C address typed into a transfer — `write_async(0x38, …)`
+            // — instead of taken from a part's declared `i2c_address`.
+            if addresses_declared && !line.contains("fid: allow-address") {
+                for call in [
+                    "write(",
+                    "read(",
+                    "write_read(",
+                    "write_async(",
+                    "read_async(",
+                    "write_read_async(",
+                ] {
+                    let mut rest = code;
+                    while let Some(at) = rest.find(call) {
+                        let arg = rest[at + call.len()..].trim_start();
+                        if arg.starts_with("0x") || arg.starts_with("0X") {
+                            let lit: String = arg
+                                .chars()
+                                .take_while(|c| c.is_ascii_alphanumeric())
+                                .collect();
+                            found.push(format!(
+                                "  {rel}:{}: addresses an I²C device as {lit} directly — take it from \
+                                 `board::<PART>_I2C_ADDRESS` (the part's declared `i2c_address`), or \
+                                 mark the line `// fid: allow-address`",
+                                i + 1
+                            ));
+                        }
+                        // …or the bytes sent typed in: `write(addr, &[0xE1, …])`.
+                        if !commands.is_empty() {
+                            let args = &rest[at + call.len()..];
+                            if let Some((_, second)) = args.split_once(',') {
+                                let second = second.trim_start().trim_start_matches('&');
+                                if second.starts_with('[')
+                                    && second[1..]
+                                        .trim_start()
+                                        .starts_with(|c: char| c.is_ascii_digit())
+                                {
+                                    found.push(format!(
+                                        "  {rel}:{}: sends a device bytes typed in place — take the command \
+                                         from `board::<PART>_<COMMAND>` (the part's device profile), or mark \
+                                         the line `// fid: allow-address`",
+                                        i + 1
+                                    ));
+                                }
+                            }
+                        }
+                        rest = &rest[at + call.len()..];
+                    }
+                }
+            }
+            // A part's command written out by hand: `const INIT: [u8; 3] = [0xE1, …]`
+            // beside the profile's `board::SENSOR_INIT` (the paper's round 4, R15).
+            let decl = code.trim_start();
+            let decl = decl.strip_prefix("pub ").unwrap_or(decl);
+            if let Some(rest) = decl.strip_prefix("const ") {
+                let name: String = rest
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                    .collect();
+                let typed = rest
+                    .split_once('=')
+                    .is_some_and(|(_, v)| v.trim_start().starts_with('['));
+                let number = rest
+                    .split_once('=')
+                    .is_some_and(|(_, v)| v.trim_start().starts_with(|c: char| c.is_ascii_digit()));
+                if let Some((_, id, mpn)) = timings.iter().find(|(c, _, _)| *c == name) {
+                    if number && !line.contains("fid: allow-timing") {
+                        found.push(format!(
+                            "  {rel}:{}: writes out {mpn}'s `{name}` wait by hand — use \
+                             `board::{}_{name}`, from the part's datasheet profile, or mark the \
+                             line `// fid: allow-timing`",
+                            i + 1,
+                            net_ident(id)
+                        ));
+                    }
+                }
+                if let Some((_, id, mpn)) = commands.iter().find(|(c, _, _)| *c == name) {
+                    if typed && !line.contains("fid: allow-command") {
+                        found.push(format!(
+                            "  {rel}:{}: writes out {mpn}'s `{name}` command by hand — use \
+                             `board::{}_{name}`, from the part's datasheet profile, or mark the \
+                             line `// fid: allow-command`",
+                            i + 1,
+                            net_ident(id)
+                        ));
+                    }
+                }
+            }
+            for tok in code.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_')) {
+                let gpio = tok.strip_prefix("PIN_").map(|n| format!("GPIO{n}"));
+                if peripheral(gpio.as_deref().unwrap_or(tok)).as_deref() == Some(tok) {
+                    found.push(format!(
+                        "  {rel}:{}: takes {tok} directly — take it through `board::<net>!(p)` \
+                         (hardware/generated/board.rs) so a moved pin moves it too, or mark the \
+                         line `// fid: allow-pin` if no declared net owns it",
+                        i + 1
+                    ));
+                }
+            }
+        }
+    }
+    found
+}
+
+fn collect_rs(dir: &Path, rel: &str, out: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut entries: Vec<_> = entries.flatten().collect();
+    entries.sort_by_key(|e| e.file_name());
+    for e in entries {
+        let name = e.file_name().to_string_lossy().to_string();
+        let child = format!("{rel}/{name}");
+        match e.file_type() {
+            Ok(t) if t.is_dir() && name != "target" && !name.starts_with('.') => {
+                collect_rs(&e.path(), &child, out)
+            }
+            Ok(t) if t.is_file() && name.ends_with(".rs") => out.push(child),
+            _ => {}
+        }
     }
 }
 
@@ -6639,6 +7198,46 @@ fn render_board_rs(p: &Product, i: &Value) -> Result<String> {
              pub(crate) use {mac};\n"
         );
     }
+    for q in p.parts.iter().filter(|q| q.i2c_address.is_some()) {
+        let addr = q.i2c_address.unwrap_or_default();
+        let id = net_ident(&q.id);
+        out += &format!(
+            "\n/// `{}`{}: its I²C address.\npub const {id}_I2C_ADDRESS: u8 = 0x{addr:02X};\n",
+            q.id,
+            q.mpn
+                .as_deref()
+                .map(|m| format!(" ({m})"))
+                .unwrap_or_default()
+        );
+    }
+    for q in &p.parts {
+        for (name, ms) in &q.timing {
+            out += &format!(
+                "\n/// `{}` ({}): `{name}`, from its device profile.\n\
+                 pub const {}_{}: u64 = {ms};\n",
+                q.id,
+                q.mpn.as_deref().unwrap_or_default(),
+                net_ident(&q.id),
+                name.to_ascii_uppercase()
+            );
+        }
+        for (name, bytes) in &q.commands {
+            out += &format!(
+                "\n/// `{}` ({}): the `{name}` command, from its device profile.\n\
+                 pub const {}_{}: [u8; {}] = [{}];\n",
+                q.id,
+                q.mpn.as_deref().unwrap_or_default(),
+                net_ident(&q.id),
+                name.to_ascii_uppercase(),
+                bytes.len(),
+                bytes
+                    .iter()
+                    .map(|b| format!("0x{b:02X}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
+    }
     Ok(out)
 }
 
@@ -6731,6 +7330,26 @@ pub fn render_output(out: &str, product: &Product, solved: &Solved, root: &Path)
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_component_value_reads_the_same_from_a_declaration_and_from_lcsc() {
+        use super::component_quantity as q;
+        assert_eq!(q("5.1k", false), Some(5100.0));
+        assert_eq!(q("27R", false), Some(27.0));
+        assert_eq!(
+            q("5.1kΩ ±1% 100mW 0603 Thick Film Resistor", true),
+            Some(5100.0)
+        );
+        assert_eq!(q("1uF 50V X5R", false), Some(1e-6));
+        assert_eq!(
+            q("1uF ±10% 50V Ceramic Capacitor X5R 0603", true),
+            Some(1e-6)
+        );
+        assert!((q("100nF ±10% 50V", true).unwrap() - 1e-7).abs() < 1e-15);
+        assert!((q("33pF 50V C0G", false).unwrap() - 33e-12).abs() < 1e-18);
+        // A description with no component quantity is not compared.
+        assert_eq!(q("USB-C Receptacle Connector 16 Position", true), None);
+    }
+
     use super::*;
 
     #[test]
@@ -6808,5 +7427,147 @@ mod tests {
             vec![(1.0, 2.0), (3.0, 2.0), (3.0, 4.0)]
         );
         assert_eq!(items[1].layer, None);
+    }
+
+    /// The capability's seed declaration plus `extra` parts and tables.
+    fn declared(extra: &str) -> Product {
+        let seed = include_str!("../capabilities/hardware/declarations/hardware/product.toml");
+        toml::from_str(&format!("{seed}\n{extra}")).unwrap()
+    }
+
+    const BUS: &str = r#"
+[rails]
+VBUS  = 5.0
+"3V3" = 3.3
+"1V8" = 1.8
+
+[[part]]
+id = "mcu2"
+name = "RP2040"
+place = "board"
+mount = "smd"
+mpn = "RP2040"
+pins = { IOVDD = "3V3", GPIO4 = "SDA", GPIO5 = "SCL" }
+
+[[part]]
+id = "sensor"
+name = "AHT20"
+place = "board"
+mount = "smd"
+mpn = "AHT20"
+pins = { VDD = "3V3", SDA = "SDA", SCL = "SCL" }
+
+[[part]]
+id = "r-sda"
+name = "SDA pull-up"
+place = "board"
+mount = "smd"
+value = "4.7k"
+pins = { 1 = "SDA", 2 = "3V3" }
+
+[[part]]
+id = "r-scl"
+name = "SCL pull-up"
+place = "board"
+mount = "smd"
+value = "4.7k"
+pins = { 1 = "SCL", 2 = "3V3" }
+
+[[part]]
+id = "buf"
+name = "Buffer"
+place = "board"
+mount = "smd"
+mpn = "SN74AHCT1G125DBVR"
+pins = { 1 = "GND", 2 = "A", 3 = "GND", 4 = "Y", 5 = "VBUS" }
+"#;
+
+    #[test]
+    fn a_profile_fills_in_what_the_datasheet_says() {
+        let mut p = declared(BUS);
+        datasheet_checks(&mut p).unwrap();
+        let get = |id: &str| p.parts.iter().find(|q| q.id == id).unwrap();
+        assert_eq!(get("mcu2").io_max_v, Some(3.8));
+        assert_eq!(get("sensor").i2c_address, Some(0x38));
+        assert_eq!(get("sensor").commands["init"], vec![0xBE, 0x08, 0x00]);
+    }
+
+    #[test]
+    fn a_belief_the_datasheet_contradicts_is_refused_naming_it() {
+        let cases = [
+            // R17: the limit raised to let a 5 V pull-up through.
+            (
+                "pins = { IOVDD = \"3V3\", GPIO4",
+                "io_max_v = 5.5\npins = { IOVDD = \"3V3\", GPIO4",
+                "no pin may go above 3.3 + 0.5 = 3.8 V",
+            ),
+            // R16: an active-low enable tied high.
+            (
+                "{ 1 = \"GND\", 2 = \"A\"",
+                "{ 1 = \"VBUS\", 2 = \"A\"",
+                "pin 1 (OE, active low) is tied to VBUS",
+            ),
+            // A part run off the wrong supply.
+            (
+                "{ VDD = \"3V3\", SDA",
+                "{ VDD = \"1V8\", SDA",
+                "on 1V8 at 1.8 V, outside 2–5.5 V",
+            ),
+            // An address the datasheet does not give.
+            (
+                "mpn = \"AHT20\"",
+                "mpn = \"AHT20\"\ni2c_address = 0x39",
+                "the datasheet's address is 0x38",
+            ),
+            // R18: a copied pull-up that kept its source's net.
+            (
+                "pins = { 1 = \"SCL\", 2 = \"3V3\" }",
+                "pins = { 1 = \"SDA\", 2 = \"3V3\" }",
+                "I²C line SCL (on sensor) has no pull-up",
+            ),
+        ];
+        for (from, to, says) in cases {
+            assert!(BUS.contains(from), "{from}");
+            let mut p = declared(&BUS.replacen(from, to, 1));
+            let e = format!("{:#}", datasheet_checks(&mut p).unwrap_err());
+            assert!(e.contains(says), "{to}: {e}");
+        }
+    }
+
+    #[test]
+    fn a_datasheet_command_typed_into_firmware_is_named() {
+        let p = declared(&format!("{BUS}\n[firmware]\nmcu = \"mcu2\"\n"));
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("firmware/shared/src");
+        std::fs::create_dir_all(&src).unwrap();
+        let lib = src.join("lib.rs");
+        std::fs::write(
+            &lib,
+            "pub mod aht20 {\n    pub use crate::board::SENSOR_INIT as INIT;\n}\n",
+        )
+        .unwrap();
+        assert!(firmware_pin_literals(dir.path(), &p).is_empty());
+        // R15: an older part's init, written out by hand.
+        std::fs::write(
+            &lib,
+            "pub mod aht20 {\n    pub const INIT: [u8; 3] = [0xE1, 0x08, 0x00];\n}\n",
+        )
+        .unwrap();
+        let found = firmware_pin_literals(dir.path(), &p);
+        assert!(
+            found[0].contains("lib.rs:2: writes out AHT20's `INIT` command by hand"),
+            "{found:?}"
+        );
+        // …or typed straight into the transfer.
+        std::fs::write(
+            &lib,
+            "fn f(i2c: I) {\n    i2c.write(board::SENSOR_I2C_ADDRESS, &[0xE1, 0x08, 0x00]);\n}\n",
+        )
+        .unwrap();
+        let found = firmware_pin_literals(dir.path(), &p);
+        assert!(
+            found[0].contains("lib.rs:2: sends a device bytes typed in place"),
+            "{found:?}"
+        );
     }
 }

@@ -1,9 +1,13 @@
 name     = "legal"
 executor = "fid-legal"
-outputs  = ["src/generated/legal.ts"]
+outputs  = ["src/generated/legal.ts", "apps/web/src/generated/consent.ts"]
 
 # `[legal]` in fiducial.toml is the declaration. The output is a TypeScript
 # file exporting typed legal page content for every locale declared in `[i18n]`.
+#
+# `consent.ts` is the consent rules — which categories exist, and that none
+# but `necessary` is used before a recorded yes. The banner component imports
+# them; a hand edit there is a stale output, not a new default.
 #
 # `fid-legal` reads `[legal]`, `[brand]`, and `[i18n]` — all three must be
 # configured before this pipeline can run.

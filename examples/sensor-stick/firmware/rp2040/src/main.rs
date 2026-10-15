@@ -7,7 +7,9 @@
 //! writes from `hardware/product.toml`. Move a net to another pin there and
 //! this file follows with no edit; rename a net and it stops compiling where
 //! the old name is used. A pin moved to one the peripheral cannot use (SDA
-//! off I2C0's pins) fails here too, as a type error.
+//! off I2C0's pins) fails here too, as a type error. The sensor's address
+//! and command bytes come from the same file, read from its datasheet once;
+//! the USB IDs and the humidity band from protocol.toml, as the page's do.
 #![no_std]
 #![no_main]
 
@@ -26,6 +28,7 @@ use embassy_rp::usb::{self, Driver};
 use embassy_time::Timer;
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use embassy_usb::{Builder, Config};
+use firmware_shared::messages::{reading::comfortable, Band, USB_PRODUCT_ID, USB_VENDOR_ID};
 use firmware_shared::{aht20, encode, encoded_len, reading};
 use smart_leds::RGB8;
 use static_cell::StaticCell;
@@ -38,12 +41,14 @@ bind_interrupts!(struct Irqs {
     USBCTRL_IRQ => usb::InterruptHandler<USB>;
 });
 
-/// Dry is blue, comfortable green, damp red.
+/// Dry is blue, comfortable green, damp red. The band is protocol.toml's,
+/// declared in %RH and tested by the generated `comfortable()`, which the
+/// page's `readingBand()` mirrors.
 fn colour(r: aht20::Reading) -> RGB8 {
-    match r.centi_percent_rh {
-        0..=3_499 => RGB8::new(0, 0, 24),
-        3_500..=6_000 => RGB8::new(0, 24, 0),
-        _ => RGB8::new(24, 0, 0),
+    match comfortable(r.centi_percent_rh) {
+        Band::Inside => RGB8::new(0, 24, 0),
+        Band::Below => RGB8::new(0, 0, 24),
+        Band::Above => RGB8::new(24, 0, 0),
     }
 }
 
@@ -53,7 +58,7 @@ async fn main(_spawner: Spawner) {
 
     // USB serial: the stick enumerates as a CDC-ACM device.
     let driver = Driver::new(p.USB, Irqs);
-    let mut config = Config::new(0x2e8a, 0x000a);
+    let mut config = Config::new(USB_VENDOR_ID, USB_PRODUCT_ID);
     config.manufacturer = Some("fiducial example");
     config.product = Some("sensor-stick");
     config.max_power = 100;
@@ -89,16 +94,16 @@ async fn main(_spawner: Spawner) {
 
     let work = async {
         Timer::after_millis(40).await;
-        let _ = i2c.write_async(aht20::ADDRESS, aht20::INIT).await;
+        let _ = i2c.write_async(board::SENSOR_I2C_ADDRESS, board::SENSOR_INIT).await;
         let mut frame = [0u8; encoded_len(reading::LEN)];
         loop {
-            Timer::after_millis(1000 - aht20::MEASURE_MS).await;
-            if i2c.write_async(aht20::ADDRESS, aht20::MEASURE).await.is_err() {
+            Timer::after_millis(1000 - board::SENSOR_MEASURE_MS).await;
+            if i2c.write_async(board::SENSOR_I2C_ADDRESS, board::SENSOR_MEASURE).await.is_err() {
                 continue;
             }
-            Timer::after_millis(aht20::MEASURE_MS).await;
+            Timer::after_millis(board::SENSOR_MEASURE_MS).await;
             let mut raw = [0u8; 7];
-            if i2c.read_async(aht20::ADDRESS, &mut raw).await.is_err() {
+            if i2c.read_async(board::SENSOR_I2C_ADDRESS, &mut raw).await.is_err() {
                 continue;
             }
             let Some(r) = aht20::convert(&raw) else { continue };

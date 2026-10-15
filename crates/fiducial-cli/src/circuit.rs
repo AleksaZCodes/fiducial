@@ -251,6 +251,58 @@ pub fn run(rs: &[Resistor], checks: &[Check]) -> Result<(Vec<String>, Vec<String
     Ok((why, failed))
 }
 
+/// Pins held above their part's limit, with every rail at its voltage.
+///
+/// Each net is solved from the rails through the declared resistors; a net
+/// nothing drives is left alone (it is the firmware's to drive). A pin on a
+/// rail itself is held at that rail's voltage.
+pub fn pins_over_limit<'a>(
+    rs: &[Resistor],
+    rails: &BTreeMap<String, f64>,
+    parts: impl Iterator<Item = (&'a str, f64, &'a BTreeMap<String, String>)>,
+) -> Result<Vec<String>> {
+    let check = Check {
+        name: "rails".into(),
+        drive: rails
+            .iter()
+            .map(|(n, v)| {
+                (
+                    n.clone(),
+                    Drive {
+                        volts: *v,
+                        ohms: 0.0,
+                    },
+                )
+            })
+            .collect(),
+        expect: BTreeMap::new(),
+    };
+    let v = solve(rs, &check)?;
+    let mut over = Vec::new();
+    for (part, max, pins) in parts {
+        for (pin, net) in pins {
+            if let Some(x) = v.get(net) {
+                if *x > max + 1e-9 {
+                    let via: Vec<&str> = rs
+                        .iter()
+                        .filter(|r| &r.a == net || &r.b == net)
+                        .map(|r| r.part.as_str())
+                        .collect();
+                    let how = if rails.contains_key(net) {
+                        format!("{net} is a {x:.2} V rail")
+                    } else {
+                        format!("{net} is held at {x:.2} V through {}", via.join(", "))
+                    };
+                    over.push(format!(
+                        "part `{part}` pin {pin}: {how}, above its {max} V limit (io_max_v)"
+                    ));
+                }
+            }
+        }
+    }
+    Ok(over)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,6 +327,32 @@ mod tests {
                 .map(|(n, a, b)| (n.to_string(), [*a, *b]))
                 .collect(),
         }
+    }
+
+    #[test]
+    fn a_pull_up_to_the_wrong_rail_holds_a_pin_above_its_limit() {
+        let rails: BTreeMap<String, f64> = [("VBUS".to_string(), 5.0), ("3V3".to_string(), 3.3)]
+            .into_iter()
+            .collect();
+        let pins: BTreeMap<String, String> = [
+            ("GPIO4".to_string(), "SDA".to_string()),
+            ("IOVDD".to_string(), "3V3".to_string()),
+        ]
+        .into_iter()
+        .collect();
+        let ok = [r("r-sda", "SDA", "3V3", 4700.0)];
+        assert!(
+            pins_over_limit(&ok, &rails, [("mcu", 3.8, &pins)].into_iter())
+                .unwrap()
+                .is_empty()
+        );
+        let bad = [r("r-sda", "SDA", "VBUS", 4700.0)];
+        let over = pins_over_limit(&bad, &rails, [("mcu", 3.8, &pins)].into_iter()).unwrap();
+        assert_eq!(over.len(), 1, "{over:?}");
+        assert!(
+            over[0].contains("SDA is held at 5.00 V through r-sda"),
+            "{over:?}"
+        );
     }
 
     fn r(part: &str, a: &str, b: &str, ohms: f64) -> Resistor {

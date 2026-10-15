@@ -57,3 +57,5 @@ args     = ["node", "scripts/rasterize.mjs"]
 # latent bug. If the marks themselves are derived (the `design` capability's
 # logo step), point `source_dir` at their *source*, not at its output.
 outputs = []
+# What the script reads: an edit here, not re-derived, fails `fid derive --check`.
+inputs   = ["fiducial.toml#raster"]
