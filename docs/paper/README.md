@@ -82,14 +82,19 @@ DOI; the hardware work the paper describes is complete from `v0.9.2` (the
 solvers, set-point checks, prices and the cut board are in `v0.9.1`, and
 `v0.9.2` makes `--check` regenerate the hardware outputs).
 
-## How the paper gets written (owner's plan, 2026-10-04)
+## The paper
 
-Not before Fiducial is finished and makes sense as a whole. Then the owner
-provides:
-- the conference's `.docx` paper template;
-- last year's best-paper award winner, written by the owner.
+Written 2026-10-15 for IEEESTEC 2026, on the conference template and in the
+voice of the author's IEEESTEC 2025 paper (Outreach):
 
-From those: the owner's writing style, what made that paper succeed, and how
-its images and illustrations work. Then, together: how best to present,
-sell and frame Fiducial. The draft written on 2026-10-02 was removed; start
-from these notes, not from it.
+- `Fiducial_Zdravkovic_Aleksa.docx` / `.pdf` — the paper as sent.
+- `figures/` — its four figures (from the 2026-10-04 drafts).
+- `build_paper.py` — writes the text into the template:
+  `python3 build_paper.py OUTREACH.docx figures OUT.docx`, where the
+  template is the Outreach `.doc` converted to `.docx` (it is not in this
+  repository: it holds the earlier paper and its co-authors' details). The
+  PDF is exported from the `.docx`.
+
+The evaluation is the measurements and the 20-mistake injection test run on
+`v0.9.4`; the input-tracking gap that test found in the software pipelines
+is still open.
