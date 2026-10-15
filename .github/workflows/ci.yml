@@ -294,7 +294,8 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      # The same script a person runs on their own machine: KiCad from apt,
+      # The same script a person runs on their own machine: KiCad 9 from
+      # KiCad's PPA (setup.sh pins the major and fails on any other),
       # hardware/.venv with pcbnew visible and requirements.txt installed.
       # CI used to do this inline, so the only description of the toolchain
       # was this YAML.

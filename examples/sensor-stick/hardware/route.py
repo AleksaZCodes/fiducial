@@ -102,7 +102,8 @@ def rules(board: pcbnew.BOARD) -> None:
     # capability (0.2 mm drill, 0.45 mm via) — small enough to escape a QFN.
     ds.m_MinThroughDrill = MM(0.25)
     ds.m_ViasMinSize = MM(0.5)
-    nc = ds.m_NetSettings.m_DefaultNetClass
+    ns = ds.m_NetSettings
+    nc = ns.GetDefaultNetclass()
     nc.SetTrackWidth(MM(track))
     nc.SetClearance(MM(clear))
     nc.SetViaDiameter(MM(0.5))
@@ -112,11 +113,14 @@ def rules(board: pcbnew.BOARD) -> None:
     power.SetClearance(MM(max(clear, 0.15)))
     power.SetViaDiameter(MM(0.6))
     power.SetViaDrill(MM(0.3))
-    ds.m_NetSettings.m_NetClasses["Power"] = power
-    for name, net in board.GetNetsByName().items():
+    ns.SetNetclass("Power", power)
+    # KiCad 9 assigns a net its class by pattern, not by setting it on the net:
+    # one exact-name pattern per power net, then let it resolve them all.
+    for name in board.GetNetsByName().keys():
         n = str(name)
         if n and any(n == p or (p.endswith("*") and n.startswith(p[:-1])) for p in power_nets()):
-            net.SetNetClass(power)
+            ns.SetNetclassPatternAssignment(n, "Power")
+    board.SynchronizeNetsAndNetClasses(True)
 
 
 def route(board: pcbnew.BOARD) -> None:
@@ -233,7 +237,7 @@ def unpad_holes(dsn: Path, board: pcbnew.BOARD) -> None:
     text = dsn.read_text()
     if "(unit um)" not in text and "(resolution um" not in text:
         return
-    clear_um = pcbnew.ToMM(board.GetDesignSettings().m_NetSettings.m_DefaultNetClass.GetClearance()) * 1000
+    clear_um = pcbnew.ToMM(board.GetDesignSettings().m_NetSettings.GetDefaultNetclass().GetClearance()) * 1000
     shrink = lambda m: f'(keepout "" (circle {m.group(1)} {max(float(m.group(2)) - 2 * clear_um, 1):.1f}'  # noqa: E731
     dsn.write_text(re.sub(r'\(keepout "" \(circle (\S+) ([\d.]+)', shrink, text))
 
@@ -340,7 +344,7 @@ def pour(board: pcbnew.BOARD) -> None:
 
 
 def drc(board: pcbnew.BOARD, path: Path) -> dict:
-    pcbnew.WriteDRCReport(board, str(path), pcbnew.EDA_UNITS_MILLIMETRES, True)
+    pcbnew.WriteDRCReport(board, str(path), pcbnew.EDA_UNITS_MM, True)
     # Each item: `[kind]: message`, then `Rule…; Severity: error|warning`.
     errors: dict[str, int] = {}
     warnings: dict[str, int] = {}
@@ -379,11 +383,13 @@ def routed_hash(board: pcbnew.BOARD) -> str:
     """The routed copper — tracks and vias, to the micrometre, in a fixed
     order — hashed. The board file itself carries UUIDs and a fill, so its
     bytes would differ on an identical route."""
+    # A via's width is per layer since KiCad 9; a through via is the same on
+    # every layer, so read the front one.
     um = lambda v: round(pcbnew.ToMM(v), 3)
     items = []
     for t in board.GetTracks():
         if t.GetClass() == "PCB_VIA":
-            items.append(("via", um(t.GetPosition().x), um(t.GetPosition().y), um(t.GetWidth()), t.GetNetname()))
+            items.append(("via", um(t.GetPosition().x), um(t.GetPosition().y), um(t.GetWidth(pcbnew.F_Cu)), t.GetNetname()))
         else:
             a, b = sorted([(um(t.GetStart().x), um(t.GetStart().y)), (um(t.GetEnd().x), um(t.GetEnd().y))])
             items.append(("track", board.GetLayerName(t.GetLayer()), *a, *b, um(t.GetWidth()), t.GetNetname()))
@@ -397,7 +403,7 @@ def copper(board: pcbnew.BOARD) -> dict:
     for t in board.GetTracks():
         if t.GetClass() == "PCB_VIA":
             out["vias"].append({"at": [mm(t.GetPosition().x), mm(t.GetPosition().y)],
-                                "d": mm(t.GetWidth()), "drill": mm(t.GetDrillValue())})
+                                "d": mm(t.GetWidth(pcbnew.F_Cu)), "drill": mm(t.GetDrillValue())})
         else:
             out["tracks"].append({"layer": board.GetLayerName(t.GetLayer()),
                                   "a": [mm(t.GetStart().x), mm(t.GetStart().y)],
