@@ -3745,8 +3745,8 @@ ortools==9.15.6755
 """
 
 [templates."hardware/route.py"]
-source_version = "0.9.7"
-hash = "729b328ce934a032fd8b337a10aaddaf57a3f267a795ac188449fab13472f0cb"
+source_version = "0.9.10"
+hash = "2c464a57b2af9e7b3358944c5d86ff1d267017ca39831b64ab12f26b1537bb15"
 base_content = '''
 #!/usr/bin/python3
 """hardware/generated/board.kicad_pcb → a routed, poured, DRC-checked board.
@@ -3852,7 +3852,8 @@ def rules(board: pcbnew.BOARD) -> None:
     # capability (0.2 mm drill, 0.45 mm via) — small enough to escape a QFN.
     ds.m_MinThroughDrill = MM(0.25)
     ds.m_ViasMinSize = MM(0.5)
-    nc = ds.m_NetSettings.m_DefaultNetClass
+    ns = ds.m_NetSettings
+    nc = ns.GetDefaultNetclass()
     nc.SetTrackWidth(MM(track))
     nc.SetClearance(MM(clear))
     nc.SetViaDiameter(MM(0.5))
@@ -3862,11 +3863,14 @@ def rules(board: pcbnew.BOARD) -> None:
     power.SetClearance(MM(max(clear, 0.15)))
     power.SetViaDiameter(MM(0.6))
     power.SetViaDrill(MM(0.3))
-    ds.m_NetSettings.m_NetClasses["Power"] = power
-    for name, net in board.GetNetsByName().items():
+    ns.SetNetclass("Power", power)
+    # KiCad 9 assigns a net its class by pattern, not by setting it on the net:
+    # one exact-name pattern per power net, then let it resolve them all.
+    for name in board.GetNetsByName().keys():
         n = str(name)
         if n and any(n == p or (p.endswith("*") and n.startswith(p[:-1])) for p in power_nets()):
-            net.SetNetClass(power)
+            ns.SetNetclassPatternAssignment(n, "Power")
+    board.SynchronizeNetsAndNetClasses(True)
 
 
 def route(board: pcbnew.BOARD) -> None:
@@ -3983,7 +3987,7 @@ def unpad_holes(dsn: Path, board: pcbnew.BOARD) -> None:
     text = dsn.read_text()
     if "(unit um)" not in text and "(resolution um" not in text:
         return
-    clear_um = pcbnew.ToMM(board.GetDesignSettings().m_NetSettings.m_DefaultNetClass.GetClearance()) * 1000
+    clear_um = pcbnew.ToMM(board.GetDesignSettings().m_NetSettings.GetDefaultNetclass().GetClearance()) * 1000
     shrink = lambda m: f'(keepout "" (circle {m.group(1)} {max(float(m.group(2)) - 2 * clear_um, 1):.1f}'  # noqa: E731
     dsn.write_text(re.sub(r'\(keepout "" \(circle (\S+) ([\d.]+)', shrink, text))
 
@@ -4090,7 +4094,7 @@ def pour(board: pcbnew.BOARD) -> None:
 
 
 def drc(board: pcbnew.BOARD, path: Path) -> dict:
-    pcbnew.WriteDRCReport(board, str(path), pcbnew.EDA_UNITS_MILLIMETRES, True)
+    pcbnew.WriteDRCReport(board, str(path), pcbnew.EDA_UNITS_MM, True)
     # Each item: `[kind]: message`, then `Rule…; Severity: error|warning`.
     errors: dict[str, int] = {}
     warnings: dict[str, int] = {}
@@ -4129,11 +4133,13 @@ def routed_hash(board: pcbnew.BOARD) -> str:
     """The routed copper — tracks and vias, to the micrometre, in a fixed
     order — hashed. The board file itself carries UUIDs and a fill, so its
     bytes would differ on an identical route."""
+    # A via's width is per layer since KiCad 9; a through via is the same on
+    # every layer, so read the front one.
     um = lambda v: round(pcbnew.ToMM(v), 3)
     items = []
     for t in board.GetTracks():
         if t.GetClass() == "PCB_VIA":
-            items.append(("via", um(t.GetPosition().x), um(t.GetPosition().y), um(t.GetWidth()), t.GetNetname()))
+            items.append(("via", um(t.GetPosition().x), um(t.GetPosition().y), um(t.GetWidth(pcbnew.F_Cu)), t.GetNetname()))
         else:
             a, b = sorted([(um(t.GetStart().x), um(t.GetStart().y)), (um(t.GetEnd().x), um(t.GetEnd().y))])
             items.append(("track", board.GetLayerName(t.GetLayer()), *a, *b, um(t.GetWidth()), t.GetNetname()))
@@ -4147,7 +4153,7 @@ def copper(board: pcbnew.BOARD) -> dict:
     for t in board.GetTracks():
         if t.GetClass() == "PCB_VIA":
             out["vias"].append({"at": [mm(t.GetPosition().x), mm(t.GetPosition().y)],
-                                "d": mm(t.GetWidth()), "drill": mm(t.GetDrillValue())})
+                                "d": mm(t.GetWidth(pcbnew.F_Cu)), "drill": mm(t.GetDrillValue())})
         else:
             out["tracks"].append({"layer": board.GetLayerName(t.GetLayer()),
                                   "a": [mm(t.GetStart().x), mm(t.GetStart().y)],
@@ -4250,8 +4256,8 @@ if __name__ == "__main__":
 '''
 
 [templates."hardware/setup.sh"]
-source_version = "0.9.8"
-hash = "381f4f801281e1fdf944c9cb5363b142f40567af158dcf9ab536c8b77e6355d7"
+source_version = "0.9.10"
+hash = "708959049901954589ed38228481304478327d1ee6c5b7d8fb4b318883bd7f55"
 base_content = '''
 #!/usr/bin/env bash
 # Everything `hardware/build.sh` needs, on this machine — the same steps CI runs.
@@ -4261,9 +4267,13 @@ base_content = '''
 #
 # What it sets up, and why each piece:
 #
-#   KiCad      `kicad-cli` (fab outputs, STEP, schematic PDF) and the `pcbnew`
+#   KiCad 9    `kicad-cli` (fab outputs, STEP, schematic PDF) and the `pcbnew`
 #              Python module route.py drives. pcbnew is built against the
 #              system Python, so it comes from the system package manager.
+#              Exactly one major version: route.py drives pcbnew's Python API,
+#              which changes between majors. On Ubuntu it comes from KiCad's
+#              own PPA, because the distribution's version is whatever that
+#              release shipped (7 on 24.04, 9 on 26.04).
 #   Java 21    Freerouting, which route.py fetches once and pins by hash.
 #   .venv      hardware/.venv — the system Python *with* its site-packages
 #              (so pcbnew is importable) plus requirements.txt: build123d,
@@ -4278,13 +4288,25 @@ base_content = '''
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# The KiCad major this toolchain is written against. The one declaration:
+# the install and the check below both read it.
+KICAD_MAJOR=9
+
 CHECK_ONLY=0
 [ "${1:-}" = "--check" ] && CHECK_ONLY=1
 VENV=hardware/.venv
 
+kicad_ok() {
+  kicad-cli version 2>/dev/null | head -1 | grep -q "^${KICAD_MAJOR}\."
+}
+
 missing() {
   local m=()
-  command -v kicad-cli >/dev/null || m+=("kicad-cli (KiCad)")
+  if ! command -v kicad-cli >/dev/null; then
+    m+=("kicad-cli (KiCad ${KICAD_MAJOR})")
+  elif ! kicad_ok; then
+    m+=("KiCad ${KICAD_MAJOR} (found $(kicad-cli version 2>/dev/null | head -1))")
+  fi
   if command -v java >/dev/null; then
     local v
     v=$(java -version 2>&1 | sed -n 's/.*version "\([0-9]*\).*/\1/p' | head -1)
@@ -4293,7 +4315,12 @@ missing() {
     m+=("java 21+")
   fi
   if [ -x "$VENV/bin/python" ]; then
-    "$VENV/bin/python" -c "import pcbnew" 2>/dev/null || m+=("pcbnew in $VENV")
+    if "$VENV/bin/python" -c "import pcbnew" 2>/dev/null; then
+      "$VENV/bin/python" -c "import pcbnew, sys; sys.exit(not pcbnew.Version().startswith('${KICAD_MAJOR}.'))" 2>/dev/null ||
+        m+=("pcbnew ${KICAD_MAJOR} in $VENV (found $("$VENV/bin/python" -c "import pcbnew; print(pcbnew.Version())" 2>/dev/null))")
+    else
+      m+=("pcbnew in $VENV")
+    fi
     "$VENV/bin/python" -c "import build123d, ortools, pypdf" 2>/dev/null ||
       m+=("requirements.txt in $VENV")
   else
@@ -4319,9 +4346,18 @@ case "$(uname -s)" in
   Linux)
     if command -v apt-get >/dev/null; then
       need=()
-      command -v kicad-cli >/dev/null || need+=(kicad)
+      kicad_ok || need+=(kicad)
       java -version 2>&1 | grep -qE 'version "(2[1-9]|[3-9][0-9])' || need+=(openjdk-21-jre-headless)
       python3 -c "import venv, ensurepip" 2>/dev/null || need+=(python3-venv)
+      # Ubuntu's own kicad package is whichever major that release shipped;
+      # KiCad's PPA pins the major. Elsewhere (Debian), apt's version stands
+      # and the check below says if it is the wrong one.
+      if [[ " ${need[*]} " == *" kicad "* ]] && grep -q '^ID=ubuntu' /etc/os-release 2>/dev/null; then
+        echo "adding ppa:kicad/kicad-${KICAD_MAJOR}.0-releases (needs sudo)"
+        command -v add-apt-repository >/dev/null ||
+          { sudo apt-get update -qq && sudo apt-get install -y -qq software-properties-common; }
+        sudo add-apt-repository -y "ppa:kicad/kicad-${KICAD_MAJOR}.0-releases"
+      fi
       if [ ${#need[@]} -gt 0 ]; then
         echo "installing: ${need[*]} (apt, needs sudo)"
         sudo apt-get update -qq
@@ -4330,13 +4366,15 @@ case "$(uname -s)" in
       # pcbnew is built for the distribution's Python; the venv must be too.
       base_python=/usr/bin/python3
     else
-      echo "No apt-get here. Install KiCad 9, Java 21 and Python 3 with venv support" >&2
+      echo "No apt-get here. Install KiCad ${KICAD_MAJOR}, Java 21 and Python 3 with venv support" >&2
       echo "from your distribution, then re-run this script." >&2
       exit 1
     fi
     ;;
   Darwin)
     command -v brew >/dev/null || { echo "Install Homebrew first: https://brew.sh" >&2; exit 1; }
+    # The cask is KiCad's current release; the check below catches the day
+    # that stops being ${KICAD_MAJOR}.
     command -v kicad-cli >/dev/null || brew install --cask kicad
     java -version 2>&1 | grep -qE 'version "(2[1-9]|[3-9][0-9])' || brew install openjdk@21
     # KiCad on macOS ships its own Python, and pcbnew lives in it.
