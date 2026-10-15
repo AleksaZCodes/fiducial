@@ -19,7 +19,7 @@ fid derive --check            ← fails if it is missing or stale
 
 ```toml
 [legal]
-jurisdiction           = "EU"                      # EU | US | UK | other
+jurisdiction           = "EU"                      # EU | UK | US | RS | other
 data_protection_email  = "privacy@example.com"
 cookie_categories      = ["necessary"]             # necessary always included
 ```
@@ -36,6 +36,7 @@ Valid jurisdictions:
 | `EU` | privacy, terms, cookies, imprint, accessibility |
 | `UK` | privacy, terms, cookies, imprint, accessibility |
 | `US` | privacy, terms, cookies, accessibility |
+| `RS` | privacy, terms, cookies, accessibility (Serbia: no imprint requirement) |
 | `other` | privacy, terms, cookies |
 
 Valid cookie categories: `necessary` (always included), `analytics`, `marketing`,
@@ -128,7 +129,18 @@ only by typing its URL is one nobody has been given.
 
 ## Cookie consent
 
-`cookie-consent.tsx` stores a decision and nothing else. **It does not stop
+The rules are derived: `apps/web/src/generated/consent.ts` holds the declared
+categories, `hasConsent()` and `recordConsent()` — and with them the one
+default the law fixes, that **nobody asked yet means no**. It is an output, so
+an edit there fails `fid derive --check`; change `[legal] cookie_categories`
+instead. A choice stored about a different category set is discarded, because
+the version is the set. **Every optional box starts unticked**: code that
+uses the consent module and starts its selection non-empty
+(`useState<CookieCategory[]>([...categories])`) or renders a box
+`defaultChecked` fails derive and `--check` — a pre-ticked box is not
+consent, and "Save" would record it as one.
+
+`cookie-consent.tsx` asks the question and stores a decision, and nothing else. **It does not stop
 anything from loading.** The product reads `hasConsent("analytics")` before it
 loads an analytics script, and that ordering is the entire compliance story: a
 banner shown over a tag that has already fired is a banner that has documented

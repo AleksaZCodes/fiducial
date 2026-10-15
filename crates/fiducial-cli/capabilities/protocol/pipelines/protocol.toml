@@ -1,0 +1,13 @@
+name     = "protocol"
+executor = "fid-protocol"
+# args = ["protocol.toml"]   # only to declare the messages somewhere else
+outputs  = ["protocol/messages.rs", "protocol/messages.ts"]
+
+# protocol.toml in, one codec per side out.
+#
+# The payload of a message — its kind byte and its fields, little-endian — is
+# a fact both sides of a link depend on. Written by hand in the firmware and
+# again in the web page, it drifts, and nothing but a test you remembered to
+# write notices. Declared once, both codecs are generated from the same table.
+#
+# Drop the `.rs` or the `.ts` output if the product has only one side.

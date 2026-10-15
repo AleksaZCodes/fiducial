@@ -1013,8 +1013,12 @@ def lighter(hex_colour: str, by: float) -> str:
 def main() -> int:
     L = json.loads(LAYOUT.read_text())
     if colour := L["case"].get("colour"):
+        # `#rrggbbaa`: a translucent filament, drawn see-through.
+        opacity = int(colour[7:9], 16) / 255 if len(colour) == 9 else 1.0
+        colour = colour[:7]
         LOOK["plastic"][0] = colour
         LOOK["plastic-lid"][0] = lighter(colour, 0.12)
+        LOOK["plastic"][3] = LOOK["plastic-lid"][3] = opacity
     BUILD.mkdir(parents=True, exist_ok=True)
     # A part that is no longer declared must not linger as a solid from an
     # earlier build: the viewer and a reviewer would both believe it.

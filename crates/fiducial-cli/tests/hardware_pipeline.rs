@@ -1678,6 +1678,49 @@ fn a_moved_pin_reaches_the_firmware_and_a_renamed_net_breaks_code_still_using_it
     let out = firmware_compiles(&root, tmp.path(), "sensor_sda");
     assert!(out.status.success(), "{}", text(&out));
 
+    // Firmware that names a pin itself would compile through a move and miss
+    // it, so both derive and --check refuse it — naming file and line —
+    // unless the line says it is deliberate.
+    std::fs::create_dir_all(root.join("firmware/src")).unwrap();
+    let main = root.join("firmware/src/main.rs");
+    std::fs::write(&main, "fn f(p: P) {\n    let sda = p.PIN_4;\n}\n").unwrap();
+    for args in [
+        &["derive", "--check", "--pipeline", "hardware"][..],
+        &["derive", "--pipeline", "hardware"],
+    ] {
+        let out = fid(&root, args);
+        assert!(!out.status.success(), "a literal pin passed {args:?}");
+        assert!(
+            text(&out).contains("firmware/src/main.rs:2: takes PIN_4 directly"),
+            "{}",
+            text(&out)
+        );
+    }
+    std::fs::write(&main, "fn f(p: P) {\n    let sda = p.PIN_4; // fid: allow-pin\n    // p.PIN_9 in a comment is not code\n}\n").unwrap();
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+    // An I²C address typed into a transfer, once a part declares its own.
+    let toml = std::fs::read_to_string(&p).unwrap();
+    std::fs::write(
+        &p,
+        toml.replacen("id = \"r-sda\"", "i2c_address = 0x38\nid = \"r-sda\"", 1),
+    )
+    .unwrap();
+    std::fs::write(
+        &main,
+        "fn f(i2c: I) {\n    i2c.write_async(0x39, &[0]);\n}\n",
+    )
+    .unwrap();
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(!out.status.success(), "a typed address passed");
+    assert!(
+        text(&out).contains("firmware/src/main.rs:2: addresses an I²C device as 0x39 directly"),
+        "{}",
+        text(&out)
+    );
+    std::fs::write(&p, toml).unwrap();
+    std::fs::remove_dir_all(root.join("firmware")).unwrap();
+
     // Swap the two pins in the declaration: the firmware follows, unedited.
     edit(
         &root,
@@ -2358,4 +2401,43 @@ fn check_regenerates_hardware_outputs_rather_than_trusting_the_lock() {
         "{}",
         text(&out)
     );
+}
+
+/// A conflict in `fiducial.toml` is not written as markers: every command
+/// parses that file, so markers in it stop the very commands that would say
+/// what to resolve. Found re-baselining a product made with 0.9.4.
+#[test]
+fn an_upgrade_never_leaves_conflict_markers_in_the_declaration() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    let lock_path = root.join("fiducial.lock");
+    let lock = std::fs::read_to_string(&lock_path).unwrap();
+    let start = lock.find("[templates.\"fiducial.toml\"]").unwrap();
+    // To the end of its multi-line `base_content`, which has `[` lines of its own.
+    let open = start + lock[start..].find("base_content = \"\"\"").unwrap() + 18;
+    let end = open + lock[open..].find("\"\"\"").unwrap();
+    // The base, as an older template wrote it, on the very line `fid add`
+    // has since changed here: a true conflict.
+    let record = lock[start..end].replacen("enabled = []", "enabled = [1]", 1);
+    assert_ne!(record, lock[start..end], "the base carries the line");
+    std::fs::write(
+        &lock_path,
+        format!("{}{}{}", &lock[..start], record, &lock[end..]),
+    )
+    .unwrap();
+    let before = std::fs::read_to_string(root.join("fiducial.toml")).unwrap();
+
+    let out = fid(&root, &["upgrade"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(
+        text(&out).contains("fiducial.toml: yours"),
+        "{}",
+        text(&out)
+    );
+    assert_eq!(
+        std::fs::read_to_string(root.join("fiducial.toml")).unwrap(),
+        before
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
 }

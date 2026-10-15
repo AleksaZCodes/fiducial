@@ -1,0 +1,1 @@
+description = "Every message a device and its apps exchange, declared once → a Rust codec for the firmware, a TypeScript codec for the web"

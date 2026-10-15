@@ -109,6 +109,10 @@ name or contact left as the placeholder's actual text only by accident of
 matching — it validates that every field is *present*, not that it is yours,
 so read what you write here once.
 
+`domain` is a bare host name — `example.com`, never `https://example.com` or
+`example.com/`: every page that links to the site adds the scheme itself, so
+a URL here becomes `https://https://…`. Derive refuses anything else.
+
 `primary_color` and `background_color` are `#RRGGBB` hex. They are the only
 two colours a favicon and a web manifest need; a full palette is
 `@fiducial/tokens`, which this declaration is the first step toward feeding.

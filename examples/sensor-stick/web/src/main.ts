@@ -7,7 +7,8 @@
 
 import { WebSerialTransport } from '@fiducial/transport-web'
 import { CONNECTORS, MCU_PINS } from '../../hardware/generated/interface.ts'
-import { decode } from './reading.ts'
+import { USB_VENDOR_ID } from '../../protocol/messages.ts'
+import { decode, show } from './reading.ts'
 
 const status = document.querySelector<HTMLParagraphElement>('#status')!
 const value = document.querySelector<HTMLParagraphElement>('#value')!
@@ -20,11 +21,11 @@ document.querySelector('#about')!.textContent =
 button.addEventListener('click', async () => {
   button.disabled = true
   try {
-    const stick = await WebSerialTransport.open({ filters: [{ usbVendorId: 0x2e8a }] })
+    const stick = await WebSerialTransport.open({ filters: [{ usbVendorId: USB_VENDOR_ID }] })
     status.textContent = 'Connected.'
     for await (const payload of stick) {
       const r = decode(payload)
-      if (r) value.textContent = `${r.celsius.toFixed(1)} °C · ${r.percentRh.toFixed(0)} %RH`
+      if (r) value.textContent = show(r)
     }
   } catch (e) {
     status.textContent = `Not connected: ${(e as Error).message}`

@@ -223,7 +223,9 @@ chart-5              = "oklch(0.36 0 0)"
 These are not documentation. `fid derive` computes every one of them from the
 values above and **fails if any falls under its minimum** — which is what turns
 "do not eyeball it" from advice into a rule. If a pair fails, change the
-colour, not the minimum.
+colour, not the minimum — derive refuses a `min` under the WCAG AA floor
+for the pair's `kind`: 4.5 for `text` (the default), 3.0 for `large-text`
+and `non-text`.
 
 A pair with no `theme` is measured in both. A slot a theme does not override
 falls back to light's.
@@ -235,7 +237,7 @@ pairs = [
   { fg = "muted-foreground",   bg = "muted",      min = 4.5, note = "the same text on a section band" },
   { fg = "primary",            bg = "background", min = 4.5, note = "primary used as a link colour" },
   { fg = "primary-foreground", bg = "primary",    min = 4.5, note = "label on a primary button" },
-  { fg = "doodle-ink",         bg = "background", min = 3.0, note = "annotation is non-text; 3.0 is the graphics floor" },
+  { fg = "doodle-ink",         bg = "background", min = 3.0, kind = "non-text", note = "annotation is non-text; 3.0 is the graphics floor" },
 ]
 ```
 
