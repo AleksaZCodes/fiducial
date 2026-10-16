@@ -107,6 +107,17 @@ IEEESTEC 2025 paper (Outreach). It cites release 0.9.11.
   injected-mistake evaluation, conclusion. Four pages. The template is the Outreach `.doc` converted to `.docx` (not in this
   repository: it holds the earlier paper and its co-authors' details). The
   PDF is exported from the `.docx`.
+- Layout follows the IEEESTEC template's rules: its own styles (`figure
+  caption`, `table head`, Heading 5 for References), figure labels in Times
+  New Roman at 8 pt or more, and every figure and table at the top or bottom
+  of a column. The previews that placement was checked on match Word's
+  layout because the build gives the title section the body's margins (the
+  .doc conversion left it narrower, which only LibreOffice honoured) and
+  turns off the automatic hyphenation the conversion switched on. Word's own
+  Outreach PDF has the same 0.63–4.01 in and 4.26–7.64 in columns.
+- To export the PDF exactly as committed, Times New Roman must be installed
+  (the Microsoft core fonts), then:
+  `soffice --headless --convert-to 'pdf:writer_pdf_Export:{"UseLosslessCompression":{"type":"boolean","value":"true"},"ReduceImageResolution":{"type":"boolean","value":"false"}}' Fiducial_Zdravkovic_Aleksa.docx`
 
 Rerun the test, then the figures, then the paper, whenever the platform
 changes what a gate catches.

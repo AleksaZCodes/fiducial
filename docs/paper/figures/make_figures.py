@@ -2,10 +2,11 @@
 
     python3 docs/paper/figures/make_figures.py
 
-Plain on purpose: black lines on white, the paper's own serif, one accent
-colour for what goes wrong, and no label a caption already says. Every
-figure is one column wide (3.375 in); the SVG's 1000 units are that width,
-so 34 units is about 8 pt in print.
+Plain on purpose: black lines on white, Times New Roman as the template
+prescribes, one accent colour for what goes wrong, and no label a caption
+already says. Every figure is placed one column wide (3.3 in); the SVG's
+1000 units are that width, so 34 units is 8 pt in print, the template's
+minimum for figure labels. No label here is smaller.
 
 Fig. 1 and Fig. 2 are drawn here. Fig. 3 is cropped from the sensor stick's
 renders (examples/sensor-stick/hardware/showcase/). Fig. 4 is the text of two
@@ -22,7 +23,7 @@ HERE = Path(__file__).parent
 REPO = HERE.parents[2]
 SCALE = 2.4  # 1000 units → 2400 px, about 700 dpi at column width
 
-SERIF = "Liberation Serif"
+SERIF = "Times New Roman"
 MONO = "Liberation Mono"
 INK = "#1a1a1a"
 GREY = "#6b6b6b"
@@ -74,33 +75,35 @@ def render(name, markup):
 
 
 def fig1():
+    """(a) and (b) side by side, so the figure is short enough for the foot
+    of the first column."""
     outputs = ["schematic", "board", "firmware", "web page"]
-    step, bh = 84, 66  # one output box every 84 units, 66 tall
+    step, bh = 60, 48            # an output box every 60 units, 48 tall
+    top = 52                     # below the panel letters
+    mid = top + (3 * step + bh) / 2
 
-    def panel(top, letter, src_fill, src_label, bad):
-        b = [text(20, top + 34, letter, anchor="start")]
-        ys = [top + 10 + i * step for i in range(4)]
-        mid = ys[0] + (ys[-1] + bh - ys[0]) / 2
-        b.append(box(70, mid - 58, 290, 116, fill=src_fill))
-        b.append(text(215, mid - 10, src_label))
-        b.append(text(215, mid + 36, "GPIO 4", family=MONO, size=32))
-        for i, (name, y) in enumerate(zip(outputs, ys)):
+    def panel(x0, letter, src_fill, src_label, bad):
+        b = [text(x0, 34, letter, anchor="start")]
+        b.append(box(x0, mid - 46, 170, 92, fill=src_fill))
+        b.append(text(x0 + 85, mid - 8, src_label))
+        b.append(text(x0 + 85, mid + 32, "GPIO 4", family=MONO))
+        for i, name in enumerate(outputs):
+            y = top + i * step
             wrong = bad and i == 2
             c = RED if wrong else INK
-            b.append(box(560, y, 400, bh, stroke=c))
-            b.append(text(580, y + 44, name, anchor="start", fill=c))
-            b.append(text(940, y + 44, "GPIO 8" if wrong else "GPIO 4", family=MONO, size=32,
+            b.append(box(x0 + 232, y, 240, bh, stroke=c))
+            b.append(text(x0 + 244, y + 34, name, anchor="start", fill=c))
+            b.append(text(x0 + 460, y + 34, "8" if wrong else "4", family=MONO,
                           anchor="end", fill=c))
-            b.append(arrow(360, mid, 556, y + bh / 2))
-        return b, ys[-1] + bh, mid
+            b.append(arrow(x0 + 170, mid, x0 + 228, y + bh / 2))
+        return b
 
-    a, end_a, _ = panel(20, "(a)", "white", "SDA pin", True)
-    top = end_a + 60
-    bb, end_b, mid = panel(top, "(b)", "#f2f2f2", "declaration", False)
-    bb.append(text(215, mid + 100, "fid derive", family=MONO, size=30))
-    bb.append(f'<line x1="560" y1="{end_b + 22}" x2="960" y2="{end_b + 22}" stroke="{INK}" stroke-width="{LINE}"/>')
-    bb.append(text(760, end_b + 62, "checked on every commit", style="italic", size=32))
-    render("fig1-one-fact", svg(1000, end_b + 80, "\n".join(a + bb)))
+    a = panel(6, "(a)", "white", "SDA pin", True)
+    bb = panel(520, "(b)", "#f2f2f2", "declared", False)
+    end = top + 3 * step + bh
+    a.append(text(242, end + 42, "copied by hand", style="italic"))
+    bb.append(text(756, end + 42, "derived, checked on commit", style="italic"))
+    render("fig1-one-fact", svg(1000, end + 56, "\n".join(a + bb)))
 
 
 # ── Fig. 2: the loop ─────────────────────────────────────────────────────────
@@ -122,23 +125,23 @@ def fig2():
     b.append(text(L + W / 2, B + 72, "checks"))
     # edit →
     b.append(arrow(L + W, T + H / 2, R - 4, T + H / 2))
-    b.append(text((L + W + R) / 2, T + H / 2 - 16, "edit", style="italic", size=32))
+    b.append(text((L + W + R) / 2, T + H / 2 - 16, "edit", style="italic", size=34))
     # derive ↓ (engines beside it)
     b.append(arrow(R + W / 2, T + H, R + W / 2, B - 4))
-    b.append(text(R + W / 2 - 20, (T + H + B) / 2 + 12, "derive", style="italic", size=32, anchor="end"))
+    b.append(text(R + W / 2 - 20, (T + H + B) / 2 + 12, "derive", style="italic", size=34, anchor="end"))
     b.append(box(R + W / 2 + 26, (T + H + B) / 2 - 62, 150, 124, dash="8 6", stroke=GREY))
     for i, s in enumerate(["solver", "CAD", "EDA"]):
-        b.append(text(R + W / 2 + 101, (T + H + B) / 2 - 22 + i * 38, s, size=30, fill=GREY))
+        b.append(text(R + W / 2 + 101, (T + H + B) / 2 - 22 + i * 38, s, size=34, fill=GREY))
     # ← checked
     b.append(arrow(R, B + H / 2, L + W + 4, B + H / 2))
-    b.append(text((L + W + R) / 2, B + H / 2 - 16, "check", style="italic", size=32))
+    b.append(text((L + W + R) / 2, B + H / 2 - 16, "check", style="italic", size=34))
     # fail ↑ back to the person, with the message
     b.append(arrow(L + W / 2, B, L + W / 2, T + H + 4, colour=RED, marker="r"))
-    b.append(text(L + W / 2 + 18, (T + H + B) / 2 - 6, "fails, naming", size=32, anchor="start", fill=RED))
-    b.append(text(L + W / 2 + 18, (T + H + B) / 2 + 32, "the declaration", size=32, anchor="start", fill=RED))
+    b.append(text(L + W / 2 + 18, (T + H + B) / 2 - 6, "fails, naming", size=34, anchor="start", fill=RED))
+    b.append(text(L + W / 2 + 18, (T + H + B) / 2 + 32, "the declaration", size=34, anchor="start", fill=RED))
     # pass ↓
     b.append(arrow(L + W / 2, B + H, L + W / 2, B + H + 86))
-    b.append(text(L + W / 2 + 18, B + H + 60, "passes: merge", style="italic", size=32, anchor="start"))
+    b.append(text(L + W / 2 + 18, B + H + 60, "passes: merge", style="italic", size=34, anchor="start"))
     render("fig2-loop", svg(1000, B + H + 100, "\n".join(b)))
 
 
@@ -164,14 +167,14 @@ def fig3():
     closed = closed.resize((round(closed.width * h / closed.height), h), Image.LANCZOS)
     board = board.resize((round(board.width * h / board.height), h), Image.LANCZOS)
     gap = 60
-    label_h = 90
+    label_h = 96
     out = Image.new("RGB", (closed.width + gap + board.width, h + label_h), "white")
     out.paste(closed, (0, label_h))
     out.paste(board, (closed.width + gap, label_h))
     # panel letters, drawn in the same serif as the other figures
     letters = svg(out.width, label_h,
-                  text(10, 64, "(a)", size=64, anchor="start")
-                  + text(closed.width + gap + 10, 64, "(b)", size=64, anchor="start"))
+                  text(10, 70, "(a)", size=80, anchor="start")
+                  + text(closed.width + gap + 10, 70, "(b)", size=80, anchor="start"))
     tmp = HERE / "_letters.png"
     cairosvg.svg2png(bytestring=letters.encode(), write_to=str(tmp))
     out.paste(Image.open(tmp).convert("RGB"), (0, 0))
@@ -189,8 +192,8 @@ def fig4():
     by_id = {r["id"]: r for r in res["results"]}
     b, y = [], 10
     # (marker, message lines kept, cut the last kept line before this text)
-    for letter, mid, keep, cut in (("(a)", "W1", 3, None),
-                                   ("(b)", "H7", 2, " (hardware/")):
+    for letter, mid, keep, cut in (("(a)", "W1", 4, None),
+                                   ("(b)", "H7", 2, " or mark the line")):
         gate = next(g for g in by_id[mid]["gates"] if not g["ok"])
         out = gate["output"].splitlines()
         # The failing pipeline's own lines: from its ✗ to the next pipeline.
@@ -205,14 +208,14 @@ def fig4():
             msg[-1] = msg[-1][: msg[-1].index(cut)] + " …"
         lines = []
         for l in msg:
-            lines += textwrap.wrap(l, 56, subsequent_indent="  ") or [""]
+            lines += textwrap.wrap(l, 46, subsequent_indent="  ") or [""]
         b.append(text(10, y + 34, letter, anchor="start"))
         top = y + 50
-        hgt = 40 + 38 * (len(lines) + 1)
+        hgt = 40 + 42 * (len(lines) + 1)
         b.append(box(10, top, 980, hgt, fill="#f7f7f7", stroke=GREY))
-        b.append(text(34, top + 48, "$ fid derive", family=MONO, size=28, anchor="start", fill=GREY))
+        b.append(text(30, top + 50, "$ fid derive", family=MONO, anchor="start", fill=GREY))
         for k, l in enumerate(lines):
-            b.append(text(34, top + 86 + 38 * k, l, family=MONO, size=28, anchor="start",
+            b.append(text(30, top + 92 + 42 * k, l, family=MONO, anchor="start",
                           fill=RED if k == 0 else INK))
         y = top + hgt + 16
     render("fig4-failures", svg(1000, y, "\n".join(b)))

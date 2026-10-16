@@ -100,9 +100,9 @@ BODY = [
      "was made for. Neither part was wrong on its own. The facts they shared "
      "had been copied by hand from one tool to another, one copy changed, and "
      "the mistake appeared only when the parts met (Fig. 1a)."),
-    ("fig", "fig1-one-fact.png@2.3",
+    ("fig", "fig1-one-fact.png",
      "One fact used in four places: (a) copied by hand, one copy changes and "
-     "nothing notices; (b) declared once, every copy is generated and "
+     "nothing notices; (b) declared once, every copy is generated from it and "
      "checked."),
     ("p",
      "Agents do not remove this problem; they speed it up. An agent sees "
@@ -148,16 +148,6 @@ BODY = [
      "declare a message once and generate the code for both sides [10]. That "
      "removes the drift met in Outreach, but only for messages; a pin, a "
      "colour or a board size has no such home."),
-    ("p",
-     "Build systems such as Bazel [11] and Nix [12] rebuild exactly what "
-     "changed, and Nix identifies every result by a fingerprint of its "
-     "inputs. They guarantee that outputs follow from files, not that files "
-     "agree with each other: the same fact typed into two source files "
-     "builds without complaint. Coding agents, finally, follow context files "
-     "such as AGENTS.md [13], which describe a repository’s rules but do not "
-     "enforce them. A known way to use a generator that can be wrong is to "
-     "pair it with a checker that cannot [14], but no existing checker spans "
-     "a whole product."),
     ("table", "Existing Approaches and Where They Stop",
      ("Approach", "Keeps in agreement", "Stops at"), [
         ("Model-based engineering", "views of one model",
@@ -169,6 +159,16 @@ BODY = [
         ("Agent context files", "nothing; they advise", "not enforced"),
         ("Fiducial", "every declared fact", "facts not yet declared"),
     ], (1500, 1550, 1500)),
+    ("p",
+     "Build systems such as Bazel [11] and Nix [12] rebuild exactly what "
+     "changed, and Nix identifies every result by a fingerprint of its "
+     "inputs. They guarantee that outputs follow from files, not that files "
+     "agree with each other: the same fact typed into two source files "
+     "builds without complaint. Coding agents, finally, follow context files "
+     "such as AGENTS.md [13], which describe a repository’s rules but do not "
+     "enforce them. A known way to use a generator that can be wrong is to "
+     "pair it with a checker that cannot [14], but no existing checker spans "
+     "a whole product."),
     ("p",
      "Fiducial keeps what works in each – text that agents can write, "
      "outputs tied to inputs by fingerprints, established engines for hard "
@@ -229,7 +229,9 @@ BODY = [
      "and instructions for agents. There are 23, from web applications and "
      "translations to firmware and hardware. Because every product has the "
      "same structure, whoever knows one knows them all, and a new product "
-     "starts from parts that already work. fid upgrade brings platform "
+     "starts from parts that already work. Adding translations, for example, "
+     "brings the language files, their generator, the check that every "
+     "language has every string, and the agent’s instructions. fid upgrade brings platform "
      "improvements into each product while keeping its own edits."),
     ("h2", "Declarations and Generation"),
     ("p",
@@ -257,7 +259,7 @@ BODY = [
      "board that does not fit its case. Consumers: compilers and type "
      "checkers read the generated files, so code that still uses a renamed "
      "fact stops compiling."),
-    ("fig", "fig2-loop.png@2.3",
+    ("fig", "fig2-loop.png",
      "How a change moves through Fiducial: declarations are edited, "
      "generation produces the artifacts with the help of established "
      "engines, and the checks either accept the change or return a message "
@@ -274,12 +276,17 @@ BODY = [
      "exists; build123d [9] builds the case; KiCad routes and checks the "
      "board. Every placement rule is one of eight general kinds, such as "
      "inside, apart or near, so a new product needs new declarations rather "
-     "than new code."),
+     "than new code. The solver’s answer is stored with the fingerprint of "
+     "the problem it solved, so checking a product never runs it again. The "
+     "engines check as well as build: KiCad confirms the board can be made, "
+     "and the case model confirms that the board fits and the lid closes."),
     ("h2", "Agents in the Loop"),
     ("p",
      "Every product carries an AGENTS.md file and one instruction file per "
      "capability, so any agent starts from the same description of the "
-     "product, and a hook stops it from editing a generated file. Agents fix "
+     "product, and a hook stops it from editing a generated file. fid dash "
+     "shows the whole product’s state in one view, recomputed from the "
+     "repository, so an agent starts from facts rather than guesses. Agents fix "
      "a problem where the fact lives, never in the output. The platform grows "
      "the same way: a mistake that gets past the checks becomes a general "
      "rule for every product."),
@@ -289,8 +296,11 @@ BODY = [
      "The repository contains a complete example product: a USB-C stick that "
      "measures temperature and humidity and shows them on a web page "
      "(Fig. 3). It is small, but it has every discipline: a printed case, a "
-     "circuit board, firmware and a web page."),
-    ("fig", "fig3-sensor-stick.png@2.7",
+     "circuit board, firmware in Rust and a page that reads the sensor in "
+     "the browser. It was chosen as the smallest "
+     "product that still crosses all of them, so every rule described above "
+     "applies to it."),
+    ("fig", "fig3-sensor-stick.png",
      "The sensor stick, generated from its declaration: (a) the closed case; "
      "(b) the routed board inside it, with the sensor under its vent."),
     ("p",
@@ -323,15 +333,17 @@ BODY = [
      "continuous integration, and the copy was reset. Three correct changes "
      "and two runs with no change tested the opposite direction: that the "
      "checks do not fail without a reason. The test is a script in the "
-     "repository."),
+     "repository, and every failure names the file and the declaration at "
+     "fault (Fig. 4)."),
+    ("p", "FINDINGS_A"),
     ("table", "Injected Mistakes, by Kind of Drift",
      ("Kind of drift", "Example", "0.9.4", VERSION), "TABLE1",
      (1330, 1780, 640, 760)),
-    ("p", "FINDINGS"),
-    ("fig", "fig4-failures.png@2.4",
+    ("fig", "fig4-failures.png",
      "Two failures as the person or agent sees them: (a) a string added in "
      "English only; (b) firmware naming a pin directly instead of taking it "
      "from the declaration."),
+    ("p", "FINDINGS_B"),
     ("p",
      "The mistakes were chosen by the author of the platform, so they may "
      "favour what it was built to catch. Only two products have been built, "
@@ -374,25 +386,28 @@ for kind, example, ids, first in _KINDS:
     TABLE1.append((kind, example, f"{first}/{len(ids)}", f"{now}/{len(ids)}"))
 TABLE1.append(("Total", "", f"{sum(k[3] for k in _KINDS)}/20", f"{_N}/20"))
 
-FINDINGS = (
+FINDINGS_A = (
     "On release 0.9.4 the checks caught 15 of the 20, and each of the five "
-    "misses was a fact the platform did not yet own. Two were declarations edited without regenerating: only the "
-    "hardware generator recorded which files it read, so the freshness "
-    "check did not notice that the others’ inputs had changed. In two, the "
-    "firmware wrote a pin number or a sensor address directly instead of "
-    "taking it from the declaration. The last was a Serbian string left "
-    "in English, complete in structure but not translated. Each became a "
-    "general rule: every generator now records its inputs, firmware that "
-    "writes a declared value directly is refused, and a translation "
-    "identical to the default language fails unless it is declared the same "
-    f"on purpose. On release {VERSION}, "
+    "misses was a fact the platform did not yet own. Two were declarations "
+    "edited without regenerating: only the hardware generator recorded which "
+    "files it read, so the freshness check did not notice that the others’ "
+    "inputs had changed. In two, the firmware wrote a pin number or a sensor "
+    "address directly instead of taking it from the declaration. The last "
+    "was a Serbian string left in English, complete in structure but not "
+    "translated."
+)
+FINDINGS_B = (
+    "Each miss became a general rule: every generator now records its "
+    "inputs, firmware that writes a declared value directly is refused, and "
+    "a translation identical to the default language fails unless it is "
+    f"declared the same on purpose. On release {VERSION}, "
     + ("all 20 are caught" if ALL_CAUGHT else f"{_N} of the 20 are caught")
     + f" – {_count('derive')} during generation, {_count('--check')} by the "
     f"freshness check and {_N - _count('derive') - _count('--check')} by the "
     "compiler – "
-    + ("and every correct change passes. " if CONTROLS_OK else
-       f"and {_SUM['controls_passed']} of the {_SUM['controls']} controls pass. ")
-    + "Fig. 4 shows two of the messages."
+    + ("and every correct change passes."
+       if CONTROLS_OK else
+       f"and {_SUM['controls_passed']} of the {_SUM['controls']} controls pass.")
 )
 
 REFERENCES = [
@@ -431,7 +446,7 @@ REFERENCES = [
     "no. 4, pp. 34–41, 1978.",
 ]
 
-FIG_WIDTH = Inches(3.15)  # the text column is 3.19 in; anything wider is cut at its edge
+FIG_WIDTH = Inches(3.3)  # the column is 3.38 in; figure labels are 8 pt at this width
 
 d = docx.Document(TEMPLATE)
 styles = {s.name.lower(): s for s in d.styles}
@@ -451,6 +466,17 @@ def set_text(p, text):
     for r in runs[1:]:
         r._r.getparent().remove(r._r)
 
+
+# The title section came out of the .doc conversion with a 1872-twip right
+# margin. Word lays the title out across the full width regardless (the
+# Outreach paper's Word PDF centres it on the page), but LibreOffice takes
+# the first section's margins as the page's and narrowed every column to
+# about 3.05 in, so its preview ran longer than Word's print. Giving the
+# title section the body's margins makes both agree with the Word PDF:
+# two 3.38 in columns from 0.63 in to 7.64 in.
+_BODY_MARGIN = docx.shared.Twips(907)
+d.sections[0].left_margin = _BODY_MARGIN
+d.sections[0].right_margin = _BODY_MARGIN
 
 # Header: the conference line (first-page header).
 for s in d.sections:
@@ -600,7 +626,8 @@ for item in BODY:
     elif kind == "h2":
         keep_with_next(para("Heading 2", item[1]))
     elif kind == "p":
-        para("Body Text", FINDINGS if item[1] == "FINDINGS" else item[1])
+        para("Body Text", {"FINDINGS_A": FINDINGS_A,
+                           "FINDINGS_B": FINDINGS_B}.get(item[1], item[1]))
     elif kind == "fig":
         _, name, caption = item
         p = para("Body Text", align=WD_ALIGN_PARAGRAPH.CENTER)
@@ -614,12 +641,13 @@ for item in BODY:
         keep_with_next(p)
         # The caption ends the figure: it must not pull the heading or
         # paragraph after it along, or a page break leaves a gap.
-        para("Slika", caption).paragraph_format.keep_with_next = False
+        para("figure caption", caption).paragraph_format.keep_with_next = False
     elif kind == "table":
         caption, header, rows, widths = item[1:]
         add_table(caption, header, TABLE1 if rows == "TABLE1" else rows, widths)
 
-keep_with_next(para("Heading 1", "References"))
+# References is a component head: Heading 5, unnumbered, as the template says.
+keep_with_next(para("Heading 5", "References"))
 for ref in REFERENCES:
     para("references", ref)
 
@@ -658,6 +686,14 @@ for tag in ("dcterms:created", "dcterms:modified"):
 core = re.sub(r"<cp:revision>\d+</cp:revision>", "<cp:revision>1</cp:revision>", core)
 core = re.sub(r"<cp:lastPrinted>.*?</cp:lastPrinted>", "", core)
 parts["docProps/core.xml"] = core.encode()
+
+# The .doc → .docx conversion switched automatic hyphenation on. Word did not
+# hyphenate the Outreach paper it printed from the same template, and the
+# LibreOffice preview cannot (no dictionary), so with it on, Word would break
+# lines differently from the preview every layout decision was checked on.
+settings = parts["word/settings.xml"].decode()
+settings = re.sub(r'<w:autoHyphenation w:val="(true|1)"/>', '', settings)
+parts["word/settings.xml"] = settings.encode()
 with zipfile.ZipFile(OUT, "w", zipfile.ZIP_DEFLATED) as z:
     for name, data in parts.items():
         z.writestr(name, data)
