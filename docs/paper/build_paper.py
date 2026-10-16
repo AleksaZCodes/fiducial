@@ -64,20 +64,14 @@ _N = _SUM["markers_caught"]
 _ALL = "all 20" if ALL_CAUGHT else f"{_N} of the 20"
 
 ABSTRACT = (
-    "AI coding agents can now write firmware, web applications and even "
-    "circuit-board and enclosure code, which lets one person attempt "
-    "products that used to need a team. Building such products showed the "
-    "author where this falls short: each part can be written quickly, but "
-    "the facts the parts share are copied between them, and nothing keeps "
-    "the copies in agreement. This paper presents Fiducial, an open-source "
-    "platform that gives a whole product, software and hardware alike, one "
-    "structure. Every fact is declared once, every artifact that uses it is "
-    "generated from that declaration, and checks on every change refuse "
-    "anything that no longer agrees with it, so AI agents work inside the "
-    "checks instead of being trusted. Of 20 realistic mistakes injected "
-    f"into a web product and a USB-C sensor stick, the checks catch {_ALL}, "
-    "each with a message naming its cause, and let every correct change "
-    "through."
+    "This paper presents Fiducial, an open-source platform for building "
+    "products that span software and hardware with AI coding agents. Agents "
+    "now write each part of a product quickly, but the facts the parts share "
+    "are still copied between them and drift apart. Fiducial declares every "
+    "fact once, generates every artifact from it – code, translations, "
+    "circuit board and enclosure – and checks every change, so agents work "
+    "within guarantees instead of being trusted. In a test of 20 realistic "
+    f"mistakes, the checks caught {_ALL} before they could be merged."
 )
 
 KEYWORDS = (
@@ -99,9 +93,9 @@ BODY = [
     ("p",
      "Building such products – first Outreach [3], an off-grid messaging "
      "system made of radios, gateways, an app and printed cases, and then "
-     "the platform described here – showed the author where the difficulty "
-     "had moved. Writing each part was no longer the slow step; keeping the "
-     "parts in agreement was. The radio’s firmware and the app disagreed on "
+     "the platform described here – has shown where the difficulty "
+     "has moved. Writing each part is no longer the slow step; keeping the "
+     "parts in agreement is. In Outreach, the radio’s firmware and the app disagreed on "
      "the layout of a message, and a printed case did not fit the board it "
      "was made for. Neither part was wrong on its own. The facts they shared "
      "had been copied by hand from one tool to another, one copy changed, and "
