@@ -192,8 +192,8 @@ def fig4():
     by_id = {r["id"]: r for r in res["results"]}
     b, y = [], 10
     # (marker, message lines kept, cut the last kept line before this text)
-    for letter, mid, keep, cut in (("(a)", "W1", 4, None),
-                                   ("(b)", "H7", 2, " or mark the line")):
+    for letter, mid, keep, cut in (("(a)", "W1", 3, None),
+                                   ("(b)", "H7", 2, " (hardware/")):
         gate = next(g for g in by_id[mid]["gates"] if not g["ok"])
         out = gate["output"].splitlines()
         # The failing pipeline's own lines: from its ✗ to the next pipeline.

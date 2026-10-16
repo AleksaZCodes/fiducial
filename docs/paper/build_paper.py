@@ -233,6 +233,22 @@ BODY = [
      "brings the language files, their generator, the check that every "
      "language has every string, and the agent’s instructions. fid upgrade brings platform "
      "improvements into each product while keeping its own edits."),
+    ("h2", "One Typed Language Underneath"),
+    ("p",
+     "The platform, and the code products share through it, is written in "
+     "Rust, a compiled language with a strict type system. The choice follows "
+     "from the approach: every mistake the compiler refuses is one the checks "
+     "never have to catch, and it is refused before anything runs, with a "
+     "message naming the file and line – the signal an agent needs. Rust also "
+     "needs no runtime or garbage collector, so one body of code can run "
+     "wherever a product does. Its core is written without the standard "
+     "library: the same message format, identifiers and typed physical "
+     "quantities compile into a microcontroller’s firmware, into the fid "
+     "tool, and to WebAssembly, which runs them in the browser and on edge "
+     "servers. The TypeScript types the web code uses are generated from the "
+     "Rust ones, never written by hand, so the boundary between the two "
+     "languages cannot drift either. TypeScript is used for interfaces, and "
+     "Python only at build time, to drive the engines."),
     ("h2", "Declarations and Generation"),
     ("p",
      "Declarations are plain text files in version control, from the "
@@ -259,11 +275,6 @@ BODY = [
      "board that does not fit its case. Consumers: compilers and type "
      "checkers read the generated files, so code that still uses a renamed "
      "fact stops compiling."),
-    ("fig", "fig2-loop.png",
-     "How a change moves through Fiducial: declarations are edited, "
-     "generation produces the artifacts with the help of established "
-     "engines, and the checks either accept the change or return a message "
-     "naming the declaration at fault."),
     ("h2", "Engines for Hard Problems"),
     ("p",
      "Some generation steps are real engineering problems: where to place "
@@ -280,6 +291,14 @@ BODY = [
      "the problem it solved, so checking a product never runs it again. The "
      "engines check as well as build: KiCad confirms the board can be made, "
      "and the case model confirms that the board fits and the lid closes."),
+    ("fig", "fig2-loop.png",
+     "How a change moves through Fiducial: declarations are edited, "
+     "generation produces the artifacts with the help of established "
+     "engines, and the checks either accept the change or return a message "
+     "naming the declaration at fault."),
+    ("fig", "fig3-sensor-stick.png",
+     "The sensor stick, generated from its declaration: (a) the closed case; "
+     "(b) the routed board inside it, with the sensor under its vent."),
     ("h2", "Agents in the Loop"),
     ("p",
      "Every product carries an AGENTS.md file and one instruction file per "
@@ -300,9 +319,6 @@ BODY = [
      "the browser. It was chosen as the smallest "
      "product that still crosses all of them, so every rule described above "
      "applies to it."),
-    ("fig", "fig3-sensor-stick.png",
-     "The sensor stick, generated from its declaration: (a) the closed case; "
-     "(b) the routed board inside it, with the sensor under its vent."),
     ("p",
      "The person writes the product declaration, an outline of its shape, "
      "the firmware’s logic and the page. Everything else is generated: the "
@@ -336,14 +352,6 @@ BODY = [
      "repository, and every failure names the file and the declaration at "
      "fault (Fig. 4)."),
     ("p", "FINDINGS_A"),
-    ("table", "Injected Mistakes, by Kind of Drift",
-     ("Kind of drift", "Example", "0.9.4", VERSION), "TABLE1",
-     (1330, 1780, 640, 760)),
-    ("fig", "fig4-failures.png",
-     "Two failures as the person or agent sees them: (a) a string added in "
-     "English only; (b) firmware naming a pin directly instead of taking it "
-     "from the declaration."),
-    ("p", "FINDINGS_B"),
     ("p",
      "The mistakes were chosen by the author of the platform, so they may "
      "favour what it was built to catch. Only two products have been built, "
@@ -352,6 +360,13 @@ BODY = [
      "agents working with Fiducial make fewer mistakes than agents working "
      "without it."),
 
+    ("table", "Injected Mistakes, by Kind of Drift",
+     ("Kind of drift", "Example", "0.9.4", VERSION), "TABLE1",
+     (1330, 1780, 640, 760)),
+    ("fig", "fig4-failures.png",
+     "Two failures as the person or agent sees them: (a) a string added in "
+     "English only; (b) firmware naming a pin directly instead of taking it "
+     "from the declaration."),
     ("h1", "Conclusion"),
     ("p",
      "AI agents have made writing each part of a product fast, and that has "
@@ -363,9 +378,12 @@ BODY = [
      "the codebase. In practice, it let one person working with AI agents keep "
      "a product’s firmware, web page, circuit board and case in agreement, "
      "with every injected mistake caught early by a message that names its "
-     "cause. The next steps are to manufacture the sensor stick and to "
-     "compare agents working with and without the platform. Fiducial and its "
-     "example are open source [4]."),
+     "cause. The next steps are to explore retrieval-augmented generation, so "
+     "that agents are given the declarations and documentation a task needs "
+     "rather than whole repositories; to refine the platform by applying it "
+     "to new products; and to measure and lower the tokens agents spend, "
+     "reasoning tokens above all. Fiducial and its example are open source "
+     "[4]."),
 ]
 
 # Table I: the twenty by kind, with an example of each and how many were
@@ -394,22 +412,8 @@ FINDINGS_A = (
     "inputs had changed. In two, the firmware wrote a pin number or a sensor "
     "address directly instead of taking it from the declaration. The last "
     "was a Serbian string left in English, complete in structure but not "
-    "translated."
+    "translated. Each became a general rule for every product."
 )
-FINDINGS_B = (
-    "Each miss became a general rule: every generator now records its "
-    "inputs, firmware that writes a declared value directly is refused, and "
-    "a translation identical to the default language fails unless it is "
-    f"declared the same on purpose. On release {VERSION}, "
-    + ("all 20 are caught" if ALL_CAUGHT else f"{_N} of the 20 are caught")
-    + f" – {_count('derive')} during generation, {_count('--check')} by the "
-    f"freshness check and {_N - _count('derive') - _count('--check')} by the "
-    "compiler – "
-    + ("and every correct change passes."
-       if CONTROLS_OK else
-       f"and {_SUM['controls_passed']} of the {_SUM['controls']} controls pass.")
-)
-
 REFERENCES = [
     "Claude Code documentation. Available at: "
     "https://docs.anthropic.com/en/docs/claude-code",
@@ -626,8 +630,7 @@ for item in BODY:
     elif kind == "h2":
         keep_with_next(para("Heading 2", item[1]))
     elif kind == "p":
-        para("Body Text", {"FINDINGS_A": FINDINGS_A,
-                           "FINDINGS_B": FINDINGS_B}.get(item[1], item[1]))
+        para("Body Text", FINDINGS_A if item[1] == "FINDINGS_A" else item[1])
     elif kind == "fig":
         _, name, caption = item
         p = para("Body Text", align=WD_ALIGN_PARAGRAPH.CENTER)
