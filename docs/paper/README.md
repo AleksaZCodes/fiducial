@@ -97,10 +97,11 @@ IEEESTEC 2025 paper (Outreach). It cites release 0.9.11.
 - `figures/make_figures.py` — the four figures. Fig. 4 is read from
   `markers/results.json`, so it shows the gates' real output.
 - `build_paper.py` — writes the text into the template:
-  `python3 build_paper.py OUTREACH.docx figures OUT.docx`. Table II, the
-  counts in Section V and the pin-move row of Table I are read from
+  `python3 build_paper.py OUTREACH.docx figures OUT.docx`. Table I, the
+  counts in Section III and the pin-move numbers are read from
   `markers/results.json`, so the paper cannot say something the last run did
-  not. The template is the Outreach `.doc` converted to `.docx` (not in this
+  not. Its sections follow the Outreach paper's: Introduction, System
+  Overview and Implementation, Results, Conclusion. The template is the Outreach `.doc` converted to `.docx` (not in this
   repository: it holds the earlier paper and its co-authors' details). The
   PDF is exported from the `.docx`.
 
