@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="810" viewBox="0 0 1000 810">
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="642" viewBox="0 0 1000 642">
 <defs>
   <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
     <path d="M0,0 L10,5 L0,10 z" fill="#1a1a1a"/>
@@ -7,23 +7,19 @@
     <path d="M0,0 L10,5 L0,10 z" fill="#b3261e"/>
   </marker>
 </defs>
-<rect width="1000" height="810" fill="white"/>
+<rect width="1000" height="642" fill="white"/>
 <text x="10" y="44" font-family="Times New Roman" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">(a)</text>
-<rect x="10" y="60" width="980" height="292" fill="#f7f7f7" stroke="#6b6b6b" stroke-width="2.2"/>
+<rect x="10" y="60" width="980" height="208" fill="#f7f7f7" stroke="#6b6b6b" stroke-width="2.2"/>
 <text x="30" y="110" font-family="Liberation Mono" font-size="34" fill="#6b6b6b" text-anchor="start" font-weight="normal" font-style="normal">$ fid derive</text>
 <text x="30" y="152" font-family="Liberation Mono" font-size="34" fill="#b3261e" text-anchor="start" font-weight="normal" font-style="normal">fid-i18n: the catalogs are not complete.</text>
 <text x="30" y="194" font-family="Liberation Mono" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">messages/sr.json is missing 1 key(s):</text>
 <text x="30" y="236" font-family="Liberation Mono" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">action.delete</text>
-<text x="30" y="278" font-family="Liberation Mono" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">A missing translation is a missing artifact,</text>
-<text x="30" y="320" font-family="Liberation Mono" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">  not a fallback (MISSION.md 1c).</text>
-<text x="10" y="402" font-family="Times New Roman" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">(b)</text>
-<rect x="10" y="418" width="980" height="376" fill="#f7f7f7" stroke="#6b6b6b" stroke-width="2.2"/>
-<text x="30" y="468" font-family="Liberation Mono" font-size="34" fill="#6b6b6b" text-anchor="start" font-weight="normal" font-style="normal">$ fid derive</text>
-<text x="30" y="510" font-family="Liberation Mono" font-size="34" fill="#b3261e" text-anchor="start" font-weight="normal" font-style="normal">firmware types what the board already declares</text>
-<text x="30" y="552" font-family="Liberation Mono" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">  (a pin, an address, a command or a wait):</text>
-<text x="30" y="594" font-family="Liberation Mono" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">firmware/rp2040/src/main.rs:84: takes PIN_4</text>
-<text x="30" y="636" font-family="Liberation Mono" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">  directly — take it through</text>
-<text x="30" y="678" font-family="Liberation Mono" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">  `board::&lt;net&gt;!(p)`</text>
-<text x="30" y="720" font-family="Liberation Mono" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">  (hardware/generated/board.rs) so a moved pin</text>
-<text x="30" y="762" font-family="Liberation Mono" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">  moves it too, …</text>
+<text x="10" y="318" font-family="Times New Roman" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">(b)</text>
+<rect x="10" y="334" width="980" height="292" fill="#f7f7f7" stroke="#6b6b6b" stroke-width="2.2"/>
+<text x="30" y="384" font-family="Liberation Mono" font-size="34" fill="#6b6b6b" text-anchor="start" font-weight="normal" font-style="normal">$ fid derive</text>
+<text x="30" y="426" font-family="Liberation Mono" font-size="34" fill="#b3261e" text-anchor="start" font-weight="normal" font-style="normal">firmware types what the board already declares</text>
+<text x="30" y="468" font-family="Liberation Mono" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">  (a pin, an address, a command or a wait):</text>
+<text x="30" y="510" font-family="Liberation Mono" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">firmware/rp2040/src/main.rs:84: takes PIN_4</text>
+<text x="30" y="552" font-family="Liberation Mono" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">  directly — take it through</text>
+<text x="30" y="594" font-family="Liberation Mono" font-size="34" fill="#1a1a1a" text-anchor="start" font-weight="normal" font-style="normal">  `board::&lt;net&gt;!(p)` …</text>
 </svg>
