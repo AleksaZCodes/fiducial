@@ -216,9 +216,10 @@ BODY = [
      "consistent: generation does that, and the checks confirm it. Its "
      "mistakes are not prevented, but they are caught before they reach the "
      "product, with a message precise enough for the agent to correct "
-     "itself. The name comes from electronics manufacturing, where fiducials "
-     "are the marks on a circuit board that every machine aligns to; the "
-     "declarations play that role for a whole product."),
+     "itself. Hence the name: a fiducial is a fixed reference point, a "
+     "universal measure that everything is aligned to and compared against, "
+     "so it stays uniform. The declarations are that reference for a "
+     "product."),
 
     ("h1", "Implementation"),
     ("p",
