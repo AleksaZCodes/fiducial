@@ -74,9 +74,10 @@ ABSTRACT = (
     "structure. Every fact is declared once, every artifact that uses it is "
     "generated from that declaration, and checks on every change refuse "
     "anything that no longer agrees with it, so AI agents work inside the "
-    "checks instead of being trusted. When 20 realistic mistakes were injected into "
-    "two products, the first version of the checks caught 15; each miss "
-    f"became a general rule, and the current version catches {_ALL}."
+    "checks instead of being trusted. Of 20 realistic mistakes injected "
+    f"into a web product and a USB-C sensor stick, the checks catch {_ALL}, "
+    "each with a message naming its cause, and let every correct change "
+    "through."
 )
 
 KEYWORDS = (
@@ -104,7 +105,11 @@ BODY = [
      "the layout of a message, and a printed case did not fit the board it "
      "was made for. Neither part was wrong on its own. The facts they shared "
      "had been copied by hand from one tool to another, one copy changed, and "
-     "the mistake appeared only when the parts met."),
+     "the mistake appeared only when the parts met (Fig. 1a)."),
+    ("fig", "fig1-one-fact.png@2.3",
+     "One fact used in four places: (a) copied by hand, one copy changes and "
+     "nothing notices; (b) declared once, every copy is generated and "
+     "checked."),
     ("p",
      "Agents do not remove this problem; they speed it up. An agent sees "
      "only the codebase it works in, so the agent writing "
@@ -117,7 +122,8 @@ BODY = [
      "What is missing is not a better tool for any one discipline, but one "
      "shared and checked context for all of them: a single place where a "
      "product’s facts live, from which every part is produced, and which "
-     "refuses a change that makes the parts disagree. This paper presents "
+     "refuses a change that makes the parts disagree (Fig. 1b). This paper "
+     "presents "
      "Fiducial [4], an open-source platform built to provide it, compares "
      "it with existing approaches, and tests whether its checks catch the "
      "mistakes that people and agents actually make."),
@@ -189,10 +195,6 @@ BODY = [
      "artifact that uses the same fact (Fig. 1a). The approach consists of "
      "three rules that together make drift visible and keep it out of the "
      "product (Fig. 1b)."),
-    ("fig", "fig1-one-fact.png@2.3",
-     "One fact used in four places: (a) copied by hand, one copy changes and "
-     "nothing notices; (b) declared once, every copy is generated and "
-     "checked."),
     ("p",
      "Declare once. Every fact is written in exactly one place, a "
      "declaration: a typed text file in the product’s repository. Typed means "
