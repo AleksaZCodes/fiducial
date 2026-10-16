@@ -100,8 +100,10 @@ IEEESTEC 2025 paper (Outreach). It cites release 0.9.11.
   `python3 build_paper.py OUTREACH.docx figures OUT.docx`. Table I, the
   counts in Section III and the pin-move numbers are read from
   `markers/results.json`, so the paper cannot say something the last run did
-  not. Its sections follow the Outreach paper's: Introduction, System
-  Overview and Implementation, Results, Conclusion. The template is the Outreach `.doc` converted to `.docx` (not in this
+  not. It is written for a first-time reader: the gap (agents
+  write each part fast, nothing keeps the parts in agreement), background,
+  the approach, implementation, the sensor stick as an example, the
+  injected-mistake evaluation, conclusion. Four pages. The template is the Outreach `.doc` converted to `.docx` (not in this
   repository: it holds the earlier paper and its co-authors' details). The
   PDF is exported from the `.docx`.
 
