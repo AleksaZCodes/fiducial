@@ -102,7 +102,8 @@ IEEESTEC 2025 paper (Outreach). It cites release 0.9.11.
   `markers/results.json`, so the paper cannot say something the last run did
   not. It is written for a first-time reader: the gap (agents
   write each part fast, nothing keeps the parts in agreement), background,
-  the approach, implementation, the sensor stick as an example, the
+  existing approaches and where each stops, the approach, implementation,
+  the sensor stick as an example, the
   injected-mistake evaluation, conclusion. Four pages. The template is the Outreach `.doc` converted to `.docx` (not in this
   repository: it holds the earlier paper and its co-authors' details). The
   PDF is exported from the `.docx`.
