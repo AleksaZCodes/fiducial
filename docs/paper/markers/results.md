@@ -1,4 +1,4 @@
-# Injected mistakes — fid 0.9.11 (07f7ec2)
+# Injected mistakes, first set — fid 0.9.11 (bbaa1b0)
 
 Markers caught: **20 / 20**. Controls passed: **5 / 5**.
 
@@ -22,7 +22,7 @@ Markers caught: **20 / 20**. Controls passed: **5 / 5**.
 | H6 | interface | consumer out of date | Net renamed, code not updated | firmware build, type check |
 | H7 | firmware | declaration bypassed | Pin named directly, then moved | derive, --check |
 | H8 | protocol | derived file edited | Message layout changed in firmware only | --check, firmware tests |
-| H9 | firmware | declaration bypassed | Sensor I²C address typed (and mistyped) | derive, --check, firmware build |
+| H9 | firmware | declaration bypassed | Sensor I²C address typed (and mistyped) | derive, --check |
 | H10 | mechanical | declarations conflict | Case narrowed 36 → 28 mm | derive, --check |
 | C1 | hardware | correct change | Sensor pin moved to GPIO8, re-derived | passes every gate |
 | C2 | i18n | correct change | UI string added in both languages | passes every gate |
