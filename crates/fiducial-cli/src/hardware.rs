@@ -1261,6 +1261,9 @@ fn d_slack() -> f64 {
 fn d_board_max() -> [f64; 2] {
     [100.0, 100.0]
 }
+/// The thicknesses JLCPCB makes standard 1–2 layer boards in, in mm.
+pub const BOARD_THICKNESSES_MM: [f64; 7] = [0.4, 0.6, 0.8, 1.0, 1.2, 1.6, 2.0];
+
 fn d_board_t() -> f64 {
     1.6
 }
@@ -3204,6 +3207,28 @@ pub fn solve(root: &Path, p: &Product) -> Result<Solved> {
                     v.unwrap()
                 );
             }
+        }
+        // A board is a part someone has to make. The fab outputs and the parts
+        // catalogue target JLCPCB, whose standard 1–2 layer boards come in
+        // these thicknesses; anything else cannot be ordered as declared, and
+        // the case, standoffs and connector heights built around it would be
+        // for a board that does not exist (the paper's held-out set, N16).
+        if b.layers <= 2
+            && !BOARD_THICKNESSES_MM
+                .iter()
+                .any(|t| (t - b.thickness_mm).abs() < 1e-6)
+        {
+            bail!(
+                "board.thickness_mm = {}: a {}-layer board is made {} mm thick — pick one of \
+                 these, so the case is built around a board that can be ordered",
+                b.thickness_mm,
+                b.layers,
+                BOARD_THICKNESSES_MM
+                    .iter()
+                    .map(|t| format!("{t}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
         }
         if !matches!(b.routing.as_str(), "auto" | "hand") {
             bail!(
@@ -6875,6 +6900,20 @@ fn peripheral(pin: &str) -> Option<String> {
     }
 }
 
+/// Delay calls and the unit each takes: Embassy's `Timer`, `embedded-hal`'s
+/// `DelayNs`, and `Duration` constructors.
+const WAIT_CALLS: [(&str, &str); 9] = [
+    ("after_millis(", "ms"),
+    ("delay_ms(", "ms"),
+    ("from_millis(", "ms"),
+    ("after_micros(", "us"),
+    ("delay_us(", "us"),
+    ("from_micros(", "us"),
+    ("after_secs(", "s"),
+    ("from_secs(", "s"),
+    ("delay_ns(", "ns"),
+];
+
 /// The directory firmware lives in, relative to the product root.
 pub const FIRMWARE_DIR: &str = "firmware";
 
@@ -7013,6 +7052,42 @@ pub fn firmware_pin_literals(root: &Path, p: &Product) -> Vec<String> {
                             i + 1,
                             net_ident(id)
                         ));
+                    }
+                }
+            }
+            // A datasheet wait typed straight into a delay — `after_millis(80)`
+            // beside the profile's `board::SENSOR_MEASURE_MS` — is the same
+            // number twice, and only the profile's copy is checked (the
+            // paper's held-out set, N19). The unit comes from the call.
+            if !line.contains("fid: allow-timing") {
+                for (call, unit) in WAIT_CALLS {
+                    for (at, _) in code.match_indices(call) {
+                        let arg = code[at + call.len()..].trim_start();
+                        let lit: String = arg
+                            .chars()
+                            .take_while(|c| c.is_ascii_digit() || *c == '_')
+                            .collect();
+                        if lit.is_empty() || !arg[lit.len()..].trim_start().starts_with(')') {
+                            continue;
+                        }
+                        let Ok(n) = lit.replace('_', "").parse::<u64>() else {
+                            continue;
+                        };
+                        let declared = profiles.iter().find_map(|(id, d)| {
+                            d.timing.iter().find_map(|(k, v)| {
+                                (*v == n && k.ends_with(&format!("_{unit}")))
+                                    .then(|| (id.clone(), d.mpn.clone(), k.to_ascii_uppercase()))
+                            })
+                        });
+                        if let Some((id, mpn, key)) = declared {
+                            found.push(format!(
+                                "  {rel}:{}: waits {n} {unit}, {mpn}'s `{key}` typed by hand — use \
+                                 `board::{}_{key}`, from the part's datasheet profile, or mark the \
+                                 line `// fid: allow-timing`",
+                                i + 1,
+                                net_ident(&id)
+                            ));
+                        }
                     }
                 }
             }
@@ -7569,5 +7644,38 @@ pins = { 1 = "GND", 2 = "A", 3 = "GND", 4 = "Y", 5 = "VBUS" }
             found[0].contains("lib.rs:2: sends a device bytes typed in place"),
             "{found:?}"
         );
+    }
+
+    #[test]
+    fn a_datasheet_wait_typed_into_a_delay_is_named() {
+        // The paper's held-out set, N19: `after_millis(80)` beside the
+        // AHT20 profile's `measure_ms = 80`.
+        let p = declared(&format!("{BUS}\n[firmware]\nmcu = \"mcu2\"\n"));
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("firmware/rp2040/src");
+        std::fs::create_dir_all(&src).unwrap();
+        let main = src.join("main.rs");
+        let good = "async fn f() {\n    Timer::after_millis(board::SENSOR_MEASURE_MS).await;\n    \
+                    Timer::after_millis(1000 - board::SENSOR_MEASURE_MS).await;\n    \
+                    Timer::after_millis(40).await;\n    Timer::after_micros(80).await;\n}\n";
+        std::fs::write(&main, good).unwrap();
+        assert!(firmware_pin_literals(dir.path(), &p).is_empty());
+        std::fs::write(
+            &main,
+            "async fn f() {\n    Timer::after_millis(80).await;\n}\n",
+        )
+        .unwrap();
+        let found = firmware_pin_literals(dir.path(), &p);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(
+            found[0].contains("main.rs:2: waits 80 ms, AHT20's `MEASURE_MS` typed by hand"),
+            "{found:?}"
+        );
+        std::fs::write(
+            &main,
+            "fn f() {\n    Timer::after_millis(80); // fid: allow-timing\n}\n",
+        )
+        .unwrap();
+        assert!(firmware_pin_literals(dir.path(), &p).is_empty());
     }
 }

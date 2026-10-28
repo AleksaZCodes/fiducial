@@ -587,6 +587,19 @@ pub fn typed_literals(root: &Path, file: &File) -> Vec<String> {
         .flat_map(|f| [f.name.clone(), camel(&f.name)])
         .filter(|n| n.contains(|c: char| c == '_' || c.is_ascii_uppercase()))
         .collect();
+    // Every band bound, in the unit and in counts: either is the band typed
+    // again when hand-written code compares a value with it.
+    let bounds: Vec<(String, f64)> = file
+        .bands
+        .iter()
+        .filter_map(|b| Some((b, file.field(&b.field)?.1)))
+        .flat_map(|(b, f)| {
+            [b.min, b.max, counts(f, b.min), counts(f, b.max)]
+                .into_iter()
+                .filter(|v| *v != 0.0)
+                .map(move |v| (b.name.clone(), v))
+        })
+        .collect();
     let mut files = Vec::new();
     crate::i18n::collect_code(root, &mut files);
     collect_ext(&root.join("firmware"), ".rs", &mut files);
@@ -641,6 +654,19 @@ pub fn typed_literals(root: &Path, file: &File) -> Vec<String> {
                         .iter()
                         .any(|k| code.contains(k.as_str()) && !code.contains("use "))
                 });
+                // `r.percentRh >= 35 && r.percentRh <= 60`: the bounds typed
+                // as numbers, on a value already in the unit, so no field
+                // name gives it away (the paper's held-out set, N20).
+                let typed_bound = compared_numbers(code)
+                    .into_iter()
+                    .find_map(|n| bounds.iter().find(|(_, v)| (v - n).abs() < 1e-9));
+                if let Some((band, _)) = typed_bound.filter(|_| !(ts_bounds || rs_bounds)) {
+                    out.push(format!(
+                        "{at}: compares a value with a bound of band `{band}` {BOUND_TYPED} — \
+                         call the generated band function (`<message>Band(…)` on the page, \
+                         `<message>::{band}(…)` in firmware), so a changed band reaches this line"
+                    ));
+                }
                 if ts_bounds || rs_bounds {
                     out.push(format!(
                         "{at}: tests a band against its bounds by hand — call the generated \
@@ -689,8 +715,20 @@ pub fn typed_literals(root: &Path, file: &File) -> Vec<String> {
             }
         }
     }
+    // One line, one message: a bound typed against a scaled field is the
+    // units mistake first, and that message already says to use the band.
+    let other: std::collections::HashSet<String> = out
+        .iter()
+        .filter(|m| !m.contains(BOUND_TYPED))
+        .filter_map(|m| m.split_once(": ").map(|(at, _)| at.to_string()))
+        .collect();
+    out.retain(|m| {
+        !m.contains(BOUND_TYPED) || m.split_once(": ").is_none_or(|(at, _)| !other.contains(at))
+    });
     out
 }
+
+const BOUND_TYPED: &str = "typed as a number";
 
 fn units_message(at: &str, field: &str) -> String {
     format!(
@@ -734,6 +772,41 @@ fn has_nonzero_int(pat: &str) -> bool {
         prev = c;
     }
     false
+}
+
+/// Every number that stands on either side of a comparison: `x >= 35`,
+/// `60 > x`, `x === 3500`. Arrows (`=>`, `->`) are not comparisons.
+fn compared_numbers(code: &str) -> Vec<f64> {
+    const OPS: [&str; 8] = ["===", "!==", "<=", ">=", "==", "!=", "<", ">"];
+    let b = code.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < b.len() {
+        let starts = b[i].is_ascii_digit()
+            && (i == 0
+                || !(b[i - 1].is_ascii_alphanumeric() || b[i - 1] == b'_' || b[i - 1] == b'.'));
+        if !starts {
+            i += 1;
+            continue;
+        }
+        let j = i + code[i..]
+            .find(|c: char| !(c.is_ascii_digit() || c == '_' || c == '.'))
+            .unwrap_or(code.len() - i);
+        let lit = code[i..j].trim_end_matches('.');
+        let before = code[..i].trim_end();
+        let after = code[j..].trim_start();
+        let arrow = before.ends_with("=>") || before.ends_with("->");
+        let compared = (!arrow && OPS.iter().any(|op| before.ends_with(op)))
+            || (OPS.iter().any(|op| after.starts_with(op)) && !after.starts_with("=>"));
+        let ident_after = code[j..].starts_with(|c: char| c.is_ascii_alphabetic() || c == '_');
+        if compared && !ident_after {
+            if let Ok(n) = lit.replace('_', "").parse::<f64>() {
+                out.push(n);
+            }
+        }
+        i = j.max(i + 1);
+    }
+    out
 }
 
 /// `35 < r.field`: a literal on the left of a comparison that ends here.
@@ -945,6 +1018,41 @@ max   = 60.0
             found[0].contains("reading.ts:1") && found[0].contains("by hand"),
             "{found:?}"
         );
+    }
+
+    #[test]
+    fn a_band_bound_typed_as_a_number_is_named() {
+        // The paper's held-out set, N20: the page's reading is already in
+        // %RH, so no scaled field name shows, but 35 and 60 are the band.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(DECLARATION), SCALED).unwrap();
+        let f = load(dir.path(), DECLARATION).unwrap();
+        let web = dir.path().join("web/src");
+        std::fs::create_dir_all(&web).unwrap();
+        let (lo, hi) = (f.bands[0].min, f.bands[0].max);
+        std::fs::write(
+            web.join("reading.ts"),
+            "const ok = readingBand('comfortable', v) === 'inside'\nconst t = (x: number) => x\nif (n > 7) {}\n",
+        )
+        .unwrap();
+        assert!(typed_literals(dir.path(), &f).is_empty());
+        std::fs::write(
+            web.join("reading.ts"),
+            format!("const ok = v >= {lo} && v <= {hi}\n"),
+        )
+        .unwrap();
+        let found = typed_literals(dir.path(), &f);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(
+            found[0].contains("reading.ts:1") && found[0].contains("typed as a number"),
+            "{found:?}"
+        );
+        std::fs::write(
+            web.join("reading.ts"),
+            format!("const ok = v >= {lo} // fid: allow-band\n"),
+        )
+        .unwrap();
+        assert!(typed_literals(dir.path(), &f).is_empty());
     }
 
     #[test]

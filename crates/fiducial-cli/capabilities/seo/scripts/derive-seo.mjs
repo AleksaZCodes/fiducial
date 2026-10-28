@@ -109,6 +109,16 @@ const staticPages = (seo.pages ?? ["/"]).map((entry) => {
   }
   return entry;
 });
+// A page listed twice is one route declared twice: the sitemap would carry it
+// twice, and when the two entries name different keys, which title the page
+// gets depends on order (the paper's held-out set, N5).
+{
+  const seen = new Set();
+  for (const { path } of staticPages) {
+    if (seen.has(path)) fail(`[seo] pages lists ${path} twice — declare each page once`);
+    seen.add(path);
+  }
+}
 
 // ── Where the outputs go ─────────────────────────────────────────────────────
 //

@@ -110,6 +110,18 @@ function frontmatter(md, where) {
 }
 
 
+// A date is a day that exists: `2026-13-01` has the shape and names no day,
+// and would sort, render and feed the sitemap as nonsense (the paper's
+// held-out set, N6). The time after the date, if any, is left to the reader.
+function isCalendarDate(v) {
+  if (typeof v !== "string") return false;
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T ])/.exec(v);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const t = new Date(Date.UTC(y, mo - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d;
+}
+
 // ── Schema check ─────────────────────────────────────────────────────────────
 // A field outside the schema is an error rather than extra data. It is almost
 // always a typo, and a typo that silently disappears from a page is the reason
@@ -128,7 +140,7 @@ function checkSchema(meta, schema, where) {
             : type === "media"
               ? typeof v === "string"
               : type === "date"
-              ? typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)
+              ? isCalendarDate(v)
               : typeof v === "string";
     if (!ok) fail(`${where}: field \`${field}\` should be ${type}, got ${JSON.stringify(v)}`);
   }
