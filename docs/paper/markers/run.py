@@ -89,7 +89,8 @@ class Case:
     apply: Callable[[Path], None]
     rederive: bool  # the person ran `fid derive` after the change
     control: bool = False
-    heldout: bool = False  # the second, independent set (see HELDOUT)
+    heldout: bool = False  # the second set (see HELDOUT)
+    independent: bool = False  # the third set (see independent_cases.py)
 
 
 W = "web"
@@ -249,6 +250,22 @@ for _c in HELDOUT:
     _c.heldout = True
 CASES += HELDOUT
 
+# ── the independent set ──────────────────────────────────────────────────────
+#
+# After the held-out set's five misses became rules (0.9.12), that set was no
+# longer held out either. independent_cases.py is a third set of 20, written
+# by a separate agent that read only the two products' files – not the
+# platform's rules, specs, earlier sets or history – and committed before
+# its first run. It is loaded here, in this module's namespace, so its cases
+# use the same helpers.
+_IND = Path(__file__).with_name("independent_cases.py")
+if _IND.exists():
+    _ns = dict(globals())
+    exec(compile(_IND.read_text(), str(_IND), "exec"), _ns)
+    for _c in _ns["INDEPENDENT"]:
+        _c.independent = True
+    CASES += _ns["INDEPENDENT"]
+
 # ── gates ────────────────────────────────────────────────────────────────────
 
 
@@ -357,14 +374,16 @@ def main() -> int:
     ap.add_argument("--fid", default=str(REPO / "target/debug/fid"))
     ap.add_argument("--only", default="")
     ap.add_argument("--out", default=str(Path(__file__).parent))
-    ap.add_argument("--set", choices=["original", "heldout"], default="original",
-                    help="the first 20 (with the controls) or the held-out 20")
+    ap.add_argument("--set", choices=["original", "heldout", "independent"], default="original",
+                    help="the first 20 (with the controls), the held-out 20, or the independent 20")
     ap.add_argument("--baseline", action="store_true",
                     help="run only the checks ordinary CI would: no derive, no --check")
     a = ap.parse_args()
     fid = str(Path(a.fid).resolve())
     only = set(filter(None, a.only.split(",")))
-    cases = [c for c in CASES if (c.heldout == (a.set == "heldout")) and (not only or c.id in only)]
+    which = {"original": lambda c: not (c.heldout or c.independent),
+             "heldout": lambda c: c.heldout, "independent": lambda c: c.independent}[a.set]
+    cases = [c for c in CASES if which(c) and (not only or c.id in only)]
 
     env = dict(os.environ)
     # One target directory for every firmware build, outside the worktree, so
@@ -423,11 +442,12 @@ def main() -> int:
         "markers_caught": sum(r["pass"] for r in markers), "markers": len(markers),
         "controls_passed": sum(r["pass"] for r in controls), "controls": len(controls),
     }
-    stem = "results" + ("-heldout" if a.set == "heldout" else "") + ("-baseline" if a.baseline else "")
+    stem = "results" + ("" if a.set == "original" else f"-{a.set}") + ("-baseline" if a.baseline else "")
     if not only:
         (out / f"{stem}.json").write_text(json.dumps({"summary": summary, "results": results},
                                                      ensure_ascii=False, indent=2) + "\n")
-        title = ("held-out set" if a.set == "heldout" else "first set") + (
+        title = {"original": "first set", "heldout": "held-out set",
+                 "independent": "independent set"}[a.set] + (
             ", without Fiducial (ordinary CI only)" if a.baseline else "")
         lines = [f"# Injected mistakes, {title} — {version} ({commit})", "",
                  f"Markers caught: **{summary['markers_caught']} / {summary['markers']}**. "
@@ -439,7 +459,7 @@ def main() -> int:
         (out / f"{stem}.md").write_text("\n".join(lines) + "\n")
     print(json.dumps(summary))
     # A held-out or baseline run is a measurement, not a gate: misses are the result.
-    return 0 if (a.set == "heldout" or a.baseline or all(r["pass"] for r in results)) else 1
+    return 0 if (a.set != "original" or a.baseline or all(r["pass"] for r in results)) else 1
 
 
 if __name__ == "__main__":
