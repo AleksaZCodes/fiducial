@@ -454,3 +454,51 @@ fn an_unknown_bare_page_names_the_fix() {
         "shows the declaration to write: {said}"
     );
 }
+
+#[test]
+fn a_page_declared_twice_fails_derive() {
+    // The paper's held-out set, N5: one route listed twice.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = seo_product(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+    let toml = read(&root, "fiducial.toml");
+    assert!(toml.contains("pages = [\"/\"]"), "fixture: {toml}");
+    write(
+        &root,
+        "fiducial.toml",
+        &toml.replace("pages = [\"/\"]", "pages = [\"/\", \"/\"]"),
+    );
+    let out = run(&root, &["derive"]);
+    assert!(
+        !out.status.success(),
+        "a duplicate page derived: {}",
+        text(&out)
+    );
+    assert!(text(&out).contains("lists / twice"), "{}", text(&out));
+}
+
+#[test]
+fn a_post_dated_a_day_that_does_not_exist_fails_derive() {
+    // The paper's held-out set, N6: the shape of a date, naming no day.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = seo_product(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+    for bad in ["2026-13-01", "2026-02-30"] {
+        let post = read(&root, "content/posts/en/hello.md");
+        let dated = post
+            .lines()
+            .map(|l| {
+                if l.starts_with("date:") {
+                    format!("date: {bad}")
+                } else {
+                    l.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        write(&root, "content/posts/en/hello.md", &dated);
+        let out = run(&root, &["derive"]);
+        assert!(!out.status.success(), "{bad} derived: {}", text(&out));
+        assert!(text(&out).contains("should be date"), "{}", text(&out));
+    }
+}

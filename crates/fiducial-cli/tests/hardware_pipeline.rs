@@ -2441,3 +2441,32 @@ fn an_upgrade_never_leaves_conflict_markers_in_the_declaration() {
     let out = fid(&root, &["derive", "--pipeline", "hardware"]);
     assert!(out.status.success(), "{}", text(&out));
 }
+
+#[test]
+fn a_board_no_fab_makes_is_refused() {
+    // The paper's held-out set, N16: a two-layer board 3 mm thick. The case
+    // grows to fit it, so nothing disagrees, but nobody makes that board.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = scaffold(tmp.path());
+    edit(
+        &root,
+        "hardware/product.toml",
+        "[board]",
+        "[board]\nthickness_mm = 3.0",
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(!out.status.success(), "a 3 mm two-layer board derived");
+    assert!(
+        text(&out).contains("board.thickness_mm = 3"),
+        "{}",
+        text(&out)
+    );
+    edit(
+        &root,
+        "hardware/product.toml",
+        "thickness_mm = 3.0",
+        "thickness_mm = 1.2",
+    );
+    let out = fid(&root, &["derive", "--pipeline", "hardware"]);
+    assert!(out.status.success(), "{}", text(&out));
+}
