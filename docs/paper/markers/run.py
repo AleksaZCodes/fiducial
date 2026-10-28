@@ -56,6 +56,16 @@ def edit_re(path: Path, pattern: str, new: str) -> None:
     path.write_text(out)
 
 
+def json_del(path: Path, dotted: str) -> None:
+    data = json.loads(path.read_text())
+    *parents, leaf = dotted.split(".")
+    node = data
+    for key in parents:
+        node = node[key]
+    del node[leaf]
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+
+
 def json_set(path: Path, dotted: str, value: str) -> None:
     data = json.loads(path.read_text())
     *parents, leaf = dotted.split(".")
@@ -79,6 +89,7 @@ class Case:
     apply: Callable[[Path], None]
     rederive: bool  # the person ran `fid derive` after the change
     control: bool = False
+    heldout: bool = False  # the second, independent set (see HELDOUT)
 
 
 W = "web"
@@ -170,6 +181,74 @@ CASES: list[Case] = [
          lambda r: None, True, control=True),
 ]
 
+# ── the held-out set ─────────────────────────────────────────────────────────
+#
+# Twenty new mistakes, written on 2026-10-28 after release 0.9.11 was fixed,
+# in answer to the IEEESTEC review: the first set was used to improve the
+# platform, so its 20/20 says nothing about mistakes the platform has not
+# seen. These were committed before they were first run, and the result is
+# reported as it came out; no rule was added for them before reporting.
+# Each is a mistake of the kind a person or an agent makes, chosen without
+# checking first whether a rule exists for it.
+
+HELDOUT: list[Case] = [
+    # ── software: the web product ──
+    Case("N1", W, "i18n", RULE, "Placeholder renamed in Serbian only",
+         lambda r: json_set(r / "messages/sr.json", "cart.summary", "{broj} stavki, ukupno {total}"), True),
+    Case("N2", W, "i18n", INCOMPLETE, "String deleted from Serbian only",
+         lambda r: json_del(r / "messages/sr.json", "action.cancel"), True),
+    Case("N3", W, "legal", RULE, "Jurisdiction mistyped",
+         lambda r: edit(r / "fiducial.toml", 'jurisdiction = "EU"', 'jurisdiction = "EUU"'), True),
+    Case("N4", W, "brand", RULE, "Brand colour mistyped (five hex digits)",
+         lambda r: edit(r / "fiducial.toml", 'primary_color = "#0EA5E9"', 'primary_color = "#0EA5E"'), True),
+    Case("N5", W, "SEO", CONFLICT, "Same page declared twice",
+         lambda r: edit(r / "fiducial.toml", 'pages = ["/"]', 'pages = ["/", "/"]'), True),
+    Case("N6", W, "content", RULE, "Post dated a month that does not exist",
+         lambda r: edit(r / "content/posts/en/hello.md", "date: 2026-01-01", "date: 2026-13-01"), True),
+    Case("N7", W, "content", INCOMPLETE, "Serbian post missing its title",
+         lambda r: edit(r / "content/posts/sr/hello.md", "title: Hello\n", ""), True),
+    Case("N8", W, "design", RULE, "Contrast pair names a colour that does not exist",
+         lambda r: edit(r / "design-system.md", '{ fg = "muted-foreground",   bg = "background"',
+                        '{ fg = "muted-fg",           bg = "background"'), True),
+    Case("N9", W, "database", RULE, "New migration uses a type the database lacks",
+         lambda r: (r / "migrations/0002_notes.sql").write_text(
+             "CREATE TABLE notes (id UUID PRIMARY KEY, body TEXT NOT NULL);\n"), True),
+    Case("N10", W, "identity", STALE, "Permissions table renamed, not re-derived",
+         lambda r: edit(r / "fiducial.toml", 'table = "grants"', 'table = "permissions"'), False),
+    # ── hardware, firmware and their interface: the sensor stick ──
+    Case("N11", S, "hardware", INCOMPLETE, "LED data net mistyped on the LED",
+         lambda r: edit(st(r, "hardware/product.toml"), 'DIN = "LED_DIN_5V" }', 'DIN = "LED_DIN5V" }'), True),
+    Case("N12", S, "hardware", CONFLICT, "Two parts given the same id",
+         lambda r: edit(st(r, "hardware/product.toml"), 'id        = "r-scl"', 'id        = "r-sda"'), True),
+    Case("N13", S, "circuit", INCOMPLETE, "I²C pull-up resistor deleted",
+         lambda r: edit_re(st(r, "hardware/product.toml"),
+                           r'\[\[part\]\]\nid\s+= "r-sda"[\s\S]*?(?=\[\[part\]\])', ""), True),
+    Case("N14", S, "parts", RULE, "Wrong order number on a resistor",
+         lambda r: edit_re(st(r, "hardware/product.toml"),
+                           r'(id\s+= "r-sda"[\s\S]*?lcsc\s+= )"C23162"', r'\1"C23186"'), True),
+    Case("N15", S, "mechanical", RULE, "Case wall thinned 1.6 → 0.4 mm",
+         lambda r: edit(st(r, "hardware/product.toml"), "wall_mm      = 1.6", "wall_mm      = 0.4"), True),
+    Case("N16", S, "mechanical", CONFLICT, "Board thickness 1.6 → 3.0 mm",
+         lambda r: edit(st(r, "hardware/product.toml"), "thickness_mm = 1.6", "thickness_mm = 3.0"), True),
+    Case("N17", S, "protocol", MEANING, "Temperature declared unsigned",
+         lambda r: edit(st(r, "protocol.toml"), '{ name = "centi_celsius", type = "i16"',
+                        '{ name = "centi_celsius", type = "u16"'), True),
+    Case("N18", S, "protocol", RULE, "Band bounds swapped (min above max)",
+         lambda r: (edit_re(st(r, "protocol.toml"), r"^min\s+= 35\.0", "min   = 60.0"),
+                    edit_re(st(r, "protocol.toml"), r"^max\s+= 60\.0", "max   = 35.0")), True),
+    Case("N19", S, "firmware", BYPASS, "Sensor wait typed as a number",
+         lambda r: edit(st(r, "firmware/rp2040/src/main.rs"),
+                        "Timer::after_millis(board::SENSOR_MEASURE_MS).await;",
+                        "Timer::after_millis(80).await;"), True),
+    Case("N20", S, "web", BYPASS, "Page compares humidity to the band by hand",
+         lambda r: edit(st(r, "web/src/reading.ts"),
+                        "readingBand('comfortable', r.percentRh) === 'inside'",
+                        "r.percentRh >= 35 && r.percentRh <= 60"), True),
+]
+for _c in HELDOUT:
+    _c.heldout = True
+CASES += HELDOUT
+
 # ── gates ────────────────────────────────────────────────────────────────────
 
 
@@ -190,11 +269,24 @@ class Result:
         return [g["gate"] for g in self.gates if not g["ok"]]
 
 
-def gates_for(product: str, fid: str, rederive: bool) -> list[Gate]:
+# Without Fiducial: the checks a project of the same shape runs in ordinary CI
+# – compilers, type checkers and tests over the code it has – with Fiducial's
+# own two steps, derive and --check, taken out. The web product's code is its
+# generated TypeScript, which in such a project is kept by hand.
+TSC_WEB = {"compilerOptions": {"target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler",
+                               "strict": True, "noEmit": True, "skipLibCheck": True,
+                               "allowImportingTsExtensions": True, "types": [], "lib": ["ES2022", "DOM"]},
+           "include": ["apps/web/src/generated/*.ts", "src/generated/*.ts"]}
+
+
+def gates_for(product: str, fid: str, rederive: bool, baseline: bool = False) -> list[Gate]:
     g = []
-    if rederive:
-        g.append(Gate("derive", [fid, "derive"], "."))
-    g.append(Gate("--check", [fid, "derive", "--check"], "."))
+    if not baseline:
+        if rederive:
+            g.append(Gate("derive", [fid, "derive"], "."))
+        g.append(Gate("--check", [fid, "derive", "--check"], "."))
+    if product == W and baseline:
+        g.append(Gate("type check", ["npx", "-y", "-p", "typescript@5.9", "tsc", "-p", "tsconfig.ci.json"], "."))
     if product == S:
         g += [
             Gate("firmware build", ["cargo", "build", "--release", "--quiet"], "firmware/rp2040"),
@@ -239,6 +331,7 @@ def make_web(base: Path, fid: str) -> Path:
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run([fid, "derive"], cwd=root, check=True,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    (root / "tsconfig.ci.json").write_text(json.dumps(TSC_WEB))
     git(root, "add", "-A")
     git(root, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "base")
     return root
@@ -264,10 +357,14 @@ def main() -> int:
     ap.add_argument("--fid", default=str(REPO / "target/debug/fid"))
     ap.add_argument("--only", default="")
     ap.add_argument("--out", default=str(Path(__file__).parent))
+    ap.add_argument("--set", choices=["original", "heldout"], default="original",
+                    help="the first 20 (with the controls) or the held-out 20")
+    ap.add_argument("--baseline", action="store_true",
+                    help="run only the checks ordinary CI would: no derive, no --check")
     a = ap.parse_args()
     fid = str(Path(a.fid).resolve())
     only = set(filter(None, a.only.split(",")))
-    cases = [c for c in CASES if not only or c.id in only]
+    cases = [c for c in CASES if (c.heldout == (a.set == "heldout")) and (not only or c.id in only)]
 
     env = dict(os.environ)
     # One target directory for every firmware build, outside the worktree, so
@@ -291,11 +388,11 @@ def main() -> int:
                 root, git_root, sub = wt / STICK, wt, STICK
             c.apply(git_root)
             res = Result(c.id)
-            for gate in gates_for(c.product, fid, c.rederive):
+            for gate in gates_for(c.product, fid, c.rederive, a.baseline):
                 res.gates.append(run_gate(gate, root, env))
             # A control must also leave every committed file as it was when
             # nothing changed: derive on an unchanged product rewrites nothing.
-            if c.mistake.endswith("unchanged"):
+            if c.mistake.endswith("unchanged") and not a.baseline:
                 diff = subprocess.run(["git", "status", "--porcelain", "--", sub], cwd=git_root,
                                       capture_output=True, text=True).stdout.strip()
                 res.gates.append({"gate": "no diff", "ok": diff == "", "seconds": 0, "message": diff})
@@ -322,23 +419,27 @@ def main() -> int:
     markers = [r for r in results if not r["control"]]
     controls = [r for r in results if r["control"]]
     summary = {
-        "fid": version, "commit": commit,
+        "fid": version, "commit": commit, "set": a.set, "baseline": a.baseline,
         "markers_caught": sum(r["pass"] for r in markers), "markers": len(markers),
         "controls_passed": sum(r["pass"] for r in controls), "controls": len(controls),
     }
+    stem = "results" + ("-heldout" if a.set == "heldout" else "") + ("-baseline" if a.baseline else "")
     if not only:
-        (out / "results.json").write_text(json.dumps({"summary": summary, "results": results},
+        (out / f"{stem}.json").write_text(json.dumps({"summary": summary, "results": results},
                                                      ensure_ascii=False, indent=2) + "\n")
-        lines = [f"# Injected mistakes — {version} ({commit})", "",
+        title = ("held-out set" if a.set == "heldout" else "first set") + (
+            ", without Fiducial (ordinary CI only)" if a.baseline else "")
+        lines = [f"# Injected mistakes, {title} — {version} ({commit})", "",
                  f"Markers caught: **{summary['markers_caught']} / {summary['markers']}**. "
                  f"Controls passed: **{summary['controls_passed']} / {summary['controls']}**.", "",
                  "| ID | Area | Class | Mistake | Caught by |", "|---|---|---|---|---|"]
         for r in results:
             by = ", ".join(r["caught_by"]) or ("passes every gate" if r["control"] else "**not caught**")
             lines.append(f"| {r['id']} | {r['area']} | {r['kind']} | {r['mistake']} | {by} |")
-        (out / "results.md").write_text("\n".join(lines) + "\n")
+        (out / f"{stem}.md").write_text("\n".join(lines) + "\n")
     print(json.dumps(summary))
-    return 0 if all(r["pass"] for r in results) else 1
+    # A held-out or baseline run is a measurement, not a gate: misses are the result.
+    return 0 if (a.set == "heldout" or a.baseline or all(r["pass"] for r in results)) else 1
 
 
 if __name__ == "__main__":
