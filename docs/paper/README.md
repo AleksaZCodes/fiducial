@@ -85,39 +85,44 @@ solvers, set-point checks, prices and the cut board are in `v0.9.1`, and
 ## The paper
 
 For IEEESTEC 2026, on the conference template, in the voice of the author's
-IEEESTEC 2025 paper (Outreach). It cites release 0.9.11.
+IEEESTEC 2025 paper (Outreach). It cites release 0.9.11. After review, its
+title is *Fiducial: Keeping Multidisciplinary Products Built with AI Agents
+Consistent*: the reviewer found "Build Any Robust …" (the platform's thesis,
+`thesis.toml`) too broad for two products, and the paper now claims
+consistency between artifacts, not correctness of the declared facts.
+`response-to-review.md` answers the review point by point.
 
 - `Fiducial_Zdravkovic_Aleksa.docx` / `.pdf` — the paper.
-- `markers/run.py` — the injected-mistake test: 20 mistakes in eight kinds
-  of drift (10 software, 10 hardware, firmware and interface) and 5
-  controls, each applied to a clean copy with the gates run in CI's order.
-  `python3 docs/paper/markers/run.py` writes `results.json` and
-  `results.md`. On 0.9.4, 15 of the 20 were caught; on 0.9.11 all 20 are,
-  and every control passes.
-- `figures/make_figures.py` — the four figures. Fig. 4 is read from
-  `markers/results.json`, so it shows the gates' real output.
-- `build_paper.py` — writes the text into the template:
-  `python3 build_paper.py OUTREACH.docx figures OUT.docx`. Table I, the
-  counts in Section III and the pin-move numbers are read from
-  `markers/results.json`, so the paper cannot say something the last run did
-  not. It is written for a first-time reader: the gap (agents
-  write each part fast, nothing keeps the parts in agreement), background,
-  existing approaches and where each stops, the approach, implementation,
-  the sensor stick as an example, the
-  injected-mistake evaluation, conclusion. Four pages. The template is the Outreach `.doc` converted to `.docx` (not in this
-  repository: it holds the earlier paper and its co-authors' details). The
-  PDF is exported from the `.docx`.
-- Layout follows the IEEESTEC template's rules: its own styles (`figure
-  caption`, `table head`, Heading 5 for References), figure labels in Times
-  New Roman at 8 pt or more, and every figure and table at the top or bottom
-  of a column. The previews that placement was checked on match Word's
-  layout because the build gives the title section the body's margins (the
-  .doc conversion left it narrower, which only LibreOffice honoured) and
-  turns off the automatic hyphenation the conversion switched on. Word's own
-  Outreach PDF has the same 0.63–4.01 in and 4.26–7.64 in columns.
-- To export the PDF exactly as committed, Times New Roman must be installed
-  (the Microsoft core fonts), then:
+- `markers/run.py` — the injected-mistake test. Two sets of 20 mistakes,
+  each applied to a clean copy of a product with the gates run in CI's
+  order:
+  - the first set (with 5 controls): 15/20 on 0.9.4, 20/20 on 0.9.11;
+    it was used to improve the platform;
+  - the held-out set (N1–N20), written after 0.9.11 and committed before
+    its first run (`bbaa1b0`): 15/20, reported with no rule added first.
+
+  `--baseline` runs either set with derive and `--check` removed, i.e.
+  ordinary CI (compilers, type checks, tests): 1/20 and 0/20. Each run
+  writes `results[-heldout][-baseline].json` and `.md`.
+- `figures/make_figures.py` — the figures. Fig. 4 (two gate messages) is
+  still drawn but no longer in the paper; it gave its space to the
+  held-out results.
+- `build_paper.py` — writes the text into the template. Every number in
+  the evaluation, Table II and the abstract is read from the result files,
+  and it asserts which held-out mistakes were missed, so the text cannot
+  drift from the data. Citations are written `[@key]` and numbered by first
+  appearance. The template is the Outreach `.doc` converted to `.docx` (not
+  in this repository: it holds the earlier paper and its co-authors'
+  details).
+- Layout follows the IEEESTEC template: its own styles (`figure caption`,
+  `table head`, Heading 5 for References), figure labels in Times New Roman
+  at 8 pt or more, every figure and table at the top or bottom of a column.
+  The preview matches Word's layout because the build gives the title
+  section the body's margins and turns off automatic hyphenation (both
+  artefacts of the .doc conversion).
+- To export the PDF as committed, Times New Roman must be installed, then:
   `soffice --headless --convert-to 'pdf:writer_pdf_Export:{"UseLosslessCompression":{"type":"boolean","value":"true"},"ReduceImageResolution":{"type":"boolean","value":"false"}}' Fiducial_Zdravkovic_Aleksa.docx`
 
-Rerun the test, then the figures, then the paper, whenever the platform
-changes what a gate catches.
+Rerun the tests, then the figures, then the paper, whenever the platform
+changes what a gate catches. A rule added for a held-out miss makes that
+set no longer held out: a later paper needs a new one.

@@ -25,7 +25,7 @@ TEMPLATE, FIGS, OUT = sys.argv[1:4]
 # lines stay as the template has them.
 HEADER = ["IEEESTEC – 19th Student Projects Conference, Niš, 2026."]
 
-TITLE = "Fiducial: Build Any Robust Multidisciplinary Product with AI Agents"
+TITLE = "Fiducial: Keeping Multidisciplinary Products Built with AI Agents Consistent"
 
 AUTHOR = [
     "Aleksa Zdravković",
@@ -55,6 +55,21 @@ def _count(gate):
 
 _C1 = _BY_ID["C1"]
 
+def _load(name):
+    return _json.loads((_HERE / "markers" / name).read_text())
+
+
+_HELD = _load("results-heldout.json")
+_BASE = _load("results-baseline.json")
+_HBASE = _load("results-heldout-baseline.json")
+_H = _HELD["summary"]["markers_caught"]
+_HB = _HBASE["summary"]["markers_caught"]
+_B = _BASE["summary"]["markers_caught"]
+_HB_W = "none" if _HB == 0 else str(_HB)
+# The text names the held-out misses; a rerun that changes them must change it.
+assert {r["id"] for r in _HELD["results"] if not r["pass"]} == {"N5", "N6", "N16", "N19", "N20"}, \
+    "the held-out misses changed: update FINDINGS"
+
 ALL_CAUGHT = _SUM["markers_caught"] == _SUM["markers"]
 CONTROLS_OK = _SUM["controls_passed"] == _SUM["controls"]
 
@@ -69,9 +84,12 @@ ABSTRACT = (
     "now write each part of a product quickly, but the facts the parts share "
     "are still copied between them and drift apart. Fiducial declares every "
     "fact once, generates every artifact from it – code, translations, "
-    "circuit board and enclosure – and checks every change, so agents work "
-    "within guarantees instead of being trusted. In a test of 20 realistic "
-    f"mistakes, the checks caught {_ALL} before they could be merged."
+    "circuit board and enclosure – and checks every change, so the parts "
+    "stay consistent with each other; whether a declared fact is itself "
+    "correct remains for the person to judge. Of 20 realistic mistakes, the "
+    f"checks first caught 15, and {_ALL} once each miss had become a rule. "
+    f"On 20 new mistakes written afterwards they caught {_H}, where the "
+    f"same project’s ordinary CI caught {_HB_W}."
 )
 
 KEYWORDS = (
@@ -85,69 +103,62 @@ BODY = [
     ("h1", "Introduction"),
     ("p",
      "Building a product used to take a team: someone for the circuit board, "
-     "someone for the firmware, others for the app, the website and the "
-     "enclosure. AI coding agents such as Claude Code [1] and Codex [2] are "
-     "changing that. An agent can write a firmware driver, a web page, a "
-     "database migration or a script that models a case in minutes, so one "
-     "person can now attempt a whole product."),
+     "someone for the firmware, others for the app and the enclosure. AI "
+     "coding agents such as Claude Code [@claude] and Codex [@codex] are "
+     "changing that: a firmware driver, a web page or a script that models a "
+     "case can be written in minutes, so one person can now attempt a whole "
+     "product."),
     ("p",
-     "Building such products – first Outreach [3], an off-grid messaging "
-     "system made of radios, gateways, an app and printed cases, and then "
-     "the platform described here – has shown where the difficulty "
-     "has moved. Writing each part is no longer the slow step; keeping the "
-     "parts in agreement is. In Outreach, the radio’s firmware and the app disagreed on "
-     "the layout of a message, and a printed case did not fit the board it "
-     "was made for. Neither part was wrong on its own. The facts they shared "
-     "had been copied by hand from one tool to another, one copy changed, and "
-     "the mistake appeared only when the parts met (Fig. 1a)."),
+     "Building such products – first Outreach [@outreach], an off-grid "
+     "messaging system of radios, gateways, an app and printed cases, and "
+     "then the platform described here – has shown where the difficulty has "
+     "moved. Writing each part is no longer the slow step; keeping the parts "
+     "in agreement is. In Outreach, the firmware and the app disagreed on "
+     "the layout of a message, and a printed case did not fit its board. "
+     "Neither part was wrong on its own: a shared fact had been copied by "
+     "hand, one copy changed, and the mistake appeared only when the parts "
+     "met (Fig. 1a)."),
     ("fig", "fig1-one-fact.png",
      "One fact used in four places: (a) copied by hand, one copy changes and "
      "nothing notices; (b) declared once, every copy is generated from it and "
      "checked."),
     ("p",
-     "Agents do not remove this problem; they speed it up. An agent sees "
-     "only the codebase it works in, so the agent writing "
-     "the firmware does not know the board changed, and the one writing the "
-     "web page does not know the firmware did. Its output is also "
-     "probabilistic: usually right, but never guaranteed. More code, written "
-     "faster, in more disconnected places, gives an inconsistent product "
-     "sooner."),
+     "Agents speed this problem up rather than remove it. An agent sees only "
+     "the codebase it works in, and its output is usually right but never "
+     "guaranteed; more code, written faster in more disconnected places, "
+     "gives an inconsistent product sooner."),
     ("p",
-     "What is missing is not a better tool for any one discipline, but one "
-     "shared and checked context for all of them: a single place where a "
-     "product’s facts live, from which every part is produced, and which "
-     "refuses a change that makes the parts disagree (Fig. 1b). This paper "
-     "presents "
-     "Fiducial [4], an open-source platform built to provide it, compares "
-     "it with existing approaches, and tests whether its checks catch the "
-     "mistakes that people and agents actually make."),
+     "What is missing is one shared and checked context for every "
+     "discipline: a single place where a product’s facts live, from which "
+     "every part is produced, and which refuses a change that makes the parts "
+     "disagree (Fig. 1b). This paper presents Fiducial [@fiducial], an "
+     "open-source platform built to provide it, compares it with existing "
+     "approaches and with ordinary CI, and tests its checks on mistakes they "
+     "were not built for."),
 
     ("h1", "Existing Approaches"),
     ("p",
-     "Several kinds of tool already address parts of this problem, and each "
-     "falls short in the same way: it keeps one kind of fact, or one pair of disciplines, in "
-     "agreement, but not the product as a whole (Table I)."),
+     "Several kinds of tool address parts of this problem; each keeps one "
+     "kind of fact, or one pair of disciplines, in agreement, but not the "
+     "product as a whole (Table I)."),
     ("p",
      "Model-driven and model-based systems engineering keep a design in one "
-     "central model and generate or check other views from it [5], [6]. They "
+     "central model and generate or check other views from it [@schmidt], "
+     "[@brambilla], in languages such as SysML [@sysml], with methods for "
+     "managing inconsistencies between views [@nuseibeh], [@herzig]. They "
      "are the closest in spirit, but the model lives in a specialised "
-     "graphical tool, the code is still written by hand beside it, and an "
-     "agent cannot easily work in it. Engineering suites link neighbouring "
-     "disciplines instead: "
-     "Altium’s MCAD CoDesigner passes changes between a circuit board and its "
-     "mechanical model [7]. The firmware, the app and the translations stay "
-     "outside, and the link is between two tools, not from one source."),
+     "graphical tool, code is still written by hand beside it, and an agent "
+     "cannot easily work in it. Engineering suites instead link two tools, "
+     "such as a circuit board and its mechanical model [@altium]; the "
+     "firmware, the app and the translations stay outside."),
     ("p",
-     "Design-as-code tools write hardware as text: a circuit in atopile [8], "
-     "a case as a build123d script [9]. This is what makes hardware writable "
-     "by an agent, and Fiducial uses build123d. But each covers one "
-     "discipline. Fiducial’s first design planned to author boards in "
-     "atopile, and found that a circuit language does not cover the case, "
-     "the layout or the cost, so the board’s facts would still be copied "
-     "into each of them. Interface languages such as Protocol Buffers "
-     "declare a message once and generate the code for both sides [10]. That "
-     "removes the drift met in Outreach, but only for messages; a pin, a "
-     "colour or a board size has no such home."),
+     "Design-as-code tools write hardware as text – a circuit in atopile "
+     "[@atopile], a case in build123d [@build123d] – which makes it writable "
+     "by an agent, but each covers one discipline: Fiducial’s first design "
+     "planned to use atopile and found that the case, the layout and the "
+     "cost would still copy the board’s facts. Interface languages such as "
+     "Protocol Buffers [@protobuf] declare a message once for both sides, "
+     "which removes the drift met in Outreach, but only for messages."),
     ("table", "Existing Approaches and Where They Stop",
      ("Approach", "Keeps in agreement", "Stops at"), [
         ("Model-based engineering", "views of one model",
@@ -155,72 +166,82 @@ BODY = [
         ("ECAD–MCAD links", "board and case", "two disciplines, two tools"),
         ("Design as code", "one discipline", "facts shared with others"),
         ("Interface languages", "messages, both sides", "everything else"),
-        ("Build systems", "outputs with files", "two files that disagree"),
+        ("Build systems, CI", "outputs with files", "two files that disagree"),
         ("Agent context files", "nothing; they advise", "not enforced"),
         ("Fiducial", "every declared fact", "facts not yet declared"),
     ], (1500, 1550, 1500)),
     ("p",
-     "Build systems such as Bazel [11] and Nix [12] rebuild exactly what "
-     "changed, and Nix identifies every result by a fingerprint of its "
-     "inputs. They guarantee that outputs follow from files, not that files "
-     "agree with each other: the same fact typed into two source files "
-     "builds without complaint. Coding agents, finally, follow context files "
-     "such as AGENTS.md [13], which describe a repository’s rules but do not "
-     "enforce them. A known way to use a generator that can be wrong is to "
-     "pair it with a checker that cannot [14], but no existing checker spans "
-     "a whole product."),
+     "Build systems such as Bazel [@bazel] and Nix [@nix] rebuild exactly "
+     "what changed, identifying results by fingerprints of their inputs. "
+     "They make sure outputs follow from files, not that files agree with "
+     "each other: the same fact typed into two files builds without "
+     "complaint, in them and in a CI pipeline built on them."),
+    ("p",
+     "Coding agents follow context files such as AGENTS.md [@agentsmd], "
+     "which describe a repository’s rules but do not enforce them, and the "
+     "code they write is often plausible but wrong. Stricter tests find "
+     "errors in programs that benchmark tests [@chen] had passed [@liu], "
+     "about 40 % of the programs in one security study were vulnerable "
+     "[@pearce], and most real repository issues remain unsolved "
+     "[@jimenez]. Models also cannot reliably correct their own reasoning "
+     "without an outside signal [@huang]. A known answer is to pair a "
+     "generator that can be wrong with a checker that cannot "
+     "[@kambhampati], but no existing checker spans a whole product."),
     ("p",
      "Fiducial keeps what works in each – text that agents can write, "
      "outputs tied to inputs by fingerprints, established engines for hard "
      "problems, and checks that decide – and changes the unit. It tracks "
-     "facts rather than "
-     "files or tools, across every discipline of one product, so any fact – "
-     "a message, a pin, a colour, a size – has exactly one home."),
+     "facts rather than files or tools, across every discipline of one "
+     "product, so any fact – a message, a pin, a colour, a size – has "
+     "exactly one home."),
 
     ("h1", "The Approach"),
     ("p",
-     "Fiducial treats a product as two kinds of thing. Facts are the "
-     "decisions that define it: which pin a sensor is connected to, what a "
-     "button says in each language, the brand colour, the size of the board, "
-     "the layout of a message between a device and its app. Artifacts are "
-     "everything built from those facts: source code, schematics, circuit "
-     "boards, translation files, web pages, enclosure models. Drift is what "
-     "happens when an artifact stops agreeing with a fact, or with another "
-     "artifact that uses the same fact (Fig. 1a). The approach consists of "
-     "three rules that together make drift visible and keep it out of the "
-     "product (Fig. 1b)."),
+     "Fiducial treats a product as facts and artifacts. Facts are the "
+     "decisions that define it: which pin a sensor uses, what a button says "
+     "in each language, the size of the board, the layout of a message. "
+     "Artifacts are everything built from them: code, schematics, boards, "
+     "translations, enclosure models. Drift is when an artifact stops "
+     "agreeing with a fact, or with another artifact that uses it "
+     "(Fig. 1a). Three rules keep drift out (Fig. 1b)."),
     ("p",
      "Declare once. Every fact is written in exactly one place, a "
-     "declaration: a typed text file in the product’s repository. Typed means "
-     "the file has a fixed structure that a program can check, not free "
-     "prose. A fact that exists once has no second copy to disagree with."),
+     "declaration: a typed text file in the repository, with a structure a "
+     "program can check. A fact that exists once has no second copy to "
+     "disagree with."),
     ("p",
      "Derive everything else. Every artifact that depends on a fact is "
-     "generated from its declaration by one command, and generated files are "
-     "never edited by hand. Generation is deterministic: the same "
-     "declarations always produce exactly the same files, which makes the "
-     "product reproducible and makes any difference meaningful."),
+     "generated from its declaration by one command and never edited by "
+     "hand. Generation is deterministic, so the product is reproducible and "
+     "any difference is meaningful."),
     ("p",
      "Check every change. Before a change is accepted, checks confirm that "
-     "every artifact still matches what its declarations produce now, and "
-     "that the declarations themselves are valid. A failing check names the "
-     "declaration and the file at fault, so the person or agent knows what to "
-     "fix."),
+     "every artifact still matches what its declarations produce and that "
+     "the declarations are valid; a failure names the declaration and the "
+     "file at fault."),
     ("p",
-     "These rules change the role of an AI agent. The agent still edits "
+     "The rules check agreement, not truth. A fact declared wrongly – the "
+     "wrong sensor address, a resistor of the wrong value – is copied "
+     "faithfully into every artifact, and the product is then consistently "
+     "wrong. Some such values break a rule and are refused, such as two "
+     "colours with too little contrast or a resistor that puts a voltage "
+     "outside its window, but whether a declaration is right is still "
+     "decided by the person, the datasheet and the bench."),
+    ("p",
+     "These rules change the role of an AI agent: it still edits "
      "declarations and code, but it is no longer trusted to keep anything "
-     "consistent: generation does that, and the checks confirm it. Its "
-     "mistakes are not prevented, but they are caught before they reach the "
-     "product, with a message precise enough for the agent to correct "
-     "itself. Hence the name: a fiducial is a fixed reference point, a "
-     "universal measure that everything is aligned to and compared against, "
-     "so it stays uniform. The declarations are that reference for a "
-     "product."),
+     "consistent. Its mistakes are not prevented, but many are caught before "
+     "they reach the product, with a message precise enough for the agent "
+     "to correct itself. Hence the name: a fiducial is a fixed reference "
+     "point, a universal measure that everything is aligned to and compared "
+     "against, so it stays uniform. The declarations are that reference for "
+     "a product."),
 
     ("h1", "Implementation"),
     ("p",
-     "Fiducial is a command-line tool, fid, written in Rust. Its parts are "
-     "described below; Fig. 2 shows how a change moves through them."),
+     "Fiducial is a command-line tool, fid, built over six weeks by one "
+     "person working with AI agents. Fig. 2 shows how a change moves through "
+     "its parts."),
     ("h2", "One Structure for Every Product"),
     ("p",
      "fid new creates a product repository with a fixed layout, and fid add "
@@ -229,9 +250,7 @@ BODY = [
      "and instructions for agents. There are 23, from web applications and "
      "translations to firmware and hardware. Because every product has the "
      "same structure, whoever knows one knows them all, and a new product "
-     "starts from parts that already work. Adding translations, for example, "
-     "brings the language files, their generator, the check that every "
-     "language has every string, and the agent’s instructions. fid upgrade brings platform "
+     "starts from parts that already work. fid upgrade brings platform "
      "improvements into each product while keeping its own edits."),
     ("h2", "One Typed Language Underneath"),
     ("p",
@@ -247,7 +266,7 @@ BODY = [
      "tool, and to WebAssembly, which runs them in the browser and on edge "
      "servers. The TypeScript types the web code uses are generated from the "
      "Rust ones, never written by hand, so the boundary between the two "
-     "languages cannot drift either. TypeScript is used for interfaces, and "
+     "languages is not kept in step by hand either. TypeScript is used for interfaces, and "
      "Python only at build time, to drive the engines."),
     ("h2", "Declarations and Generation"),
     ("p",
@@ -258,7 +277,7 @@ BODY = [
      "goes through ordinary code review. fid "
      "derive runs each capability’s generator, which reads the declarations "
      "and writes the artifacts, from a typed module of translations to a "
-     "firmware pin map or a KiCad circuit board [15]. A lock file records a "
+     "firmware pin map or a KiCad circuit board [@kicad]. A lock file records a "
      "cryptographic hash – a short fingerprint of a file’s contents – for "
      "every input and output, so the platform knows exactly what each "
      "artifact was made from."),
@@ -282,15 +301,12 @@ BODY = [
      "them. The first version placed parts with a hand-written search, and "
      "each new product added special rules until they began to interact. Now "
      "the platform only writes the problem down and hands it to an "
-     "established engine. A constraint solver, CP-SAT [16], is given the "
+     "established engine. A constraint solver, CP-SAT [@cpsat], is given the "
      "rules a placement must satisfy and finds one that does, or proves none "
-     "exists; build123d [9] builds the case; KiCad routes and checks the "
+     "exists; build123d [@build123d] builds the case; KiCad routes and checks the "
      "board. Every placement rule is one of eight general kinds, such as "
      "inside, apart or near, so a new product needs new declarations rather "
-     "than new code. The solver’s answer is stored with the fingerprint of "
-     "the problem it solved, so checking a product never runs it again. The "
-     "engines check as well as build: KiCad confirms the board can be made, "
-     "and the case model confirms that the board fits and the lid closes."),
+     "than new code."),
     ("fig", "fig2-loop.png",
      "How a change moves through Fiducial: declarations are edited, "
      "generation produces the artifacts with the help of established "
@@ -303,70 +319,57 @@ BODY = [
     ("p",
      "Every product carries an AGENTS.md file and one instruction file per "
      "capability, so any agent starts from the same description of the "
-     "product, and a hook stops it from editing a generated file. fid dash "
-     "shows the whole product’s state in one view, recomputed from the "
-     "repository, so an agent starts from facts rather than guesses. Agents fix "
+     "product, and a hook stops it from editing a generated file. Agents fix "
      "a problem where the fact lives, never in the output. The platform grows "
      "the same way: a mistake that gets past the checks becomes a general "
      "rule for every product."),
 
     ("h1", "Example: A Sensor Stick"),
     ("p",
-     "The repository contains a complete example product: a USB-C stick that "
+     "The repository contains a complete example: a USB-C stick that "
      "measures temperature and humidity and shows them on a web page "
-     "(Fig. 3). It is small, but it has every discipline: a printed case, a "
-     "circuit board, firmware in Rust and a page that reads the sensor in "
-     "the browser. It was chosen as the smallest "
-     "product that still crosses all of them, so every rule described above "
-     "applies to it."),
-    ("p",
-     "The person writes the product declaration, an outline of its shape, "
-     "the firmware’s logic and the page. Everything else is generated: the "
-     "routed board with its schematic and bill of materials, the case built "
-     "around it, the files a manufacturer needs, and the code the firmware "
-     "and the page use to exchange readings. Moving the sensor to another "
-     "pin is one changed line. Until the product is regenerated the check "
-     "fails; afterwards the board, the firmware’s pin map and the page’s "
-     "types have all followed, with no edit to the firmware or the page. If "
-     "the new pin is one the chip’s sensor bus cannot use, the firmware stops "
-     "compiling – before any board is made."),
+     "(Fig. 3), with a printed case, a circuit board, Rust firmware and a "
+     "browser page. The person writes the product declaration, an outline of "
+     "its shape, the firmware’s logic and the page; the routed board with "
+     "its schematic and bill of materials, the case, the manufacturing files "
+     "and the code both sides use to exchange readings are generated. Moving "
+     "the sensor to another pin is one changed line: the check fails until "
+     "the product is regenerated, after which the board, the firmware’s pin "
+     "map and the page’s types have all followed with no other edit, and a "
+     "pin the chip’s sensor bus cannot use stops the firmware compiling."),
 
     ("h1", "Evaluation"),
     ("p",
-     "Fiducial was built over six weeks by one person working with AI "
-     "agents, through 68 reviewed pull requests, and used on two products: "
-     "the sensor stick and a private product. On the sensor stick, moving one "
-     f"pin regenerates {_PIN_N} files in {_PIN_S} s."),
-    ("p",
      "Checks are only useful if they catch the mistakes that people and "
      "agents actually make. The test borrows the idea of mutation testing "
-     "[17]: a realistic mistake is introduced on purpose, the checks are "
-     "run, and the result shows whether they noticed. Twenty mistakes cover "
-     "eight kinds of drift met while building Fiducial and its products "
-     "(Table II): ten in a fresh web product in English and Serbian, and ten "
-     "in the sensor stick’s hardware, firmware and the interface between "
-     "them. Each was applied to a clean copy, the checks ran as in "
-     "continuous integration, and the copy was reset. Three correct changes "
+     "[@demillo]: a realistic mistake is introduced on purpose, the checks "
+     "are run, and the result shows whether they noticed. Each mistake was "
+     "applied to a clean copy of one of two products – a fresh web product "
+     "in English and Serbian, and the sensor stick – the checks ran as in "
+     "continuous integration, and the copy was reset. Two sets were used. "
+     "The first 20 mistakes cover eight kinds of drift met while building "
+     "Fiducial: stale outputs, hand-edited generated files, incomplete or "
+     "conflicting declarations, broken rules, code using an old name, values "
+     "typed past their declaration, and text left untranslated. They were "
+     "also used to improve the platform. The second 20 are held out: written "
+     "after release 0.9.11 was fixed, committed before their first run, and "
+     "reported without any change made for them. As a baseline, both sets "
+     "also ran through ordinary CI alone – the same compilers, type checkers "
+     "and tests, with Fiducial’s own two steps removed. Three correct changes "
      "and two runs with no change tested the opposite direction: that the "
-     "checks do not fail without a reason. The test is a script in the "
-     "repository, and every failure names the file and the declaration at "
-     "fault (Fig. 4)."),
+     "checks do not fail without a reason. Table II gives the results."),
+    ("table", "Injected Mistakes Caught",
+     ("Mistakes", "Ordinary CI", "Fiducial 0.9.4", f"Fiducial {VERSION}"), "TABLE1",
+     (1660, 1000, 1000, 1000)),
     ("p", "FINDINGS_A"),
+    ("p", "FINDINGS_B"),
     ("p",
-     "The mistakes were chosen by the author of the platform, so they may "
-     "favour what it was built to catch. Only two products have been built, "
-     "and neither has yet been "
-     "manufactured and tested. The test measures the checks, not whether "
-     "agents working with Fiducial make fewer mistakes than agents working "
-     "without it."),
-
-    ("table", "Injected Mistakes, by Kind of Drift",
-     ("Kind of drift", "Example", "0.9.4", VERSION), "TABLE1",
-     (1330, 1780, 640, 760)),
-    ("fig", "fig4-failures.png",
-     "Two failures as the person or agent sees them: (a) a string added in "
-     "English only; (b) firmware naming a pin directly instead of taking it "
-     "from the declaration."),
+     "Both sets, and the script that runs them, are in the repository. Both "
+     "were written by the author of the platform, so even the "
+     "held-out one may favour what it was built to catch; a set written by "
+     "others would be stronger. Only two products have been built, neither "
+     "yet manufactured and tested, and the test measures the checks, not "
+     "whether agents make fewer mistakes with Fiducial than without it."),
     ("h1", "Conclusion"),
     ("p",
      "AI agents have made writing each part of a product fast, and that has "
@@ -375,80 +378,132 @@ BODY = [
      "left to agents, but a probabilistic system cannot guarantee its "
      "output, and even a deterministic tool is only right about what it was "
      "told. Fiducial answers this at the level of the product rather than "
-     "the codebase. In practice, it let one person working with AI agents keep "
-     "a product’s firmware, web page, circuit board and case in agreement, "
-     "with every injected mistake caught early by a message that names its "
-     "cause. The next steps are to explore retrieval-augmented generation, so "
-     "that agents are given the declarations and documentation a task needs "
-     "rather than whole repositories; to refine the platform by applying it "
-     "to new products; and to measure and lower the tokens agents spend, "
-     "reasoning tokens above all. Fiducial and its example are open source "
-     "[4]."),
+     "the codebase: it keeps the parts consistent with each other, while "
+     "whether each declared fact is true remains the person’s to judge. On "
+     "the mistakes it was improved against, its checks went from 15 to "
+     f"{_N} of 20; on 20 new ones they caught {_H}, where ordinary CI caught "
+     f"{_HB_W}, each with a message that names the cause. The next steps "
+     "are to test it on mistakes written by others; to explore "
+     "retrieval-augmented generation, so that agents are given the "
+     "declarations and documentation a task needs rather than whole "
+     "repositories; to refine the platform by applying it to new products; "
+     "and to measure and lower the tokens agents spend, reasoning tokens "
+     "above all. Fiducial and its example are open source [@fiducial]."),
 ]
 
-# Table I: the twenty by kind, with an example of each and how many were
-# caught on 0.9.4 (the first run) and on this version.
-_KINDS = [
-    ("Stale output", "Domain edited, not re-derived", ["W2", "W6", "H1"], 1),
-    ("Generated file edited", "Pin map edited by hand", ["W3", "W7", "W9", "H2", "H8"], 5),
-    ("Missing declaration", "String in English only", ["W1", "W4", "W5"], 3),
-    ("Rule broken", "Contrast below 4.5 : 1", ["W8", "H3", "H5"], 3),
-    ("Declarations conflict", "Case too narrow for board", ["H4", "H10"], 2),
-    ("Code out of date", "Net renamed, old name used", ["H6"], 1),
-    ("Declaration bypassed", "Pin typed as a number", ["H7", "H9"], 0),
-    ("Not translated", "Serbian left in English", ["W10"], 0),
+# Table II: each set, with and without Fiducial. 0.9.4 ran only the first
+# set (15 of 20, every control passed); the rest is read from the results.
+def _ctl(res):
+    c = [r for r in res["results"] if r["control"]]
+    return f"{sum(r['pass'] for r in c)}/{len(c)}"
+
+
+TABLE1 = [
+    ("First set, used to improve", f"{_B}/20", "15/20", f"{_N}/20"),
+    ("Held-out set", f"{_HB}/20", "–", f"{_H}/20"),
+    ("Correct changes passed", _ctl(_BASE), "5/5", _ctl(_RESULTS)),
 ]
-TABLE1 = []
-for kind, example, ids, first in _KINDS:
-    now = sum(1 for i in ids if _BY_ID[i]["pass"])
-    TABLE1.append((kind, example, f"{first}/{len(ids)}", f"{now}/{len(ids)}"))
-TABLE1.append(("Total", "", f"{sum(k[3] for k in _KINDS)}/20", f"{_N}/20"))
 
 FINDINGS_A = (
-    "On release 0.9.4 the checks caught 15 of the 20, and each of the five "
-    "misses was a fact the platform did not yet own. Two were declarations "
-    "edited without regenerating: only the hardware generator recorded which "
-    "files it read, so the freshness check did not notice that the others’ "
-    "inputs had changed. In two, the firmware wrote a pin number or a sensor "
-    "address directly instead of taking it from the declaration. The last "
-    "was a Serbian string left in English, complete in structure but not "
-    "translated. Each became a general rule for every product."
+    "On release 0.9.4 the checks caught 15 of the first 20. Each "
+    "miss was a fact the platform did not yet own: two declarations edited "
+    "without regenerating went unnoticed because only the hardware "
+    "generator recorded which files it read; in two, the firmware wrote a "
+    "pin number or a sensor address directly; and a Serbian string left in "
+    "English passed every structural check. Each became a general rule, and "
+    f"release {VERSION} catches "
+    + ("all 20" if ALL_CAUGHT else f"{_N} of the 20")
+    + ", each with a message naming the declaration at fault. That "
+    "result is on mistakes the platform was improved against: it shows the "
+    "rules work, not that they generalise."
 )
-REFERENCES = [
-    "Claude Code documentation. Available at: "
-    "https://docs.anthropic.com/en/docs/claude-code",
-    "OpenAI Codex. Available at: https://openai.com/codex/",
-    "A. Zdravković, Đ. Jovanović and P. Šubarević, “Outreach: Modular "
-    "AI-enhanced off-grid mesh communication system for remote "
-    "environments,” IEEESTEC – 18th Student Projects Conference, Niš, 2025.",
-    f"A. Zdravković, Fiducial, release {VERSION}, 2026. Available at: "
-    "https://github.com/AleksaZCodes/fiducial",
-    "D. C. Schmidt, “Guest editor’s introduction: Model-driven "
-    "engineering,” Computer, vol. 39, no. 2, pp. 25–31, 2006.",
-    "S. J. I. Herzig, A. Qamar and C. J. J. Paredis, “An approach to "
-    "identifying inconsistencies in model-based systems engineering,” "
-    "Procedia Computer Science, vol. 28, pp. 354–362, 2014.",
-    "Altium, MCAD CoDesigner, ECAD–MCAD collaboration. Available at: "
-    "https://www.altium.com/",
-    "atopile, a language for designing circuit boards as code. Available "
-    "at: https://github.com/atopile/atopile",
-    "build123d, a Python CAD library on the OpenCascade kernel. Available "
-    "at: https://github.com/gumyr/build123d",
-    "Protocol Buffers. Available at: https://protobuf.dev/",
-    "Bazel, a build and test tool. Available at: https://bazel.build/",
-    "E. Dolstra, M. de Jonge and E. Visser, “Nix: A safe and policy-free "
-    "system for software deployment,” in Proc. LISA, 2004, pp. 79–92.",
-    "AGENTS.md, a format for guiding coding agents. Available at: "
-    "https://agents.md/",
-    "S. Kambhampati et al., “Position: LLMs can’t plan, but can help "
-    "planning in LLM-Modulo frameworks,” in Proc. ICML, PMLR 235, 2024.",
-    "KiCad EDA. Available at: https://www.kicad.org/",
-    "L. Perron and F. Didier, CP-SAT, Google OR-Tools. Available at: "
-    "https://developers.google.com/optimization/cp/cp_solver",
-    "R. A. DeMillo, R. J. Lipton and F. G. Sayward, “Hints on test data "
-    "selection: Help for the practicing programmer,” Computer, vol. 11, "
-    "no. 4, pp. 34–41, 1978.",
-]
+FINDINGS_B = (
+    f"The held-out set measures that. The checks caught {_H} of the 20 new "
+    "mistakes. They missed a page declared twice, a post dated a month that "
+    "does not exist, a board made thicker, a sensor wait typed as a number "
+    "and a page comparing humidity to its band by hand; the last two have "
+    "rules, but only for narrower patterns. Ordinary CI caught "
+    + ("one" if _B == 1 else str(_B))
+    + " of the first 20 – a firmware test noticed a swapped message layout – "
+    f"and {_HB_W} of the held-out set, because nothing in it compares one "
+    "artifact with another. Every correct change passed under both."
+)
+
+REFS = {
+    "claude": "Claude Code documentation. Available at: "
+              "https://docs.anthropic.com/en/docs/claude-code",
+    "codex": "OpenAI Codex. Available at: https://openai.com/codex/",
+    "outreach": "A. Zdravković, Đ. Jovanović and P. Šubarević, “Outreach: Modular "
+                "AI-enhanced off-grid mesh communication system for remote "
+                "environments,” IEEESTEC – 18th Student Projects Conference, Niš, 2025.",
+    "fiducial": f"A. Zdravković, Fiducial, release {VERSION}, 2026. Available at: "
+                "https://github.com/AleksaZCodes/fiducial",
+    "schmidt": "D. C. Schmidt, “Guest editor’s introduction: Model-driven "
+               "engineering,” Computer, vol. 39, no. 2, pp. 25–31, 2006.",
+    "brambilla": "M. Brambilla, J. Cabot and M. Wimmer, Model-Driven Software "
+                 "Engineering in Practice, 2nd ed. Morgan & Claypool, 2017.",
+    "sysml": "S. Friedenthal, A. Moore and R. Steiner, A Practical Guide to "
+             "SysML, 3rd ed. Morgan Kaufmann, 2014.",
+    "nuseibeh": "B. Nuseibeh, S. Easterbrook and A. Russo, “Leveraging "
+                "inconsistency in software development,” Computer, vol. 33, "
+                "no. 4, pp. 24–29, 2000.",
+    "herzig": "S. J. I. Herzig, A. Qamar and C. J. J. Paredis, “An approach to "
+              "identifying inconsistencies in model-based systems engineering,” "
+              "Procedia Computer Science, vol. 28, pp. 354–362, 2014.",
+    "altium": "Altium, MCAD CoDesigner, ECAD–MCAD collaboration. Available at: "
+              "https://www.altium.com/",
+    "atopile": "atopile, a language for designing circuit boards as code. "
+               "Available at: https://github.com/atopile/atopile",
+    "build123d": "build123d, a Python CAD library on the OpenCascade kernel. "
+                 "Available at: https://github.com/gumyr/build123d",
+    "protobuf": "Protocol Buffers. Available at: https://protobuf.dev/",
+    "bazel": "Bazel, a build and test tool. Available at: https://bazel.build/",
+    "nix": "E. Dolstra, M. de Jonge and E. Visser, “Nix: A safe and policy-free "
+           "system for software deployment,” in Proc. LISA, 2004, pp. 79–92.",
+    "agentsmd": "AGENTS.md, a format for guiding coding agents. Available at: "
+                "https://agents.md/",
+    "chen": "M. Chen et al., “Evaluating large language models trained on "
+            "code,” arXiv:2107.03374, 2021.",
+    "liu": "J. Liu, C. S. Xia, Y. Wang and L. Zhang, “Is your code generated by "
+           "ChatGPT really correct? Rigorous evaluation of large language models "
+           "for code generation,” in Proc. NeurIPS, 2023.",
+    "pearce": "H. Pearce, B. Ahmad, B. Tan, B. Dolan-Gavitt and R. Karri, “Asleep "
+              "at the keyboard? Assessing the security of GitHub Copilot’s code "
+              "contributions,” in Proc. IEEE S&P, 2022, pp. 754–768.",
+    "jimenez": "C. E. Jimenez et al., “SWE-bench: Can language models resolve "
+               "real-world GitHub issues?,” in Proc. ICLR, 2024.",
+    "huang": "J. Huang et al., “Large language models cannot self-correct "
+             "reasoning yet,” in Proc. ICLR, 2024.",
+    "kambhampati": "S. Kambhampati et al., “Position: LLMs can’t plan, but can "
+                   "help planning in LLM-Modulo frameworks,” in Proc. ICML, "
+                   "PMLR 235, 2024.",
+    "kicad": "KiCad EDA. Available at: https://www.kicad.org/",
+    "cpsat": "L. Perron and F. Didier, CP-SAT, Google OR-Tools. Available at: "
+             "https://developers.google.com/optimization/cp/cp_solver",
+    "demillo": "R. A. DeMillo, R. J. Lipton and F. G. Sayward, “Hints on test data "
+               "selection: Help for the practicing programmer,” Computer, vol. 11, "
+               "no. 4, pp. 34–41, 1978.",
+}
+
+# Number references by first citation, as IEEE style requires: [@key] in the
+# text becomes [n], and the list is printed in that order.
+_ORDER = []
+
+
+def _cite(text):
+    def num(m):
+        if m.group(1) not in _ORDER:
+            _ORDER.append(m.group(1))
+        return f"[{_ORDER.index(m.group(1)) + 1}]"
+    return _re.sub(r"\[@(\w+)\]", num, text)
+
+
+BODY = [tuple(_cite(x) if isinstance(x, str) and i else x for i, x in enumerate(item))
+        for item in BODY]
+FINDINGS_A, FINDINGS_B = _cite(FINDINGS_A), _cite(FINDINGS_B)
+_unused = set(REFS) - set(_ORDER)
+assert not _unused, f"references never cited: {_unused}"
+REFERENCES = [REFS[k] for k in _ORDER]
 
 FIG_WIDTH = Inches(3.3)  # the column is 3.38 in; figure labels are 8 pt at this width
 
@@ -630,7 +685,8 @@ for item in BODY:
     elif kind == "h2":
         keep_with_next(para("Heading 2", item[1]))
     elif kind == "p":
-        para("Body Text", FINDINGS_A if item[1] == "FINDINGS_A" else item[1])
+        para("Body Text", {"FINDINGS_A": FINDINGS_A,
+                           "FINDINGS_B": FINDINGS_B}.get(item[1], item[1]))
     elif kind == "fig":
         _, name, caption = item
         p = para("Body Text", align=WD_ALIGN_PARAGRAPH.CENTER)
