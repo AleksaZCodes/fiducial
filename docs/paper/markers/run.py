@@ -163,7 +163,7 @@ CASES: list[Case] = [
     Case("H9", S, "firmware", BYPASS, "Sensor I²C address typed (and mistyped)",
          lambda r: edit(st(r, "firmware/rp2040/src/main.rs"),
                         "i2c.write_async(board::SENSOR_I2C_ADDRESS, board::SENSOR_INIT)",
-                        "i2c.write_async(0x39, board::SENSOR_INIT)"), True),
+                        "i2c.write_async(0x39u8, board::SENSOR_INIT)"), True),
     Case("H10", S, "mechanical", CONFLICT, "Case narrowed 36 → 28 mm",
          lambda r: edit_re(st(r, "hardware/product.toml"), r"^width_mm = 36\.0", "width_mm = 28.0"), True),
     # ── controls: correct changes and no change ──
