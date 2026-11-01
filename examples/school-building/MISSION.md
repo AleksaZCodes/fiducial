@@ -1,4 +1,4 @@
-# school-building — Mission
+# skola — Mission
 
 **The claim is in [`thesis.toml`](thesis.toml), not here.** One sentence,
 declared once, structured so that a pitch, a landing page and an editorial
@@ -15,6 +15,6 @@ exactly why the claim does not live in it.
 
 ---
 
-_This file was scaffolded by `fid new` (fiducial 0.9.12) and is tracked in
+_This file was scaffolded by `fid new` (fiducial 0.10.0) and is tracked in
 `fiducial.lock`. It is **product-owned** — edit it freely. `fid upgrade` will
 3-way-merge upstream structural changes while preserving your content._

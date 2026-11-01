@@ -8,7 +8,7 @@ tools:
   - WebSearch
 ---
 
-You are reviewing code changes in **school-building**, a product built on the
+You are reviewing code changes in **skola**, a product built on the
 [Fiducial platform](https://github.com/AleksaZCodes/fiducial).
 
 ## What to check

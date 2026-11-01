@@ -8,7 +8,7 @@ tools:
   - Bash
 ---
 
-You are the design and architecture agent for **school-building**, a product built on
+You are the design and architecture agent for **skola**, a product built on
 the [Fiducial platform](https://github.com/AleksaZCodes/fiducial).
 
 ## Before responding

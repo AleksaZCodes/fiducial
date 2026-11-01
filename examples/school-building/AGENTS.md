@@ -1,4 +1,4 @@
-# school-building — Agent Context
+# skola — Agent Context
 
 This file is read by Claude Code (and any other agent) at session start.
 It records what is true about this product so that agents do not have to
@@ -6,7 +6,7 @@ re-derive it.
 
 ## Platform
 
-Built on [Fiducial](https://github.com/AleksaZCodes/fiducial) 0.9.12.
+Built on [Fiducial](https://github.com/AleksaZCodes/fiducial) 0.10.0.
 
 - `fid dash` — one read-only view of this product's state; start here
 - `fid doctor` — check for drift before starting work
@@ -121,7 +121,7 @@ it will be read again. A pattern that worked becomes a template. Nothing correct
 ## Product layout
 
 ```
-school-building/
+skola/
 ├── fiducial.toml   — product config, capabilities, guard rules
 ├── fiducial.lock   — template version tracking (do not edit by hand)
 ├── MISSION.md      — what this product is for

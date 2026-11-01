@@ -1,6 +1,6 @@
-# thesis.toml — what school-building claims, and what would prove it wrong.
+# thesis.toml — what skola claims, and what would prove it wrong.
 #
-# Scaffolded by `fid new` (fiducial 0.9.12). Product-owned, and the one
+# Scaffolded by `fid new` (fiducial 0.10.0). Product-owned, and the one
 # file here worth filling in before anything else exists.
 #
 # A thesis is the single claim this product is built to test. Not a description
@@ -58,3 +58,6 @@
 # [thesis.evidence]
 # proven  = ["What you have actually shown."]
 # not_yet = ["What you have not."]
+[[thesis]]
+date  = "2026-11-01"
+claim = "A building's controllers, server and app can be derived from one topology declaration, so adding a classroom is one declaration and no code"

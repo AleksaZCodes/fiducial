@@ -667,7 +667,8 @@ is done; parts, nets and the public example are 0.9.0
 **Still open, deliberately:** curved outlines (refused by name, not
 flattened); nonlinear or transient circuit checks (ngspice is the engine
 when a product needs one); the deprecated `eda` capability, removed in
-0.10.0 (a breaking change, so not in a patch) — `hardware` owns the board.
+the next minor release (a breaking change, so not in a patch; 0.10.0 went to
+the class-level gate changes) — `hardware` owns the board.
 
 ### On demand ✅
 
