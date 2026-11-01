@@ -60,15 +60,27 @@ def _load(name):
 
 
 _HELD = _load("results-heldout.json")
+_IND = _load("results-independent.json")
+_FOURTH = _load("results-fourth.json")
 _BASE = _load("results-baseline.json")
 _HBASE = _load("results-heldout-baseline.json")
+_IBASE = _load("results-independent-baseline.json")
+_FBASE = _load("results-fourth-baseline.json")
+_FIRST = _load("first_runs.json")
 _H = _HELD["summary"]["markers_caught"]
+_I = _IND["summary"]["markers_caught"]
+_F = _FOURTH["summary"]["markers_caught"]
 _HB = _HBASE["summary"]["markers_caught"]
+_IB = _IBASE["summary"]["markers_caught"]
+_FB = _FBASE["summary"]["markers_caught"]
 _B = _BASE["summary"]["markers_caught"]
-_HB_W = "none" if _HB == 0 else str(_HB)
-# The text names the held-out misses; a rerun that changes them must change it.
-assert {r["id"] for r in _HELD["results"] if not r["pass"]} == {"N5", "N6", "N16", "N19", "N20"}, \
-    "the held-out misses changed: update FINDINGS"
+_UNSEEN_CI = _HB + _IB + _FB
+_F1 = {k: _FIRST[k]["caught"] for k in ("original", "heldout", "independent", "fourth")}
+# The text names what is still missed; a rerun that changes it must change it.
+assert {r["id"] for r in _FOURTH["results"] if not r["pass"]} == {"F17"}, \
+    "the fourth set's misses changed: update FINDINGS"
+assert _H == _I == 20, "an earlier set regressed: update FINDINGS"
+assert _UNSEEN_CI == 0, "ordinary CI caught an unseen mistake: update FINDINGS"
 
 ALL_CAUGHT = _SUM["markers_caught"] == _SUM["markers"]
 CONTROLS_OK = _SUM["controls_passed"] == _SUM["controls"]
@@ -86,10 +98,11 @@ ABSTRACT = (
     "fact once, generates every artifact from it – code, translations, "
     "circuit board and enclosure – and checks every change, so the parts "
     "stay consistent with each other; whether a declared fact is itself "
-    "correct remains for the person to judge. Of 20 realistic mistakes, the "
-    f"checks first caught 15, and {_ALL} once each miss had become a rule. "
-    f"On 20 new mistakes written afterwards they caught {_H}, where the "
-    f"same project’s ordinary CI caught {_HB_W}."
+    "correct remains for the person to judge. On three sets of 20 realistic "
+    "mistakes, each written after the checks it tests, the checks caught "
+    f"{_F1['heldout']}, {_F1['independent']} and {_F1['fourth']} on first "
+    "run, where the same projects’ ordinary CI caught none. Every miss fell "
+    "into one of five classes, each now closed by one mechanism."
 )
 
 KEYWORDS = (
@@ -346,30 +359,28 @@ BODY = [
      "are run, and the result shows whether they noticed. Each mistake was "
      "applied to a clean copy of one of two products – a fresh web product "
      "in English and Serbian, and the sensor stick – the checks ran as in "
-     "continuous integration, and the copy was reset. Two sets were used. "
-     "The first 20 mistakes cover eight kinds of drift met while building "
-     "Fiducial: stale outputs, hand-edited generated files, incomplete or "
-     "conflicting declarations, broken rules, code using an old name, values "
-     "typed past their declaration, and text left untranslated. They were "
-     "also used to improve the platform. The second 20 are held out: written "
-     "after release 0.9.11 was fixed, committed before their first run, and "
-     "reported without any change made for them. As a baseline, both sets "
-     "also ran through ordinary CI alone – the same compilers, type checkers "
-     "and tests, with Fiducial’s own two steps removed. Three correct changes "
-     "and two runs with no change tested the opposite direction: that the "
-     "checks do not fail without a reason. Table II gives the results."),
+     "continuous integration, and the copy was reset. Four sets of 20 were "
+     "used, each committed before its first run. The first covers eight "
+     "kinds of drift met while building Fiducial and was used to improve it. "
+     "The author wrote the second after the first was fixed; separate agents "
+     "that read only the two products, not the platform, wrote the third and "
+     "the fourth, the fourth aimed at the classes the third revealed. As a "
+     "baseline, every set also ran through ordinary CI alone – the same "
+     "compilers, type checkers and tests, with Fiducial’s two steps removed. "
+     "Three correct changes and two runs with no change tested the opposite "
+     "direction: that the checks do not fail without a reason. Table II gives "
+     "the results."),
     ("table", "Injected Mistakes Caught",
-     ("Mistakes", "Ordinary CI", "Fiducial 0.9.4", f"Fiducial {VERSION}"), "TABLE1",
+     ("Mistakes", "Ordinary CI", "First run", f"Fiducial {VERSION}"), "TABLE1",
      (1660, 1000, 1000, 1000)),
     ("p", "FINDINGS_A"),
     ("p", "FINDINGS_B"),
     ("p",
-     "Both sets, and the script that runs them, are in the repository. Both "
-     "were written by the author of the platform, so even the "
-     "held-out one may favour what it was built to catch; a set written by "
-     "others would be stronger. Only two products have been built, neither "
-     "yet manufactured and tested, and the test measures the checks, not "
-     "whether agents make fewer mistakes with Fiducial than without it."),
+     "All four sets and their script are in the repository. Only first runs "
+     "measure how the checks generalise; the fourth set was aimed at classes "
+     "the author named; and two products have been built, neither yet "
+     "manufactured. The test measures the checks, not whether agents make "
+     "fewer mistakes with Fiducial."),
     ("h1", "Conclusion"),
     ("p",
      "AI agents have made writing each part of a product fast, and that has "
@@ -380,53 +391,61 @@ BODY = [
      "told. Fiducial answers this at the level of the product rather than "
      "the codebase: it keeps the parts consistent with each other, while "
      "whether each declared fact is true remains the person’s to judge. On "
-     "the mistakes it was improved against, its checks went from 15 to "
-     f"{_N} of 20; on 20 new ones they caught {_H}, where ordinary CI caught "
-     f"{_HB_W}, each with a message that names the cause. The next steps "
-     "are to test it on mistakes written by others; to explore "
+     "60 mistakes it had not seen, its checks caught "
+     f"{_F1['heldout'] + _F1['independent'] + _F1['fourth']} on first run "
+     "where ordinary CI caught none, each with a message that names the "
+     "cause, and every miss fell into one of five classes that are now each "
+     "closed by one mechanism; what remains is meaning, which no declaration "
+     "states. The next steps "
+     "are to test it on mistakes written by other people; to explore "
      "retrieval-augmented generation, so that agents are given the "
      "declarations and documentation a task needs rather than whole "
-     "repositories; to refine the platform by applying it to new products; "
+     "repositories; to refine the platform by applying it to new products, "
+     "the first a school building of several controllers and a server; "
      "and to measure and lower the tokens agents spend, reasoning tokens "
      "above all. Fiducial and its example are open source [@fiducial]."),
 ]
 
-# Table II: each set, with and without Fiducial. 0.9.4 ran only the first
-# set (15 of 20, every control passed); the rest is read from the results.
+# Table II: each set without Fiducial, on its first run (first_runs.json),
+# and on this release; the rest is read from the results.
 def _ctl(res):
     c = [r for r in res["results"] if r["control"]]
     return f"{sum(r['pass'] for r in c)}/{len(c)}"
 
 
 TABLE1 = [
-    ("First set, used to improve", f"{_B}/20", "15/20", f"{_N}/20"),
-    ("Held-out set", f"{_HB}/20", "–", f"{_H}/20"),
-    ("Correct changes passed", _ctl(_BASE), "5/5", _ctl(_RESULTS)),
+    ("First, used to improve", f"{_B}/20", f"{_F1['original']}/20", f"{_N}/20"),
+    ("Second, by the author", f"{_HB}/20", f"{_F1['heldout']}/20", f"{_H}/20"),
+    ("Third, by an agent", f"{_IB}/20", f"{_F1['independent']}/20", f"{_I}/20"),
+    ("Fourth, by an agent", f"{_FB}/20", f"{_F1['fourth']}/20", f"{_F}/20"),
+    ("Correct changes", _ctl(_BASE), "5/5", _ctl(_RESULTS)),
 ]
 
 FINDINGS_A = (
-    "On release 0.9.4 the checks caught 15 of the first 20. Each "
-    "miss was a fact the platform did not yet own: two declarations edited "
-    "without regenerating went unnoticed because only the hardware "
-    "generator recorded which files it read; in two, the firmware wrote a "
-    "pin number or a sensor address directly; and a Serbian string left in "
-    "English passed every structural check. Each became a general rule, and "
-    f"release {VERSION} catches "
-    + ("all 20" if ALL_CAUGHT else f"{_N} of the 20")
-    + ", each with a message naming the declaration at fault. That "
-    "result is on mistakes the platform was improved against: it shows the "
-    "rules work, not that they generalise."
+    f"On first run the checks caught {_F1['heldout']}, {_F1['independent']} "
+    f"and {_F1['fourth']} of the three unseen sets; ordinary CI caught none "
+    "of them, and one of the first set, because nothing in it compares one "
+    "artifact with another. Every miss fell into one of five classes: a "
+    "declared value typed again into code, such as a footer spelling out the "
+    "domain; the check itself removed, or run after a step that regenerates "
+    "what it checks; a field that accepts any value of the right shape, such "
+    "as a month that does not exist; a rule from outside the product, such "
+    "as a regulator whose output is not the rail it feeds or a linker script "
+    "larger than the flash chip; and a generator reading a file nobody "
+    "declared."
 )
 FINDINGS_B = (
-    f"The held-out set measures that. The checks caught {_H} of the 20 new "
-    "mistakes. They missed a page declared twice, a post dated a month that "
-    "does not exist, a board made thicker, a sensor wait typed as a number "
-    "and a page comparing humidity to its band by hand; the last two have "
-    "rules, but only for narrower patterns. Ordinary CI caught "
-    + ("one" if _B == 1 else str(_B))
-    + " of the first 20 – a firmware test noticed a swapped message layout – "
-    f"and {_HB_W} of the held-out set, because nothing in it compares one "
-    "artifact with another. Every correct change passed under both."
+    "Fixing misses one rule at a time had taken the second set to 20 and "
+    "left the third at 16, so each class now has one mechanism: a scan for "
+    "declared values in "
+    "hand-written code; a check that CI still runs the gate first; typed "
+    "declarations that reject unknown keys; outside rules kept as data, from "
+    "datasheets, fabrication limits and law; and generators confined to "
+    "their declared inputs. With these, release "
+    f"{VERSION} catches every mistake in the first three sets and {_F} of "
+    "the fourth, and every correct change still passes. The one it misses is "
+    "meaning: a colour pair relabelled as large text passes, because which "
+    "text is large is declared nowhere."
 )
 
 REFS = {
