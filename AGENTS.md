@@ -401,11 +401,14 @@ The capabilities this platform ships:
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
 | `legal` | declares `legal`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability legal` |
 | `migrations` | declares `migrations`; 1 pipeline(s) | `fid add capability migrations` |
+| `monitoring` | declares `monitoring.toml`; 1 pipeline(s) | `fid add capability monitoring` |
 | `press` | declares `press`, `press/docs/en/boilerplate.md`, `press/docs/en/facts.md`, `press/stories/en/0001-why-this-exists.md`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability press` |
+| `protocol` | declares `protocol.toml`; 1 pipeline(s) | `fid add capability protocol` |
 | `realtime` | a skill | `fid add capability realtime` |
 | `research` | declares `paper`; seeds a `fiducial.toml` block | `fid add capability research` |
 | `seo` | declares `seo`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability seo` |
 | `tauri` | 5 template file(s); guard rules | `fid add capability tauri` |
+| `topology` | declares `topology.toml`; 1 pipeline(s) | `fid add capability topology` |
 | `web-next` | 13 template file(s); guard rules | `fid add capability web-next` |
 | `web-svelte` | 11 template file(s); guard rules | `fid add capability web-svelte` |
 | `worker-cloudflare` | 1 template file(s); guard rules | `fid add capability worker-cloudflare` |

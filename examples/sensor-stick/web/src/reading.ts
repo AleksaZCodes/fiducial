@@ -1,8 +1,9 @@
-// A reading off the wire: the payload of one fiducial-protocol frame, laid
-// out as the firmware writes it (firmware/shared/src/lib.rs → `reading`):
-// [1, °C × 100 as i16 LE, %RH × 100 as u16 LE].
+// A reading off the wire, and how the page shows it. The payload's layout,
+// scale and units are not written here: they are declared once in
+// protocol.toml and derived into protocol/messages.ts, the same table the
+// firmware's encoder (protocol/messages.rs) comes from.
 
-export const KIND = 1
+import { READING_UNITS, decodeReading, readingBand, readingValues } from '../../protocol/messages.ts'
 
 export interface Reading {
   celsius: number
@@ -11,10 +12,14 @@ export interface Reading {
 
 /** A payload as a reading, or null when it is some other kind of message. */
 export function decode(payload: Uint8Array): Reading | null {
-  if (payload.length !== 5 || payload[0] !== KIND) return null
-  const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength)
-  return {
-    celsius: view.getInt16(1, true) / 100,
-    percentRh: view.getUint16(3, true) / 100,
-  }
+  const r = decodeReading(payload)
+  if (r === null) return null
+  const v = readingValues(r)
+  return { celsius: v.centiCelsius, percentRh: v.centiPercentRh }
+}
+
+/** What the page shows for a reading — and, inside the declared band, that it is comfortable (the LED is green then too). */
+export function show(r: Reading): string {
+  const comfortable = readingBand('comfortable', r.percentRh) === 'inside' ? ' · comfortable' : ''
+  return `${r.celsius.toFixed(1)} ${READING_UNITS.centiCelsius} · ${r.percentRh.toFixed(0)} ${READING_UNITS.centiPercentRh}${comfortable}`
 }

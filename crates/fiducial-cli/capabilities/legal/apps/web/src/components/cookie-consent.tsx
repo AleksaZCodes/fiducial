@@ -39,39 +39,22 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import {
+  type CookieCategory,
+  OPTIONAL_CATEGORIES,
+  cookieConsent,
+  recordConsent,
+} from "../generated/consent";
 
-const STORAGE_KEY = "cookie-consent";
-/** Bump when the category set changes: a stored choice about a different set of categories is not a choice about this one. */
-const VERSION = 1;
-
-export type CookieCategory = "necessary" | "analytics" | "marketing" | "functional";
-
-export interface ConsentRecord {
-  v: number;
-  /** ISO date the choice was made, so an audit can show when. */
-  at: string;
-  granted: CookieCategory[];
-}
-
-/** The stored decision, or `null` when nobody has been asked yet. */
-export function cookieConsent(): ConsentRecord | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as ConsentRecord;
-    if (parsed.v !== VERSION || !Array.isArray(parsed.granted)) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-/** True when this category may be used. `necessary` is always true. */
-export function hasConsent(category: CookieCategory): boolean {
-  if (category === "necessary") return true;
-  return cookieConsent()?.granted.includes(category) ?? false;
-}
+// The rules — which categories exist, and that nothing optional is used
+// before a recorded yes — are derived from `[legal] cookie_categories` into
+// `generated/consent.ts`. This file only asks the question.
+export {
+  type ConsentRecord,
+  type CookieCategory,
+  cookieConsent,
+  hasConsent,
+} from "../generated/consent";
 
 const REOPEN_EVENT = "cookie-consent:open";
 
@@ -80,22 +63,9 @@ export function openCookieSettings() {
   window.dispatchEvent(new Event(REOPEN_EVENT));
 }
 
-function store(granted: CookieCategory[]) {
-  try {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ v: VERSION, at: new Date().toISOString(), granted } satisfies ConsentRecord),
-    );
-  } catch {
-    // Storage denied. The choice applies to this page view and we ask again
-    // next time, which is the conservative failure: it never remembers a
-    // consent it could not record.
-  }
-}
-
 export interface CookieConsentProps {
-  /** Optional categories, in the order they should be listed. Omit for a necessary-only product, where this component renders nothing. */
-  categories?: Exclude<CookieCategory, "necessary">[];
+  /** Optional categories, in the order they should be listed. Defaults to the declared ones; a necessary-only product renders nothing. */
+  categories?: readonly Exclude<CookieCategory, "necessary">[];
   /** Copy, passed in so it comes from the product's message catalog rather than being hardcoded English here. */
   labels: {
     title: string;
@@ -110,7 +80,7 @@ export interface CookieConsentProps {
   };
 }
 
-export function CookieConsent({ categories = [], labels }: CookieConsentProps) {
+export function CookieConsent({ categories = OPTIONAL_CATEGORIES, labels }: CookieConsentProps) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<CookieCategory[]>([]);
 
@@ -129,8 +99,8 @@ export function CookieConsent({ categories = [], labels }: CookieConsentProps) {
     return () => window.removeEventListener(REOPEN_EVENT, reopen);
   }, [categories.length]);
 
-  const decide = useCallback((granted: CookieCategory[]) => {
-    store(["necessary", ...granted.filter((c) => c !== "necessary")]);
+  const decide = useCallback((granted: readonly CookieCategory[]) => {
+    recordConsent(granted);
     setOpen(false);
   }, []);
 

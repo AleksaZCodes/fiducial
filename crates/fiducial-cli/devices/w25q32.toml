@@ -1,0 +1,4 @@
+# Winbond W25Q32JV, 32 Mbit serial NOR flash — datasheet §1: 4,194,304 bytes.
+mpn         = "W25Q32"
+source      = "W25Q32JV datasheet (Winbond), §1 General Description"
+flash_bytes = 4_194_304

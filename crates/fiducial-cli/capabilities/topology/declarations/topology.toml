@@ -1,0 +1,47 @@
+# The system: which computers exist, what connects them, and which settings a
+# person can change. Firmware tables (Rust, C or JSON), topics and pin maps
+# are derived from this file by `fid derive`.
+
+[[system]]
+id    = "site"
+nodes = ["controller", "server"]
+
+# `target`, `runtime` and `language` are free text: any toolchain works, and
+# derive passes them through to the generated tables.
+[[node]]
+id         = "controller"
+kind       = "mcu"
+target     = "riscv32imac-unknown-none-elf"
+runtime    = "embassy-esp"
+language   = "rust"
+firmware   = "controller"
+interfaces = ["wifi", "i2c0"]
+
+[[node]]
+id         = "server"
+kind       = "host"
+target     = "aarch64-unknown-linux-gnu"
+runtime    = "linux-compose"
+apps       = ["server"]
+interfaces = ["eth0"]
+
+[[bus]]
+id      = "sensors"
+type    = "i2c"
+connect = ["controller.i2c0"]
+
+[[bus]]
+id       = "lan"
+type     = "ip"
+protocol = "mqtt"
+tls      = true
+broker   = "server"
+connect  = ["controller.wifi", "server.eth0"]
+
+[[parameter]]
+id      = "threshold"
+scope   = "controller"
+unit    = "ppm"
+range   = [400, 2000]
+default = 1000
+doc     = "A value a person can change at runtime, kept in range."

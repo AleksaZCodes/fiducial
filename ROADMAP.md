@@ -630,6 +630,26 @@ session, which starts from the owner's `.docx` template and prior paper
 (`docs/paper/README.md`) — so item 5 targets that template (Pandoc's
 `--reference-doc`), not an IEEE LaTeX one.
 
+### Distributed, self-hosted products — *multiplying* 🟡
+
+Several controllers, a Linux host and one web app, declared once in
+`topology.toml` (`docs/specs/2026-11-01-topology-is-a-declaration.md`). The
+platform carries only what generalises: no product lives here, and any
+firmware stack reads the derived tables (`.rs`, `.h` or `.json`). Ordered by
+cost of delay:
+
+| Phase | Item | Class | State |
+|---|---|---|---|
+| 0 | Decisions and STACK rows: topology, self-hosted target, ESP32-C6 firmware, transliteration | debt-accruing | ✅ |
+| 1 | One message declaration, two encodings (postcard on device links, JSON typed by `ts-rs` at the web): a product-side pattern, proved and documented; no platform code needed | debt-accruing | ✅ |
+| 2 | `topology.toml` and `fid-topology` (nodes, buses, settings, topics, in any firmware language) and the optional `monitoring` capability (points, rules, schedules, web cards, readings schema) | multiplying | ✅ |
+| 3 | Hardware built from modules, with variants and derived wiring; products extend the module library | multiplying | ✅ |
+| 4 | `firmware-esp32c6` capability: an optional template; any firmware already reads the derived tables | terminal | ⬜ |
+| 5 | Self-hosted server stack: `sqlite`, `native` auth, `ollama`, `compose`, broker ACL from `can()` | terminal | ⬜ |
+| 6 | The web app as a static export served by the server | terminal | ⬜ |
+| 7 | Derived documentation: topology, wiring, rules, sequence and storage diagrams (wiring per variant done) | multiplying | 🟡 |
+| 8 | CAN / CAN-FD with ISO-TP, and a Linux RT runtime — gated on a product | terminal | ⬜ |
+
 ### Physical products — outline, region, part, cost ✅
 
 **Shipped 2026-09-30** as the `hardware` capability, with input tracking in
@@ -647,7 +667,8 @@ is done; parts, nets and the public example are 0.9.0
 **Still open, deliberately:** curved outlines (refused by name, not
 flattened); nonlinear or transient circuit checks (ngspice is the engine
 when a product needs one); the deprecated `eda` capability, removed in
-0.10.0 (a breaking change, so not in a patch) — `hardware` owns the board.
+the next minor release (a breaking change, so not in a patch; 0.10.0 went to
+the class-level gate changes) — `hardware` owns the board.
 
 ### On demand ✅
 

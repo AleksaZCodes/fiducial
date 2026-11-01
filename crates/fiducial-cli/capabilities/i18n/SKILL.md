@@ -93,6 +93,13 @@ locale list. Adding `messages/de.json` puts German in the menu and nothing else
 is touched — which is the whole test of whether an i18n layer is real or is a
 two-language special case that has not been asked a third question yet.
 
+**`tag` is what `Intl` formats with** — `"sr-Latn-RS"`, `"en-GB"` — and
+`fid derive` checks it: it must name the catalog's own language, and, for a
+language written in more than one script (Serbian, Bosnian, Uzbek…), say
+which. `sr-RS` reads tidier and `Intl` takes it as *Cyrillic*, so a Latin site
+would print its months in the other alphabet. A tag naming a script the
+catalog is not written in fails too.
+
 `region` is a hint for a flag icon set and nothing more. A flag is a country,
 not a language, and the two do not line up; render it `aria-hidden` and let the
 endonym be the accessible label, so assistive tech announces the language and
@@ -135,6 +142,29 @@ may differ freely — only the set is checked.
 
 **5 · Never edit `src/generated/messages.ts`.** It is guard-blocked and
 overwritten. Change the catalog and run `fid derive`.
+
+## Untranslated values
+
+A value identical to the default locale's — a Serbian sentence still in
+English — is a warning while you work (`fid derive`) and a failure at the
+gate (`fid derive --check`). A value that really is the same in every
+language (a product name, "Wi-Fi") is declared, so the decision is written
+down:
+
+```toml
+[i18n]
+same = ["meta.title", "footer.brand"]
+```
+
+Values with fewer than four letters ("OK", "{count}") are not compared.
+
+## Never name a locale in code
+
+`l === "en"`, `case "sr":` — a locale typed into a comparison is `[i18n]`
+written a second time, and the copy stays behind when the default changes.
+Compare with `defaultLocale` and `locales` from the generated messages module.
+`fid derive` and `--check` fail on a typed one, naming file and line; a line
+that means it says `// fid: allow-locale`.
 
 ## Plurals
 

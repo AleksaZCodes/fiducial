@@ -1,0 +1,16 @@
+# Sensirion SCD41 photoacoustic CO₂ sensor module — SCD4x datasheet: I²C
+# address 0x62; CO₂, temperature and humidity from one device.
+id     = "sensirion-scd41"
+name   = "Sensirion SCD41 module"
+kind   = "sensor"
+protocol = "i2c"
+i2c_address = 0x62
+supply = 3.3
+source = "Sensirion SCD41 module datasheet or product page"
+price  = { rsd = 3500, vendor = "Mikrotron (HR)", checked = "2026-11-01" }
+
+[pins]
+VDD = { roles = ["power"] }
+GND = { roles = ["ground"] }
+SDA = { roles = ["i2c-sda"] }
+SCL = { roles = ["i2c-scl"] }

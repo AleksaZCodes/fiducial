@@ -1,0 +1,32 @@
+# What each jurisdiction asks of a product's legal pages and consent, as data.
+#
+# fid-legal reads this table; no jurisdiction rule is a code path. Adding a
+# jurisdiction is a block here, with the source for each requirement.
+
+# Every cookie category a product may declare.
+categories = ["necessary", "functional", "analytics", "marketing"]
+
+[jurisdiction.EU]
+pages      = ["privacy", "terms", "cookies", "imprint", "accessibility"]
+categories = ["necessary"]
+source     = "ePrivacy Directive 2002/58/EC Art. 5(3); Telemediengesetz §5 (imprint); EAA 2019/882 (accessibility)"
+
+[jurisdiction.UK]
+pages      = ["privacy", "terms", "cookies", "imprint", "accessibility"]
+categories = ["necessary"]
+source     = "PECR reg. 6; Companies Act 2006 s.82 (imprint); Equality Act 2010 (accessibility)"
+
+[jurisdiction.US]
+pages      = ["privacy", "terms", "cookies", "accessibility"]
+categories = ["necessary"]
+source     = "CCPA §1798.100; ADA Title III (accessibility)"
+
+[jurisdiction.RS]
+pages      = ["privacy", "terms", "cookies", "accessibility"]
+categories = ["necessary"]
+source     = "Zakon o zaštiti podataka o ličnosti (2018); Zakon o elektronskim komunikacijama čl. 126"
+
+[jurisdiction.other]
+pages      = ["privacy", "terms", "cookies"]
+categories = ["necessary"]
+source     = "the minimal set every product needs"

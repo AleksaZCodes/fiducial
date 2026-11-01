@@ -6,17 +6,12 @@
 pub use fiducial_core::{version, DeviceId, VERSION};
 pub use fiducial_protocol::{encode, encoded_len, FrameDecoder};
 
-/// The AHT20 temperature and humidity sensor (Aosong), over I²C.
+/// The AHT20 temperature and humidity sensor (Aosong), over I²C. Its
+/// address, command bytes and measuring time are datasheet facts: `fid
+/// derive` writes them into hardware/generated/board.rs (`SENSOR_INIT`,
+/// `SENSOR_MEASURE`, `SENSOR_MEASURE_MS`) from the platform's AHT20 profile,
+/// so they are not typed here.
 pub mod aht20 {
-    /// Its fixed I²C address.
-    pub const ADDRESS: u8 = 0x38;
-    /// Calibrate, once after power-up (datasheet §5.4: wait 40 ms first).
-    pub const INIT: [u8; 3] = [0xBE, 0x08, 0x00];
-    /// Start a measurement; the result is ready 80 ms later.
-    pub const MEASURE: [u8; 3] = [0xAC, 0x33, 0x00];
-    /// Measurement time, ms.
-    pub const MEASURE_MS: u64 = 80;
-
     /// One reading, in hundredths: 2153 is 21.53 °C, 4810 is 48.10 %RH.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct Reading {
@@ -51,20 +46,18 @@ pub mod aht20 {
     }
 }
 
-/// A reading on the wire: the payload of one fiducial-protocol frame.
-/// `[1, celsius×100 as i16 LE, %RH×100 as u16 LE]` — five bytes, read by
-/// the web page with the same layout (`web/src/reading.ts`).
+/// The reading's payload, derived from `protocol.toml` with the web page's
+/// decoder (`protocol/messages.ts`): the layout is declared once, so the two
+/// sides cannot disagree.
+#[path = "../../../protocol/messages.rs"]
+pub mod messages;
+
 pub mod reading {
-    use super::aht20::Reading;
+    pub use crate::messages::reading::{KIND, LEN};
+    use crate::{aht20, messages::reading::Reading};
 
-    /// The payload's first byte: what kind of message this is.
-    pub const KIND: u8 = 1;
-    pub const LEN: usize = 5;
-
-    pub fn payload(r: Reading) -> [u8; LEN] {
-        let t = r.centi_celsius.to_le_bytes();
-        let h = r.centi_percent_rh.to_le_bytes();
-        [KIND, t[0], t[1], h[0], h[1]]
+    pub fn payload(r: aht20::Reading) -> [u8; LEN] {
+        Reading { centi_celsius: r.centi_celsius, centi_percent_rh: r.centi_percent_rh }.encode()
     }
 }
 
@@ -125,6 +118,7 @@ mod tests {
         let mut dec: FrameDecoder<64> = FrameDecoder::new();
         let got = wire[..n].iter().find_map(|b| dec.feed(*b).map(|p| p.to_vec()));
         assert_eq!(got.as_deref(), Some(&payload[..]));
-        assert_eq!(i16::from_le_bytes([payload[1], payload[2]]), -1234);
+        let back = messages::reading::Reading::decode(&payload).unwrap();
+        assert_eq!((back.centi_celsius, back.centi_percent_rh), (-1234, 4810));
     }
 }

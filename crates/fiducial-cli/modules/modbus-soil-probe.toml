@@ -1,0 +1,14 @@
+# RS-485 Modbus RTU soil moisture probe, 5 V.
+id     = "modbus-soil-probe"
+name   = "RS-485 Modbus soil probe"
+kind   = "sensor"
+protocol = "rs485"
+supply = 5.0
+source = "RS-485 Modbus soil probe datasheet or product page"
+price  = { rsd = 2000, vendor = "other", checked = "2026-11-01" }
+
+[pins]
+VCC = { roles = ["power"] }
+GND = { roles = ["ground"] }
+A = { roles = ["bus"] }
+B = { roles = ["bus"] }

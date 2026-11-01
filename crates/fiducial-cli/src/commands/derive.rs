@@ -96,8 +96,11 @@ fn run_derive(
         match run_pipeline_command(pipeline, &working_dir) {
             Ok(_) => {
                 println!(" ✓");
+                // Re-recorded from scratch: an input this run no longer reads
+                // (a deleted catalogue, a dropped favicon) must stop being one.
+                lock.forget_inputs_of(&pipeline.name);
                 for input in pipeline_inputs(pipeline, root) {
-                    match std::fs::read(root.join(&input)) {
+                    match read_input(root, &input) {
                         Ok(content) => lock.record_input(&input, &content, &pipeline.name),
                         Err(e) => {
                             eprintln!("  ⚠ could not read input `{input}`: {e}");
@@ -162,18 +165,169 @@ fn run_derive(
 /// the brand, not to the hardware. When the logo is redrawn the hardware
 /// outputs still match their own hashes; only the input record notices.
 pub(crate) fn pipeline_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
-    let mut inputs = pipeline.inputs.clone();
-    if pipeline.executor == "fid-hardware" {
-        let decl = pipeline
-            .args
-            .first()
-            .cloned()
-            .unwrap_or_else(|| crate::hardware::DECLARATION.to_string());
-        inputs.extend(crate::hardware::inputs(root, &decl));
-    }
+    let mut inputs = expand_inputs(root, &pipeline.inputs);
+    inputs.extend(executor_inputs(pipeline, root));
     inputs.sort();
     inputs.dedup();
     inputs
+}
+
+/// What a built-in executor reads, which it knows and a template should not
+/// have to restate.
+///
+/// Until 0.9.5 only `fid-hardware` reported its reads, so every other
+/// executor's outputs were checked against the lock but its declarations were
+/// not: a message catalogue or `[brand]` edited and never re-derived passed
+/// `--check`, and the stale sitemap or message module could merge. The
+/// drift-injection study for the paper found it (cases W2 and W7).
+fn executor_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
+    let cfg = |keys: &[&str]| -> Vec<String> {
+        keys.iter()
+            .map(|k| format!("{}#{k}", crate::config::CONFIG_FILE))
+            .collect()
+    };
+    let arg = |default: &str| {
+        pipeline
+            .args
+            .first()
+            .cloned()
+            .unwrap_or_else(|| default.to_string())
+    };
+    let config = || crate::config::Config::load(&root.join(crate::config::CONFIG_FILE)).ok();
+    match pipeline.executor.as_str() {
+        "fid-hardware" => crate::hardware::inputs(root, &arg(crate::hardware::DECLARATION)),
+        "fid-i18n" => {
+            let dir = pipeline.args.first().cloned().unwrap_or_else(|| {
+                config()
+                    .map(|c| c.i18n.messages_dir().to_string())
+                    .unwrap_or_else(|| "messages".to_string())
+            });
+            let mut v = cfg(&["i18n"]);
+            v.extend(expand_inputs(root, &[format!("{dir}/*.json")]));
+            v
+        }
+        "fid-brand" => {
+            let mut v = cfg(&["brand"]);
+            v.extend(config().and_then(|c| c.brand.favicon));
+            v
+        }
+        "fid-legal" => cfg(&["legal", "brand", "i18n"]),
+        "fid-deploy" => cfg(&["deploy", "adapters", "product.name"]),
+        "fid-identity" => cfg(&["identity", "adapters"]),
+        "fid-adapters" => cfg(&["adapters"]),
+        "fid-thesis" => {
+            let mut v = expand_inputs(root, &[format!("{}?", crate::thesis::THESIS_FILE)]);
+            v.extend(cfg(&["product.name"]));
+            v
+        }
+        "fid-design" => vec![arg("design-system.md")],
+        "fid-protocol" => vec![arg(crate::protocol::DECLARATION)],
+        "fid-topology" => vec![arg(crate::topology::DECLARATION)],
+        "fid-monitoring" => vec![
+            arg(crate::monitoring::DECLARATION),
+            arg(crate::topology::DECLARATION),
+        ],
+        "fid-schema" => expand_inputs(root, &[format!("{}/*.sql", crate::schema::DIR)]),
+        "fid-mesh" => vec![arg("board/board.interface.json")],
+        _ => Vec::new(),
+    }
+}
+
+/// The bytes an input stands for. `file#a.b` is the value at key `a.b` of a
+/// TOML file — `fiducial.toml#brand` — so that a pipeline reading one section
+/// is not made stale by an edit to another (`fid add` rewrites the
+/// capability list on every install). A key that is absent reads as empty.
+pub(crate) fn read_input(root: &Path, input: &str) -> std::io::Result<Vec<u8>> {
+    let Some((file, key)) = input.split_once('#') else {
+        return std::fs::read(root.join(input));
+    };
+    let raw = std::fs::read_to_string(root.join(file))?;
+    let doc: toml::Value = toml::from_str(&raw)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    let found = key.split('.').try_fold(&doc, |v, k| v.get(k));
+    Ok(found
+        .map(|v| v.to_string())
+        .unwrap_or_default()
+        .into_bytes())
+}
+
+/// `inputs` entries as files, relative to the product root.
+///
+/// A plain path is kept as written, so a missing one is an error where it is
+/// read. A trailing `?` makes it optional. `*` matches within one path
+/// segment and `**` any number of segments; a pattern may match nothing, and
+/// a file added or removed under it is a changed input like an edited one.
+pub(crate) fn expand_inputs(root: &Path, patterns: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    for pattern in patterns {
+        let (pattern, optional) = match pattern.strip_suffix('?') {
+            Some(p) => (p, true),
+            None => (pattern.as_str(), false),
+        };
+        if !pattern.contains('*') {
+            if !optional || root.join(pattern).exists() {
+                out.push(pattern.to_string());
+            }
+            continue;
+        }
+        let segs: Vec<&str> = pattern.split('/').collect();
+        let fixed = segs.iter().take_while(|s| !s.contains('*')).count();
+        let base = segs[..fixed].join("/");
+        let mut files = Vec::new();
+        collect_files(&root.join(&base), &base, &mut files);
+        out.extend(
+            files
+                .into_iter()
+                .filter(|f| glob_match(&segs, &f.split('/').collect::<Vec<_>>())),
+        );
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+fn collect_files(dir: &Path, rel: &str, out: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let child = if rel.is_empty() {
+            name.clone()
+        } else {
+            format!("{rel}/{name}")
+        };
+        match entry.file_type() {
+            Ok(t) if t.is_dir() => collect_files(&entry.path(), &child, out),
+            Ok(t) if t.is_file() => out.push(child),
+            _ => {}
+        }
+    }
+}
+
+fn glob_match(pat: &[&str], path: &[&str]) -> bool {
+    match (pat.first(), path.first()) {
+        (None, None) => true,
+        (Some(&"**"), _) => {
+            glob_match(&pat[1..], path) || (!path.is_empty() && glob_match(pat, &path[1..]))
+        }
+        (Some(p), Some(s)) => segment_match(p, s) && glob_match(&pat[1..], &path[1..]),
+        _ => false,
+    }
+}
+
+fn segment_match(pat: &str, s: &str) -> bool {
+    match pat.split_once('*') {
+        None => pat == s,
+        Some((head, tail)) => {
+            let Some(rest) = s.strip_prefix(head) else {
+                return false;
+            };
+            (0..=rest.len())
+                .filter(|&i| rest.is_char_boundary(i))
+                .any(|i| segment_match(tail, &rest[i..]))
+        }
+    }
 }
 
 // ── Check mode ────────────────────────────────────────────────────────────────
@@ -193,6 +347,15 @@ pub(crate) fn pipeline_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
 pub(crate) fn outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<String> {
     match pipeline.executor.as_str() {
         "fid-identity" => identity_outputs_not_applicable(pipeline, root),
+        // `seo` knows the routes, so it owns the sitemap; brand's one-line
+        // sitemap is for a product without it. Both writing one was a race
+        // a fresh product with every capability lost on its first derive.
+        "fid-brand" if root.join("pipelines/seo.toml").exists() => pipeline
+            .outputs
+            .iter()
+            .filter(|o| o.ends_with("sitemap.xml"))
+            .cloned()
+            .collect(),
         // The design capability is installed in every new product, because the
         // alternative to having a design system is having the default one. But
         // its output is a stylesheet, and a firmware-only product has nowhere
@@ -387,6 +550,73 @@ fn expected_output(pipeline: &Pipeline, root: &Path) -> Option<String> {
 ///
 /// Both executors are pure functions of committed declarations, so the honest
 /// check is to run them and compare — see [`expected_output`].
+/// Untranslated values, less the keys declared identical on purpose.
+fn untranslated_except_same(
+    findings: &crate::i18n::Findings,
+    same: &[String],
+) -> BTreeMap<String, Vec<String>> {
+    findings
+        .untranslated
+        .iter()
+        .map(|(l, keys)| {
+            (
+                l.clone(),
+                keys.iter()
+                    .filter(|k| !same.contains(k))
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .filter(|(_, keys)| !keys.is_empty())
+        .collect()
+}
+
+/// For `--check`: values a locale left identical to the default locale.
+///
+/// A Serbian sentence that is still the English one is complete in every
+/// structural sense, so nothing else notices it (the paper's study, case
+/// W12). It is a missing translation all the same (MISSION.md 1c). A value
+/// that really is the same everywhere is declared in `[i18n] same`.
+fn untranslated_values(pipeline: &Pipeline, root: &Path) -> Vec<String> {
+    let Ok(config) = Config::load(&root.join(crate::config::CONFIG_FILE)) else {
+        return Vec::new();
+    };
+    let dir = pipeline
+        .args
+        .first()
+        .cloned()
+        .unwrap_or_else(|| config.i18n.messages_dir().to_string());
+    let Ok(default_locale) = config.i18n.default_locale() else {
+        return Vec::new();
+    };
+    let mut catalogs = BTreeMap::new();
+    for f in expand_inputs(root, &[format!("{dir}/*.json")]) {
+        let path = root.join(&f);
+        let Some(locale) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        let Ok(c) = crate::i18n::load_catalog(&path) else {
+            return Vec::new();
+        };
+        catalogs.insert(locale.to_string(), c);
+    }
+    let Ok(findings) = crate::i18n::compare(&catalogs, default_locale) else {
+        return Vec::new();
+    };
+    untranslated_except_same(&findings, &config.i18n.same)
+        .into_iter()
+        .flat_map(|(locale, keys)| {
+            let dir = dir.clone();
+            keys.into_iter().map(move |k| {
+                format!(
+                    "  {dir}/{locale}.json: `{k}` is identical to {default_locale} — translate it, \
+                     or declare it in `[i18n] same` if it is the same in every language"
+                )
+            })
+        })
+        .collect()
+}
+
 fn outputs_with_moved_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
     let Some(expected) = expected_output(pipeline, root) else {
         return Vec::new();
@@ -456,8 +686,23 @@ fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
 
     for pipeline in pipelines {
         let before = issues.len();
-        for input in pipeline_inputs(pipeline, root) {
-            match (lock.inputs.get(&input), std::fs::read(root.join(&input))) {
+        let inputs = pipeline_inputs(pipeline, root);
+        // A file matched by a pattern when the pipeline ran and gone now (a
+        // deleted locale, a removed migration) is a changed input too.
+        for (path, rec) in &lock.inputs {
+            if rec.pipelines.contains(&pipeline.name)
+                && !inputs.contains(path)
+                && !root.join(path.split('#').next().unwrap_or(path)).exists()
+            {
+                issues.push(format!(
+                    "  {path}: read by `{}` when it last ran, and gone now — \
+                     its outputs may no longer follow (run `fid derive`)",
+                    pipeline.name
+                ));
+            }
+        }
+        for input in inputs {
+            match (lock.inputs.get(&input), read_input(root, &input)) {
                 (_, Err(e)) => issues.push(format!(
                     "  {input}: input to `{}` is unreadable — {e}",
                     pipeline.name
@@ -494,6 +739,38 @@ fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
         if pipeline.executor == "fid-hardware" && issues.len() == before {
             issues.extend(hardware_drift(pipeline, root));
         }
+        if pipeline.executor == "fid-protocol" {
+            let decl = pipeline
+                .args
+                .first()
+                .map(String::as_str)
+                .unwrap_or(crate::protocol::DECLARATION);
+            if let Ok(file) = crate::protocol::load(root, decl) {
+                issues.extend(crate::protocol::typed_literals(root, &file));
+            }
+        }
+        if pipeline.executor == "fid-legal" {
+            issues.extend(crate::legal::preticked_consent(root));
+        }
+        if pipeline.executor == "fid-i18n" {
+            issues.extend(untranslated_values(pipeline, root));
+            if let Ok(config) = Config::load(&root.join(crate::config::CONFIG_FILE)) {
+                issues.extend(crate::i18n::locale_literals(root, &config.i18n.locales));
+            }
+        }
+        if pipeline.executor == "fid-hardware" {
+            let decl = pipeline
+                .args
+                .first()
+                .map(|s| s.as_str())
+                .unwrap_or(crate::hardware::DECLARATION);
+            if let Ok(raw) = std::fs::read_to_string(root.join(decl)) {
+                if let Ok(product) = toml::from_str::<crate::hardware::Product>(&raw) {
+                    issues.extend(crate::hardware::firmware_pin_literals(root, &product));
+                    issues.extend(crate::hardware::linker_regions(root, &product));
+                }
+            }
+        }
         let skip = outputs_not_applicable(pipeline, root);
         for out in &pipeline.outputs {
             if skip.contains(out) {
@@ -524,6 +801,17 @@ fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
             }
         }
     }
+
+    let enabled = Config::load(&root.join(crate::config::CONFIG_FILE))
+        .map(|c| c.capabilities.enabled)
+        .unwrap_or_default();
+    let (drift, _) = crate::commands::doctor::platform_drift(root, lock, &enabled);
+    issues.extend(drift.into_iter().map(|d| format!("  {d}")));
+    issues.extend(crate::gate::problems(
+        root,
+        lock.templates.contains_key(".github/workflows/ci.yml"),
+    ));
+    issues.extend(crate::shadow::copies(root, pipelines));
 
     if issues.is_empty() {
         println!("✦ fid derive --check — all artifacts fresh");
@@ -597,6 +885,10 @@ fn run_fid_hardware(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     }
     if let Some(v) = solved.cost_violation {
         bail!("cost: {v}");
+    }
+    let literal = crate::hardware::firmware_pin_literals(working_dir, &product);
+    if !literal.is_empty() {
+        bail!("firmware types what the board already declares (a pin, an address, a command or a wait):\n{}", literal.join("\n"));
     }
     Ok(())
 }
@@ -806,6 +1098,28 @@ fn run_fid_i18n(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         );
     }
 
+    let tag_problems: Vec<String> = catalogs
+        .iter()
+        .flat_map(|(locale, c)| {
+            crate::i18n::locale_tag_problems(locale, c)
+                .into_iter()
+                .map(move |m| format!("  {dir_name}/{locale}.json: {m}"))
+        })
+        .collect();
+    let named = crate::i18n::locale_literals(working_dir, &config.i18n.locales);
+    if !named.is_empty() {
+        bail!(
+            "fid-i18n: code names a locale directly, a second copy of `[i18n]`:\n{}",
+            named.join("\n")
+        );
+    }
+    if !tag_problems.is_empty() {
+        bail!(
+            "fid-i18n: a locale tag is wrong — dates, numbers and plurals would \
+             format for another language or script:\n{}",
+            tag_problems.join("\n")
+        );
+    }
     let findings = crate::i18n::compare(&catalogs, &default_locale)?;
 
     if findings.is_fatal() {
@@ -843,9 +1157,10 @@ fn run_fid_i18n(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         bail!(message);
     }
 
-    // Non-fatal findings are surfaced but do not stop the build — a legitimate
-    // "Wi-Fi" must not block anyone.
-    for (locale, keys) in &findings.untranslated {
+    // Untranslated values are a warning here and a failure in `--check`: a
+    // locale just seeded from the default is work in progress on a laptop,
+    // and never something a reader sees. See `untranslated_values`.
+    for (locale, keys) in &untranslated_except_same(&findings, &config.i18n.same) {
         println!(
             "\n    ⚠ {locale}: {} value(s) identical to {default_locale} — likely untranslated",
             keys.len()
@@ -900,7 +1215,8 @@ fn run_fid_brand(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     }
     brand.validate()?;
 
-    for out in &pipeline.outputs {
+    let skip = outputs_not_applicable(pipeline, working_dir);
+    for out in pipeline.outputs.iter().filter(|o| !skip.contains(o)) {
         let path = Path::new(out);
         let name = path
             .file_name()
@@ -1069,7 +1385,10 @@ fn run_fid_deploy(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     let config = Config::load(&working_dir.join(crate::config::CONFIG_FILE))
         .context("fid-deploy needs [deploy] in fiducial.toml")?;
 
-    let vendor = config.adapters.get("deploy").unwrap_or("none");
+    // Installing this pipeline is choosing Cloudflare: a product that has not
+    // named a deploy vendor gets it, rather than failing its first derive on
+    // a setting the platform never wrote. An explicit other choice is refused.
+    let vendor = config.adapters.get("deploy").unwrap_or("cloudflare");
     if vendor != "cloudflare" {
         bail!(
             "fid-deploy: [adapters] deploy = \"{vendor}\" — this executor \
@@ -1676,6 +1995,21 @@ fn run_fid_identity(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
 /// so a set that cannot be applied safely fails here rather than at deploy.
 fn run_fid_schema(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     let migrations = crate::schema::discover(working_dir)?;
+    let config = Config::load(&working_dir.join(crate::config::CONFIG_FILE)).ok();
+    let sqlite = config.as_ref().is_none_or(|c| {
+        c.identity
+            .resolve_dialect(&c.adapters)
+            .is_ok_and(|d| d == crate::config::SqlDialect::Sqlite)
+    });
+    if sqlite {
+        let problems = crate::schema::sqlite_problems(&migrations);
+        if !problems.is_empty() {
+            bail!(
+                "fid-schema: the database is SQLite, and a migration is not:\n{}",
+                problems.join("\n")
+            );
+        }
+    }
 
     let target = output_with_extension(pipeline, "ts")
         .ok_or_else(|| anyhow::anyhow!("fid-schema: no `.ts` output declared for the manifest"))?;
@@ -2230,6 +2564,253 @@ fn vendor_ts_class_and_path(contract: &str, vendor: &str) -> (String, String) {
 /// pairs and their minimums, and a palette that misses one fails here. That is
 /// the difference between a design system that documents a rule and one that
 /// holds it.
+/// `protocol.toml` in, one codec per side out: `.rs` for the firmware, `.ts`
+/// for the web. See `crate::protocol`.
+fn run_fid_protocol(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    let decl = pipeline
+        .args
+        .first()
+        .map(String::as_str)
+        .unwrap_or(crate::protocol::DECLARATION);
+    let file = crate::protocol::load(working_dir, decl)?;
+    let typed = crate::protocol::typed_literals(working_dir, &file);
+    if !typed.is_empty() {
+        bail!(
+            "fid-protocol: code types what `{decl}` declares:\n{}",
+            typed.join("\n")
+        );
+    }
+    if pipeline.outputs.is_empty() {
+        bail!("fid-protocol: no outputs declared (a `.rs` and/or a `.ts`)");
+    }
+    for out in &pipeline.outputs {
+        let content = match Path::new(out).extension().and_then(|e| e.to_str()) {
+            Some("rs") => crate::protocol::render_rust(&file, decl),
+            Some("ts") => crate::protocol::render_ts(&file, decl),
+            _ => bail!("fid-protocol: output `{out}` is neither `.rs` nor `.ts`"),
+        };
+        write_output(working_dir, out, &content)?;
+    }
+    Ok(())
+}
+
+fn run_fid_topology(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    use crate::topology as topo;
+    let decl = pipeline
+        .args
+        .first()
+        .map(String::as_str)
+        .unwrap_or(topo::DECLARATION);
+    let t = topo::load(working_dir, decl)?;
+    let lib = crate::modules::library(working_dir)?;
+    let variant_dir = |rel: &str| {
+        Path::new(rel)
+            .parent()
+            .map(|d| d.to_string_lossy().replace('\\', "/"))
+            .unwrap_or_default()
+    };
+    let role_of = |out: &str| -> String {
+        out.strip_prefix("firmware/")
+            .and_then(|r| r.split('/').next())
+            .unwrap_or_default()
+            .to_string()
+    };
+    let has = |role: &str, stem: &str| {
+        pipeline.outputs.iter().any(|o| {
+            role_of(o) == role
+                && Path::new(o).file_stem().and_then(|s| s.to_str()) == Some(stem)
+                && Path::new(o)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|e| topo::FIRMWARE_EXTENSIONS.contains(&e))
+        })
+    };
+    let mut missing: Vec<String> = Vec::new();
+    for r in t.roles() {
+        let mut stems = vec!["params"];
+        if t.first_node_of(&r).is_some_and(|n| n.hardware.is_some()) {
+            stems.push("board");
+        }
+        for stem in stems {
+            if !has(&r, stem) {
+                missing.push(format!(
+                    "firmware/{r}/…/{stem}.<{}> (the extension is the firmware's language)",
+                    topo::FIRMWARE_EXTENSIONS.join("|")
+                ));
+            }
+        }
+    }
+    for n in &t.node {
+        let mut expected = Vec::new();
+        for f in topo::hardware_files(n) {
+            let d = variant_dir(f);
+            for name in ["wiring.csv", "bom.csv", "wiring.svg"] {
+                expected.push(format!("{d}/generated/{name}"));
+            }
+        }
+        if n.variants.len() > 1 {
+            expected.push(format!("hardware/{}/variants.md", n.id));
+        }
+        missing.extend(
+            expected
+                .into_iter()
+                .filter(|o| !pipeline.outputs.contains(o)),
+        );
+    }
+    if !missing.is_empty() {
+        bail!(
+            "fid-topology: {decl} declares firmware or hardware that pipelines/{}.toml does not \
+             derive — add to `outputs`:\n  {}",
+            pipeline.name,
+            missing.join("\n  ")
+        );
+    }
+    for out in &pipeline.outputs {
+        let file = Path::new(out)
+            .file_name()
+            .and_then(|f| f.to_str())
+            .unwrap_or_default();
+        let role_owned = role_of(out);
+        let role = role_owned.as_str();
+        let stem = Path::new(out)
+            .file_stem()
+            .and_then(|f| f.to_str())
+            .unwrap_or_default();
+        let ext = Path::new(out)
+            .extension()
+            .and_then(|f| f.to_str())
+            .unwrap_or_default();
+        let variant_of = |name: &str| {
+            t.node
+                .iter()
+                .flat_map(topo::hardware_files)
+                .find(|v| format!("{}/generated/{name}", variant_dir(v)) == *out)
+                .cloned()
+        };
+        let content = match file {
+            "wiring.csv" | "bom.csv" | "wiring.svg" => {
+                let Some(v) = variant_of(file) else {
+                    bail!("fid-topology: output `{out}` belongs to no node's hardware");
+                };
+                let h = crate::modules::load(working_dir, &v)?;
+                if file == "bom.csv" {
+                    crate::modules::render_bom(&h, &lib, &v)
+                } else if file == "wiring.svg" {
+                    crate::modules::render_wiring_svg(&h, &lib, &v)
+                } else {
+                    crate::modules::render_wiring(&h, &v)
+                }
+            }
+            "variants.md" => {
+                let id = out
+                    .trim_start_matches("hardware/")
+                    .trim_end_matches("/variants.md");
+                let Some(n) = t.node.iter().find(|n| n.id == id) else {
+                    bail!("fid-topology: output `{out}` names no node");
+                };
+                crate::modules::render_variants(&t, n, working_dir, &lib)?
+            }
+            _ if !role.is_empty() && stem == "board" => {
+                let Some(h) = t.first_node_of(role).and_then(|n| n.hardware.clone()) else {
+                    bail!("fid-topology: output `{out}`: firmware `{role}` runs on no node with hardware");
+                };
+                crate::modules::render_board(
+                    &crate::modules::load(working_dir, &h)?,
+                    &lib,
+                    &h,
+                    ext,
+                )?
+            }
+            _ if !role.is_empty() && stem == "params" => topo::render_params(&t, role, decl, ext)?,
+            _ if stem == "topics" => topo::render_topics(&t, decl, ext)?,
+            _ => bail!(
+                "fid-topology: unknown output `{out}` (supported: firmware/<role>/…/params and \
+                 board as .rs, .h or .json; topics as .rs, .h or .json; per hardware variant \
+                 wiring.csv, wiring.svg, bom.csv; hardware/<node>/variants.md)"
+            ),
+        };
+        if !role.is_empty() && t.first_node_of(role).is_none() {
+            bail!("fid-topology: output `{out}` is for firmware `{role}`, which no node runs");
+        }
+        write_output(working_dir, out, &content)?;
+    }
+    Ok(())
+}
+
+fn run_fid_monitoring(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    use crate::{monitoring as mon, topology as topo};
+    let decl = pipeline
+        .args
+        .first()
+        .map(String::as_str)
+        .unwrap_or(mon::DECLARATION);
+    let topo_decl = pipeline
+        .args
+        .get(1)
+        .map(String::as_str)
+        .unwrap_or(topo::DECLARATION);
+    let t = topo::load(working_dir, topo_decl)?;
+    let m = mon::load(working_dir, decl, &t)?;
+    let role_of = |out: &str| -> String {
+        out.strip_prefix("firmware/")
+            .and_then(|r| r.split('/').next())
+            .unwrap_or_default()
+            .to_string()
+    };
+    let missing: Vec<String> = t
+        .roles()
+        .into_iter()
+        .filter(|r| !m.points_of_role(&t, r).is_empty())
+        .filter(|r| {
+            !pipeline.outputs.iter().any(|o| {
+                role_of(o) == *r
+                    && Path::new(o).file_stem().and_then(|s| s.to_str()) == Some("points")
+            })
+        })
+        .map(|r| format!("firmware/{r}/…/points.<rs|h|json>"))
+        .collect();
+    if !missing.is_empty() {
+        bail!(
+            "fid-monitoring: {decl} declares points for firmware that pipelines/{}.toml does not \
+             derive — add to `outputs`:\n  {}",
+            pipeline.name,
+            missing.join("\n  ")
+        );
+    }
+    let dialect = Config::load(&working_dir.join(crate::config::CONFIG_FILE))
+        .ok()
+        .and_then(|c| c.adapters.selected.get("database").cloned())
+        .map(|d| if d == "d1" { "sqlite".to_string() } else { d })
+        .unwrap_or_else(|| "sqlite".to_string());
+    for out in &pipeline.outputs {
+        let stem = Path::new(out)
+            .file_stem()
+            .and_then(|f| f.to_str())
+            .unwrap_or_default();
+        let ext = Path::new(out)
+            .extension()
+            .and_then(|f| f.to_str())
+            .unwrap_or_default();
+        let role = role_of(out);
+        let content = match (stem, ext) {
+            ("points", "ts") => mon::render_points_ts(&m, &t, decl),
+            ("cards", "ts") => mon::render_cards_ts(&m, &t, decl),
+            ("points", _) if !role.is_empty() => mon::render_points(&m, &t, &role, decl, ext)?,
+            ("schedules", _) if !role.is_empty() => mon::render_schedules(&m, &role, decl, ext)?,
+            (_, "sql") => mon::render_migration(&m, &t, decl, &dialect)?,
+            _ => bail!(
+                "fid-monitoring: unknown output `{out}` (supported: firmware/<role>/…/points and \
+                 schedules as .rs, .h or .json; points.ts; cards.ts; migrations/*.sql)"
+            ),
+        };
+        if !role.is_empty() && t.first_node_of(&role).is_none() {
+            bail!("fid-monitoring: output `{out}` is for firmware `{role}`, which no node runs");
+        }
+        write_output(working_dir, out, &content)?;
+    }
+    Ok(())
+}
+
 fn run_fid_design(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     let source = pipeline
         .args
@@ -2245,8 +2826,10 @@ fn run_fid_design(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         )
     })?;
 
-    let system = crate::design::parse(&md)
-        .with_context(|| format!("fid-design: `{source}` does not parse"))?;
+    // `{:#}` so the reason reaches the terminal: derive prints only the
+    // outermost message, and "does not parse" hid every rule `parse` holds.
+    let system =
+        crate::design::parse(&md).map_err(|e| anyhow::anyhow!("fid-design: `{source}`: {e:#}"))?;
 
     let pairs = system
         .check_contrast()
@@ -2310,6 +2893,13 @@ fn run_fid_legal(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         );
     }
     legal.validate()?;
+    let preticked = crate::legal::preticked_consent(working_dir);
+    if !preticked.is_empty() {
+        bail!(
+            "fid-legal: consent must start unasked:\n{}",
+            preticked.join("\n")
+        );
+    }
 
     if config.i18n.is_empty() {
         bail!(
@@ -2339,7 +2929,13 @@ fn run_fid_legal(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("creating parent for `{out}`"))?;
         }
-        std::fs::write(&abs, &rendered).with_context(|| format!("writing {out}"))?;
+        // `consent.ts` is the consent rules; any other output is the pages.
+        let content = if out.ends_with("consent.ts") {
+            crate::legal::render_consent_ts(legal)
+        } else {
+            rendered.clone()
+        };
+        std::fs::write(&abs, &content).with_context(|| format!("writing {out}"))?;
     }
 
     Ok(())
@@ -2376,16 +2972,25 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             "fid-schema" => return run_fid_schema(pipeline, working_dir),
             "fid-legal" => return run_fid_legal(pipeline, working_dir),
             "fid-design" => return run_fid_design(pipeline, working_dir),
+            "fid-protocol" => return run_fid_protocol(pipeline, working_dir),
+            "fid-topology" => return run_fid_topology(pipeline, working_dir),
+            "fid-monitoring" => return run_fid_monitoring(pipeline, working_dir),
             "fid-hardware" => return run_fid_hardware(pipeline, working_dir),
             other => bail!(
                 "unknown executor `{other}` \
                  (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n, fid-brand, \
                  fid-adapters, fid-deploy, fid-identity, fid-schema, fid-legal, fid-design, \
-                 fid-hardware)"
+                 fid-protocol, fid-topology, fid-monitoring, fid-hardware)"
             ),
         };
 
+    let sandbox = if program == "node" && pipeline.working_dir.is_none() {
+        node_sandbox(pipeline, working_dir)
+    } else {
+        Vec::new()
+    };
     let status = Command::new(program)
+        .args(&sandbox)
         .args(&base_args)
         .args(&extra_args)
         .current_dir(working_dir)
@@ -2396,4 +3001,173 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         bail!("pipeline `{}` exited with {}", pipeline.name, status);
     }
     Ok(())
+}
+
+/// Node's permission model, scoped to what the pipeline declares: it may read
+/// its own script directory, its declared inputs and `node_modules`, and write
+/// only where its outputs go. A script that reads a file it does not declare
+/// fails naming it, instead of producing an output whose input `fiducial.lock`
+/// never recorded — so a change to that file could never make it stale.
+///
+/// Empty when this Node has no permission model (before 22), so an older Node
+/// runs the script as before.
+fn node_sandbox(pipeline: &Pipeline, root: &Path) -> Vec<String> {
+    if !node_has_permissions() {
+        return Vec::new();
+    }
+    let abs = |rel: &str| root.join(rel).to_string_lossy().into_owned();
+    // Its own declaration, which a script may read for its outputs.
+    let mut read: Vec<String> = vec![abs(&format!("pipelines/{}.toml", pipeline.name))];
+    for arg in &pipeline.args[1..] {
+        let p = root.join(arg);
+        if p.is_file() {
+            if let Some(dir) = p.parent() {
+                read.push(format!("{}/*", dir.to_string_lossy()));
+            }
+        }
+    }
+    for input in &pipeline.inputs {
+        let file = input
+            .split('#')
+            .next()
+            .unwrap_or(input)
+            .trim_end_matches('?');
+        match file.find('*') {
+            Some(i) => {
+                let dir = file[..i].trim_end_matches('/');
+                read.push(format!("{}/*", abs(if dir.is_empty() { "." } else { dir })));
+            }
+            None => read.push(abs(file)),
+        }
+    }
+    for dir in root.ancestors() {
+        let nm = dir.join("node_modules");
+        if nm.is_dir() {
+            read.push(format!("{}/*", nm.to_string_lossy()));
+        }
+    }
+    let mut write: Vec<String> = pipeline
+        .outputs
+        .iter()
+        .filter_map(|o| {
+            Path::new(o)
+                .parent()
+                .map(|d| d.to_string_lossy().into_owned())
+        })
+        .map(|d| {
+            let _ = std::fs::create_dir_all(root.join(&d));
+            format!("{}/*", abs(if d.is_empty() { "." } else { &d }))
+        })
+        .collect();
+    write.sort();
+    write.dedup();
+    // A script reads back what it writes (a previous output, to keep it
+    // stable), so output directories are readable too.
+    read.extend(write.iter().cloned());
+    read.sort();
+    read.dedup();
+    let mut flags = vec!["--permission".to_string()];
+    flags.extend(read.into_iter().map(|r| format!("--allow-fs-read={r}")));
+    flags.extend(write.into_iter().map(|w| format!("--allow-fs-write={w}")));
+    flags
+}
+
+fn node_has_permissions() -> bool {
+    static HAS: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *HAS.get_or_init(|| {
+        Command::new("node")
+            .args(["--permission", "-e", "0"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success())
+    })
+}
+
+#[cfg(test)]
+mod input_pattern_tests {
+    use super::expand_inputs;
+
+    fn tree(files: &[&str]) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        for f in files {
+            let p = dir.path().join(f);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, "x").unwrap();
+        }
+        dir
+    }
+
+    fn expand(dir: &tempfile::TempDir, pats: &[&str]) -> Vec<String> {
+        expand_inputs(
+            dir.path(),
+            &pats.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+        )
+    }
+
+    #[test]
+    fn a_star_stays_within_one_segment() {
+        let d = tree(&[
+            "messages/en.json",
+            "messages/sr.json",
+            "messages/old/en.json",
+            "messages/notes.md",
+        ]);
+        assert_eq!(
+            expand(&d, &["messages/*.json"]),
+            ["messages/en.json", "messages/sr.json"]
+        );
+    }
+
+    #[test]
+    fn a_double_star_crosses_segments() {
+        let d = tree(&[
+            "content/posts/en/a.md",
+            "content/posts/sr/a.md",
+            "content.toml",
+        ]);
+        assert_eq!(
+            expand(&d, &["content/**"]),
+            ["content/posts/en/a.md", "content/posts/sr/a.md"]
+        );
+    }
+
+    #[test]
+    fn a_pattern_may_match_nothing_and_an_optional_path_may_be_absent() {
+        let d = tree(&["fiducial.toml"]);
+        assert!(expand(&d, &["press/**", "content.toml?"]).is_empty());
+        assert_eq!(expand(&d, &["fiducial.toml?"]), ["fiducial.toml"]);
+    }
+
+    #[test]
+    fn a_section_input_reads_only_its_key() {
+        let d = tree(&[]);
+        std::fs::write(
+            d.path().join("fiducial.toml"),
+            "[brand]\ndomain = \"a.com\"\n[capabilities]\nenabled = [\"i18n\"]\n",
+        )
+        .unwrap();
+        let before = super::read_input(d.path(), "fiducial.toml#brand").unwrap();
+        std::fs::write(
+            d.path().join("fiducial.toml"),
+            "[brand]\ndomain = \"a.com\"\n[capabilities]\nenabled = [\"i18n\", \"seo\"]\n",
+        )
+        .unwrap();
+        assert_eq!(
+            super::read_input(d.path(), "fiducial.toml#brand").unwrap(),
+            before
+        );
+        assert!(super::read_input(d.path(), "fiducial.toml#press")
+            .unwrap()
+            .is_empty());
+        assert!(!super::read_input(d.path(), "fiducial.toml#brand.domain")
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn a_plain_path_is_kept_even_when_missing() {
+        let d = tree(&[]);
+        assert_eq!(expand(&d, &["content.toml"]), ["content.toml"]);
+    }
 }

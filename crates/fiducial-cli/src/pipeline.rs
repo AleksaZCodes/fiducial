@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use crate::config::Config;
 
 /// A pipeline as declared in `pipelines/<name>.toml`.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Pipeline {
     /// Pipeline name, unique within a product.
     pub name: String,
@@ -41,6 +41,12 @@ pub struct Pipeline {
     /// one re-derives, and every output still matches its recorded hash. A
     /// built-in executor that knows what it read reports those files itself;
     /// this list is for a `shell` pipeline, which cannot.
+    ///
+    /// An entry is a path (`content.toml`), an optional path (`content.toml?`),
+    /// a pattern (`messages/*.json`, `content/**` — a file added or removed
+    /// under it is a changed input), or one key of a TOML file
+    /// (`fiducial.toml#i18n`), so that an edit to another section does not
+    /// make this pipeline stale.
     #[serde(default)]
     pub inputs: Vec<String>,
 }

@@ -99,6 +99,7 @@ pub struct Config {
 /// and answers with a large one is a normal agent, and forcing it to build a
 /// second adapter would make this declaration a lie rather than a default.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Ai {
     /// Gateway model id, e.g. `anthropic/claude-opus-5`.
     ///
@@ -121,6 +122,7 @@ pub struct Ai {
 /// version nor rots. Declaring `model` pins a version instead, which is what a
 /// product wants once an answer distribution matters to it.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct SystemOne {
     /// Decision model id, e.g. `typesafe/jev-1.13`. Empty means the vendor's
     /// tracking alias.
@@ -172,6 +174,7 @@ impl Ai {
 /// scaffolded product, and requiring every product to restate it would be the
 /// second declaration this block exists to avoid.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Freshness {
     /// Commands that gate a generated artifact, matched as substrings against
     /// each workflow's text.
@@ -214,6 +217,7 @@ impl SqlDialect {
 /// the case the platform cannot see (a product pointing `none` at a real
 /// database of its own).
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Identity {
     /// Where the permission rows live: `sql` (the default) or `none`.
     ///
@@ -404,6 +408,7 @@ impl Identity {
 /// Cloudflare account knows: the database's id, the bucket's name, the route.
 /// Those live here; the bindings are generated around them.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Deploy {
     /// Worker name. Defaults to `<product>-worker` when left empty.
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -487,6 +492,7 @@ pub struct Deploy {
 
 /// One KV namespace binding: the name the Worker reads, and the account's id.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct KvNamespace {
     /// The binding name in the Worker, e.g. `SPOTS`.
     pub binding: String,
@@ -637,6 +643,7 @@ impl Adapters {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Product {
     /// Snake-case product identifier; also used as the crate/package name prefix.
     pub name: String,
@@ -652,6 +659,7 @@ fn default_version() -> String {
 /// Whether this product uses the L0 Rust spine (fiducial-core etc.).
 /// Pure web products may leave this false.
 #[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Spine {
     #[serde(default)]
     pub enabled: bool,
@@ -659,6 +667,7 @@ pub struct Spine {
 
 /// Capability declarations.
 #[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Capabilities {
     /// Installed capability identifiers, e.g. ["web-next", "firmware-rp2040"].
     #[serde(default)]
@@ -677,6 +686,7 @@ pub struct Capabilities {
 /// built monolingual will be, and principle 1c says monolingual is a state you
 /// pass through before the first commit.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct I18n {
     #[serde(default)]
     pub locales: Vec<String>,
@@ -692,6 +702,11 @@ pub struct I18n {
         skip_serializing_if = "is_default_messages_dir"
     )]
     pub messages_dir: String,
+    /// Keys whose value is the same in every locale on purpose — a product
+    /// name, "Wi-Fi". Any other value identical to the default locale's is
+    /// untranslated, and `fid derive --check` refuses it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub same: Vec<String>,
 }
 
 fn is_default_messages_dir(dir: &str) -> bool {
@@ -754,6 +769,7 @@ impl I18n {
 // opt-in default a credit line should have. A hand-written impl listing nine
 // fields is one more place to forget a field when a tenth is added.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Brand {
     #[serde(default)]
     pub legal_name: String,
@@ -880,6 +896,16 @@ impl Brand {
                 missing.join(", ")
             );
         }
+        // A domain is a host name, not a URL: the generators add the scheme,
+        // so `https://example.com` would come out as `https://https://…`.
+        if !is_host_name(self.domain.trim()) {
+            bail!(
+                "[brand] domain = \"{}\" is not a bare host name.\n\
+                 Write it as `example.com` — no scheme, path, port or spaces; \
+                 every page that links to the site adds `https://` itself.",
+                self.domain
+            );
+        }
         for (field, value) in [
             ("primary_color", self.primary_color()),
             ("background_color", self.background_color()),
@@ -890,6 +916,19 @@ impl Brand {
         }
         Ok(())
     }
+}
+
+/// `example.com`, `www.example.co.uk`: dot-separated labels of letters, digits
+/// and hyphens (any non-ASCII letter too, for an IDN), at least two of them.
+fn is_host_name(s: &str) -> bool {
+    let labels: Vec<&str> = s.split('.').collect();
+    labels.len() >= 2
+        && labels.iter().all(|l| {
+            !l.is_empty()
+                && !l.starts_with('-')
+                && !l.ends_with('-')
+                && l.chars().all(|c| c == '-' || c.is_alphanumeric())
+        })
 }
 
 /// `#` followed by exactly six hex digits.
@@ -911,6 +950,7 @@ fn is_hex_color(s: &str) -> bool {
 /// and contact) and `[i18n]` (for the locale set). Neither dependency is
 /// restated here: they are declared once in their own blocks.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Legal {
     /// `EU` | `US` | `UK` | `RS` | `other`. Affects which pages are generated
     /// and which compliance checklist items appear.
@@ -953,46 +993,75 @@ impl Legal {
         self.jurisdiction.is_empty()
     }
 
-    /// Every fact the legal pipeline needs is present and well-formed.
+    /// Every fact the legal pipeline needs is present and well-formed, and
+    /// the jurisdiction's profile (`profiles/legal.toml`) is met.
     pub fn validate(&self) -> anyhow::Result<()> {
-        match self.jurisdiction.as_str() {
-            "EU" | "US" | "UK" | "RS" | "other" => {}
-            other => anyhow::bail!(
-                "[legal] jurisdiction = \"{other}\" is not a known jurisdiction.\n\
-                 Known: EU, US, UK, RS, other."
-            ),
-        }
+        let profile = crate::legal::profile();
+        let Some(rules) = profile.jurisdiction.get(&self.jurisdiction) else {
+            anyhow::bail!(
+                "[legal] jurisdiction = \"{}\" is not a known jurisdiction.\n\
+                 Known: {}.",
+                self.jurisdiction,
+                profile
+                    .jurisdiction
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        };
         if self.data_protection_email.trim().is_empty() {
             anyhow::bail!(
                 "[legal] data_protection_email is missing.\n\
                  It appears in every generated legal page — add a real address."
             );
         }
-        let known = ["necessary", "analytics", "marketing", "functional"];
         for cat in &self.cookie_categories {
-            if !known.contains(&cat.as_str()) {
+            if !profile.categories.contains(cat) {
                 anyhow::bail!(
                     "[legal] cookie_categories contains \"{cat}\", which is not a \
                      known category.\n\
-                     Known: necessary, analytics, marketing, functional."
+                     Known: {}.",
+                    profile.categories.join(", ")
                 );
             }
+        }
+        // Stated, not supplied: a declaration the pipeline quietly repairs is
+        // no longer the truth about the product (the paper's independent
+        // set, I7, dropped `necessary` and nothing said so).
+        let missing: Vec<&str> = rules
+            .categories
+            .iter()
+            .filter(|c| !self.cookie_categories.contains(c))
+            .map(String::as_str)
+            .collect();
+        if !missing.is_empty() {
+            anyhow::bail!(
+                "[legal] cookie_categories = {:?} leaves out {} — required in {} ({}). \
+                 The site sets them whatever is declared, so the declaration has to say so.",
+                self.cookie_categories,
+                missing
+                    .iter()
+                    .map(|c| format!("\"{c}\""))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                self.jurisdiction,
+                rules.source
+            );
         }
         Ok(())
     }
 
-    /// The effective cookie categories — `"necessary"` is always included.
+    /// The declared cookie categories, which `validate` has checked include
+    /// every one the jurisdiction requires.
     pub fn effective_categories(&self) -> Vec<&str> {
-        let mut cats: Vec<&str> = self.cookie_categories.iter().map(|s| s.as_str()).collect();
-        if !cats.contains(&"necessary") {
-            cats.insert(0, "necessary");
-        }
-        cats
+        self.cookie_categories.iter().map(|s| s.as_str()).collect()
     }
 }
 
 /// Guard configuration — what `fid guard-check` enforces in this product.
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Guard {
     /// Named rule sets that are active.
     #[serde(default = "default_rules")]
@@ -1079,6 +1148,35 @@ mod brand_tests {
         assert_eq!(brand.primary_color(), "#0EA5E9");
         assert_eq!(brand.background_color(), "#0B1120");
         assert!(brand.validate().is_ok());
+    }
+
+    #[test]
+    fn a_domain_is_a_host_name_not_a_url() {
+        for bad in [
+            "https://example.com",
+            "example.com/",
+            "example",
+            "exa mple.com",
+            "example.com:443",
+        ] {
+            let b = Brand {
+                domain: bad.into(),
+                ..filled()
+            };
+            assert!(b.validate().is_err(), "{bad} passed");
+        }
+        for good in [
+            "example.com",
+            "www.example.co.uk",
+            "my-shop.rs",
+            "primer.срб",
+        ] {
+            let b = Brand {
+                domain: good.into(),
+                ..filled()
+            };
+            assert!(b.validate().is_ok(), "{good} failed");
+        }
     }
 
     #[test]

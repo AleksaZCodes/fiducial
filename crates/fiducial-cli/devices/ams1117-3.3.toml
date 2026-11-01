@@ -1,0 +1,5 @@
+# Advanced Monolithic Systems AMS1117-3.3, fixed 3.3 V LDO — datasheet,
+# "Electrical Characteristics": VOUT 3.267–3.333 V; pin 2 (tab) is VOUT.
+mpn    = "AMS1117-3.3"
+source = "AMS1117 datasheet (Advanced Monolithic Systems), Electrical Characteristics"
+output = { pin = "VO", volts = 3.3 }

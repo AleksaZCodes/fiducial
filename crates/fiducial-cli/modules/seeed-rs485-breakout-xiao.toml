@@ -1,0 +1,17 @@
+# Seeed RS-485 Breakout Board for XIAO (TP8485E): automatic direction, TX on
+# D4, RX on D5, 120 Ω termination switch, 5 V OUT for the sensors.
+id     = "seeed-rs485-breakout-xiao"
+name   = "Seeed RS-485 Breakout for XIAO"
+kind   = "breakout"
+protocol = "rs485"
+supply = 5.0
+source = "Seeed RS-485 Breakout for XIAO datasheet or product page"
+price  = { rsd = 990, vendor = "Malina314", checked = "2026-11-01" }
+
+[pins]
+TX = { roles = ["uart-tx"] }
+RX = { roles = ["uart-rx"] }
+A = { roles = ["bus"] }
+B = { roles = ["bus"] }
+"5V_OUT" = { roles = ["power"] }
+GND = { roles = ["ground"] }

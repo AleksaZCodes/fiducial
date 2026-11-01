@@ -1,0 +1,12 @@
+# Auxiliary contact of a cabinet device (ALL STOP, a MANUAL-0-AUTO selector)
+# brought to the controller; part of the cabinet, priced there.
+id     = "contact-aux"
+name   = "Auxiliary contact"
+kind   = "switch"
+protocol = "digital"
+source = "Auxiliary contact datasheet or product page"
+price  = { rsd = 0, vendor = "cabinet", checked = "2026-11-01" }
+
+[pins]
+C1 = { roles = ["contact"] }
+C2 = { roles = ["contact"] }

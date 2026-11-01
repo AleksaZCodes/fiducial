@@ -82,14 +82,54 @@ DOI; the hardware work the paper describes is complete from `v0.9.2` (the
 solvers, set-point checks, prices and the cut board are in `v0.9.1`, and
 `v0.9.2` makes `--check` regenerate the hardware outputs).
 
-## How the paper gets written (owner's plan, 2026-10-04)
+## The paper
 
-Not before Fiducial is finished and makes sense as a whole. Then the owner
-provides:
-- the conference's `.docx` paper template;
-- last year's best-paper award winner, written by the owner.
+For IEEESTEC 2026, on the conference template, in the voice of the author's
+IEEESTEC 2025 paper (Outreach). It cites the release in `Cargo.toml`. After review, its
+title is *Fiducial: Keeping Multidisciplinary Products Built with AI Agents
+Consistent*: the reviewer found "Build Any Robust …" (the platform's thesis,
+`thesis.toml`) too broad for two products, and the paper now claims
+consistency between artifacts, not correctness of the declared facts.
+`response-to-review.md` answers the review point by point.
 
-From those: the owner's writing style, what made that paper succeed, and how
-its images and illustrations work. Then, together: how best to present,
-sell and frame Fiducial. The draft written on 2026-10-02 was removed; start
-from these notes, not from it.
+- `Fiducial_Zdravkovic_Aleksa.docx` / `.pdf` — the paper.
+- `markers/run.py` — the injected-mistake test. Four sets of 20 mistakes,
+  each applied to a clean copy of a product with the gates run in CI's
+  order, each committed before its first run. `first_runs.json` records
+  every first run:
+  - the first set (with 5 controls): 15/20 on 0.9.4; it was used to
+    improve the platform;
+  - the second (N1–N20), by the author after 0.9.11: 15/20;
+  - the third (I1–I20, `independent_cases.py`), by a separate agent that
+    read only the products: 16/20 on 0.9.12;
+  - the fourth (F1–F20, `fourth_cases.py`), by a separate agent, aimed at
+    the five classes the third revealed: 14/20 on 0.10.0.
+
+  Every miss fell into one of five classes, each closed by one mechanism
+  (`docs/specs/2026-11-01-mistakes-are-fixed-by-class.md`); the results
+  files hold the current release's runs. `--baseline` runs a set with
+  derive and `--check` removed, i.e. ordinary CI (compilers, type checks,
+  tests): 1/20 on the first set, 0/20 on each of the others. Each run
+  writes `results[-<set>][-baseline].json` and `.md`.
+- `figures/make_figures.py` — the figures. Fig. 4 (two gate messages) is
+  still drawn but no longer in the paper; it gave its space to the
+  held-out results.
+- `build_paper.py` — writes the text into the template. Every number in
+  the evaluation, Table II and the abstract is read from the result files,
+  and it asserts which mistakes are still missed, so the text cannot
+  drift from the data. Citations are written `[@key]` and numbered by first
+  appearance. The template is the Outreach `.doc` converted to `.docx` (not
+  in this repository: it holds the earlier paper and its co-authors'
+  details).
+- Layout follows the IEEESTEC template: its own styles (`figure caption`,
+  `table head`, Heading 5 for References), figure labels in Times New Roman
+  at 8 pt or more, every figure and table at the top or bottom of a column.
+  The preview matches Word's layout because the build gives the title
+  section the body's margins and turns off automatic hyphenation (both
+  artefacts of the .doc conversion).
+- To export the PDF as committed, Times New Roman must be installed, then:
+  `soffice --headless --convert-to 'pdf:writer_pdf_Export:{"UseLosslessCompression":{"type":"boolean","value":"true"},"ReduceImageResolution":{"type":"boolean","value":"false"}}' Fiducial_Zdravkovic_Aleksa.docx`
+
+Rerun the tests, then the figures, then the paper, whenever the platform
+changes what a gate catches. A fix made after a set's first run makes that
+set no longer unseen: a later paper needs a new one.

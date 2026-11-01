@@ -187,6 +187,15 @@ impl Lock {
         }
     }
 
+    /// Drop `pipeline` from every input record, and the records no pipeline
+    /// reads any more.
+    pub fn forget_inputs_of(&mut self, pipeline: &str) {
+        for rec in self.inputs.values_mut() {
+            rec.pipelines.retain(|p| p != pipeline);
+        }
+        self.inputs.retain(|_, rec| !rec.pipelines.is_empty());
+    }
+
     pub fn record_artifact(
         &mut self,
         path: impl Into<String>,

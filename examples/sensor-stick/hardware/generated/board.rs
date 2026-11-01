@@ -31,3 +31,15 @@ macro_rules! sensor_sda {
     };
 }
 pub(crate) use sensor_sda;
+
+/// `sensor` (AHT20): its I²C address.
+pub const SENSOR_I2C_ADDRESS: u8 = 0x38;
+
+/// `sensor` (AHT20): `measure_ms`, from its device profile.
+pub const SENSOR_MEASURE_MS: u64 = 80;
+
+/// `sensor` (AHT20): the `init` command, from its device profile.
+pub const SENSOR_INIT: [u8; 3] = [0xBE, 0x08, 0x00];
+
+/// `sensor` (AHT20): the `measure` command, from its device profile.
+pub const SENSOR_MEASURE: [u8; 3] = [0xAC, 0x33, 0x00];

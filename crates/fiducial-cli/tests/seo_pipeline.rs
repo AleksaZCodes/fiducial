@@ -345,18 +345,17 @@ fn the_seo_pipeline_does_not_write_another_pipelines_artifact() {
 
 // ── The handover off `brand` ────────────────────────────────────────────────
 
-/// Two pipelines owning one artifact is refused whatever directory they spell.
+/// Brand steps aside for `seo`, whatever directory the sitemap is spelled at.
 ///
-/// The guard used to match the literal `apps/web/public/sitemap.xml`, so it was
-/// silent for a product whose pipelines say `static/` — which is every product
-/// that had to edit the paths, and therefore the population most likely to have
-/// left both owners in place.
+/// Both pipelines listing a sitemap used to be refused, which made a fresh
+/// product with both capabilities fail its first derive on files the platform
+/// wrote. Now brand's one-line sitemap is not applicable while `seo` exists,
+/// so there is one owner and one file — even at a non-Next.js path.
 #[test]
-fn both_pipelines_owning_the_sitemap_is_refused() {
+fn brand_steps_aside_for_seos_sitemap() {
     let tmp = tempfile::tempdir().unwrap();
     let root = seo_product(tmp.path());
 
-    // Hand it back to brand, at a path that is not the Next.js one.
     edit_line(
         &root,
         "pipelines/seo.toml",
@@ -372,12 +371,18 @@ fn both_pipelines_owning_the_sitemap_is_refused() {
     write(&root, "pipelines/brand.toml", &brand);
 
     let out = run(&root, &["derive"]);
-    assert!(!out.status.success(), "should refuse: {}", text(&out));
-    let said = text(&out);
+    assert!(out.status.success(), "{}", text(&out));
+    let lock = read(&root, "fiducial.lock");
+    let entry = lock
+        .split("[artifacts.\"apps/web/static/sitemap.xml\"]")
+        .nth(1)
+        .expect("the sitemap is tracked");
     assert!(
-        said.contains("sitemap.xml") && said.contains("brand.toml"),
-        "names the file and the pipeline to edit: {said}"
+        entry.trim_start().starts_with("pipeline = \"seo\""),
+        "seo owns the sitemap: {entry}"
     );
+    let out = run(&root, &["derive", "--check"]);
+    assert!(out.status.success(), "{}", text(&out));
 }
 
 // ── The pages declaration ───────────────────────────────────────────────────
@@ -448,4 +453,52 @@ fn an_unknown_bare_page_names_the_fix() {
         said.contains("/workshop") && said.contains("title ="),
         "shows the declaration to write: {said}"
     );
+}
+
+#[test]
+fn a_page_declared_twice_fails_derive() {
+    // The paper's held-out set, N5: one route listed twice.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = seo_product(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+    let toml = read(&root, "fiducial.toml");
+    assert!(toml.contains("pages = [\"/\"]"), "fixture: {toml}");
+    write(
+        &root,
+        "fiducial.toml",
+        &toml.replace("pages = [\"/\"]", "pages = [\"/\", \"/\"]"),
+    );
+    let out = run(&root, &["derive"]);
+    assert!(
+        !out.status.success(),
+        "a duplicate page derived: {}",
+        text(&out)
+    );
+    assert!(text(&out).contains("lists / twice"), "{}", text(&out));
+}
+
+#[test]
+fn a_post_dated_a_day_that_does_not_exist_fails_derive() {
+    // The paper's held-out set, N6: the shape of a date, naming no day.
+    let tmp = tempfile::tempdir().unwrap();
+    let root = seo_product(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+    for bad in ["2026-13-01", "2026-02-30"] {
+        let post = read(&root, "content/posts/en/hello.md");
+        let dated = post
+            .lines()
+            .map(|l| {
+                if l.starts_with("date:") {
+                    format!("date: {bad}")
+                } else {
+                    l.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        write(&root, "content/posts/en/hello.md", &dated);
+        let out = run(&root, &["derive"]);
+        assert!(!out.status.success(), "{bad} derived: {}", text(&out));
+        assert!(text(&out).contains("should be date"), "{}", text(&out));
+    }
 }

@@ -1,0 +1,13 @@
+name     = "topology"
+executor = "fid-topology"
+outputs  = [
+  "firmware/controller/generated/params.rs",
+  "firmware/controller/generated/topics.rs",
+]
+
+# topology.toml in; per firmware role a parameter table, and a topic table.
+# The extension picks the firmware's language: `.rs` for Rust (Embassy or any
+# other), `.h` for C and C++ (ESP-IDF, Zephyr, Arduino, a vendor SDK), `.json`
+# for anything else. The path is the firmware's own layout. Add a `board.<ext>`
+# and the hardware variants' wiring, bill of materials and diagrams when a
+# node's `hardware` is declared from modules.

@@ -67,6 +67,7 @@ Every row carries a status, and the statuses are honest:
 | Desktop | **Tauri** — Rust backend, shares crates with firmware and geometry | Decided |
 | Mobile | **Tauri** — same shell as desktop. Native Rust on the phone, no webview-WASM | Decided |
 | Mobile + desktop BLE | **`tauri-plugin-blec`** (btleplug-based). iOS is the least-proven path | Decided |
+| Mobile until Tauri mobile ships | **Responsive web app installed as a PWA** — one site on every screen size | Decided |
 | Capacitor | **Dropped from the platform.** Available as an optional capability if a product needs a specific plugin | Decided |
 | Browser | The one place the WASM boundary is unavoidable | Decided |
 
@@ -81,6 +82,8 @@ Every row carries a status, and the statuses are honest:
 | Transactional email | **Resend**, via `@fiducial/email` | Decided |
 | CMS | **Payload** | Candidate — ROP-proven, not yet platform-generalized |
 | Docs site | **VitePress** | Decided |
+| Self-hosted server | **Rust `axum` + `tokio`**, `sqlx` — a recorded exception to TypeScript server glue (`2026-11-01-a-self-hosted-target`) | Decided |
+| Self-hosted database | **SQLite (WAL)** — raw readings 30 days, hourly roll-ups kept | Decided |
 | Error tracking | — | **Gap** — deliberately undecided, inherited from ROP |
 | Payments | — | **Gap** — decide at first paid product |
 
@@ -90,14 +93,20 @@ Every row carries a status, and the statuses are honest:
 | --- | --- | --- |
 | Language | **Rust only.** No PlatformIO, no C++ | Decided |
 | Framework | **Embassy** (async) — `embassy-stm32`, `embassy-rp` | Decided |
-| MCUs | **STM32** · **RP2040 / RP235x** | Decided |
+| MCUs | **STM32** · **RP2040 / RP235x** · **ESP32-C6** (`esp-hal` + Embassy + `esp-radio` + `esp-rtos`) | Decided |
 | Flash + debug | **probe-rs** (`runner = "probe-rs run --chip …"`) | Decided |
 | Logging | **defmt** + `defmt-rtt` | Decided |
 | On-target tests | **`defmt-test`** | Decided |
 | Host-side firmware tests | Mocked HAL, `cargo test` | Decided |
 | LoRa | **`lora-rs`** — `lora-phy`, `lora-modulation`, `lorawan-encoding`, `lorawan-device` | Decided |
 | IP networking | **`embassy-net`** (smoltcp) | Decided |
-| Custom link/network layer | **`fiducial-protocol`** — framing, fragmentation, addressing, above the radio | Decided |
+| Custom link/network layer | **`fiducial-protocol`** — framing (`MAGIC · LEN16 · payload · CRC-32`), above the link | Decided |
+| IoT transport | **MQTT 3.1.1 over TLS**, broker **Mosquitto**; per-device credentials, ACL derived from `can()` | Decided |
+| Fieldbus to vendor sensors | **Modbus RTU over RS-485** | Decided |
+| ESP firmware OTA | `esp-bootloader-esp-idf` partitions + `fiducial-ota` (`embassy-boot` has no ESP backend) | Candidate → first product that needs it |
+| CAN / CAN-FD | ISO 15765-2 (ISO-TP) segmentation in `fiducial-protocol::segment`; FDCAN on MCUs, SocketCAN on Linux | Candidate → distributed Phase 8 |
+| Linux real-time node runtime | `PREEMPT_RT` (mainline since 6.12), `mlockall`, stack prefault, `SCHED_FIFO` from the declaration | Candidate → distributed Phase 8 |
+| Time-triggered / TSN Ethernet | — | **Gap** — no product needs one |
 | Hardware-in-the-loop rigs | — | Deferred until a board physically exists |
 
 ## 7 · Electronics (EDA)
@@ -150,6 +159,7 @@ Every row carries a status, and the statuses are honest:
 | Numerical / physics | **Rust** — `fiducial-sim` + `rayon`; WASM single-threaded by default | Decided |
 | Dataframes | **Polars** | Candidate |
 | ML training | PyTorch via `uv` (pragmatic) vs `candle`/`burn` (Rust) | **Gap** — decide on real need |
+| Local inference | **`ollama`** (llama.cpp, OpenAI-compatible endpoint) behind the `ai` contract | Decided |
 | Structure | Any of these is **a pipeline** (§3 of the spec). The core absorbs them without change | Decided |
 
 ## 12 · Quality
@@ -177,6 +187,7 @@ Every row carries a status, and the statuses are honest:
 | Binary artifacts | GitHub Releases on tag + local build cache. Never committed | Decided |
 | Text artifacts | Committed, diffable, `--check`ed | Decided |
 | Web deploy | **Vercel** (Next SSR) · **Cloudflare Workers** (static/PWA, DO) | Decided |
+| Self-hosted deploy | **Docker Compose** on a Linux host (arm64 or x86_64), **Caddy** for TLS — derived like `wrangler.toml` | Decided |
 | Schema deploy | Supabase GitHub integration. **Never `db push` by hand** | Decided |
 
 ## 14 · Agent tooling
@@ -255,10 +266,11 @@ Every row carries a status, and the statuses are honest:
 
 ## Score
 
-**141 rows. 122 Decided · 12 Candidate (each with a named phase) · 4 Gap · 2 Deferred.**
+**152 rows. 129 Decided · 15 Candidate (each with a named phase) · 5 Gap · 2 Deferred.**
 
 **The gaps, in full:** error tracking · payments · ML framework · FEA/thermal/CFD (which also
-covers structural sizing, materials data and certification evidence).
+covers structural sizing, materials data and certification evidence) · time-triggered / TSN
+Ethernet.
 **Deferred:** Ruby/Rails · hardware-in-the-loop rigs.
 
 **Nothing on that list blocks Phase 0 through Phase 8.**

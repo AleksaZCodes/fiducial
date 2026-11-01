@@ -1,0 +1,12 @@
+name     = "monitoring"
+executor = "fid-monitoring"
+outputs  = [
+  "firmware/controller/generated/points.rs",
+  "apps/web/src/generated/points.ts",
+  "apps/web/src/generated/cards.ts",
+  "migrations/0001_monitoring.sql",
+]
+
+# monitoring.toml and topology.toml in; per firmware role a point table, the
+# web's point types and cards, and the readings schema. A firmware role with
+# points that is not listed here fails derive.

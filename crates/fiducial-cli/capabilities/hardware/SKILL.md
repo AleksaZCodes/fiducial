@@ -314,6 +314,52 @@ could not solve is in `hardware/build/placement-model.json`; run
 `python3 hardware/place.py < hardware/build/placement-model.json` to try an
 edit to it by hand before changing the declaration.
 
+## Facts the electronics check for you
+
+- **`value` is checked against the part ordered.** A pinned part's `value`
+  ("1uF 50V X5R") must state the same resistance, capacitance or inductance as
+  LCSC's own description of its `lcsc` number in `hardware/parts.lock`; a
+  mismatch fails derive with both, so the schematic, the BOM and the reel
+  agree.
+- **`[rails]` and `io_max_v`.** Declare each rail's voltage
+  (`[rails] VBUS = 5.0, "3V3" = 3.3`) and, on a part, the highest voltage its
+  pins may see from its datasheet's absolute maximum ratings
+  (`io_max_v = 3.8`). Every net a resistor pulls toward a rail is solved, and
+  a pin above its part's limit fails derive, naming the net and the resistor
+  that put it there.
+- **`i2c_address`.** A part's I²C address (`i2c_address = 0x38`) is declared
+  on the part and derived into `board.rs` as `<PART>_I2C_ADDRESS`. Firmware
+  takes it from there: an address typed into an I²C transfer
+  (`write_async(0x38, …)`) fails derive, unless marked `// fid: allow-address`.
+- **Device profiles: the datasheet, read once.** A part whose `mpn` the
+  platform has a profile for (RP2040, AHT20, SN74AHCT1G125, WS2812B so far) is
+  checked against its datasheet on every derive: its supply pin's rail must be
+  in range; its `io_max_v` may not exceed the datasheet's (an RP2040 on 3.3 V
+  is 3.8 V, not 5.5 — the limit is not a setting); its `i2c_address` must be
+  the datasheet's; an active-low enable tied high (or active-high tied low) is
+  a part that never turns on. What you leave out, the profile fills in. Its
+  command bytes reach `board.rs` as `<PART>_<COMMAND>` (`SENSOR_INIT`); a
+  command written out by hand in firmware (`const INIT: [u8; 3] = [0xE1, …]`)
+  or typed into a transfer (`write(addr, &[0xE1, …])`) fails derive. Its waits
+  reach `board.rs` the same way (`SENSOR_MEASURE_MS`), and a firmware `const
+  MEASURE_MS: u64 = 8;` fails. An MCU that needs a crystal frequency (RP2040:
+  12 MHz on XIN) is checked against the frequency in the crystal's LCSC
+  description in `parts.lock`.
+- **Every pinned part is in `parts.lock`.** Once a product has a lock, a part
+  whose `lcsc` is not in it is one nobody checked against LCSC: derive fails
+  until `parts.py resolve` has read it.
+- **A light is seen.** A light inside the case (a profile that says so, or an
+  LED symbol) needs a translucent case — `colour = "#rrggbbaa"`, alpha under
+  `f0`, which the renders also draw see-through — or an opening
+  (`through_wall = true`).
+- **Every I²C line is pulled up.** A net on a pin called SDA or SCL needs a
+  resistor to a supply rail; a bus line nothing pulls high never reads high.
+  A copied pull-up that kept its source's net leaves its own line bare, and
+  derive names it.
+- **Pins go through `board.rs`.** Firmware that names a pin directly
+  (`p.PIN_4`, `p.PA5`) fails derive and `--check`, naming file and line; a
+  deliberate one is marked `// fid: allow-pin`.
+
 ## Drift you cannot see
 
 The declaration names SVG files it does not own — a logo belongs to the brand.

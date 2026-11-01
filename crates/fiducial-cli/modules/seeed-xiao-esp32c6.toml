@@ -1,0 +1,25 @@
+# Seeed Studio XIAO ESP32C6 — Seeed wiki "Pin Map": D0–D2 are ADC (GPIO0–2),
+# D4/D5 are GPIO22/23, D6 is UART0 TX (GPIO16), which the boot ROM drives
+# at power-up, so a contact to GND there shorts the output.
+id     = "seeed-xiao-esp32c6"
+name   = "Seeed XIAO ESP32C6"
+kind   = "mcu"
+supply = 3.3
+source = "Seeed XIAO ESP32C6 wiki, Pin Map; ESP32-C6 datasheet §2.3"
+price  = { rsd = 799, vendor = "Malina314", checked = "2026-11-01" }
+
+[pins]
+D0  = { gpio = 0,  roles = ["adc"] }
+D1  = { gpio = 1,  roles = ["adc"] }
+D2  = { gpio = 2,  roles = ["adc"] }
+D3  = { gpio = 21, roles = [] }
+D4  = { gpio = 22, roles = [] }
+D5  = { gpio = 23, roles = [] }
+D6  = { gpio = 16, roles = ["boot-driven"] }
+D7  = { gpio = 17, roles = ["uart0-rx"] }
+D8  = { gpio = 19, roles = [] }
+D9  = { gpio = 20, roles = [] }
+D10 = { gpio = 18, roles = [] }
+"3V3" = { roles = ["power"] }
+"5V"  = { roles = ["power"] }
+GND   = { roles = ["ground"] }

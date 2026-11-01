@@ -1,0 +1,684 @@
+{
+  "summary": {
+    "fid": "fid 0.9.11",
+    "commit": "bbaa1b0",
+    "set": "heldout",
+    "baseline": true,
+    "markers_caught": 0,
+    "markers": 20,
+    "controls_passed": 0,
+    "controls": 0
+  },
+  "results": [
+    {
+      "id": "N1",
+      "product": "web",
+      "area": "i18n",
+      "kind": "declaration breaks a rule",
+      "mistake": "Placeholder renamed in Serbian only",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "messages/sr.json"
+      ],
+      "gates": [
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.12,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N2",
+      "product": "web",
+      "area": "i18n",
+      "kind": "incomplete declaration",
+      "mistake": "String deleted from Serbian only",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "messages/sr.json"
+      ],
+      "gates": [
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.19,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N3",
+      "product": "web",
+      "area": "legal",
+      "kind": "declaration breaks a rule",
+      "mistake": "Jurisdiction mistyped",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "fiducial.toml"
+      ],
+      "gates": [
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.29,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N4",
+      "product": "web",
+      "area": "brand",
+      "kind": "declaration breaks a rule",
+      "mistake": "Brand colour mistyped (five hex digits)",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "fiducial.toml"
+      ],
+      "gates": [
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.25,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N5",
+      "product": "web",
+      "area": "SEO",
+      "kind": "declarations conflict",
+      "mistake": "Same page declared twice",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "fiducial.toml"
+      ],
+      "gates": [
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.26,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N6",
+      "product": "web",
+      "area": "content",
+      "kind": "declaration breaks a rule",
+      "mistake": "Post dated a month that does not exist",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "content/posts/en/hello.md"
+      ],
+      "gates": [
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.28,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N7",
+      "product": "web",
+      "area": "content",
+      "kind": "incomplete declaration",
+      "mistake": "Serbian post missing its title",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "content/posts/sr/hello.md"
+      ],
+      "gates": [
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.29,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N8",
+      "product": "web",
+      "area": "design",
+      "kind": "declaration breaks a rule",
+      "mistake": "Contrast pair names a colour that does not exist",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "design-system.md"
+      ],
+      "gates": [
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.26,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N9",
+      "product": "web",
+      "area": "database",
+      "kind": "declaration breaks a rule",
+      "mistake": "New migration uses a type the database lacks",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "migrations/0002_notes.sql"
+      ],
+      "gates": [
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.25,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N10",
+      "product": "web",
+      "area": "identity",
+      "kind": "stale output",
+      "mistake": "Permissions table renamed, not re-derived",
+      "control": false,
+      "rederive": false,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "fiducial.toml"
+      ],
+      "gates": [
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.3,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N11",
+      "product": "stick",
+      "area": "hardware",
+      "kind": "incomplete declaration",
+      "mistake": "LED data net mistyped on the LED",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "examples/sensor-stick/hardware/product.toml"
+      ],
+      "gates": [
+        {
+          "gate": "firmware build",
+          "ok": true,
+          "seconds": 2.45,
+          "message": "",
+          "output": ""
+        },
+        {
+          "gate": "firmware tests",
+          "ok": true,
+          "seconds": 0.5,
+          "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "output": ""
+        },
+        {
+          "gate": "web test",
+          "ok": true,
+          "seconds": 0.17,
+          "message": "# (node:4983) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-cngmm9i_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "output": ""
+        },
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.27,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N12",
+      "product": "stick",
+      "area": "hardware",
+      "kind": "declarations conflict",
+      "mistake": "Two parts given the same id",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "examples/sensor-stick/hardware/product.toml"
+      ],
+      "gates": [
+        {
+          "gate": "firmware build",
+          "ok": true,
+          "seconds": 0.16,
+          "message": "",
+          "output": ""
+        },
+        {
+          "gate": "firmware tests",
+          "ok": true,
+          "seconds": 0.17,
+          "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "output": ""
+        },
+        {
+          "gate": "web test",
+          "ok": true,
+          "seconds": 0.19,
+          "message": "# (node:5041) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-cngmm9i_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "output": ""
+        },
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.7,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N13",
+      "product": "stick",
+      "area": "circuit",
+      "kind": "incomplete declaration",
+      "mistake": "I²C pull-up resistor deleted",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "examples/sensor-stick/hardware/product.toml"
+      ],
+      "gates": [
+        {
+          "gate": "firmware build",
+          "ok": true,
+          "seconds": 0.14,
+          "message": "",
+          "output": ""
+        },
+        {
+          "gate": "firmware tests",
+          "ok": true,
+          "seconds": 0.14,
+          "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "output": ""
+        },
+        {
+          "gate": "web test",
+          "ok": true,
+          "seconds": 0.21,
+          "message": "# (node:5099) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-cngmm9i_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "output": ""
+        },
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.54,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N14",
+      "product": "stick",
+      "area": "parts",
+      "kind": "declaration breaks a rule",
+      "mistake": "Wrong order number on a resistor",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "examples/sensor-stick/hardware/product.toml"
+      ],
+      "gates": [
+        {
+          "gate": "firmware build",
+          "ok": true,
+          "seconds": 0.14,
+          "message": "",
+          "output": ""
+        },
+        {
+          "gate": "firmware tests",
+          "ok": true,
+          "seconds": 0.12,
+          "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "output": ""
+        },
+        {
+          "gate": "web test",
+          "ok": true,
+          "seconds": 0.22,
+          "message": "# (node:5157) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-cngmm9i_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "output": ""
+        },
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.62,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N15",
+      "product": "stick",
+      "area": "mechanical",
+      "kind": "declaration breaks a rule",
+      "mistake": "Case wall thinned 1.6 → 0.4 mm",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "examples/sensor-stick/hardware/product.toml"
+      ],
+      "gates": [
+        {
+          "gate": "firmware build",
+          "ok": true,
+          "seconds": 0.16,
+          "message": "",
+          "output": ""
+        },
+        {
+          "gate": "firmware tests",
+          "ok": true,
+          "seconds": 0.13,
+          "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "output": ""
+        },
+        {
+          "gate": "web test",
+          "ok": true,
+          "seconds": 0.24,
+          "message": "# (node:5215) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-cngmm9i_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "output": ""
+        },
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.51,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N16",
+      "product": "stick",
+      "area": "mechanical",
+      "kind": "declarations conflict",
+      "mistake": "Board thickness 1.6 → 3.0 mm",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "examples/sensor-stick/hardware/product.toml"
+      ],
+      "gates": [
+        {
+          "gate": "firmware build",
+          "ok": true,
+          "seconds": 0.15,
+          "message": "",
+          "output": ""
+        },
+        {
+          "gate": "firmware tests",
+          "ok": true,
+          "seconds": 0.17,
+          "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "output": ""
+        },
+        {
+          "gate": "web test",
+          "ok": true,
+          "seconds": 0.18,
+          "message": "# (node:5274) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-cngmm9i_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "output": ""
+        },
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.4,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N17",
+      "product": "stick",
+      "area": "protocol",
+      "kind": "copied, not translated",
+      "mistake": "Temperature declared unsigned",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "examples/sensor-stick/protocol.toml"
+      ],
+      "gates": [
+        {
+          "gate": "firmware build",
+          "ok": true,
+          "seconds": 0.15,
+          "message": "",
+          "output": ""
+        },
+        {
+          "gate": "firmware tests",
+          "ok": true,
+          "seconds": 0.1,
+          "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "output": ""
+        },
+        {
+          "gate": "web test",
+          "ok": true,
+          "seconds": 0.16,
+          "message": "# (node:5332) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-cngmm9i_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "output": ""
+        },
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.28,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N18",
+      "product": "stick",
+      "area": "protocol",
+      "kind": "declaration breaks a rule",
+      "mistake": "Band bounds swapped (min above max)",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "examples/sensor-stick/protocol.toml"
+      ],
+      "gates": [
+        {
+          "gate": "firmware build",
+          "ok": true,
+          "seconds": 0.17,
+          "message": "",
+          "output": ""
+        },
+        {
+          "gate": "firmware tests",
+          "ok": true,
+          "seconds": 0.12,
+          "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "output": ""
+        },
+        {
+          "gate": "web test",
+          "ok": true,
+          "seconds": 0.21,
+          "message": "# (node:5390) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-cngmm9i_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "output": ""
+        },
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.46,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N19",
+      "product": "stick",
+      "area": "firmware",
+      "kind": "declaration bypassed",
+      "mistake": "Sensor wait typed as a number",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "examples/sensor-stick/firmware/rp2040/src/main.rs"
+      ],
+      "gates": [
+        {
+          "gate": "firmware build",
+          "ok": true,
+          "seconds": 2.57,
+          "message": "",
+          "output": ""
+        },
+        {
+          "gate": "firmware tests",
+          "ok": true,
+          "seconds": 0.13,
+          "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "output": ""
+        },
+        {
+          "gate": "web test",
+          "ok": true,
+          "seconds": 0.18,
+          "message": "# (node:5461) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-cngmm9i_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "output": ""
+        },
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.4,
+          "message": "",
+          "output": ""
+        }
+      ]
+    },
+    {
+      "id": "N20",
+      "product": "stick",
+      "area": "web",
+      "kind": "declaration bypassed",
+      "mistake": "Page compares humidity to the band by hand",
+      "control": false,
+      "rederive": true,
+      "caught_by": [],
+      "pass": false,
+      "changed": [
+        "examples/sensor-stick/web/src/reading.ts"
+      ],
+      "gates": [
+        {
+          "gate": "firmware build",
+          "ok": true,
+          "seconds": 2.45,
+          "message": "",
+          "output": ""
+        },
+        {
+          "gate": "firmware tests",
+          "ok": true,
+          "seconds": 0.13,
+          "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "output": ""
+        },
+        {
+          "gate": "web test",
+          "ok": true,
+          "seconds": 0.18,
+          "message": "# (node:5531) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-cngmm9i_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "output": ""
+        },
+        {
+          "gate": "type check",
+          "ok": true,
+          "seconds": 1.37,
+          "message": "",
+          "output": ""
+        }
+      ]
+    }
+  ]
+}

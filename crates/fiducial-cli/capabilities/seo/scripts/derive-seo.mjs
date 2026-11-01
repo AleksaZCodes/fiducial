@@ -46,7 +46,19 @@ import { parseToml } from "./toml-lite.mjs";
 import { frontmatter } from "./frontmatter.mjs";
 
 const at = (p) => new URL(`../${p}`, import.meta.url);
-const read = (p) => readFileSync(at(p), "utf8");
+// A missing file is named, never a stack trace: a locale added to [i18n]
+// before its catalog is the common case (the paper's independent set, I1).
+const read = (p) => {
+  if (!existsSync(at(p))) {
+    const locale = /^messages\/([^/]+)\.json$/.exec(p)?.[1];
+    const why = locale
+      ? `[i18n] declares the locale \`${locale}\` and ${p} does not exist — add the catalog, or remove the locale`
+      : `${p} does not exist`;
+    console.error(`derive-seo: ${why}`);
+    process.exit(1);
+  }
+  return readFileSync(at(p), "utf8");
+};
 const readJson = (p) => JSON.parse(read(p));
 
 const fail = (msg) => {
@@ -109,6 +121,16 @@ const staticPages = (seo.pages ?? ["/"]).map((entry) => {
   }
   return entry;
 });
+// A page listed twice is one route declared twice: the sitemap would carry it
+// twice, and when the two entries name different keys, which title the page
+// gets depends on order (the paper's held-out set, N5).
+{
+  const seen = new Set();
+  for (const { path } of staticPages) {
+    if (seen.has(path)) fail(`[seo] pages lists ${path} twice — declare each page once`);
+    seen.add(path);
+  }
+}
 
 // ── Where the outputs go ─────────────────────────────────────────────────────
 //
@@ -153,18 +175,9 @@ const xmlOut = output("sitemap.xml");
 // product — whose brand pipeline says `apps/web/static/sitemap.xml` — so the
 // race this guard exists to prevent was left in place precisely where the
 // paths differ, which is where it was most likely to happen.
-const brandPipeline = existsSync(at("pipelines/brand.toml")) ? read("pipelines/brand.toml") : "";
-const brandSitemap = (parseToml(brandPipeline || "outputs = []").outputs ?? []).find((o) =>
-  o.endsWith("/sitemap.xml"),
-);
-if (brandSitemap) {
-  fail(
-    `pipelines/brand.toml still lists ${brandSitemap} as an output.\n` +
-      "  Remove that line: `seo` owns the sitemap now, because it is the one that\n" +
-      "  knows the routes. Two pipelines writing one artifact is a race decided by\n" +
-      "  pipeline name order.",
-  );
-}
+// brand's sitemap: `fid derive` skips it while this pipeline exists (brand's
+// one-line sitemap is for a product without routes), so there is one sitemap,
+// and it is this one.
 
 const prefix = (locale) => (locale === defaultLocale ? "" : `/${locale}`);
 const localized = (locale, path) => `${prefix(locale)}${path === "/" ? "" : path}` || "/";

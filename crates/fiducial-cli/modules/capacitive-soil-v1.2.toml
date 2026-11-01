@@ -1,0 +1,14 @@
+# Capacitive soil moisture sensor v1.2 — analog output, 0–3.0 V at 3.3 V
+# supply; calibrated dry = 0 %, in water = 100 %.
+id     = "capacitive-soil-v1.2"
+name   = "Capacitive soil sensor v1.2"
+kind   = "sensor"
+protocol = "analog"
+supply = 3.3
+source = "Capacitive soil sensor v1.2 datasheet or product page"
+price  = { rsd = 200, vendor = "Kalem", checked = "2026-11-01" }
+
+[pins]
+VCC = { roles = ["power"] }
+GND = { roles = ["ground"] }
+AOUT = { roles = ["analog-out"] }

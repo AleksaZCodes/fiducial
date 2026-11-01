@@ -311,9 +311,11 @@ jobs:
       - name: every board part is orderable for assembly
         run: grep -q "Every board part has an LCSC number" hardware/build/fab/README.md
 
-      - name: firmware compiles against the derived pin map
-        working-directory: examples/sensor-stick/firmware
-        run: cargo check --release --target thumbv6m-none-eabi
+      # A build, not a check: only linking reads memory.x, and a check
+      # passed for weeks while the link could not find it.
+      - name: firmware builds and links against the derived pin map
+        working-directory: examples/sensor-stick/firmware/rp2040
+        run: cargo build --release
 
       - name: firmware arithmetic and wire format (host tests)
         working-directory: examples/sensor-stick/firmware

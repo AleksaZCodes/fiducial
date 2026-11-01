@@ -1,0 +1,11 @@
+# Worldsemi WS2812B addressable RGB LED — datasheet, electrical
+# parameters: VDD 3.5–5.3 V.
+mpn    = "WS2812B"
+source = "WS2812B datasheet (Worldsemi), electrical parameters"
+supply = { pin = "VDD", min = 3.5, max = 5.3 }
+light  = true
+
+# "Electrical parameters": V_IH(min) = 0.7 × VDD on DIN. At VDD = 5 V that is
+# 3.5 V, above what a 3.3 V output drives, which is why the stick buffers it.
+[inputs.DIN]
+vih_of_supply = 0.7

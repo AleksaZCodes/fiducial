@@ -9,6 +9,8 @@ mod commands;
 mod config;
 mod context;
 mod design;
+mod devices;
+mod gate;
 mod guard;
 mod hardware;
 mod i18n;
@@ -17,14 +19,19 @@ mod kicad;
 mod legal;
 mod lock;
 mod migration;
+mod modules;
+mod monitoring;
 mod ownership;
 mod pipeline;
 mod place;
 mod prose;
+mod protocol;
 mod schema;
 mod security;
+mod shadow;
 mod templates;
 mod thesis;
+mod topology;
 mod wires;
 
 // ── Top-level CLI ────────────────────────────────────────────────────────────

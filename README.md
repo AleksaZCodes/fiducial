@@ -144,11 +144,14 @@ product actually needs.
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
 | `legal` | declares `legal`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability legal` |
 | `migrations` | declares `migrations`; 1 pipeline(s) | `fid add capability migrations` |
+| `monitoring` | declares `monitoring.toml`; 1 pipeline(s) | `fid add capability monitoring` |
 | `press` | declares `press`, `press/docs/en/boilerplate.md`, `press/docs/en/facts.md`, `press/stories/en/0001-why-this-exists.md`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability press` |
+| `protocol` | declares `protocol.toml`; 1 pipeline(s) | `fid add capability protocol` |
 | `realtime` | a skill | `fid add capability realtime` |
 | `research` | declares `paper`; seeds a `fiducial.toml` block | `fid add capability research` |
 | `seo` | declares `seo`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability seo` |
 | `tauri` | 5 template file(s); guard rules | `fid add capability tauri` |
+| `topology` | declares `topology.toml`; 1 pipeline(s) | `fid add capability topology` |
 | `web-next` | 13 template file(s); guard rules | `fid add capability web-next` |
 | `web-svelte` | 11 template file(s); guard rules | `fid add capability web-svelte` |
 | `worker-cloudflare` | 1 template file(s); guard rules | `fid add capability worker-cloudflare` |
@@ -309,9 +312,15 @@ hashed into the lock too, and `--check` names the one that moved.
 Executors are `shell` and `cargo-test` — which need no platform change at all —
 plus the in-process ones (`fid-validate`, `fid-mesh`, `fid-i18n`, `fid-brand`,
 `fid-thesis`, `fid-deploy`, `fid-identity`, `fid-adapters`, `fid-schema`,
-`fid-legal`, `fid-design`, `fid-hardware`). Reach for `shell` first; a new in-process executor
+`fid-legal`, `fid-design`, `fid-protocol`, `fid-topology`, `fid-monitoring`, `fid-hardware`). Reach for `shell` first; a new in-process executor
 is warranted only when the work is genuinely a Rust library call rather than a
 tool invocation.
+
+A `shell` pipeline that runs `node` runs under Node's permission model: it may
+read its script's directory, its own `pipelines/<name>.toml`, its declared
+`inputs` and `node_modules`, and write only where its `outputs` go. A script
+that reads a file it does not declare fails naming that file, instead of
+producing an output whose input the lock never recorded.
 
 `fid-design` is the clearest case of that line: it parses a declaration, runs
 OKLCH-to-sRGB conversion and WCAG contrast arithmetic over the palette, and
