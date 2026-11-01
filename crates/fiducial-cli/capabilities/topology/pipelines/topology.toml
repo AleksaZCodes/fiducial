@@ -1,20 +1,13 @@
 name     = "topology"
 executor = "fid-topology"
 outputs  = [
-  "firmware/controller/src/generated/points.rs",
-  "firmware/controller/src/generated/params.rs",
-  "crates/messages/src/generated/topics.rs",
-  "apps/web/src/generated/points.ts",
-  "apps/web/src/generated/cards.ts",
-  "migrations/0001_topology.sql",
+  "firmware/controller/generated/params.rs",
+  "firmware/controller/generated/topics.rs",
 ]
 
-# topology.toml in; per firmware role a point table and a parameter table,
-# one topic table for every node, the web's point types and cards, and the
-# server's schema. A firmware role added to topology.toml fails derive until
-# its outputs are listed here.
-#
+# topology.toml in; per firmware role a parameter table, and a topic table.
 # The extension picks the firmware's language: `.rs` for Rust (Embassy or any
 # other), `.h` for C and C++ (ESP-IDF, Zephyr, Arduino, a vendor SDK), `.json`
-# for anything else. The path is the firmware's own layout, under
-# firmware/<role>/.
+# for anything else. The path is the firmware's own layout. Add a `board.<ext>`
+# and the hardware variants' wiring, bill of materials and diagrams when a
+# node's `hardware` is declared from modules.

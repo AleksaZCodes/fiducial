@@ -1,1 +1,1 @@
-description = "Several computers, the buses between them and what each measures and drives, declared once → firmware tables, topics, web cards and the database schema"
+description = "Several computers, the buses between them, their modules and wiring and their settings, declared once → firmware tables in Rust, C or JSON, topics, pin maps, wiring diagrams and a bill of materials"

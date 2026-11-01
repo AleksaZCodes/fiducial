@@ -14,7 +14,7 @@ use std::path::Path;
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 
-use crate::topology::{Node, Point, PointKind, Topology};
+use crate::topology::{Node, Topology};
 
 const LIBRARY: &[&str] = &[
     include_str!("../modules/buzzer-active-3v3.toml"),
@@ -79,8 +79,6 @@ pub struct Hardware {
     #[serde(default)]
     pub wire: Vec<Wire>,
     #[serde(default)]
-    pub point: Vec<Binding>,
-    #[serde(default)]
     pub cost: Option<Cost>,
 }
 
@@ -107,18 +105,11 @@ pub struct Wire {
     pub ends: Vec<String>,
     #[serde(default)]
     pub colour: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Binding {
-    pub id: String,
-    #[serde(default)]
-    pub bus: Option<String>,
-    #[serde(default)]
-    pub address: Option<u32>,
-    #[serde(default)]
-    pub net: Option<String>,
+    /// What the controller does with this net: `analog-in`, `output` or
+    /// `contact` (an input a contact pulls to ground). It selects the pin
+    /// rules that apply; a wire with no `use` is only drawn and listed.
+    #[serde(default, rename = "use")]
+    pub usage: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -171,18 +162,18 @@ pub fn load(root: &Path, rel: &str) -> Result<Hardware> {
     Ok(h)
 }
 
-/// A point as this hardware binds it: the variant's own binding where it
-/// declares one, else the topology's.
-pub fn effective(p: &Point, h: &Hardware) -> Point {
-    let mut q = p.clone();
-    if let Some(b) = h.point.iter().find(|b| b.id == p.id) {
-        q.bus = b.bus.clone();
-        q.address = b.address;
-        q.net = b.net.clone();
-        q.adc = None;
-        q.pin = None;
-    }
-    q
+/// Physical buses that connect `node` and need a module on the board: every
+/// bus but the network ones (`ip`, `usb`), which the controller carries itself.
+pub fn wired_buses<'a>(
+    t: &'a Topology,
+    node: &'a Node,
+) -> impl Iterator<Item = &'a crate::topology::Bus> {
+    t.bus.iter().filter(move |b| {
+        !["ip", "usb"].contains(&b.kind.as_str())
+            && b.connect
+                .iter()
+                .any(|e| e.split('.').next() == Some(node.id.as_str()))
+    })
 }
 
 /// Every problem with one node's hardware declaration against the topology
@@ -273,99 +264,58 @@ pub fn validate(
         }
     }
 
-    let net_pin = |net: &str| -> Option<String> {
-        h.wire
-            .iter()
-            .filter(|w| w.net == net)
-            .flat_map(|w| w.ends.iter())
-            .find_map(|e| {
-                e.strip_prefix(&format!("{}.", h.board.mcu))
-                    .map(str::to_string)
-            })
-    };
     let role_of = |pin: &str| {
         mcu.pins
             .get(pin)
             .map(|p| p.roles.clone())
             .unwrap_or_default()
     };
-
-    for p in t.point.iter().filter(|p| p.node == node.id) {
-        let e = effective(p, h);
-        let pin = e
-            .net
-            .as_deref()
-            .and_then(net_pin)
-            .or_else(|| e.pin.clone())
-            .or_else(|| e.adc.clone());
-        if e.bus.is_some() {
-            continue;
-        }
-        let Some(pin) = pin else {
-            out.push(at(format!(
-                "point `{}`: net `{}` reaches no {} pin",
-                p.id,
-                e.net.clone().unwrap_or_default(),
-                mcu.name
-            )));
+    for w in &h.wire {
+        let Some(usage) = w.usage.as_deref() else {
             continue;
         };
-        if !mcu.pins.contains_key(&pin) {
+        if !["analog-in", "output", "contact"].contains(&usage) {
             out.push(at(format!(
-                "point `{}`: {} has no pin `{pin}`",
-                p.id, mcu.name
+                "wire `{}`: use = \"{usage}\" is not analog-in, output or contact",
+                w.net
             )));
             continue;
         }
-        let roles = role_of(&pin);
-        let analog = p.kind == PointKind::Sensor;
-        if analog && !roles.iter().any(|r| r == "adc") {
+        let Some(pin) = w
+            .ends
+            .iter()
+            .find_map(|e| e.strip_prefix(&format!("{}.", h.board.mcu)))
+        else {
+            out.push(at(format!("wire `{}` reaches no {} pin", w.net, mcu.name)));
+            continue;
+        };
+        let roles = role_of(pin);
+        if usage == "analog-in" && !roles.iter().any(|r| r == "adc") {
             out.push(at(format!(
-                "point `{}` is analog, and {} pin {pin} has no ADC — {}",
-                p.id, mcu.name, mcu.source
+                "wire `{}` is an analog input, and {} pin {pin} has no ADC — {}",
+                w.net, mcu.name, mcu.source
             )));
         }
-        if p.kind == PointKind::Actuator {
+        if usage == "output" {
             if let Some(r) = roles.iter().find(|r| *r == "strapping" || *r == "usb") {
                 out.push(at(format!(
-                    "point `{}`: an output on {} pin {pin}, a {r} pin, changes how the chip boots or \
+                    "wire `{}`: an output on {} pin {pin}, a {r} pin, changes how the chip boots or \
                      breaks USB — {}",
-                    p.id, mcu.name, mcu.source
+                    w.net, mcu.name, mcu.source
                 )));
             }
         }
-        if p.kind == PointKind::Contact && roles.iter().any(|r| r == "boot-driven") {
+        if usage == "contact" && roles.iter().any(|r| r == "boot-driven") {
             out.push(at(format!(
-                "point `{}`: a contact to GND on {} pin {pin}, which the boot ROM drives at power-up, \
+                "wire `{}`: a contact to GND on {} pin {pin}, which the boot ROM drives at power-up, \
                  shorts that output — {}",
-                p.id, mcu.name, mcu.source
+                w.net, mcu.name, mcu.source
             )));
         }
     }
 
-    let used_buses: BTreeSet<String> = t
-        .point
-        .iter()
-        .filter(|p| p.node == node.id)
-        .filter_map(|p| effective(p, h).bus)
-        .collect();
-    for bus_id in &used_buses {
-        let Some(bus) = t.bus.iter().find(|b| &b.id == bus_id) else {
-            out.push(at(format!(
-                "a point is bound to bus `{bus_id}`, which topology.toml does not declare"
-            )));
-            continue;
-        };
-        if !bus
-            .connect
-            .iter()
-            .any(|e| e.split('.').next() == Some(node.id.as_str()))
-        {
-            out.push(at(format!(
-                "bus `{bus_id}` does not connect node `{}`",
-                node.id
-            )));
-        }
+    for bus in wired_buses(t, node) {
+        let bus_id = &bus.id;
         let speaking: Vec<&Module> = h
             .module
             .iter()
@@ -402,22 +352,27 @@ pub fn validate(
                 bus.kind, node.id, bus.kind, h.board.mcu
             )));
         }
-        if bus.kind == "i2c" {
-            for p in t.point.iter().filter(|p| p.node == node.id) {
-                let e = effective(p, h);
-                if e.bus.as_deref() != Some(bus_id.as_str()) {
-                    continue;
-                }
-                if let Some(a) = e.address {
-                    if !speaking
-                        .iter()
-                        .any(|m| lib.get(&m.part).and_then(|d| d.i2c_address) == Some(a))
-                    {
-                        out.push(at(format!(
-                            "point `{}` is at I²C address 0x{a:02X} on `{bus_id}`, and no module there answers at it",
-                            p.id
-                        )));
-                    }
+    }
+
+    for w in &h.wire {
+        let mut at_address: BTreeMap<u32, &str> = BTreeMap::new();
+        for e in &w.ends {
+            let Some((mid, _)) = e.split_once('.') else {
+                continue;
+            };
+            let Some(a) = modules
+                .get(mid)
+                .and_then(|m| lib.get(&m.part))
+                .and_then(|d| d.i2c_address)
+            else {
+                continue;
+            };
+            if let Some(other) = at_address.insert(a, mid) {
+                if other != mid {
+                    out.push(at(format!(
+                        "`{other}` and `{mid}` both answer at I²C address 0x{a:02X} on net `{}`",
+                        w.net
+                    )));
                 }
             }
         }
@@ -784,12 +739,7 @@ pub fn render_variants(
     );
     for v in &node.variants {
         let h = load(root, v)?;
-        let buses: BTreeSet<String> = t
-            .point
-            .iter()
-            .filter(|p| p.node == node.id)
-            .filter_map(|p| effective(p, &h).bus)
-            .collect();
+        let buses: BTreeSet<String> = wired_buses(t, node).map(|b| b.id.clone()).collect();
         let spare = spare_pins(&h, lib);
         let core: f64 = h
             .module
@@ -858,36 +808,6 @@ id = "i2c"
 type = "i2c"
 connect = ["n.i2c0"]
 
-[[point]]
-id = "co2"
-node = "n"
-kind = "sensor"
-unit = "ppm"
-range = [400, 5000]
-bus = "i2c"
-address = 0x62
-display = true
-
-[[point]]
-id = "soil"
-node = "n"
-kind = "sensor"
-unit = "%"
-range = [0, 100]
-net = "SOIL"
-display = true
-
-[[point]]
-id = "stop"
-node = "n"
-kind = "contact"
-net = "STOP"
-
-[[point]]
-id = "relay"
-node = "n"
-kind = "actuator"
-net = "RELAY"
 "#;
 
     const HW: &str = r#"
@@ -917,6 +837,7 @@ ends = ["mcu.GPIO6", "scd41.SDA"]
 
 [[wire]]
 net = "SOIL"
+use = "analog-in"
 ends = ["mcu.GPIO4", "soil.AOUT"]
 
 [[module]]
@@ -929,10 +850,12 @@ part = "relay-2ch-opto"
 
 [[wire]]
 net = "STOP"
+use = "contact"
 ends = ["mcu.GPIO2", "stop.C1"]
 
 [[wire]]
 net = "RELAY"
+use = "output"
 ends = ["mcu.GPIO18", "relays.IN1"]
 "#;
 
@@ -973,7 +896,7 @@ ends = ["mcu.GPIO18", "relays.IN1"]
         let e = check(&HW.replace("mcu.GPIO4\", \"soil.AOUT", "mcu.GPIO10\", \"soil.AOUT"));
         assert!(
             e.contains(
-                "point `soil` is analog, and ESP32-C6-DevKitC-1 (WROOM-1) pin GPIO10 has no ADC"
+                "wire `SOIL` is an analog input, and ESP32-C6-DevKitC-1 (WROOM-1) pin GPIO10 has no ADC"
             ),
             "{e}"
         );

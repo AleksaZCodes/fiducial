@@ -20,6 +20,7 @@ mod legal;
 mod lock;
 mod migration;
 mod modules;
+mod monitoring;
 mod ownership;
 mod pipeline;
 mod place;

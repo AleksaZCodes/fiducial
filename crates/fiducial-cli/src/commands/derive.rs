@@ -223,6 +223,10 @@ fn executor_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
         "fid-design" => vec![arg("design-system.md")],
         "fid-protocol" => vec![arg(crate::protocol::DECLARATION)],
         "fid-topology" => vec![arg(crate::topology::DECLARATION)],
+        "fid-monitoring" => vec![
+            arg(crate::monitoring::DECLARATION),
+            arg(crate::topology::DECLARATION),
+        ],
         "fid-schema" => expand_inputs(root, &[format!("{}/*.sql", crate::schema::DIR)]),
         "fid-mesh" => vec![arg("board/board.interface.json")],
         _ => Vec::new(),
@@ -2623,7 +2627,7 @@ fn run_fid_topology(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     };
     let mut missing: Vec<String> = Vec::new();
     for r in t.roles() {
-        let mut stems = vec!["points", "params"];
+        let mut stems = vec!["params"];
         if t.first_node_of(&r).is_some_and(|n| n.hardware.is_some()) {
             stems.push("board");
         }
@@ -2661,11 +2665,6 @@ fn run_fid_topology(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             missing.join("\n  ")
         );
     }
-    let dialect = Config::load(&working_dir.join(crate::config::CONFIG_FILE))
-        .ok()
-        .and_then(|c| c.adapters.selected.get("database").cloned())
-        .map(|d| if d == "d1" { "sqlite".to_string() } else { d })
-        .unwrap_or_else(|| "sqlite".to_string());
     for out in &pipeline.outputs {
         let file = Path::new(out)
             .file_name()
@@ -2703,7 +2702,9 @@ fn run_fid_topology(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
                 }
             }
             "variants.md" => {
-                let id = out.trim_start_matches("hardware/").trim_end_matches("/variants.md");
+                let id = out
+                    .trim_start_matches("hardware/")
+                    .trim_end_matches("/variants.md");
                 let Some(n) = t.node.iter().find(|n| n.id == id) else {
                     bail!("fid-topology: output `{out}` names no node");
                 };
@@ -2713,25 +2714,97 @@ fn run_fid_topology(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
                 let Some(h) = t.first_node_of(role).and_then(|n| n.hardware.clone()) else {
                     bail!("fid-topology: output `{out}`: firmware `{role}` runs on no node with hardware");
                 };
-                crate::modules::render_board(&crate::modules::load(working_dir, &h)?, &lib, &h, ext)?
-            }
-            _ if !role.is_empty() && stem == "points" && ext != "ts" => {
-                topo::render_points(&t, role, decl, ext)?
+                crate::modules::render_board(
+                    &crate::modules::load(working_dir, &h)?,
+                    &lib,
+                    &h,
+                    ext,
+                )?
             }
             _ if !role.is_empty() && stem == "params" => topo::render_params(&t, role, decl, ext)?,
             _ if stem == "topics" => topo::render_topics(&t, decl, ext)?,
-            "points.ts" => topo::render_points_ts(&t, decl),
-            "cards.ts" => topo::render_cards_ts(&t, decl),
-            f if f.ends_with(".sql") => topo::render_migration(&t, decl, &dialect)?,
             _ => bail!(
-                "fid-topology: unknown output `{out}` (supported: firmware/<role>/…/points, params and \
-                 board as .rs, .h or .json; topics as .rs, .h or .json; points.ts; cards.ts; \
-                 migrations/*.sql; per hardware variant wiring.csv, wiring.svg, bom.csv; \
-                 hardware/<node>/variants.md)"
+                "fid-topology: unknown output `{out}` (supported: firmware/<role>/…/params and \
+                 board as .rs, .h or .json; topics as .rs, .h or .json; per hardware variant \
+                 wiring.csv, wiring.svg, bom.csv; hardware/<node>/variants.md)"
             ),
         };
         if !role.is_empty() && t.first_node_of(role).is_none() {
             bail!("fid-topology: output `{out}` is for firmware `{role}`, which no node runs");
+        }
+        write_output(working_dir, out, &content)?;
+    }
+    Ok(())
+}
+
+fn run_fid_monitoring(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    use crate::{monitoring as mon, topology as topo};
+    let decl = pipeline
+        .args
+        .first()
+        .map(String::as_str)
+        .unwrap_or(mon::DECLARATION);
+    let topo_decl = pipeline
+        .args
+        .get(1)
+        .map(String::as_str)
+        .unwrap_or(topo::DECLARATION);
+    let t = topo::load(working_dir, topo_decl)?;
+    let m = mon::load(working_dir, decl, &t)?;
+    let role_of = |out: &str| -> String {
+        out.strip_prefix("firmware/")
+            .and_then(|r| r.split('/').next())
+            .unwrap_or_default()
+            .to_string()
+    };
+    let missing: Vec<String> = t
+        .roles()
+        .into_iter()
+        .filter(|r| !m.points_of_role(&t, r).is_empty())
+        .filter(|r| {
+            !pipeline.outputs.iter().any(|o| {
+                role_of(o) == *r
+                    && Path::new(o).file_stem().and_then(|s| s.to_str()) == Some("points")
+            })
+        })
+        .map(|r| format!("firmware/{r}/…/points.<rs|h|json>"))
+        .collect();
+    if !missing.is_empty() {
+        bail!(
+            "fid-monitoring: {decl} declares points for firmware that pipelines/{}.toml does not \
+             derive — add to `outputs`:\n  {}",
+            pipeline.name,
+            missing.join("\n  ")
+        );
+    }
+    let dialect = Config::load(&working_dir.join(crate::config::CONFIG_FILE))
+        .ok()
+        .and_then(|c| c.adapters.selected.get("database").cloned())
+        .map(|d| if d == "d1" { "sqlite".to_string() } else { d })
+        .unwrap_or_else(|| "sqlite".to_string());
+    for out in &pipeline.outputs {
+        let stem = Path::new(out)
+            .file_stem()
+            .and_then(|f| f.to_str())
+            .unwrap_or_default();
+        let ext = Path::new(out)
+            .extension()
+            .and_then(|f| f.to_str())
+            .unwrap_or_default();
+        let role = role_of(out);
+        let content = match (stem, ext) {
+            ("points", "ts") => mon::render_points_ts(&m, &t, decl),
+            ("cards", "ts") => mon::render_cards_ts(&m, &t, decl),
+            ("points", _) if !role.is_empty() => mon::render_points(&m, &t, &role, decl, ext)?,
+            ("schedules", _) if !role.is_empty() => mon::render_schedules(&m, &role, decl, ext)?,
+            (_, "sql") => mon::render_migration(&m, &t, decl, &dialect)?,
+            _ => bail!(
+                "fid-monitoring: unknown output `{out}` (supported: firmware/<role>/…/points and \
+                 schedules as .rs, .h or .json; points.ts; cards.ts; migrations/*.sql)"
+            ),
+        };
+        if !role.is_empty() && t.first_node_of(&role).is_none() {
+            bail!("fid-monitoring: output `{out}` is for firmware `{role}`, which no node runs");
         }
         write_output(working_dir, out, &content)?;
     }
@@ -2901,12 +2974,13 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             "fid-design" => return run_fid_design(pipeline, working_dir),
             "fid-protocol" => return run_fid_protocol(pipeline, working_dir),
             "fid-topology" => return run_fid_topology(pipeline, working_dir),
+            "fid-monitoring" => return run_fid_monitoring(pipeline, working_dir),
             "fid-hardware" => return run_fid_hardware(pipeline, working_dir),
             other => bail!(
                 "unknown executor `{other}` \
                  (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n, fid-brand, \
                  fid-adapters, fid-deploy, fid-identity, fid-schema, fid-legal, fid-design, \
-                 fid-protocol, fid-topology, fid-hardware)"
+                 fid-protocol, fid-topology, fid-monitoring, fid-hardware)"
             ),
         };
 

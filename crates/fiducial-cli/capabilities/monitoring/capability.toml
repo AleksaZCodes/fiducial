@@ -1,0 +1,2 @@
+description = "What a monitoring and control product measures, drives and schedules, declared once → firmware point tables, web types and cards, and the readings schema"
+requires_capabilities = ["topology"]

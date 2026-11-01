@@ -1,0 +1,29 @@
+# What the system measures and drives. Point tables (Rust, C or JSON), web
+# types and cards and the readings schema are derived from this file. It refers
+# to the nodes and parameters in topology.toml.
+
+[[point]]
+id        = "co2"
+node      = "controller"
+kind      = "sensor"
+quantity  = "co2"
+unit      = "ppm"
+range     = [400, 5000]
+tolerance = "50 ppm"
+bus       = "sensors"
+address   = 0x62
+limits    = ["threshold"]
+
+[[point]]
+id   = "fan"
+node = "controller"
+kind = "actuator"
+net  = "RELAY_FAN"
+
+[[rule]]
+id         = "ventilation"
+scope      = "controller"
+reads      = ["co2"]
+drives     = ["fan"]
+parameters = ["threshold"]
+doc        = "The fan runs while co2 is above the threshold."

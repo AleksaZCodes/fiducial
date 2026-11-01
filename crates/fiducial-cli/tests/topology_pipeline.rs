@@ -1,5 +1,5 @@
-//! The `topology` capability: several computers, the buses between them and
-//! the points each measures and drives, declared once in `topology.toml`.
+//! The `topology` capability: computers, the buses between them, their modules
+//! and wiring and their settings, declared once in `topology.toml`.
 
 use std::{path::Path, process::Command};
 
@@ -34,37 +34,40 @@ fn product(tmp: &Path) -> std::path::PathBuf {
     root
 }
 
-fn edit(root: &Path, old: &str, new: &str) {
-    let p = root.join("topology.toml");
+fn edit(root: &Path, file: &str, old: &str, new: &str) {
+    let p = root.join(file);
     let s = std::fs::read_to_string(&p).unwrap();
-    assert!(s.contains(old), "{old:?} not in topology.toml");
+    assert!(s.contains(old), "{old:?} not in {file}");
     std::fs::write(p, s.replacen(old, new, 1)).unwrap();
 }
 
 #[test]
-fn a_new_point_reaches_firmware_and_web_in_one_derive() {
+fn a_setting_reaches_firmware_in_the_language_its_output_names() {
     let tmp = tempfile::tempdir().unwrap();
     let root = product(tmp.path());
-    let humidity = "\n[[point]]\nid       = \"humidity\"\nnode     = \"controller\"\nkind     = \"sensor\"\nunit     = \"%\"\nrange    = [0, 100]\nbus      = \"sensors\"\naddress  = 0x62\nquantity = \"relative_humidity\"\ndisplay  = true\n";
-    let p = root.join("topology.toml");
-    let s = std::fs::read_to_string(&p).unwrap();
-    std::fs::write(&p, s + humidity).unwrap();
+    let rs = std::fs::read_to_string(root.join("firmware/controller/generated/params.rs")).unwrap();
+    assert!(rs.contains("Parameter::Threshold => 1000.0"), "{rs}");
 
-    let stale = fid(&root, &["derive", "--check"]);
-    assert!(!stale.status.success());
-    assert!(text(&stale).contains("topology.toml"), "{}", text(&stale));
-
-    ok(&root, &["derive"]);
-    let rs =
-        std::fs::read_to_string(root.join("firmware/controller/src/generated/points.rs")).unwrap();
-    assert!(rs.contains("Humidity = 3,"), "{rs}");
-    let cards = std::fs::read_to_string(root.join("apps/web/src/generated/cards.ts")).unwrap();
-    assert!(
-        cards.contains("{ point: \"humidity\", unit: \"%\", limits: [] }"),
-        "{cards}"
+    edit(
+        &root,
+        "pipelines/topology.toml",
+        "  \"firmware/controller/generated/params.rs\",",
+        "  \"firmware/controller/generated/params.rs\",\n  \"firmware/controller/generated/params.h\",\n  \"firmware/controller/generated/params.json\",",
     );
-    let ts = std::fs::read_to_string(root.join("apps/web/src/generated/points.ts")).unwrap();
-    assert!(ts.contains("name: \"humidity\""), "{ts}");
+    ok(&root, &["derive"]);
+    let h = std::fs::read_to_string(root.join("firmware/controller/generated/params.h")).unwrap();
+    assert!(
+        h.contains("#define PARAMETER_THRESHOLD_DEFAULT 1000.0f"),
+        "{h}"
+    );
+    let j =
+        std::fs::read_to_string(root.join("firmware/controller/generated/params.json")).unwrap();
+    assert!(j.contains("\"threshold\""), "{j}");
+
+    edit(&root, "topology.toml", "default = 1000", "default = 1200");
+    let stale = fid(&root, &["derive", "--check"]);
+    assert!(!stale.status.success(), "a changed default was not stale");
+    ok(&root, &["derive"]);
     ok(&root, &["derive", "--check"]);
 }
 
@@ -74,6 +77,7 @@ fn a_bus_across_systems_fails_naming_both() {
     let root = product(tmp.path());
     edit(
         &root,
+        "topology.toml",
         "nodes = [\"controller\", \"server\"]",
         "nodes = [\"controller\"]\n\n[[system]]\nid    = \"office\"\nnodes = [\"server\"]",
     );
@@ -87,55 +91,46 @@ fn a_bus_across_systems_fails_naming_both() {
 }
 
 #[test]
-fn a_parameter_pointing_at_a_missing_rule_fails() {
-    let tmp = tempfile::tempdir().unwrap();
-    let root = product(tmp.path());
-    edit(
-        &root,
-        "rule    = \"ventilation\"\nlimits  = \"co2\"\n\n[[parameter]]\nid      = \"co2_off\"",
-        "rule    = \"airing\"\nlimits  = \"co2\"\n\n[[parameter]]\nid      = \"co2_off\"",
-    );
-    let out = fid(&root, &["derive"]);
-    assert!(!out.status.success());
-    assert!(
-        text(&out).contains("parameter `co2_on` names rule `airing`, which is not declared"),
-        "{}",
-        text(&out)
-    );
-}
-
-#[test]
 fn a_new_firmware_role_fails_until_its_outputs_are_listed() {
     let tmp = tempfile::tempdir().unwrap();
     let root = product(tmp.path());
     edit(
         &root,
+        "topology.toml",
         "nodes = [\"controller\", \"server\"]",
-        "nodes = [\"controller\", \"roof\", \"server\"]",
+        "nodes = [\"controller\", \"other\", \"server\"]",
     );
     let p = root.join("topology.toml");
     let s = std::fs::read_to_string(&p).unwrap();
     std::fs::write(
         &p,
-        s + "\n[[node]]\nid = \"roof\"\nkind = \"mcu\"\ntarget = \"riscv32imac-unknown-none-elf\"\nruntime = \"embassy-esp\"\nfirmware = \"roof\"\n",
+        s + "\n[[node]]\nid = \"other\"\nkind = \"mcu\"\nfirmware = \"other\"\n",
     )
     .unwrap();
     let out = fid(&root, &["derive"]);
     assert!(!out.status.success());
     assert!(
-        text(&out).contains("firmware/roof/…/points.<rs|h|json>"),
+        text(&out).contains("firmware/other/…/params.<rs|h|json>"),
         "{}",
         text(&out)
     );
 }
 
 #[test]
-fn mqtt_without_tls_is_refused() {
+fn a_setting_outside_its_range_and_mqtt_without_tls_are_refused() {
     let tmp = tempfile::tempdir().unwrap();
     let root = product(tmp.path());
-    edit(&root, "tls      = true\n", "");
+    edit(&root, "topology.toml", "default = 1000", "default = 5000");
     let out = fid(&root, &["derive"]);
     assert!(!out.status.success());
+    assert!(
+        text(&out).contains("default 5000 is outside its range"),
+        "{}",
+        text(&out)
+    );
+    edit(&root, "topology.toml", "default = 5000", "default = 1000");
+    edit(&root, "topology.toml", "tls      = true\n", "");
+    let out = fid(&root, &["derive"]);
     assert!(
         text(&out).contains("MQTT without `tls = true`"),
         "{}",

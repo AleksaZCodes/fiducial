@@ -401,6 +401,7 @@ The capabilities this platform ships:
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
 | `legal` | declares `legal`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability legal` |
 | `migrations` | declares `migrations`; 1 pipeline(s) | `fid add capability migrations` |
+| `monitoring` | declares `monitoring.toml`; 1 pipeline(s) | `fid add capability monitoring` |
 | `press` | declares `press`, `press/docs/en/boilerplate.md`, `press/docs/en/facts.md`, `press/stories/en/0001-why-this-exists.md`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability press` |
 | `protocol` | declares `protocol.toml`; 1 pipeline(s) | `fid add capability protocol` |
 | `realtime` | a skill | `fid add capability realtime` |
