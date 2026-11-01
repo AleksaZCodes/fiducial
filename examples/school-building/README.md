@@ -40,7 +40,8 @@ in a catalog.
 |---|---|
 | Messages and topology | done |
 | Hardware from modules, with roof variants А and Б | done: `hardware/roof/variants.md` compares them |
-| ESP32-C6 firmware, self-hosted server, PWA, derived diagrams | to do |
+| Control rules (`crates/skola-rules`, `no_std`, host-tested, built for the C6) | done |
+| ESP32-C6 firmware runtime, self-hosted server, PWA, derived diagrams | to do |
 
 The roadmap is the platform's `ROADMAP.md`, *Distributed, self-hosted
 products*.

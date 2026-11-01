@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members  = ["crates/skola-messages"]
+members  = ["crates/skola-messages", "crates/skola-rules"]
 
 [workspace.package]
 version = "0.1.0"

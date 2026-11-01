@@ -359,6 +359,14 @@ jobs:
       - name: messages round-trip, and every reason has a message in every catalog
         run: cargo test -p skola-messages --features ts
 
+      - name: control rules, every row of the blind table and both hysteresis edges
+        run: cargo test -p skola-rules
+
+      - name: messages and rules build for the ESP32-C6
+        run: |
+          rustup target add riscv32imac-unknown-none-elf
+          cargo build -p skola-rules --target riscv32imac-unknown-none-elf
+
       - name: re-deriving changes nothing
         run: fid derive && git diff --exit-code -- .
 

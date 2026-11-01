@@ -644,7 +644,7 @@ PWA. Ordered by cost of delay:
 | 1 | One message declaration, two encodings (postcard on device links, JSON typed by `ts-rs` at the web) | debt-accruing | ✅ |
 | 2 | `topology.toml` and `fid-topology`: points, params, topics, TS cards, migrations; validations 1, 2, 4, 6, 7 | multiplying | ✅ |
 | 3 | Hardware built from modules, with variants and derived wiring (CSV now; SVG with phase 7) | multiplying | ✅ |
-| 4 | `firmware-esp32c6` capability | terminal | ⬜ |
+| 4 | `firmware-esp32c6` capability (the product's `no_std` rules crate is done and host-tested) | terminal | 🟡 |
 | 5 | Self-hosted server stack: `sqlite`, `native` auth, `ollama`, `compose`, broker ACL from `can()` | terminal | ⬜ |
 | 6 | The web app as a static export served by the server | terminal | ⬜ |
 | 7 | Derived documentation: topology, wiring, rules, sequence and storage diagrams | multiplying | ⬜ |
