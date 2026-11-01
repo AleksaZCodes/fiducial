@@ -249,13 +249,14 @@ fn workflow_files(dir: &Path) -> Vec<PathBuf> {
     files
 }
 
-/// The nearest ancestor with workflows, else the nearest holding `.git`, else
-/// `root` itself.
+/// Where GitHub looks for workflows: the repository root, the nearest
+/// ancestor holding `.git`. A `.github/` inside a product nested in a larger
+/// repository is never run, so it does not count. Outside any repository,
+/// the product root.
 fn repo_root(root: &Path) -> PathBuf {
     let abs = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     abs.ancestors()
-        .find(|a| a.join(WORKFLOWS).is_dir())
-        .or_else(|| abs.ancestors().find(|a| a.join(".git").exists()))
+        .find(|a| a.join(".git").exists())
         .map(Path::to_path_buf)
         .unwrap_or(abs)
 }
@@ -383,5 +384,26 @@ mod tests {
             p[0].contains("no step runs `fid derive --check` in the repository root"),
             "{p:?}"
         );
+    }
+
+    #[test]
+    fn a_workflow_nested_in_a_product_is_not_one_github_runs() {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path();
+        std::fs::create_dir_all(repo.join(".git")).unwrap();
+        std::fs::create_dir_all(repo.join(WORKFLOWS)).unwrap();
+        std::fs::write(
+            repo.join(SCAFFOLDED),
+            "jobs:\n  a:\n    steps:\n      - run: cargo test\n",
+        )
+        .unwrap();
+        let product = repo.join("examples/p");
+        std::fs::create_dir_all(product.join(WORKFLOWS)).unwrap();
+        std::fs::write(product.join(SCAFFOLDED), SCAFFOLD).unwrap();
+        let p = problems(&product, true);
+        assert!(p[0].contains("in `examples/p`"), "{p:?}");
+        let gated = "jobs:\n  a:\n    defaults:\n      run:\n        working-directory: examples/p\n    steps:\n      - run: fid derive --check\n";
+        std::fs::write(repo.join(SCAFFOLDED), gated).unwrap();
+        assert!(problems(&product, true).is_empty());
     }
 }

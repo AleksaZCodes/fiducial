@@ -6935,8 +6935,19 @@ pub fn load(root: &Path, decl: &str) -> Result<(Product, Solved)> {
     // outermost message, and "hardware/product.toml" alone says nothing.
     let mut product: Product = toml::from_str(&raw).map_err(|e| anyhow!("{decl}: {e}"))?;
     resolve_components(root, &mut product).map_err(|e| anyhow!("{decl}: {e:#}"))?;
-    resolve_picks(root, &mut product).map_err(|e| anyhow!("{decl}: {e:#}"))?;
-    datasheet_checks(&mut product).map_err(|e| anyhow!("{decl}: {e:#}"))?;
+    // Both run before either fails: a part swapped for an unchecked LCSC
+    // number is usually swapped for a reason the datasheet refuses too, and
+    // that reason is the one worth reading (the paper's independent set, I11).
+    let picks = resolve_picks(root, &mut product);
+    let sheets = datasheet_checks(&mut product);
+    let failed: Vec<String> = [picks.err(), sheets.err()]
+        .into_iter()
+        .flatten()
+        .map(|e| format!("{e:#}"))
+        .collect();
+    if !failed.is_empty() {
+        bail!("{decl}: {}", failed.join("\n"));
+    }
     let solved = solve(root, &product).map_err(|e| anyhow!("{decl}: {e:#}"))?;
     Ok((product, solved))
 }

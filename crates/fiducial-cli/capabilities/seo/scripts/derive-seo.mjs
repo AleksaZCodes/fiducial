@@ -46,7 +46,19 @@ import { parseToml } from "./toml-lite.mjs";
 import { frontmatter } from "./frontmatter.mjs";
 
 const at = (p) => new URL(`../${p}`, import.meta.url);
-const read = (p) => readFileSync(at(p), "utf8");
+// A missing file is named, never a stack trace: a locale added to [i18n]
+// before its catalog is the common case (the paper's independent set, I1).
+const read = (p) => {
+  if (!existsSync(at(p))) {
+    const locale = /^messages\/([^/]+)\.json$/.exec(p)?.[1];
+    const why = locale
+      ? `[i18n] declares the locale \`${locale}\` and ${p} does not exist — add the catalog, or remove the locale`
+      : `${p} does not exist`;
+    console.error(`derive-seo: ${why}`);
+    process.exit(1);
+  }
+  return readFileSync(at(p), "utf8");
+};
 const readJson = (p) => JSON.parse(read(p));
 
 const fail = (msg) => {
