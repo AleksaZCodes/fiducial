@@ -1,0 +1,52 @@
+{
+  "locale": {
+    "name": "Srpski",
+    "region": "RS",
+    "tag": "sr-Latn-RS",
+    "switch": "Promeni jezik"
+  },
+  "footer": {
+    "madeWith": "Napravljeno koristeći"
+  },
+  "nav": {
+    "home": "Početna",
+    "settings": "Podešavanja",
+    "menu": "Meni",
+    "closeMenu": "Zatvori meni"
+  },
+  "action": {
+    "save": "Sačuvaj izmene",
+    "cancel": "Otkaži"
+  },
+  "cart": {
+    "summary": "{count} stavki, ukupno {total}"
+  },
+  "reason": {
+    "boot": "Pokretanje: izlazi su isključeni dok se senzori ne provere",
+    "all_stop": "Pritisnut je TOTAL STOP",
+    "manual": "Ručni režim na prekidaču",
+    "selector_off": "Prekidač je u položaju 0",
+    "not_in_auto": "Odbijeno: prekidač nije u položaju AUTO",
+    "unsafe": "Odbijeno: nije bezbedno",
+    "sensor_fault": "Kvar senzora",
+    "no_timetable": "Raspored nije stigao, učionica se smatra zauzetom",
+    "lesson_warm_bright": "Čas je u toku, toplo je i sunčano",
+    "lesson_warm_dark": "Čas je u toku, toplo je i oblačno",
+    "lesson_cold_bright": "Čas je u toku, hladno je i sunčano",
+    "lesson_cold_dark": "Čas je u toku, hladno je i oblačno",
+    "empty_warm_bright": "Učionica je prazna, toplo je i sunčano",
+    "empty_warm_dark": "Učionica je prazna, toplo je i oblačno",
+    "empty_cold_bright": "Učionica je prazna, hladno je i sunčano",
+    "empty_cold_dark": "Učionica je prazna, hladno je i oblačno",
+    "co2_high": "CO₂ je iznad praga uključenja",
+    "co2_low": "CO₂ je ispod praga isključenja",
+    "soil_dry": "Zemlja je suva",
+    "soil_wet": "Zemlja je dovoljno vlažna",
+    "tank_low": "Rezervoar je prazan, dopuna iz vodovoda",
+    "tank_full": "Rezervoar je pun",
+    "command": "Po nalogu iz aplikacije"
+  },
+  "outcome": {
+    "executed": "Izvršeno"
+  }
+}

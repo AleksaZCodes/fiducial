@@ -1,0 +1,344 @@
+# The school building: a roof controller and one controller per classroom,
+# peers on the school Wi-Fi, and a Raspberry Pi running the broker, the
+# server and the app. Every controller decides and acts on its own; the
+# server stores, explains and forwards commands.
+
+[[system]]
+id    = "skola"
+nodes = ["roof", "classroom_1", "server"]
+
+[[node]]
+id         = "roof"
+kind       = "mcu"
+target     = "riscv32imac-unknown-none-elf"
+runtime    = "embassy-esp"
+firmware   = "roof"
+hardware   = "hardware/roof-b/product.toml"
+variants   = ["hardware/roof-a/product.toml", "hardware/roof-b/product.toml"]
+interfaces = ["wifi", "onewire0", "adc"]
+
+[[node]]
+id         = "classroom_1"
+kind       = "mcu"
+target     = "riscv32imac-unknown-none-elf"
+runtime    = "embassy-esp"
+firmware   = "classroom"
+hardware   = "hardware/classroom/product.toml"
+interfaces = ["wifi", "i2c0", "onewire0"]
+
+[[node]]
+id         = "server"
+kind       = "host"
+target     = "aarch64-unknown-linux-gnu"
+runtime    = "linux-compose"
+apps       = ["server", "web"]
+interfaces = ["eth0"]
+
+[[bus]]
+id       = "lan"
+type     = "ip"
+protocol = "mqtt"
+tls      = true
+broker   = "server"
+connect  = ["roof.wifi", "classroom_1.wifi", "server.eth0"]
+
+[[bus]]
+id      = "roof_1wire"
+type    = "onewire"
+connect = ["roof.onewire0"]
+
+[[bus]]
+id      = "classroom_i2c"
+type    = "i2c"
+connect = ["classroom_1.i2c0"]
+
+[[bus]]
+id      = "classroom_1wire"
+type    = "onewire"
+connect = ["classroom_1.onewire0"]
+
+# ── Roof ─────────────────────────────────────────────────────────────────────
+
+[[point]]
+id          = "soil_1"
+node        = "roof"
+kind        = "sensor"
+quantity    = "soil_moisture"
+unit        = "%"
+range       = [0, 100]
+tolerance   = "5 %"
+adc         = "GPIO4"
+calibration = { dry = 0, wet = 100 }
+
+[[point]]
+id          = "soil_2"
+node        = "roof"
+kind        = "sensor"
+quantity    = "soil_moisture"
+unit        = "%"
+range       = [0, 100]
+tolerance   = "5 %"
+adc         = "GPIO5"
+calibration = { dry = 0, wet = 100 }
+
+[[point]]
+id        = "roof_bare"
+node      = "roof"
+kind      = "sensor"
+quantity  = "temperature"
+unit      = "°C"
+range     = [-30, 90]
+tolerance = "0.5 °C"
+bus       = "roof_1wire"
+display   = true
+
+[[point]]
+id        = "roof_green"
+node      = "roof"
+kind      = "sensor"
+quantity  = "temperature"
+unit      = "°C"
+range     = [-30, 90]
+tolerance = "0.5 °C"
+bus       = "roof_1wire"
+display   = true
+
+[[point]]
+id   = "float_low"
+node = "roof"
+kind = "contact"
+pin  = "GPIO10"
+
+[[point]]
+id   = "float_high"
+node = "roof"
+kind = "contact"
+pin  = "GPIO11"
+
+[[point]]
+id   = "roof_all_stop"
+node = "roof"
+kind = "contact"
+pin  = "GPIO2"
+
+[[point]]
+id   = "pump_auto"
+node = "roof"
+kind = "contact"
+pin  = "GPIO22"
+
+[[point]]
+id   = "valve_auto"
+node = "roof"
+kind = "contact"
+pin  = "GPIO23"
+
+[[point]]
+id   = "pump"
+node = "roof"
+kind = "actuator"
+pin  = "GPIO18"
+
+[[point]]
+id   = "valve"
+node = "roof"
+kind = "actuator"
+pin  = "GPIO19"
+
+[[rule]]
+id     = "irrigation"
+scope  = "roof"
+reads  = ["soil_1", "soil_2", "float_low", "float_high", "roof_all_stop", "pump_auto", "valve_auto"]
+drives = ["pump", "valve"]
+doc    = "The pump runs from soil_start until soil_stop on the average of both probes, never dry; an empty tank opens the valve until the high float."
+
+[[parameter]]
+id      = "soil_start"
+scope   = "roof"
+unit    = "%"
+range   = [10, 60]
+default = 30
+rule    = "irrigation"
+limits  = "soil_1"
+
+[[parameter]]
+id      = "soil_stop"
+scope   = "roof"
+unit    = "%"
+range   = [20, 80]
+default = 40
+rule    = "irrigation"
+limits  = "soil_1"
+
+# ── Classroom ────────────────────────────────────────────────────────────────
+
+[[point]]
+id        = "co2"
+node      = "classroom_1"
+kind      = "sensor"
+quantity  = "co2"
+unit      = "ppm"
+range     = [400, 5000]
+tolerance = "50 ppm"
+bus       = "classroom_i2c"
+address   = 0x62
+
+[[point]]
+id        = "inside_temp"
+node      = "classroom_1"
+kind      = "sensor"
+quantity  = "temperature"
+unit      = "°C"
+range     = [-10, 60]
+tolerance = "0.8 °C"
+bus       = "classroom_i2c"
+address   = 0x62
+display   = true
+
+[[point]]
+id        = "humidity"
+node      = "classroom_1"
+kind      = "sensor"
+quantity  = "relative_humidity"
+unit      = "%"
+range     = [0, 100]
+tolerance = "6 %"
+bus       = "classroom_i2c"
+address   = 0x62
+display   = true
+
+[[point]]
+id        = "outside_light"
+node      = "classroom_1"
+kind      = "sensor"
+quantity  = "illuminance"
+unit      = "lx"
+range     = [0, 65535]
+tolerance = "100 lx"
+bus       = "classroom_i2c"
+address   = 0x23
+
+[[point]]
+id        = "outside_temp"
+node      = "classroom_1"
+kind      = "sensor"
+quantity  = "temperature"
+unit      = "°C"
+range     = [-30, 60]
+tolerance = "0.5 °C"
+bus       = "classroom_1wire"
+
+[[point]]
+id   = "classroom_all_stop"
+node = "classroom_1"
+kind = "contact"
+pin  = "GPIO2"
+
+[[point]]
+id   = "blind_auto"
+node = "classroom_1"
+kind = "contact"
+pin  = "GPIO22"
+
+[[point]]
+id   = "recuperator_auto"
+node = "classroom_1"
+kind = "contact"
+pin  = "GPIO23"
+
+[[point]]
+id        = "blind_up"
+node      = "classroom_1"
+kind      = "actuator"
+pin       = "GPIO18"
+interlock = "blind_down"
+
+[[point]]
+id        = "blind_down"
+node      = "classroom_1"
+kind      = "actuator"
+pin       = "GPIO19"
+interlock = "blind_up"
+
+[[point]]
+id   = "recuperator"
+node = "classroom_1"
+kind = "actuator"
+pin  = "GPIO20"
+
+[[point]]
+id   = "buzzer"
+node = "classroom_1"
+kind = "actuator"
+pin  = "GPIO21"
+
+[[rule]]
+id     = "blinds"
+scope  = "classroom"
+reads  = ["outside_temp", "outside_light", "classroom_all_stop", "blind_auto"]
+drives = ["blind_up", "blind_down"]
+doc    = "Warm is above blind_warm, bright above blind_bright; with the room occupied (timetable) or empty, the eight-case table picks up, down or partial."
+
+[[rule]]
+id     = "recuperator"
+scope  = "classroom"
+reads  = ["co2", "classroom_all_stop", "recuperator_auto"]
+drives = ["recuperator"]
+doc    = "On above co2_on, off below co2_off."
+
+[[rule]]
+id     = "alarm"
+scope  = "classroom"
+reads  = ["classroom_all_stop"]
+drives = ["buzzer"]
+doc    = "The buzzer sounds while ALL STOP is pressed."
+
+[[parameter]]
+id      = "co2_on"
+scope   = "classroom"
+unit    = "ppm"
+range   = [600, 2000]
+default = 1000
+rule    = "recuperator"
+limits  = "co2"
+
+[[parameter]]
+id      = "co2_off"
+scope   = "classroom"
+unit    = "ppm"
+range   = [400, 1800]
+default = 800
+rule    = "recuperator"
+limits  = "co2"
+
+[[parameter]]
+id      = "blind_warm"
+scope   = "classroom"
+unit    = "°C"
+range   = [15, 35]
+default = 24
+rule    = "blinds"
+limits  = "outside_temp"
+
+[[parameter]]
+id      = "blind_bright"
+scope   = "classroom"
+unit    = "lx"
+range   = [1000, 60000]
+default = 20000
+rule    = "blinds"
+limits  = "outside_light"
+
+[[parameter]]
+id      = "blind_partial"
+scope   = "classroom"
+unit    = "s"
+range   = [1, 60]
+default = 8
+rule    = "blinds"
+
+[[schedule]]
+id                   = "timetable"
+scope                = "classroom"
+granularity          = "5 min"
+default_when_missing = "occupied"

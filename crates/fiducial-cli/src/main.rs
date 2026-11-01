@@ -29,6 +29,7 @@ mod security;
 mod shadow;
 mod templates;
 mod thesis;
+mod topology;
 mod wires;
 
 // ── Top-level CLI ────────────────────────────────────────────────────────────

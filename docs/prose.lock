@@ -13,7 +13,7 @@
 "MISSION.md::thesis.toml" = "a9affaf2390447e378e43c6976661525be96c085ce7d5e1cfe9567a9d21f56d2"
 "README.md::crates/fiducial-cli/src/adapter.rs#pub static CONTRACTS" = "d1c901180283f0937983e0af631c6b78613236462b4f44c24006f23d188606f4"
 "README.md::crates/fiducial-cli/src/capability/manifest.rs#pub fn derive" = "19e3fa3f6cfe7367c72f2f2c72d19c4c5464799095743f7f039547cc48565300"
-"README.md::crates/fiducial-cli/src/commands/derive.rs#fn run_pipeline_command" = "cfc893689b6fe1691379ffb02f9317c466353f3c1d75fdf040c43469cbee0adf"
+"README.md::crates/fiducial-cli/src/commands/derive.rs#fn run_pipeline_command" = "c3ba26c15d66e09f638c3f0fcc44a144253f8e3144daca7975c77b99b58402e6"
 "README.md::thesis.toml" = "a9affaf2390447e378e43c6976661525be96c085ce7d5e1cfe9567a9d21f56d2"
 "docs/paper/README.md::thesis.toml" = "a9affaf2390447e378e43c6976661525be96c085ce7d5e1cfe9567a9d21f56d2"
 "docs/specs/2026-10-02-making-the-thesis-true.md::thesis.toml" = "a9affaf2390447e378e43c6976661525be96c085ce7d5e1cfe9567a9d21f56d2"

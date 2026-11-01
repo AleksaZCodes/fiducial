@@ -91,6 +91,7 @@ class Case:
     control: bool = False
     heldout: bool = False  # the second set (see HELDOUT)
     independent: bool = False  # the third set (see independent_cases.py)
+    fourth: bool = False  # the fourth set (see fourth_cases.py)
 
 
 W = "web"
@@ -266,6 +267,20 @@ if _IND.exists():
         _c.independent = True
     CASES += _ns["INDEPENDENT"]
 
+# ── the fourth set ───────────────────────────────────────────────────────────
+#
+# After the independent set's misses were closed by class rather than by case
+# (docs/specs/2026-11-01-mistakes-are-fixed-by-class.md), that set had
+# informed the fixes. fourth_cases.py is written blind, the same way, aimed at
+# the classes rather than at any earlier case, and committed before its run.
+_FOURTH = Path(__file__).with_name("fourth_cases.py")
+if _FOURTH.exists():
+    _ns = dict(globals())
+    exec(compile(_FOURTH.read_text(), str(_FOURTH), "exec"), _ns)
+    for _c in _ns["FOURTH"]:
+        _c.fourth = True
+    CASES += _ns["FOURTH"]
+
 # ── gates ────────────────────────────────────────────────────────────────────
 
 
@@ -374,15 +389,16 @@ def main() -> int:
     ap.add_argument("--fid", default=str(REPO / "target/debug/fid"))
     ap.add_argument("--only", default="")
     ap.add_argument("--out", default=str(Path(__file__).parent))
-    ap.add_argument("--set", choices=["original", "heldout", "independent"], default="original",
-                    help="the first 20 (with the controls), the held-out 20, or the independent 20")
+    ap.add_argument("--set", choices=["original", "heldout", "independent", "fourth"], default="original",
+                    help="the first 20 (with the controls), the held-out 20, the independent 20, or the fourth 20")
     ap.add_argument("--baseline", action="store_true",
                     help="run only the checks ordinary CI would: no derive, no --check")
     a = ap.parse_args()
     fid = str(Path(a.fid).resolve())
     only = set(filter(None, a.only.split(",")))
-    which = {"original": lambda c: not (c.heldout or c.independent),
-             "heldout": lambda c: c.heldout, "independent": lambda c: c.independent}[a.set]
+    which = {"original": lambda c: not (c.heldout or c.independent or c.fourth),
+             "heldout": lambda c: c.heldout, "independent": lambda c: c.independent,
+             "fourth": lambda c: c.fourth}[a.set]
     cases = [c for c in CASES if which(c) and (not only or c.id in only)]
 
     env = dict(os.environ)
@@ -447,7 +463,7 @@ def main() -> int:
         (out / f"{stem}.json").write_text(json.dumps({"summary": summary, "results": results},
                                                      ensure_ascii=False, indent=2) + "\n")
         title = {"original": "first set", "heldout": "held-out set",
-                 "independent": "independent set"}[a.set] + (
+                 "independent": "independent set", "fourth": "fourth set"}[a.set] + (
             ", without Fiducial (ordinary CI only)" if a.baseline else "")
         lines = [f"# Injected mistakes, {title} — {version} ({commit})", "",
                  f"Markers caught: **{summary['markers_caught']} / {summary['markers']}**. "

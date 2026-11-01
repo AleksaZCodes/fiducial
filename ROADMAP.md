@@ -641,8 +641,8 @@ PWA. Ordered by cost of delay:
 | Phase | Item | Class | State |
 |---|---|---|---|
 | 0 | Decisions and STACK rows: topology, self-hosted target, ESP32-C6 firmware, transliteration | debt-accruing | ✅ |
-| 1 | One message declaration, two encodings (postcard on device links, JSON typed by `ts-rs` at the web) | debt-accruing | ⬜ |
-| 2 | `topology.toml` and `fid-topology`: firmware members, points, params, topics, TS cards, migrations | multiplying | ⬜ |
+| 1 | One message declaration, two encodings (postcard on device links, JSON typed by `ts-rs` at the web) | debt-accruing | ✅ |
+| 2 | `topology.toml` and `fid-topology`: points, params, topics, TS cards, migrations; validations 1, 2, 4, 6, 7 | multiplying | ✅ |
 | 3 | Hardware built from modules, with variants and derived wiring | multiplying | ⬜ |
 | 4 | `firmware-esp32c6` capability | terminal | ⬜ |
 | 5 | Self-hosted server stack: `sqlite`, `native` auth, `ollama`, `compose`, broker ACL from `can()` | terminal | ⬜ |

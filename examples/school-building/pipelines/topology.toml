@@ -1,0 +1,12 @@
+name     = "topology"
+executor = "fid-topology"
+outputs  = [
+  "firmware/classroom/src/generated/points.rs",
+  "firmware/classroom/src/generated/params.rs",
+  "firmware/roof/src/generated/points.rs",
+  "firmware/roof/src/generated/params.rs",
+  "crates/skola-messages/src/generated/topics.rs",
+  "apps/web/src/generated/points.ts",
+  "apps/web/src/generated/cards.ts",
+  "migrations/0001_topology.sql",
+]
