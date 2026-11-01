@@ -6788,6 +6788,112 @@ fn datasheet_checks(p: &mut Product) -> Result<()> {
     Ok(())
 }
 
+/// A firmware linker script that places more than the board's flash holds.
+///
+/// `memory.x` is written by hand, and its `FLASH` length is copied from
+/// whatever board the template came from. The flash part's capacity is a
+/// datasheet fact in its device profile, so an image the linker accepts and
+/// the chip cannot hold is refused here (the paper's fourth set, F16).
+pub fn linker_regions(root: &Path, p: &Product) -> Vec<String> {
+    let capacity: u64 = p
+        .parts
+        .iter()
+        .filter_map(|q| {
+            crate::devices::for_mpn(q.mpn.as_deref()?)
+                .ok()??
+                .flash_bytes
+        })
+        .sum();
+    if capacity == 0 {
+        return Vec::new();
+    }
+    let mut files = Vec::new();
+    collect_named(&root.join("firmware"), "memory.x", &mut files);
+    let mut out = Vec::new();
+    for f in files {
+        let Ok(text) = std::fs::read_to_string(&f) else {
+            continue;
+        };
+        let rel = f
+            .strip_prefix(root)
+            .unwrap_or(&f)
+            .to_string_lossy()
+            .replace('\\', "/");
+        let mut placed = 0u64;
+        for line in text.lines() {
+            let l = line.split("/*").next().unwrap_or(line);
+            let name = l.split(':').next().unwrap_or("").trim();
+            if !(name == "FLASH" || name == "BOOT2" || name == "BOOT") {
+                continue;
+            }
+            if let Some(len) = l
+                .split("LENGTH")
+                .nth(1)
+                .and_then(|r| r.trim_start().strip_prefix('='))
+            {
+                if let Some(n) = linker_size(len) {
+                    placed += n;
+                }
+            }
+        }
+        if placed > capacity {
+            out.push(format!(
+                "  {rel}: places {} KiB in flash, and the board's flash holds {} KiB (its device \
+                 profile) — the image links and does not fit",
+                placed / 1024,
+                capacity / 1024
+            ));
+        }
+    }
+    out
+}
+
+fn linker_size(expr: &str) -> Option<u64> {
+    let mut total: i64 = 0;
+    let mut sign = 1i64;
+    for tok in expr
+        .replace('-', " - ")
+        .replace('+', " + ")
+        .split_whitespace()
+    {
+        match tok {
+            "-" => sign = -1,
+            "+" => sign = 1,
+            t => {
+                let (num, mul) = match t.chars().last()? {
+                    'K' | 'k' => (&t[..t.len() - 1], 1024),
+                    'M' | 'm' => (&t[..t.len() - 1], 1024 * 1024),
+                    _ => (t, 1),
+                };
+                let v = match num.strip_prefix("0x").or_else(|| num.strip_prefix("0X")) {
+                    Some(h) => i64::from_str_radix(h, 16).ok()?,
+                    None => num.parse::<i64>().ok()?,
+                };
+                total += sign * v * mul;
+                sign = 1;
+            }
+        }
+    }
+    u64::try_from(total).ok()
+}
+
+fn collect_named(dir: &Path, name: &str, out: &mut Vec<std::path::PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for e in entries.flatten() {
+        let p = e.path();
+        let n = e.file_name().to_string_lossy().to_string();
+        if p.is_dir() {
+            if n != "target" && !n.starts_with('.') {
+                collect_named(&p, name, out);
+            }
+        } else if n == name {
+            out.push(p);
+        }
+    }
+}
+
 /// Voltages that have to agree across parts: a regulator's output against the
 /// rail it is declared to hold, and a logic input against the level of what
 /// drives it. Both are datasheet facts the product never states, so neither
@@ -7645,6 +7751,24 @@ mount = "smd"
 mpn = "SN74AHCT1G125DBVR"
 pins = { 1 = "GND", 2 = "A", 3 = "GND", 4 = "Y", 5 = "VBUS" }
 "#;
+
+    #[test]
+    fn a_linker_region_larger_than_the_flash_is_refused() {
+        assert_eq!(linker_size(" 2048K - 0x100"), Some(2048 * 1024 - 256));
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("firmware/rp2040")).unwrap();
+        std::fs::write(
+            dir.path().join("firmware/rp2040/memory.x"),
+            "MEMORY {\n    BOOT2 : ORIGIN = 0x10000000, LENGTH = 0x100\n    FLASH : ORIGIN = 0x10000100, LENGTH = 16384K - 0x100\n}\n",
+        )
+        .unwrap();
+        let p = declared(&format!("{BUS}\n[[part]]\nid = \"flash\"\nname = \"Flash\"\nplace = \"board\"\nmount = \"smd\"\nmpn = \"W25Q32JVSSIQ\"\n"));
+        let e = linker_regions(dir.path(), &p).join("\n");
+        assert!(
+            e.contains("places 16384 KiB in flash, and the board's flash holds 4096 KiB"),
+            "{e}"
+        );
+    }
 
     #[test]
     fn levels_across_parts_are_checked_against_their_datasheets() {

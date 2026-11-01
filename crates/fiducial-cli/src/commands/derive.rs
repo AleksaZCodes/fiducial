@@ -763,6 +763,7 @@ fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
             if let Ok(raw) = std::fs::read_to_string(root.join(decl)) {
                 if let Ok(product) = toml::from_str::<crate::hardware::Product>(&raw) {
                     issues.extend(crate::hardware::firmware_pin_literals(root, &product));
+                    issues.extend(crate::hardware::linker_regions(root, &product));
                 }
             }
         }
@@ -797,6 +798,11 @@ fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
         }
     }
 
+    let enabled = Config::load(&root.join(crate::config::CONFIG_FILE))
+        .map(|c| c.capabilities.enabled)
+        .unwrap_or_default();
+    let (drift, _) = crate::commands::doctor::platform_drift(root, lock, &enabled);
+    issues.extend(drift.into_iter().map(|d| format!("  {d}")));
     issues.extend(crate::gate::problems(
         root,
         lock.templates.contains_key(".github/workflows/ci.yml"),

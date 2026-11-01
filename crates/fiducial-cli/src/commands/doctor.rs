@@ -481,47 +481,7 @@ fn check_lock(
     // an issue meant the platform contradicted its own templates. The first product had
     // seventeen of them and runs `fid doctor` with `continue-on-error` as a
     // result, which costs every real finding too. See `crate::ownership`.
-    let mut drifted: Vec<String> = Vec::new();
-    let mut owned_edits = 0usize;
-
-    for (path, problem) in lock.verify(root) {
-        let rel = path
-            .strip_prefix(root)
-            .unwrap_or(&path)
-            .display()
-            .to_string();
-        // `fiducial.lock` keys are forward-slashed; a Windows path is not.
-        let key = rel.replace('\\', "/");
-
-        // A file a capability names as its declaration is the product's by
-        // definition: editing it is how the product states its facts. The
-        // list above is for scaffolded files no capability claims; without
-        // this, every new capability's declaration (`protocol.toml`) read as
-        // drift until someone remembered to add it there too.
-        let declared = lock
-            .capabilities
-            .values()
-            .any(|c| c.declarations.contains(&key));
-        if declared || crate::ownership::of(&key).is_product() {
-            owned_edits += 1;
-            continue;
-        }
-        if let Some((_, why)) = crate::templates::RETIRED_TEMPLATES
-            .iter()
-            .find(|(p, _)| *p == key)
-            .filter(|(p, _)| crate::templates::raw_for(p, &enabled).is_none())
-        {
-            drifted.push(format!(
-                "{rel}: the platform no longer ships it ({why}). `fid upgrade` stops \
-                 tracking it, and removes it only if it is unedited."
-            ));
-            continue;
-        }
-        drifted.push(format!(
-            "{rel}: {problem}. This file is platform-owned — `fid upgrade` will \
-             rewrite it, so an edit here will be merged over."
-        ));
-    }
+    let (mut drifted, owned_edits) = platform_drift(root, &lock, &enabled);
 
     if owned_edits > 0 {
         // Counted rather than silent: "you have edited 17 of your own files" is
@@ -715,4 +675,57 @@ fn check_security_headers(root: &Path, issues: &mut Vec<String>, ok: &mut Vec<St
                 .count()
         ));
     }
+}
+
+/// Platform-owned files recorded in the lock and edited since, as lines
+/// naming each; and how many product-owned files were edited (expected).
+///
+/// Shared with `fid derive --check`: a platform-owned file is generator code
+/// or scaffolding the platform rewrites, so an unrecorded edit is a change to
+/// how artifacts are derived that no declaration states (the paper's fourth
+/// set, F14 and F15, edited two generator scripts).
+pub(crate) fn platform_drift(root: &Path, lock: &Lock, enabled: &[String]) -> (Vec<String>, usize) {
+    let mut drifted: Vec<String> = Vec::new();
+    let mut owned_edits = 0usize;
+
+    for (path, problem) in lock.verify(root) {
+        let rel = path
+            .strip_prefix(root)
+            .unwrap_or(&path)
+            .display()
+            .to_string();
+        // `fiducial.lock` keys are forward-slashed; a Windows path is not.
+        let key = rel.replace('\\', "/");
+
+        // A file a capability names as its declaration is the product's by
+        // definition: editing it is how the product states its facts. The
+        // list above is for scaffolded files no capability claims; without
+        // this, every new capability's declaration (`protocol.toml`) read as
+        // drift until someone remembered to add it there too.
+        let declared = lock
+            .capabilities
+            .values()
+            .any(|c| c.declarations.contains(&key));
+        if declared || crate::ownership::of(&key).is_product() {
+            owned_edits += 1;
+            continue;
+        }
+        if let Some((_, why)) = crate::templates::RETIRED_TEMPLATES
+            .iter()
+            .find(|(p, _)| *p == key)
+            .filter(|(p, _)| crate::templates::raw_for(p, enabled).is_none())
+        {
+            drifted.push(format!(
+                "{rel}: the platform no longer ships it ({why}). `fid upgrade` stops \
+                 tracking it, and removes it only if it is unedited."
+            ));
+            continue;
+        }
+        drifted.push(format!(
+            "{rel}: {problem}. This file is platform-owned — `fid upgrade` will \
+             rewrite it, so an edit here will be merged over."
+        ));
+    }
+
+    (drifted, owned_edits)
 }

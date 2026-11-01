@@ -33,6 +33,7 @@ const PROFILES: &[(&str, &str)] = &[
         "ams1117-5.0.toml",
         include_str!("../devices/ams1117-5.0.toml"),
     ),
+    ("w25q32.toml", include_str!("../devices/w25q32.toml")),
 ];
 
 #[derive(Debug, Deserialize)]
@@ -64,6 +65,9 @@ pub struct Profile {
     /// The crystal frequency the part is built around.
     #[serde(default)]
     pub crystal: Option<Crystal>,
+    /// A memory's capacity in bytes: what the firmware's linker may place.
+    #[serde(default)]
+    pub flash_bytes: Option<u64>,
     /// A regulator's output: the pin and the voltage it holds there.
     #[serde(default)]
     pub output: Option<Output>,

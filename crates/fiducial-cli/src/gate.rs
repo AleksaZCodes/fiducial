@@ -80,8 +80,9 @@ pub fn problems(root: &Path, scaffolded_tracked: bool) -> Vec<String> {
             .iter()
             .map(|s| {
                 format!(
-                    "  {WORKFLOWS}/{}: runs `fid derive --check` but {} — a red result \
-                     would not fail the build. Remove it.",
+                    "  {WORKFLOWS}/{}: runs `fid derive --check` but {} — a stale artifact \
+                     would not fail the build. Make it the first step after installing fid, \
+                     and let its failure fail the job.",
                     s.file,
                     s.silenced.as_deref().unwrap_or_default()
                 )
@@ -100,6 +101,7 @@ pub fn steps_running_check(file: &str, text: &str) -> Vec<Step> {
     let mut job_default = String::from(".");
     let mut in_defaults = false;
     let mut in_jobs = false;
+    let mut earlier: Vec<String> = Vec::new();
     let mut i = 0;
     while i < lines.len() {
         let line = strip_comment(lines[i]);
@@ -119,6 +121,7 @@ pub fn steps_running_check(file: &str, text: &str) -> Vec<Step> {
             job_indent = Some(ind);
             job_default = ".".into();
             in_defaults = false;
+            earlier.clear();
             i += 1;
             continue;
         }
@@ -146,8 +149,15 @@ pub fn steps_running_check(file: &str, text: &str) -> Vec<Step> {
                         .map(|l| strip_comment(l).trim().to_string()),
                 )
                 .collect();
-            if let Some(step) = step_from(file, &block, &job_default) {
+            if let Some(mut step) = step_from(file, &block, &job_default) {
+                if step.silenced.is_none() {
+                    step.silenced = earlier
+                        .first()
+                        .map(|name| format!("runs after `{name}`, which can regenerate artifacts before they are checked"));
+                }
                 out.push(step);
+            } else if let Some(name) = mutating(&block) {
+                earlier.push(name);
             }
             i = j;
             continue;
@@ -155,6 +165,38 @@ pub fn steps_running_check(file: &str, text: &str) -> Vec<Step> {
         i += 1;
     }
     out
+}
+
+/// A step that may write into the tree before the gate reads it: anything
+/// that runs a command other than setting up the toolchain, installing or
+/// building `fid`, or `fid doctor`. Its name, or its command.
+fn mutating(block: &[String]) -> Option<String> {
+    let run = block.iter().position(|l| l.starts_with("run:"))?;
+    let text: String = std::iter::once(value(&block[run], "run:").to_string())
+        .chain(block[run + 1..].iter().take_while(|l| !is_key(l)).cloned())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let benign = [
+        "fiducial-cli",
+        "cargo install",
+        "fid doctor",
+        "fid --version",
+        "GITHUB_PATH",
+        "rustup",
+        "corepack",
+        "pnpm install",
+        "npm ci",
+        "apt-get",
+    ];
+    if benign.iter().any(|b| text.contains(b)) {
+        return None;
+    }
+    let name = block
+        .iter()
+        .find(|l| l.starts_with("name:"))
+        .map(|l| value(l, "name:").to_string())
+        .unwrap_or_else(|| text.trim().to_string());
+    Some(name)
 }
 
 fn step_from(file: &str, block: &[String], job_default: &str) -> Option<Step> {
@@ -349,6 +391,18 @@ mod tests {
             "        continue-on-error: true\n        run: fid derive --check\n",
         );
         assert!(steps_running_check("ci.yml", &c)[0].silenced.is_some());
+    }
+
+    #[test]
+    fn a_check_after_a_build_step_is_named() {
+        let y = "jobs:\n  a:\n    steps:\n      - uses: actions/checkout@v4\n      - name: Build fid\n        run: cargo build -p fiducial-cli\n      - name: build\n        run: hardware/build.sh\n      - run: fid derive --check\n";
+        let s = steps_running_check("ci.yml", y);
+        assert_eq!(
+            s[0].silenced.as_deref(),
+            Some("runs after `build`, which can regenerate artifacts before they are checked")
+        );
+        let first = y.replace("      - name: build\n        run: hardware/build.sh\n", "");
+        assert_eq!(steps_running_check("ci.yml", &first)[0].silenced, None);
     }
 
     #[test]

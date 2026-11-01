@@ -55,6 +55,7 @@ struct Fact {
 pub fn copies(root: &Path, pipelines: &[&Pipeline]) -> Vec<String> {
     let owned = derived_and_platform_files(root, pipelines);
     let strings = string_facts(root, pipelines);
+    let lists = list_facts(root);
     let numbers = number_facts(root, pipelines);
     let mut files = Vec::new();
     collect(root, root, &mut files);
@@ -81,6 +82,16 @@ pub fn copies(root: &Path, pipelines: &[&Pipeline]) -> Vec<String> {
             let code = strip_line_comment(line, &rel);
             let at = format!("  {rel}:{}", i + 1);
             let mut said = BTreeSet::new();
+            for literal in string_lists(code) {
+                if let Some((_, origin)) = lists.iter().find(|(set, _)| *set == literal) {
+                    if said.insert(origin.clone()) {
+                        out.push(format!(
+                            "{at}: types the list declared in {origin} — import it from what that \
+                             block derives, so a value added there reaches this line"
+                        ));
+                    }
+                }
+            }
             for (value, fact) in &strings {
                 if contains_token(code, value) && said.insert(value.clone()) {
                     out.push(format!(
@@ -163,6 +174,65 @@ fn string_facts(root: &Path, pipelines: &[&Pipeline]) -> BTreeMap<String, Fact> 
         }
     }
     facts
+}
+
+/// Every list of two or more strings declared in `fiducial.toml`, as a set,
+/// with where it is declared. A hand-typed `["en", "sr"]` is the locale list
+/// again, in any order (the paper's fourth set, F18).
+fn list_facts(root: &Path) -> Vec<(BTreeSet<String>, String)> {
+    let mut out = Vec::new();
+    let Some(doc) = read_toml(&root.join(crate::config::CONFIG_FILE)) else {
+        return out;
+    };
+    let Some(t) = doc.as_table() else {
+        return out;
+    };
+    for (block, v) in t {
+        if ["capabilities", "guard"].contains(&block.as_str()) {
+            continue;
+        }
+        let Some(tbl) = v.as_table() else { continue };
+        for (k, val) in tbl {
+            let Some(arr) = val.as_array() else { continue };
+            let set: BTreeSet<String> = arr
+                .iter()
+                .filter_map(|x| x.as_str().map(str::to_string))
+                .collect();
+            if set.len() >= 2 && set.len() == arr.len() {
+                out.push((set, format!("fiducial.toml [{block}] {k}")));
+            }
+        }
+    }
+    out
+}
+
+/// The string elements of each bracketed list on a line: `["en", "sr"]`.
+fn string_lists(code: &str) -> Vec<BTreeSet<String>> {
+    let mut out = Vec::new();
+    let mut rest = code;
+    while let Some(open) = rest.find('[') {
+        let after = &rest[open + 1..];
+        let Some(close) = after.find(']') else { break };
+        let inner = &after[..close];
+        let items: Vec<&str> = inner
+            .split(',')
+            .map(str::trim)
+            .filter(|x| !x.is_empty())
+            .collect();
+        let strings: Vec<String> = items
+            .iter()
+            .filter_map(|x| {
+                let q = x.chars().next()?;
+                (matches!(q, '"' | '\'' | '`') && x.len() >= 2 && x.ends_with(q))
+                    .then(|| x[1..x.len() - 1].to_string())
+            })
+            .collect();
+        if strings.len() >= 2 && strings.len() == items.len() {
+            out.push(strings.into_iter().collect());
+        }
+        rest = &after[close + 1..];
+    }
+    out
 }
 
 fn instead_for(block: &str) -> String {
@@ -510,6 +580,17 @@ mod tests {
         ] {
             assert!(!distinctive(s), "{s}");
         }
+    }
+
+    #[test]
+    fn a_list_is_found_in_any_order() {
+        assert_eq!(
+            string_lists(r#"const LOCALES = ["sr", 'en'] as const; f([1, 2])"#),
+            vec![["en".to_string(), "sr".to_string()]
+                .into_iter()
+                .collect::<BTreeSet<_>>()]
+        );
+        assert!(string_lists("x[0] + y[\"a\"]").is_empty());
     }
 
     #[test]

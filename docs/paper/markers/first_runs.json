@@ -1,0 +1,7 @@
+{
+  "_": "Each set's first run, before anything was changed for it. Later runs of a set are in results-<set>.json; these numbers are read from the commit that recorded each first run.",
+  "original": {"fid": "0.9.4", "caught": 15, "markers": 20, "recorded_in": "the paper's first draft (0.9.4); every miss became a rule by 0.9.11"},
+  "heldout": {"fid": "0.9.11", "caught": 15, "markers": 20, "recorded_in": "c3e1929"},
+  "independent": {"fid": "0.9.12", "caught": 16, "markers": 20, "recorded_in": "c633f54"},
+  "fourth": {"fid": "0.10.0", "caught": 14, "markers": 20, "recorded_in": "dba6d6b"}
+}
