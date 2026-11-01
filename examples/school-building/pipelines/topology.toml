@@ -13,9 +13,12 @@ outputs  = [
   "migrations/0001_topology.sql",
   "hardware/classroom/generated/wiring.csv",
   "hardware/classroom/generated/bom.csv",
+  "hardware/classroom/generated/wiring.svg",
   "hardware/roof-a/generated/wiring.csv",
   "hardware/roof-a/generated/bom.csv",
+  "hardware/roof-a/generated/wiring.svg",
   "hardware/roof-b/generated/wiring.csv",
   "hardware/roof-b/generated/bom.csv",
+  "hardware/roof-b/generated/wiring.svg",
   "hardware/roof/variants.md",
 ]

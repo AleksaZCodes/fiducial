@@ -92,7 +92,8 @@ Derive checks every variant against the library, where pin rules are data:
 - a module's supply matches the rail it is wired to;
 - the variant's module cost stays under `[cost] ceiling_rsd`.
 
-Per variant it derives `<dir>/generated/wiring.csv` and `bom.csv` (price,
+Per variant it derives `<dir>/generated/wiring.csv`, `wiring.svg` (the
+controller, each module and every wire, in its colour) and `bom.csv` (price,
 vendor, date checked). For the built hardware of each firmware role it
 derives `firmware/<role>/src/generated/board.rs` (one constant per net). For
 a node with several variants it derives `hardware/<node>/variants.md`, which

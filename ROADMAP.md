@@ -647,7 +647,7 @@ PWA. Ordered by cost of delay:
 | 4 | `firmware-esp32c6` capability (the product's `no_std` rules crate is done and host-tested) | terminal | 🟡 |
 | 5 | Self-hosted server stack: `sqlite`, `native` auth, `ollama`, `compose`, broker ACL from `can()` | terminal | ⬜ |
 | 6 | The web app as a static export served by the server | terminal | ⬜ |
-| 7 | Derived documentation: topology, wiring, rules, sequence and storage diagrams | multiplying | ⬜ |
+| 7 | Derived documentation: topology, wiring, rules, sequence and storage diagrams (wiring per variant done) | multiplying | 🟡 |
 | 8 | CAN / CAN-FD with ISO-TP, and a Linux RT runtime — gated on a product | terminal | ⬜ |
 
 ### Physical products — outline, region, part, cost ✅

@@ -2618,6 +2618,7 @@ fn run_fid_topology(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             let d = variant_dir(f);
             expected.push(format!("{d}/generated/wiring.csv"));
             expected.push(format!("{d}/generated/bom.csv"));
+            expected.push(format!("{d}/generated/wiring.svg"));
         }
         if n.variants.len() > 1 {
             expected.push(format!("hardware/{}/variants.md", n.id));
@@ -2657,13 +2658,15 @@ fn run_fid_topology(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
                 .cloned()
         };
         let content = match file {
-            "wiring.csv" | "bom.csv" => {
+            "wiring.csv" | "bom.csv" | "wiring.svg" => {
                 let Some(v) = variant_of(file) else {
                     bail!("fid-topology: output `{out}` belongs to no node's hardware");
                 };
                 let h = crate::modules::load(working_dir, &v)?;
                 if file == "bom.csv" {
                     crate::modules::render_bom(&h, &lib, &v)
+                } else if file == "wiring.svg" {
+                    crate::modules::render_wiring_svg(&h, &lib, &v)
                 } else {
                     crate::modules::render_wiring(&h, &v)
                 }

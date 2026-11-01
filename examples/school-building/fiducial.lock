@@ -1093,6 +1093,11 @@ pipeline = "topology"
 source_version = "0.10.1"
 hash = "b3a7921421662a9ec625c9a7502cdac2a68a3883a2ba61e024644c009b40842e"
 
+[artifacts."hardware/classroom/generated/wiring.svg"]
+pipeline = "topology"
+source_version = "0.10.1"
+hash = "b690b9959ee620ec916fe77388969a5d967734a382aac28066f7a4e6a863c58f"
+
 [artifacts."hardware/roof-a/generated/bom.csv"]
 pipeline = "topology"
 source_version = "0.10.1"
@@ -1103,6 +1108,11 @@ pipeline = "topology"
 source_version = "0.10.1"
 hash = "7cdd655d38970149969a7a46c68d98b3804f6d3ed6892763ba279dc506fc2576"
 
+[artifacts."hardware/roof-a/generated/wiring.svg"]
+pipeline = "topology"
+source_version = "0.10.1"
+hash = "47d095a19691d00d20614b5eddba66400459be2bf995f423eff11733c8a090c3"
+
 [artifacts."hardware/roof-b/generated/bom.csv"]
 pipeline = "topology"
 source_version = "0.10.1"
@@ -1112,6 +1122,11 @@ hash = "b7e2ed6a9662edf972c05d8349c6695f694d40f78c5fcf78390486b46f2c6de4"
 pipeline = "topology"
 source_version = "0.10.1"
 hash = "bf850649a10b8b73e1483f6d7c9aefa587c6f5960f249e8fff54bc8e375950a5"
+
+[artifacts."hardware/roof-b/generated/wiring.svg"]
+pipeline = "topology"
+source_version = "0.10.1"
+hash = "1ab4b07ed6896ee2605e885bc83e20bdbe4e1c34ffe4e60f6ee2d077ecdb1bd5"
 
 [artifacts."hardware/roof/variants.md"]
 pipeline = "topology"

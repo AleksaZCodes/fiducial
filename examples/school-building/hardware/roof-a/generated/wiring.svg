@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1278" viewBox="0 0 960 1278" font-family="sans-serif">
+<!-- Derived by fid-topology from hardware/roof-a/product.toml — do not edit. -->
+<rect width="960" height="1278" fill="white"/>
+<rect x="40" y="58" width="170" height="244" fill="#eef3f8" stroke="#333"/>
+<text x="46" y="72" font-size="12" font-weight="bold">Seeed XIAO ESP32C6</text>
+<text x="204" y="86" font-size="11" text-anchor="end">5V</text>
+<text x="204" y="106" font-size="11" text-anchor="end">GND</text>
+<text x="204" y="126" font-size="11" text-anchor="end">D4</text>
+<text x="204" y="146" font-size="11" text-anchor="end">D5</text>
+<text x="204" y="166" font-size="11" text-anchor="end">D0</text>
+<text x="204" y="186" font-size="11" text-anchor="end">D1</text>
+<text x="204" y="206" font-size="11" text-anchor="end">D2</text>
+<text x="204" y="226" font-size="11" text-anchor="end">D3</text>
+<text x="204" y="246" font-size="11" text-anchor="end">D8</text>
+<text x="204" y="266" font-size="11" text-anchor="end">D9</text>
+<text x="204" y="286" font-size="11" text-anchor="end">D10</text>
+<rect x="560" y="58" width="190" height="144" fill="#f7f7f7" stroke="#333"/>
+<text x="566" y="72" font-size="12" font-weight="bold">rs485</text>
+<text x="756" y="72" font-size="10" fill="#666">Seeed RS-485 Breakout for XIAO</text>
+<text x="566" y="86" font-size="11">5V_OUT</text>
+<text x="566" y="106" font-size="11">GND</text>
+<text x="566" y="126" font-size="11">TX</text>
+<text x="566" y="146" font-size="11">RX</text>
+<text x="566" y="166" font-size="11">A</text>
+<text x="566" y="186" font-size="11">B</text>
+<rect x="560" y="214" width="190" height="104" fill="#f7f7f7" stroke="#333"/>
+<text x="566" y="228" font-size="12" font-weight="bold">soil_1</text>
+<text x="756" y="228" font-size="10" fill="#666">RS-485 Modbus soil probe</text>
+<text x="566" y="242" font-size="11">VCC</text>
+<text x="566" y="262" font-size="11">GND</text>
+<text x="566" y="282" font-size="11">A</text>
+<text x="566" y="302" font-size="11">B</text>
+<rect x="560" y="330" width="190" height="104" fill="#f7f7f7" stroke="#333"/>
+<text x="566" y="344" font-size="12" font-weight="bold">soil_2</text>
+<text x="756" y="344" font-size="10" fill="#666">RS-485 Modbus soil probe</text>
+<text x="566" y="358" font-size="11">VCC</text>
+<text x="566" y="378" font-size="11">GND</text>
+<text x="566" y="398" font-size="11">A</text>
+<text x="566" y="418" font-size="11">B</text>
+<rect x="560" y="446" width="190" height="104" fill="#f7f7f7" stroke="#333"/>
+<text x="566" y="460" font-size="12" font-weight="bold">t_bare</text>
+<text x="756" y="460" font-size="10" fill="#666">RS-485 Modbus temperature probe</text>
+<text x="566" y="474" font-size="11">VCC</text>
+<text x="566" y="494" font-size="11">GND</text>
+<text x="566" y="514" font-size="11">A</text>
+<text x="566" y="534" font-size="11">B</text>
+<rect x="560" y="562" width="190" height="104" fill="#f7f7f7" stroke="#333"/>
+<text x="566" y="576" font-size="12" font-weight="bold">t_green</text>
+<text x="756" y="576" font-size="10" fill="#666">RS-485 Modbus temperature probe</text>
+<text x="566" y="590" font-size="11">VCC</text>
+<text x="566" y="610" font-size="11">GND</text>
+<text x="566" y="630" font-size="11">A</text>
+<text x="566" y="650" font-size="11">B</text>
+<rect x="560" y="678" width="190" height="64" fill="#f7f7f7" stroke="#333"/>
+<text x="566" y="692" font-size="12" font-weight="bold">float_low</text>
+<text x="756" y="692" font-size="10" fill="#666">Vertical float switch</text>
+<text x="566" y="706" font-size="11">C2</text>
+<text x="566" y="726" font-size="11">C1</text>
+<rect x="560" y="754" width="190" height="64" fill="#f7f7f7" stroke="#333"/>
+<text x="566" y="768" font-size="12" font-weight="bold">float_high</text>
+<text x="756" y="768" font-size="10" fill="#666">Vertical float switch</text>
+<text x="566" y="782" font-size="11">C2</text>
+<text x="566" y="802" font-size="11">C1</text>
+<rect x="560" y="830" width="190" height="104" fill="#f7f7f7" stroke="#333"/>
+<text x="566" y="844" font-size="12" font-weight="bold">relays</text>
+<text x="756" y="844" font-size="10" fill="#666">Relay module, 2 channels, optocoupled</text>
+<text x="566" y="858" font-size="11">VCC</text>
+<text x="566" y="878" font-size="11">GND</text>
+<text x="566" y="898" font-size="11">IN1</text>
+<text x="566" y="918" font-size="11">IN2</text>
+<rect x="560" y="946" width="190" height="64" fill="#f7f7f7" stroke="#333"/>
+<text x="566" y="960" font-size="12" font-weight="bold">all_stop</text>
+<text x="756" y="960" font-size="10" fill="#666">Auxiliary contact</text>
+<text x="566" y="974" font-size="11">C2</text>
+<text x="566" y="994" font-size="11">C1</text>
+<rect x="560" y="1022" width="190" height="64" fill="#f7f7f7" stroke="#333"/>
+<text x="566" y="1036" font-size="12" font-weight="bold">pump_auto</text>
+<text x="756" y="1036" font-size="10" fill="#666">Auxiliary contact</text>
+<text x="566" y="1050" font-size="11">C2</text>
+<text x="566" y="1070" font-size="11">C1</text>
+<rect x="560" y="1098" width="190" height="64" fill="#f7f7f7" stroke="#333"/>
+<text x="566" y="1112" font-size="12" font-weight="bold">valve_auto</text>
+<text x="756" y="1112" font-size="10" fill="#666">Auxiliary contact</text>
+<text x="566" y="1126" font-size="11">C2</text>
+<text x="566" y="1146" font-size="11">C1</text>
+<rect x="560" y="1174" width="190" height="64" fill="#f7f7f7" stroke="#333"/>
+<text x="566" y="1188" font-size="12" font-weight="bold">psu</text>
+<text x="756" y="1188" font-size="10" fill="#666">5 V 2.4 A DIN supply MP15S-0502400</text>
+<text x="566" y="1202" font-size="11">+V</text>
+<text x="566" y="1222" font-size="11">-V</text>
+<polyline points="210,82 240,82 240,1198 560,1198" fill="none" stroke="#c0392b" stroke-width="1.6"/>
+<polyline points="210,82 240,82 240,854 560,854" fill="none" stroke="#c0392b" stroke-width="1.6"/>
+<text x="214" y="79" font-size="9" fill="#c0392b">5V</text>
+<polyline points="560,82 545,82 545,238 560,238" fill="none" stroke="#c0392b" stroke-width="1.6"/>
+<polyline points="560,82 545,82 545,354 560,354" fill="none" stroke="#c0392b" stroke-width="1.6"/>
+<polyline points="560,82 545,82 545,470 560,470" fill="none" stroke="#c0392b" stroke-width="1.6"/>
+<polyline points="560,82 545,82 545,586 560,586" fill="none" stroke="#c0392b" stroke-width="1.6"/>
+<text x="564" y="79" font-size="9" fill="#c0392b">SENSOR_5V</text>
+<polyline points="210,102 274,102 274,1218 560,1218" fill="none" stroke="#222222" stroke-width="1.6"/>
+<polyline points="210,102 274,102 274,102 560,102" fill="none" stroke="#222222" stroke-width="1.6"/>
+<polyline points="210,102 274,102 274,874 560,874" fill="none" stroke="#222222" stroke-width="1.6"/>
+<polyline points="210,102 274,102 274,258 560,258" fill="none" stroke="#222222" stroke-width="1.6"/>
+<polyline points="210,102 274,102 274,374 560,374" fill="none" stroke="#222222" stroke-width="1.6"/>
+<polyline points="210,102 274,102 274,490 560,490" fill="none" stroke="#222222" stroke-width="1.6"/>
+<polyline points="210,102 274,102 274,606 560,606" fill="none" stroke="#222222" stroke-width="1.6"/>
+<polyline points="210,102 274,102 274,702 560,702" fill="none" stroke="#222222" stroke-width="1.6"/>
+<polyline points="210,102 274,102 274,778 560,778" fill="none" stroke="#222222" stroke-width="1.6"/>
+<polyline points="210,102 274,102 274,970 560,970" fill="none" stroke="#222222" stroke-width="1.6"/>
+<polyline points="210,102 274,102 274,1046 560,1046" fill="none" stroke="#222222" stroke-width="1.6"/>
+<polyline points="210,102 274,102 274,1122 560,1122" fill="none" stroke="#222222" stroke-width="1.6"/>
+<text x="214" y="99" font-size="9" fill="#222222">GND</text>
+<polyline points="210,122 291,122 291,122 560,122" fill="none" stroke="#555555" stroke-width="1.6"/>
+<text x="214" y="119" font-size="9" fill="#555555">RS485_TX</text>
+<polyline points="210,142 308,142 308,142 560,142" fill="none" stroke="#555555" stroke-width="1.6"/>
+<text x="214" y="139" font-size="9" fill="#555555">RS485_RX</text>
+<polyline points="560,162 550,162 550,278 560,278" fill="none" stroke="#8a8a8a" stroke-width="1.6"/>
+<polyline points="560,162 550,162 550,394 560,394" fill="none" stroke="#8a8a8a" stroke-width="1.6"/>
+<polyline points="560,162 550,162 550,510 560,510" fill="none" stroke="#8a8a8a" stroke-width="1.6"/>
+<polyline points="560,162 550,162 550,626 560,626" fill="none" stroke="#8a8a8a" stroke-width="1.6"/>
+<text x="564" y="159" font-size="9" fill="#8a8a8a">RS485_A</text>
+<polyline points="560,182 545,182 545,298 560,298" fill="none" stroke="#1f5fa8" stroke-width="1.6"/>
+<polyline points="560,182 545,182 545,414 560,414" fill="none" stroke="#1f5fa8" stroke-width="1.6"/>
+<polyline points="560,182 545,182 545,530 560,530" fill="none" stroke="#1f5fa8" stroke-width="1.6"/>
+<polyline points="560,182 545,182 545,646 560,646" fill="none" stroke="#1f5fa8" stroke-width="1.6"/>
+<text x="564" y="179" font-size="9" fill="#1f5fa8">RS485_B</text>
+<polyline points="210,162 359,162 359,722 560,722" fill="none" stroke="#8a8a8a" stroke-width="1.6"/>
+<text x="214" y="159" font-size="9" fill="#8a8a8a">FLOAT_LOW</text>
+<polyline points="210,182 376,182 376,798 560,798" fill="none" stroke="#8a8a8a" stroke-width="1.6"/>
+<text x="214" y="179" font-size="9" fill="#8a8a8a">FLOAT_HIGH</text>
+<polyline points="210,202 393,202 393,894 560,894" fill="none" stroke="#1e8449" stroke-width="1.6"/>
+<text x="214" y="199" font-size="9" fill="#1e8449">RELAY_PUMP</text>
+<polyline points="210,222 410,222 410,914 560,914" fill="none" stroke="#1e8449" stroke-width="1.6"/>
+<text x="214" y="219" font-size="9" fill="#1e8449">RELAY_VALVE</text>
+<polyline points="210,242 427,242 427,990 560,990" fill="none" stroke="#7f8c8d" stroke-width="1.6"/>
+<text x="214" y="239" font-size="9" fill="#7f8c8d">ALL_STOP</text>
+<polyline points="210,262 444,262 444,1066 560,1066" fill="none" stroke="#7f8c8d" stroke-width="1.6"/>
+<text x="214" y="259" font-size="9" fill="#7f8c8d">PUMP_AUTO</text>
+<polyline points="210,282 461,282 461,1142 560,1142" fill="none" stroke="#7f8c8d" stroke-width="1.6"/>
+<text x="214" y="279" font-size="9" fill="#7f8c8d">VALVE_AUTO</text>
+</svg>

@@ -531,6 +531,161 @@ pub fn render_board_rs(h: &Hardware, lib: &BTreeMap<String, ModuleDef>, rel: &st
     s
 }
 
+fn colour_hex(name: Option<&str>) -> &'static str {
+    match name.unwrap_or("") {
+        "red" => "#c0392b",
+        "black" => "#222222",
+        "orange" => "#d35400",
+        "yellow" => "#b7950b",
+        "green" => "#1e8449",
+        "blue" => "#1f5fa8",
+        "white" => "#8a8a8a",
+        "grey" | "gray" => "#7f8c8d",
+        "purple" => "#7d3c98",
+        _ => "#555555",
+    }
+}
+
+fn esc(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+/// A wiring diagram: the controller on the left with every pin in use, each
+/// module on the right with its wired pins, and one line per wire end.
+pub fn render_wiring_svg(h: &Hardware, lib: &BTreeMap<String, ModuleDef>, rel: &str) -> String {
+    const ROW: f64 = 20.0;
+    const PAD: f64 = 28.0;
+    let mcu_prefix = format!("{}.", h.board.mcu);
+    let mut mcu_pins: Vec<String> = Vec::new();
+    let mut mod_pins: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for w in &h.wire {
+        for e in &w.ends {
+            let Some((m, pin)) = e.split_once('.') else {
+                continue;
+            };
+            if m == h.board.mcu {
+                if !mcu_pins.contains(&pin.to_string()) {
+                    mcu_pins.push(pin.to_string());
+                }
+            } else {
+                let v = mod_pins.entry(m.to_string()).or_default();
+                if !v.contains(&pin.to_string()) {
+                    v.push(pin.to_string());
+                }
+            }
+        }
+    }
+    let order: Vec<&str> = h
+        .module
+        .iter()
+        .map(|m| m.id.as_str())
+        .filter(|m| *m != h.board.mcu)
+        .collect();
+    let mut at: BTreeMap<String, (f64, f64)> = BTreeMap::new();
+    let (mx, mw) = (40.0, 170.0);
+    let my = PAD + 30.0;
+    for (i, pin) in mcu_pins.iter().enumerate() {
+        at.insert(
+            format!("{mcu_prefix}{pin}"),
+            (mx + mw, my + 24.0 + i as f64 * ROW),
+        );
+    }
+    let mcu_h = 24.0 + mcu_pins.len() as f64 * ROW;
+    let (rx, rw) = (560.0, 190.0);
+    let mut y = PAD + 30.0;
+    let mut boxes = String::new();
+    for m in &order {
+        let pins = mod_pins.get(*m).cloned().unwrap_or_default();
+        let name = h
+            .module
+            .iter()
+            .find(|x| x.id == *m)
+            .and_then(|x| lib.get(&x.part))
+            .map(|d| d.name.clone())
+            .unwrap_or_default();
+        let bh = 24.0 + pins.len().max(1) as f64 * ROW;
+        boxes.push_str(&format!(
+            "<rect x=\"{rx}\" y=\"{y}\" width=\"{rw}\" height=\"{bh}\" fill=\"#f7f7f7\" stroke=\"#333\"/>\n\
+             <text x=\"{}\" y=\"{}\" font-size=\"12\" font-weight=\"bold\">{}</text>\n<text x=\"{}\" y=\"{}\" font-size=\"10\" fill=\"#666\">{}</text>\n",
+            rx + 6.0,
+            y + 14.0,
+            esc(m),
+            rx + rw + 6.0,
+            y + 14.0,
+            esc(&name)
+        ));
+        for (i, pin) in pins.iter().enumerate() {
+            let py = y + 24.0 + i as f64 * ROW;
+            at.insert(format!("{m}.{pin}"), (rx, py));
+            boxes.push_str(&format!(
+                "<text x=\"{}\" y=\"{}\" font-size=\"11\">{}</text>\n",
+                rx + 6.0,
+                py + 4.0,
+                esc(pin)
+            ));
+        }
+        y += bh + 12.0;
+    }
+    let height = (my + mcu_h).max(y) + PAD;
+    let mcu_name = h
+        .module
+        .iter()
+        .find(|m| m.id == h.board.mcu)
+        .and_then(|m| lib.get(&m.part))
+        .map(|d| d.name.clone())
+        .unwrap_or_default();
+    let mut s = format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"960\" height=\"{height}\" viewBox=\"0 0 960 {height}\" font-family=\"sans-serif\">\n\
+         <!-- Derived by fid-topology from {} — do not edit. -->\n<rect width=\"960\" height=\"{height}\" fill=\"white\"/>\n\
+         <rect x=\"{mx}\" y=\"{my}\" width=\"{mw}\" height=\"{mcu_h}\" fill=\"#eef3f8\" stroke=\"#333\"/>\n\
+         <text x=\"{}\" y=\"{}\" font-size=\"12\" font-weight=\"bold\">{}</text>\n",
+        esc(rel),
+        mx + 6.0,
+        my + 14.0,
+        esc(&mcu_name)
+    );
+    for (i, pin) in mcu_pins.iter().enumerate() {
+        s.push_str(&format!(
+            "<text x=\"{}\" y=\"{}\" font-size=\"11\" text-anchor=\"end\">{}</text>\n",
+            mx + mw - 6.0,
+            my + 28.0 + i as f64 * ROW,
+            esc(pin)
+        ));
+    }
+    s.push_str(&boxes);
+    for (k, w) in h.wire.iter().enumerate() {
+        let colour = colour_hex(w.colour.as_deref());
+        let mut pts: Vec<(f64, f64)> = w.ends.iter().filter_map(|e| at.get(e).copied()).collect();
+        if let Some(i) = w.ends.iter().position(|e| e.starts_with(&mcu_prefix)) {
+            if let Some(p) = at.get(&w.ends[i]).copied() {
+                pts.retain(|q| *q != p);
+                pts.insert(0, p);
+            }
+        }
+        let Some(&(x0, y0)) = pts.first() else {
+            continue;
+        };
+        let lane = 240.0 + (k as f64 * 17.0) % 280.0;
+        let side = rx - 10.0 - (k % 5) as f64 * 5.0;
+        for &(x1, y1) in &pts[1..] {
+            let mid = if x0 == x1 { side } else { lane };
+            s.push_str(&format!(
+                "<polyline points=\"{x0},{y0} {mid},{y0} {mid},{y1} {x1},{y1}\" fill=\"none\" stroke=\"{colour}\" stroke-width=\"1.6\"/>\n"
+            ));
+        }
+        s.push_str(&format!(
+            "<text x=\"{}\" y=\"{}\" font-size=\"9\" fill=\"{colour}\">{}</text>\n",
+            x0 + 4.0,
+            y0 - 3.0,
+            esc(&w.net)
+        ));
+    }
+    s.push_str("</svg>\n");
+    s
+}
+
 pub fn spare_pins(h: &Hardware, lib: &BTreeMap<String, ModuleDef>) -> Vec<String> {
     let Some(mcu) = h
         .module
