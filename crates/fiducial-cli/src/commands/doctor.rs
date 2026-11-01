@@ -73,6 +73,17 @@ pub fn run() -> Result<()> {
     // ── 11. Does every web app still send its security headers? ───────────
     check_security_headers(&root, &mut issues, &mut ok);
 
+    // ── 12. Does CI still run the gate? ───────────────────────────────────
+    let tracked = lock
+        .as_ref()
+        .is_some_and(|l| l.templates.contains_key(".github/workflows/ci.yml"));
+    let gate = crate::gate::problems(&root, tracked);
+    if gate.is_empty() {
+        ok.push("CI runs `fid derive --check` for this product".to_string());
+    } else {
+        issues.extend(gate.into_iter().map(|g| g.trim().to_string()));
+    }
+
     // ── Report ────────────────────────────────────────────────────────────
     for msg in &ok {
         println!("  ✓ {msg}");

@@ -796,6 +796,12 @@ fn run_check(pipelines: &[&Pipeline], lock: &Lock, root: &Path) -> Result<()> {
         }
     }
 
+    issues.extend(crate::gate::problems(
+        root,
+        lock.templates.contains_key(".github/workflows/ci.yml"),
+    ));
+    issues.extend(crate::shadow::copies(root, pipelines));
+
     if issues.is_empty() {
         println!("✦ fid derive --check — all artifacts fresh");
         Ok(())
@@ -2748,7 +2754,13 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             ),
         };
 
+    let sandbox = if program == "node" && pipeline.working_dir.is_none() {
+        node_sandbox(pipeline, working_dir)
+    } else {
+        Vec::new()
+    };
     let status = Command::new(program)
+        .args(&sandbox)
         .args(&base_args)
         .args(&extra_args)
         .current_dir(working_dir)
@@ -2759,6 +2771,87 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         bail!("pipeline `{}` exited with {}", pipeline.name, status);
     }
     Ok(())
+}
+
+/// Node's permission model, scoped to what the pipeline declares: it may read
+/// its own script directory, its declared inputs and `node_modules`, and write
+/// only where its outputs go. A script that reads a file it does not declare
+/// fails naming it, instead of producing an output whose input `fiducial.lock`
+/// never recorded — so a change to that file could never make it stale.
+///
+/// Empty when this Node has no permission model (before 22), so an older Node
+/// runs the script as before.
+fn node_sandbox(pipeline: &Pipeline, root: &Path) -> Vec<String> {
+    if !node_has_permissions() {
+        return Vec::new();
+    }
+    let abs = |rel: &str| root.join(rel).to_string_lossy().into_owned();
+    // Its own declaration, which a script may read for its outputs.
+    let mut read: Vec<String> = vec![abs(&format!("pipelines/{}.toml", pipeline.name))];
+    for arg in &pipeline.args[1..] {
+        let p = root.join(arg);
+        if p.is_file() {
+            if let Some(dir) = p.parent() {
+                read.push(format!("{}/*", dir.to_string_lossy()));
+            }
+        }
+    }
+    for input in &pipeline.inputs {
+        let file = input
+            .split('#')
+            .next()
+            .unwrap_or(input)
+            .trim_end_matches('?');
+        match file.find('*') {
+            Some(i) => {
+                let dir = file[..i].trim_end_matches('/');
+                read.push(format!("{}/*", abs(if dir.is_empty() { "." } else { dir })));
+            }
+            None => read.push(abs(file)),
+        }
+    }
+    for dir in root.ancestors() {
+        let nm = dir.join("node_modules");
+        if nm.is_dir() {
+            read.push(format!("{}/*", nm.to_string_lossy()));
+        }
+    }
+    let mut write: Vec<String> = pipeline
+        .outputs
+        .iter()
+        .filter_map(|o| {
+            Path::new(o)
+                .parent()
+                .map(|d| d.to_string_lossy().into_owned())
+        })
+        .map(|d| {
+            let _ = std::fs::create_dir_all(root.join(&d));
+            format!("{}/*", abs(if d.is_empty() { "." } else { &d }))
+        })
+        .collect();
+    write.sort();
+    write.dedup();
+    // A script reads back what it writes (a previous output, to keep it
+    // stable), so output directories are readable too.
+    read.extend(write.iter().cloned());
+    read.sort();
+    read.dedup();
+    let mut flags = vec!["--permission".to_string()];
+    flags.extend(read.into_iter().map(|r| format!("--allow-fs-read={r}")));
+    flags.extend(write.into_iter().map(|w| format!("--allow-fs-write={w}")));
+    flags
+}
+
+fn node_has_permissions() -> bool {
+    static HAS: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *HAS.get_or_init(|| {
+        Command::new("node")
+            .args(["--permission", "-e", "0"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success())
+    })
 }
 
 #[cfg(test)]

@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use crate::config::Config;
 
 /// A pipeline as declared in `pipelines/<name>.toml`.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Pipeline {
     /// Pipeline name, unique within a product.
     pub name: String,

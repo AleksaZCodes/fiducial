@@ -1,0 +1,5 @@
+# Advanced Monolithic Systems AMS1117-5.0, fixed 5.0 V LDO — datasheet,
+# "Electrical Characteristics": VOUT 4.950–5.050 V.
+mpn    = "AMS1117-5.0"
+source = "AMS1117 datasheet (Advanced Monolithic Systems), Electrical Characteristics"
+output = { pin = "VO", volts = 5.0 }

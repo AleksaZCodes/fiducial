@@ -6781,10 +6781,88 @@ fn datasheet_checks(p: &mut Product) -> Result<()> {
         }
     }
     problems.extend(unpulled_i2c(p));
+    problems.extend(levels(p)?);
     if !problems.is_empty() {
         bail!("{}", problems.join("\n"));
     }
     Ok(())
+}
+
+/// Voltages that have to agree across parts: a regulator's output against the
+/// rail it is declared to hold, and a logic input against the level of what
+/// drives it. Both are datasheet facts the product never states, so neither
+/// can be checked from the product alone: in the paper's independent set a
+/// 5.0 V regulator held the "3V3" rail (I11), and a 5 V LED's data pin was
+/// wired straight to a 3.3 V output (I12).
+fn levels(p: &Product) -> Result<Vec<String>> {
+    let mut problems = Vec::new();
+    let mut profiled = Vec::new();
+    for q in &p.parts {
+        if let Some(d) = q
+            .mpn
+            .as_deref()
+            .map(crate::devices::for_mpn)
+            .transpose()?
+            .flatten()
+        {
+            profiled.push((q, d));
+        }
+    }
+    let supply_of = |q: &Part, d: &crate::devices::Profile| {
+        d.supply
+            .as_ref()
+            .and_then(|s| d.net(&s.pin, &q.pins))
+            .and_then(|n| p.rails.get(n).map(|v| (n.clone(), *v)))
+    };
+    for (q, d) in &profiled {
+        let mpn = q.mpn.as_deref().unwrap_or_default();
+        if let Some(o) = &d.output {
+            if let Some(net) = d.net(&o.pin, &q.pins) {
+                if let Some(v) = p.rails.get(net) {
+                    if (v - o.volts).abs() > o.volts * 0.03 {
+                        problems.push(format!(
+                            "part `{}` ({mpn}): its output {} holds {} V, but {net} is declared \
+                             at {v} V in [rails] — {}",
+                            q.id, o.pin, o.volts, d.source
+                        ));
+                    }
+                }
+            }
+        }
+        let Some((rail, own)) = supply_of(q, d) else {
+            continue;
+        };
+        for (pin, input) in &d.inputs {
+            let Some(net) = d.net(pin, &q.pins) else {
+                continue;
+            };
+            if crate::devices::level(net, &p.rails).is_some() {
+                continue;
+            }
+            let need = ((input.vih_of_supply * own) * 1000.0).round() / 1000.0;
+            for (x, xd) in &profiled {
+                if x.id == q.id || !x.pins.values().any(|n| n == net) {
+                    continue;
+                }
+                let Some((xrail, drive)) = supply_of(x, xd) else {
+                    continue;
+                };
+                if drive < need - 1e-9 {
+                    problems.push(format!(
+                        "part `{}` ({mpn}): pin {pin} needs a high of at least {need} V \
+                         ({} × its supply on {rail} at {own} V), but {net} is driven by `{}` \
+                         ({}) from {xrail} at {drive} V — put a level shifter between them — {}",
+                        q.id,
+                        input.vih_of_supply,
+                        x.id,
+                        x.mpn.as_deref().unwrap_or_default(),
+                        d.source
+                    ));
+                }
+            }
+        }
+    }
+    Ok(problems)
 }
 
 /// I²C lines with no pull-up. The bus is open-drain: nothing drives a line
@@ -7556,6 +7634,34 @@ mount = "smd"
 mpn = "SN74AHCT1G125DBVR"
 pins = { 1 = "GND", 2 = "A", 3 = "GND", 4 = "Y", 5 = "VBUS" }
 "#;
+
+    #[test]
+    fn levels_across_parts_are_checked_against_their_datasheets() {
+        let board = |reg: &str, din: &str| {
+            format!(
+                "{BUS}\n[[part]]\nid = \"reg\"\nname = \"LDO\"\nplace = \"board\"\nmount = \"smd\"\n\
+                 mpn = \"{reg}\"\npins = {{ VI = \"VBUS\", VO = \"3V3\", GND = \"GND\" }}\n\n\
+                 [[part]]\nid = \"led\"\nname = \"LED\"\nplace = \"board\"\nmount = \"smd\"\n\
+                 mpn = \"WS2812B\"\npins = {{ VDD = \"VBUS\", VSS = \"GND\", DIN = \"{din}\" }}\n"
+            )
+        };
+        let mut good = declared(&board("AMS1117-3.3", "Y"));
+        datasheet_checks(&mut good).unwrap();
+        let ok = declared(&board("AMS1117-3.3", "Y"));
+        assert!(levels(&ok).unwrap().is_empty());
+        let wrong_reg = declared(&board("AMS1117-5.0", "Y"));
+        let e = levels(&wrong_reg).unwrap().join("\n");
+        assert!(
+            e.contains("its output VO holds 5 V, but 3V3 is declared at 3.3 V"),
+            "{e}"
+        );
+        let unshifted = declared(&board("AMS1117-3.3", "SDA"));
+        let e = levels(&unshifted).unwrap().join("\n");
+        assert!(
+            e.contains("pin DIN needs a high of at least 3.5 V") && e.contains("driven by `mcu2`"),
+            "{e}"
+        );
+    }
 
     #[test]
     fn a_profile_fills_in_what_the_datasheet_says() {

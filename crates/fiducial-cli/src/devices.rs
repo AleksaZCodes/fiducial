@@ -25,6 +25,14 @@ const PROFILES: &[(&str, &str)] = &[
         include_str!("../devices/sn74ahct1g125.toml"),
     ),
     ("ws2812b.toml", include_str!("../devices/ws2812b.toml")),
+    (
+        "ams1117-3.3.toml",
+        include_str!("../devices/ams1117-3.3.toml"),
+    ),
+    (
+        "ams1117-5.0.toml",
+        include_str!("../devices/ams1117-5.0.toml"),
+    ),
 ];
 
 #[derive(Debug, Deserialize)]
@@ -56,6 +64,27 @@ pub struct Profile {
     /// The crystal frequency the part is built around.
     #[serde(default)]
     pub crystal: Option<Crystal>,
+    /// A regulator's output: the pin and the voltage it holds there.
+    #[serde(default)]
+    pub output: Option<Output>,
+    /// Logic inputs by pin name, with the high level they need as a
+    /// fraction of the part's own supply.
+    #[serde(default)]
+    pub inputs: BTreeMap<String, Input>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Output {
+    pub pin: String,
+    pub volts: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Input {
+    /// V_IH(min) as a fraction of the supply pin's voltage: 0.7 for WS2812B.
+    pub vih_of_supply: f64,
 }
 
 #[derive(Debug, Deserialize)]

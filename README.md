@@ -314,6 +314,12 @@ plus the in-process ones (`fid-validate`, `fid-mesh`, `fid-i18n`, `fid-brand`,
 is warranted only when the work is genuinely a Rust library call rather than a
 tool invocation.
 
+A `shell` pipeline that runs `node` runs under Node's permission model: it may
+read its script's directory, its own `pipelines/<name>.toml`, its declared
+`inputs` and `node_modules`, and write only where its `outputs` go. A script
+that reads a file it does not declare fails naming that file, instead of
+producing an output whose input the lock never recorded.
+
 `fid-design` is the clearest case of that line: it parses a declaration, runs
 OKLCH-to-sRGB conversion and WCAG contrast arithmetic over the palette, and
 fails the derive when a declared pair misses its minimum. Shelling out would

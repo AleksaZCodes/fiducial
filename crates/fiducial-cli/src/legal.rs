@@ -14,20 +14,35 @@ use anyhow::Result;
 
 use crate::config::{Brand, Legal};
 
+/// What each jurisdiction asks for, read from `profiles/legal.toml`.
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Profile {
+    pub categories: Vec<String>,
+    pub jurisdiction: std::collections::BTreeMap<String, Jurisdiction>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Jurisdiction {
+    pub pages: Vec<String>,
+    /// Cookie categories the declaration must name.
+    pub categories: Vec<String>,
+    pub source: String,
+}
+
+pub fn profile() -> Profile {
+    toml::from_str(include_str!("../profiles/legal.toml")).expect("profiles/legal.toml parses")
+}
+
 /// Pages included per jurisdiction.
-///
-/// EU and UK include `imprint` — a legal disclosure requirement in Germany and
-/// other EU/UK jurisdictions. US drops it (no equivalent requirement). RS
-/// (Serbia) has no Impressum equivalent, so it takes the minimal set plus an
-/// accessibility statement, which Serbian public-sector procurement commonly
-/// asks for. `other` produces the minimal set every product needs.
-fn pages_for_jurisdiction(jurisdiction: &str) -> &'static [&'static str] {
-    match jurisdiction {
-        "EU" | "UK" => &["privacy", "terms", "cookies", "imprint", "accessibility"],
-        "US" => &["privacy", "terms", "cookies", "accessibility"],
-        "RS" => &["privacy", "terms", "cookies", "accessibility"],
-        _ => &["privacy", "terms", "cookies"],
-    }
+fn pages_for_jurisdiction(jurisdiction: &str) -> Vec<String> {
+    let p = profile();
+    p.jurisdiction
+        .get(jurisdiction)
+        .or_else(|| p.jurisdiction.get("other"))
+        .map(|j| j.pages.clone())
+        .unwrap_or_default()
 }
 
 /// Languages this pipeline can render legal copy in.
@@ -871,8 +886,9 @@ pub fn render_legal_ts(
             lang_of(default_locale)
         };
         out.push_str(&format!("export const {const_name}: LegalCatalog = {{\n"));
-        for page in pages {
-            let (title_template, body_template) = page_content(page, render_lang, &categories);
+        for page in &pages {
+            let (title_template, body_template) =
+                page_content(page.as_str(), render_lang, &categories);
             let facts = Facts {
                 legal_name: &brand.legal_name,
                 domain: &brand.domain,
@@ -961,34 +977,38 @@ mod tests {
 
     #[test]
     fn eu_pages_include_imprint() {
-        assert!(pages_for_jurisdiction("EU").contains(&"imprint"));
-        assert!(pages_for_jurisdiction("UK").contains(&"imprint"));
+        assert!(pages_for_jurisdiction("EU").contains(&"imprint".to_string()));
+        assert!(pages_for_jurisdiction("UK").contains(&"imprint".to_string()));
     }
 
     #[test]
     fn us_pages_omit_imprint() {
-        assert!(!pages_for_jurisdiction("US").contains(&"imprint"));
+        assert!(!pages_for_jurisdiction("US").contains(&"imprint".to_string()));
     }
 
     #[test]
     fn other_jurisdiction_has_minimal_set() {
         let pages = pages_for_jurisdiction("other");
-        assert!(pages.contains(&"privacy"));
-        assert!(pages.contains(&"terms"));
-        assert!(pages.contains(&"cookies"));
-        assert!(!pages.contains(&"imprint"));
-        assert!(!pages.contains(&"accessibility"));
+        assert!(pages.contains(&"privacy".to_string()));
+        assert!(pages.contains(&"terms".to_string()));
+        assert!(pages.contains(&"cookies".to_string()));
+        assert!(!pages.contains(&"imprint".to_string()));
+        assert!(!pages.contains(&"accessibility".to_string()));
     }
 
     #[test]
-    fn necessary_is_always_in_effective_categories() {
+    fn a_declaration_without_necessary_is_refused_naming_the_source() {
         let legal = Legal {
             jurisdiction: "EU".into(),
             data_protection_email: "p@example.com".into(),
             cookie_categories: vec!["analytics".into()],
             ..Legal::default()
         };
-        assert!(legal.effective_categories().contains(&"necessary"));
+        let e = legal.validate().unwrap_err().to_string();
+        assert!(
+            e.contains("leaves out \"necessary\"") && e.contains("ePrivacy"),
+            "{e}"
+        );
     }
 
     #[test]

@@ -121,6 +121,7 @@ $ fid doctor
   ✓ templates up to date with platform vX.Y.Z
   ✓ no pending codemod migrations
   ✓ tooling: 1 command(s) present
+  ✓ CI runs `fid derive --check` for this product
 
 ✦ fiducial doctor: clean
 ```
