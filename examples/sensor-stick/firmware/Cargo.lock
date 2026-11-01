@@ -658,11 +658,15 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "fiducial-core"
-version = "0.9.12"
+version = "0.9.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2be0050006ff1e22d1c0de7ae6bcdc3501f8038da9739b0b1bc3a3270c67eeff"
 
 [[package]]
 name = "fiducial-protocol"
-version = "0.9.12"
+version = "0.9.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5bf5adff02433d98786df4ed05f746e27b4511b958d934d8aa4c9f43fd9cd86d"
 
 [[package]]
 name = "find-msvc-tools"
@@ -1638,3 +1642,11 @@ dependencies = [
  "quote",
  "syn 2.0.119",
 ]
+
+[[patch.unused]]
+name = "fiducial-core"
+version = "0.10.0"
+
+[[patch.unused]]
+name = "fiducial-protocol"
+version = "0.10.0"
