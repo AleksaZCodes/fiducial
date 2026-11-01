@@ -950,177 +950,177 @@ base_content = """
 
 [artifacts."PITCH.md"]
 pipeline = "thesis"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "c567b22f732526c414b2b690a3120b7fc6010ad957af789b04c479a6143a5a83"
 
 [artifacts."apps/web/src/generated/cards.ts"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "2b19762887a7852e5f366ca55c0c13856de38bb55bc678076eaafe0a3d10d5a8"
 
 [artifacts."apps/web/src/generated/messages.ts"]
 pipeline = "i18n"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "d1e5e256769dbeaed80b37d43c3a91af0368e14781dd563d02c99d8162a49f67"
 
 [artifacts."apps/web/src/generated/points.ts"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "729c3b06750e4536f19a400b5dba367940d7552c16234b45b70e2521597bd993"
 
 [artifacts."apps/web/src/generated/wire/Action.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "365e393e1c8b783265a2d45ae5efc5b5e5f9f1f034f847fd1db9e30b92c4a0bd"
 
 [artifacts."apps/web/src/generated/wire/Alarm.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "12f6baff17aab21b642df8e8d1f740740edea08082875145e73cbd17f3c91cda"
 
 [artifacts."apps/web/src/generated/wire/AlarmKind.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "ea69cbab68a023445d9c56fa0568b7b91381fc54da6454848d0b1e6e2cc4f9fe"
 
 [artifacts."apps/web/src/generated/wire/Command.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "e62603a844447d9fc6d8de3580d58d26da4f36c5a34f7a92615136789d0d4ee9"
 
 [artifacts."apps/web/src/generated/wire/CommandAck.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "8393d5e05eecf8361570c282c889e1759fd90516ab8e8ad942fe1abb704f618e"
 
 [artifacts."apps/web/src/generated/wire/Outcome.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "362f1ac0b8c1ba78feab39e9a85fe01703459554a3184674d94f7ba3e98bd262"
 
 [artifacts."apps/web/src/generated/wire/Output.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "e506669a46648efaba1b53943fa98f41dccfaafa78d428486d8a832c10c60304"
 
 [artifacts."apps/web/src/generated/wire/Reading.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "9a57790a64e140360122f742221d5ce6f345d906914c963f52c61491417294d6"
 
 [artifacts."apps/web/src/generated/wire/Reason.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "b4f37e0fbf5fecb901f3b8d5abf9380c34b83373fd99ab2d099edad3b9cadd3f"
 
 [artifacts."apps/web/src/generated/wire/Selector.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "d2b52e39487026ebeabc33e205d55e7eb4cc8fe8411fa49a2149407fbd1dbaa5"
 
 [artifacts."apps/web/src/generated/wire/Slot.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "f3b32376c76d9cb7dadbb6c0ece95a3ecfce2355de8bff0db27f788096d3fc4b"
 
 [artifacts."apps/web/src/generated/wire/State.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "97387d31bdb2c4fbddd875a75c9ed06736738e100edc4042ec1b574a70fb9a06"
 
 [artifacts."apps/web/src/generated/wire/Status.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "617b3149096d84611a1f1b5e725a4dcce5172364fc8516c5236c4d4f859d3b90"
 
 [artifacts."apps/web/src/generated/wire/Threshold.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "788ad6f29d3d41c178dd454f2a3d983738afc16003aca886133d308db7257388"
 
 [artifacts."apps/web/src/generated/wire/Thresholds.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "aa64edcc3d575663b82c33faf5727b8ab70c36f3095f6307496e4fef88bdd456"
 
 [artifacts."apps/web/src/generated/wire/Timetable.ts"]
 pipeline = "messages"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "b6113802ce20c380c621d63317c483806ac5c95b7a77455d39cea74f50e1d6fc"
 
 [artifacts."crates/skola-messages/src/generated/topics.rs"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "ebb3f604ec96b26cbdd1e2fb60410f138b2f17f43adc938375aa492b3926cf3d"
 
 [artifacts."firmware/classroom/src/generated/board.rs"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "cd41ede45f669aef106717810f62105e191177a66680e597c4fc77fe931db688"
 
 [artifacts."firmware/classroom/src/generated/params.rs"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "122fd5b3d3ec46b660cc051e37b39244666c92f9a54d10f865e06638e979ff9f"
 
 [artifacts."firmware/classroom/src/generated/points.rs"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "22de5af1edf009672f3b4da85fe6b2c91f623d90d35622643e2ff02bfa85e977"
 
 [artifacts."firmware/roof/src/generated/board.rs"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "cbee365b3e492d0f55e0242ad29b209ed8f4bd9b1d25e8ca5fce78a218041e22"
 
 [artifacts."firmware/roof/src/generated/params.rs"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "0cfa020053b9b5ea9b9dff5c06a5578a7acae30bb9e9b2514beb2e1af0c06fcc"
 
 [artifacts."firmware/roof/src/generated/points.rs"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "65f0132120dd273156849c9fabcbe974c04d175d389b43fa5736f6300e22a11e"
 
 [artifacts."hardware/classroom/generated/bom.csv"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "346080fb2fb1dab8c989f7683b250620d199027762fad1fa4d995e830abbba63"
 
 [artifacts."hardware/classroom/generated/wiring.csv"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "b3a7921421662a9ec625c9a7502cdac2a68a3883a2ba61e024644c009b40842e"
 
 [artifacts."hardware/roof-a/generated/bom.csv"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "33e05097a0de9379599d794f22846f6d70a065a8ad043b65acf7000e3b9aaf36"
 
 [artifacts."hardware/roof-a/generated/wiring.csv"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "7cdd655d38970149969a7a46c68d98b3804f6d3ed6892763ba279dc506fc2576"
 
 [artifacts."hardware/roof-b/generated/bom.csv"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "b7e2ed6a9662edf972c05d8349c6695f694d40f78c5fcf78390486b46f2c6de4"
 
 [artifacts."hardware/roof-b/generated/wiring.csv"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "bf850649a10b8b73e1483f6d7c9aefa587c6f5960f249e8fff54bc8e375950a5"
 
 [artifacts."hardware/roof/variants.md"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "5726df2ead85ed7c9a26849793859d77186237e612530fff967a168ba9bfc998"
 
 [artifacts."migrations/0001_topology.sql"]
 pipeline = "topology"
-source_version = "0.10.0"
+source_version = "0.10.1"
 hash = "a847432b4c7fa026581e1e74af7e6a62dba753f1c15121f77b3ea83a039e9136"
 
 [capabilities.i18n]

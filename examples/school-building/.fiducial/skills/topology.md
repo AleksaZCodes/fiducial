@@ -52,7 +52,53 @@ Every output is gated by `fid derive --check`. A firmware role added to
 - a parameter naming a missing rule, or with its default outside its range;
 - two nodes sharing firmware with different points.
 
+## Hardware built from modules
+
+A node's `hardware` (and each of its `variants`) is a declaration with
+`[board] kind = "modules"`:
+
+```toml
+[board]
+kind = "modules"
+mcu  = "mcu"                     # the module that is the controller
+
+[[module]]
+id   = "mcu"
+part = "esp32-c6-devkitc-1"      # from the platform's module library
+
+[[wire]]
+net    = "RELAY_PUMP"            # the net a topology point binds to
+ends   = ["mcu.GPIO18", "relays.IN1"]
+colour = "green"
+
+[[point]]                        # a variant's own binding for a point
+id      = "soil_1"
+bus     = "roof_rs485"
+address = 1
+```
+
+Points bind to **nets** in `topology.toml` (`net = "RELAY_PUMP"`), so every
+variant can carry them on different pins. A sensor bound to a net is analog.
+
+Derive checks every variant against the library, where pin rules are data:
+
+- an analog point needs an ADC pin;
+- an output on a strapping or USB pin is refused;
+- a contact to GND on a pin the boot ROM drives is refused;
+- one pin carries one net;
+- a bus a point uses needs a module speaking its protocol wired to the
+  controller by a signal wire (removing a transceiver fails, naming the bus);
+- an I²C point's address needs a module that answers there;
+- a module's supply matches the rail it is wired to;
+- the variant's module cost stays under `[cost] ceiling_rsd`.
+
+Per variant it derives `<dir>/generated/wiring.csv` and `bom.csv` (price,
+vendor, date checked). For the built hardware of each firmware role it
+derives `firmware/<role>/src/generated/board.rs` (one constant per net). For
+a node with several variants it derives `hardware/<node>/variants.md`, which
+compares controller-and-sensor cost, total module cost, spare pins and buses.
+
 ## What it does not do
 
-It picks no parts and adds nothing to make a check pass. Bus contracts
-against the netlist and MCU pin rules arrive with module-built hardware.
+It picks no parts and adds nothing to make a check pass. The electrical
+cabinet (24 V ladder, 230 V main circuit) has no declaration yet.

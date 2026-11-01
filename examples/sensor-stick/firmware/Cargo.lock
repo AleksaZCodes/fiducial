@@ -1645,8 +1645,8 @@ dependencies = [
 
 [[patch.unused]]
 name = "fiducial-core"
-version = "0.10.0"
+version = "0.10.1"
 
 [[patch.unused]]
 name = "fiducial-protocol"
-version = "0.10.0"
+version = "0.10.1"
