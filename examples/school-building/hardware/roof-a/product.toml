@@ -1,0 +1,146 @@
+# Roof controller, variant А: a Seeed XIAO ESP32C6 with the RS-485 breakout,
+# and Modbus RTU probes on one four-wire cable. The real-building solution.
+
+[board]
+kind = "modules"
+mcu  = "mcu"
+
+[[module]]
+id   = "mcu"
+part = "seeed-xiao-esp32c6"
+
+[[module]]
+id   = "rs485"
+part = "seeed-rs485-breakout-xiao"
+
+[[module]]
+id   = "soil_1"
+part = "modbus-soil-probe"
+
+[[module]]
+id   = "soil_2"
+part = "modbus-soil-probe"
+
+[[module]]
+id   = "t_bare"
+part = "modbus-temp-probe"
+
+[[module]]
+id   = "t_green"
+part = "modbus-temp-probe"
+
+[[module]]
+id   = "float_low"
+part = "float-switch-vertical"
+
+[[module]]
+id   = "float_high"
+part = "float-switch-vertical"
+
+[[module]]
+id   = "relays"
+part = "relay-2ch-opto"
+
+[[module]]
+id   = "all_stop"
+part = "contact-aux"
+
+[[module]]
+id   = "pump_auto"
+part = "contact-aux"
+
+[[module]]
+id   = "valve_auto"
+part = "contact-aux"
+
+[[module]]
+id   = "psu"
+part = "supply-5v-din-mp15s"
+
+[[point]]
+id      = "soil_1"
+bus     = "roof_rs485"
+address = 1
+
+[[point]]
+id      = "soil_2"
+bus     = "roof_rs485"
+address = 2
+
+[[point]]
+id      = "roof_bare"
+bus     = "roof_rs485"
+address = 11
+
+[[point]]
+id      = "roof_green"
+bus     = "roof_rs485"
+address = 12
+
+[[wire]]
+net    = "5V"
+ends   = ["psu.+V", "mcu.5V", "relays.VCC"]
+colour = "red"
+
+[[wire]]
+net    = "SENSOR_5V"
+ends   = ["rs485.5V_OUT", "soil_1.VCC", "soil_2.VCC", "t_bare.VCC", "t_green.VCC"]
+colour = "red"
+
+[[wire]]
+net    = "GND"
+ends   = ["psu.-V", "mcu.GND", "rs485.GND", "relays.GND", "soil_1.GND", "soil_2.GND", "t_bare.GND", "t_green.GND", "float_low.C2", "float_high.C2", "all_stop.C2", "pump_auto.C2", "valve_auto.C2"]
+colour = "black"
+
+[[wire]]
+net    = "RS485_TX"
+ends   = ["mcu.D4", "rs485.TX"]
+
+[[wire]]
+net    = "RS485_RX"
+ends   = ["mcu.D5", "rs485.RX"]
+
+[[wire]]
+net    = "RS485_A"
+ends   = ["rs485.A", "soil_1.A", "soil_2.A", "t_bare.A", "t_green.A"]
+colour = "white"
+
+[[wire]]
+net    = "RS485_B"
+ends   = ["rs485.B", "soil_1.B", "soil_2.B", "t_bare.B", "t_green.B"]
+colour = "blue"
+
+[[wire]]
+net    = "FLOAT_LOW"
+ends   = ["mcu.D0", "float_low.C1"]
+colour = "white"
+
+[[wire]]
+net    = "FLOAT_HIGH"
+ends   = ["mcu.D1", "float_high.C1"]
+colour = "white"
+
+[[wire]]
+net    = "RELAY_PUMP"
+ends   = ["mcu.D2", "relays.IN1"]
+colour = "green"
+
+[[wire]]
+net    = "RELAY_VALVE"
+ends   = ["mcu.D3", "relays.IN2"]
+colour = "green"
+
+[[wire]]
+net    = "ALL_STOP"
+ends   = ["mcu.D8", "all_stop.C1"]
+colour = "grey"
+
+[[wire]]
+net    = "PUMP_AUTO"
+ends   = ["mcu.D9", "pump_auto.C1"]
+colour = "grey"
+
+[[wire]]
+net    = "VALVE_AUTO"
+ends   = ["mcu.D10", "valve_auto.C1"]
+colour = "grey"

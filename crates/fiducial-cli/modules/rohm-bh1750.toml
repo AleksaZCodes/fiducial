@@ -1,0 +1,17 @@
+# ROHM BH1750FVI ambient light sensor module — datasheet: I²C address 0x23
+# with ADDR low, 0x5C with ADDR high.
+id     = "rohm-bh1750"
+name   = "ROHM BH1750 module"
+kind   = "sensor"
+protocol = "i2c"
+i2c_address = 0x23
+supply = 3.3
+source = "ROHM BH1750 module datasheet or product page"
+price  = { rsd = 250, vendor = "other", checked = "2026-11-01" }
+
+[pins]
+VCC = { roles = ["power"] }
+GND = { roles = ["ground"] }
+SDA = { roles = ["i2c-sda"] }
+SCL = { roles = ["i2c-scl"] }
+ADDR = { roles = ["address"] }

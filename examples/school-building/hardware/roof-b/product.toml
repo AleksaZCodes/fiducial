@@ -1,0 +1,119 @@
+# Roof controller, variant Б: sensors wired directly to an ESP32-C6-DevKitC,
+# the same board as the classrooms. Recommended for the maquette.
+
+[board]
+kind = "modules"
+mcu  = "mcu"
+
+[[module]]
+id   = "mcu"
+part = "esp32-c6-devkitc-1"
+
+[[module]]
+id   = "soil_1"
+part = "capacitive-soil-v1.2"
+
+[[module]]
+id   = "soil_2"
+part = "capacitive-soil-v1.2"
+
+[[module]]
+id   = "t_bare"
+part = "ds18b20-probe"
+
+[[module]]
+id   = "t_green"
+part = "ds18b20-probe"
+
+[[module]]
+id   = "float_low"
+part = "float-switch-vertical"
+
+[[module]]
+id   = "float_high"
+part = "float-switch-vertical"
+
+[[module]]
+id   = "relays"
+part = "relay-2ch-opto"
+
+[[module]]
+id   = "all_stop"
+part = "contact-aux"
+
+[[module]]
+id   = "pump_auto"
+part = "contact-aux"
+
+[[module]]
+id   = "valve_auto"
+part = "contact-aux"
+
+[[module]]
+id   = "psu"
+part = "supply-5v-din-mp15s"
+
+[[wire]]
+net    = "5V"
+ends   = ["psu.+V", "mcu.5V", "relays.VCC"]
+colour = "red"
+
+[[wire]]
+net    = "3V3"
+ends   = ["mcu.3V3", "soil_1.VCC", "soil_2.VCC", "t_bare.VDD", "t_green.VDD"]
+colour = "orange"
+
+[[wire]]
+net    = "GND"
+ends   = ["psu.-V", "mcu.GND", "relays.GND", "soil_1.GND", "soil_2.GND", "t_bare.GND", "t_green.GND", "float_low.C2", "float_high.C2", "all_stop.C2", "pump_auto.C2", "valve_auto.C2"]
+colour = "black"
+
+[[wire]]
+net    = "SOIL_1"
+ends   = ["mcu.GPIO4", "soil_1.AOUT"]
+colour = "yellow"
+
+[[wire]]
+net    = "SOIL_2"
+ends   = ["mcu.GPIO5", "soil_2.AOUT"]
+colour = "yellow"
+
+[[wire]]
+net    = "ONEWIRE"
+ends   = ["mcu.GPIO3", "t_bare.DQ", "t_green.DQ"]
+colour = "blue"
+
+[[wire]]
+net    = "FLOAT_LOW"
+ends   = ["mcu.GPIO10", "float_low.C1"]
+colour = "white"
+
+[[wire]]
+net    = "FLOAT_HIGH"
+ends   = ["mcu.GPIO11", "float_high.C1"]
+colour = "white"
+
+[[wire]]
+net    = "RELAY_PUMP"
+ends   = ["mcu.GPIO18", "relays.IN1"]
+colour = "green"
+
+[[wire]]
+net    = "RELAY_VALVE"
+ends   = ["mcu.GPIO19", "relays.IN2"]
+colour = "green"
+
+[[wire]]
+net    = "ALL_STOP"
+ends   = ["mcu.GPIO2", "all_stop.C1"]
+colour = "grey"
+
+[[wire]]
+net    = "PUMP_AUTO"
+ends   = ["mcu.GPIO22", "pump_auto.C1"]
+colour = "grey"
+
+[[wire]]
+net    = "VALVE_AUTO"
+ends   = ["mcu.GPIO23", "valve_auto.C1"]
+colour = "grey"

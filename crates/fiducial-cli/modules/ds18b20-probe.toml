@@ -1,0 +1,14 @@
+# Maxim DS18B20 waterproof probe, 1 m — datasheet: 1-Wire, factory ROM code
+# per device, 4.7 kΩ pull-up to VDD.
+id     = "ds18b20-probe"
+name   = "DS18B20 waterproof probe, 1 m"
+kind   = "sensor"
+protocol = "onewire"
+supply = 3.3
+source = "DS18B20 waterproof probe, 1 m datasheet or product page"
+price  = { rsd = 330, vendor = "Elektro Modul", checked = "2026-11-01" }
+
+[pins]
+VDD = { roles = ["power"] }
+GND = { roles = ["ground"] }
+DQ = { roles = ["onewire"] }

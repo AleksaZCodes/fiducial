@@ -2592,10 +2592,33 @@ fn run_fid_topology(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         .map(String::as_str)
         .unwrap_or(topo::DECLARATION);
     let t = topo::load(working_dir, decl)?;
-    let missing: Vec<String> = t
-        .roles()
+    let lib = crate::modules::library()?;
+    let variant_dir = |rel: &str| {
+        Path::new(rel)
+            .parent()
+            .map(|d| d.to_string_lossy().replace('\\', "/"))
+            .unwrap_or_default()
+    };
+    let mut expected: Vec<String> = Vec::new();
+    for r in t.roles() {
+        expected.push(format!("firmware/{r}/src/generated/points.rs"));
+        expected.push(format!("firmware/{r}/src/generated/params.rs"));
+        if t.first_node_of(&r).is_some_and(|n| n.hardware.is_some()) {
+            expected.push(format!("firmware/{r}/src/generated/board.rs"));
+        }
+    }
+    for n in &t.node {
+        for f in topo::hardware_files(n) {
+            let d = variant_dir(f);
+            expected.push(format!("{d}/generated/wiring.csv"));
+            expected.push(format!("{d}/generated/bom.csv"));
+        }
+        if n.variants.len() > 1 {
+            expected.push(format!("hardware/{}/variants.md", n.id));
+        }
+    }
+    let missing: Vec<String> = expected
         .into_iter()
-        .flat_map(|r| ["points.rs", "params.rs"].map(|f| format!("firmware/{r}/src/generated/{f}")))
         .filter(|o| !pipeline.outputs.contains(o))
         .collect();
     if !missing.is_empty() {
@@ -2620,7 +2643,38 @@ fn run_fid_topology(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             .strip_prefix("firmware/")
             .and_then(|r| r.split('/').next())
             .unwrap_or_default();
+        let variant_of = |name: &str| {
+            t.node
+                .iter()
+                .flat_map(topo::hardware_files)
+                .find(|v| format!("{}/generated/{name}", variant_dir(v)) == *out)
+                .cloned()
+        };
         let content = match file {
+            "wiring.csv" | "bom.csv" => {
+                let Some(v) = variant_of(file) else {
+                    bail!("fid-topology: output `{out}` belongs to no node's hardware");
+                };
+                let h = crate::modules::load(working_dir, &v)?;
+                if file == "bom.csv" {
+                    crate::modules::render_bom(&h, &lib, &v)
+                } else {
+                    crate::modules::render_wiring(&h, &v)
+                }
+            }
+            "variants.md" => {
+                let id = out.trim_start_matches("hardware/").trim_end_matches("/variants.md");
+                let Some(n) = t.node.iter().find(|n| n.id == id) else {
+                    bail!("fid-topology: output `{out}` names no node");
+                };
+                crate::modules::render_variants(&t, n, working_dir, &lib)?
+            }
+            "board.rs" if !role.is_empty() => {
+                let Some(h) = t.first_node_of(role).and_then(|n| n.hardware.clone()) else {
+                    bail!("fid-topology: output `{out}`: firmware `{role}` runs on no node with hardware");
+                };
+                crate::modules::render_board_rs(&crate::modules::load(working_dir, &h)?, &lib, &h)
+            }
             "points.rs" if !role.is_empty() => topo::render_points_rs(&t, role, decl),
             "params.rs" if !role.is_empty() => topo::render_params_rs(&t, role, decl),
             "topics.rs" => topo::render_topics_rs(&t, decl),

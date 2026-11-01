@@ -90,13 +90,13 @@ impl Point {
             Point::Humidity => Binding::Bus { bus: "classroom_i2c", address: 0x62 },
             Point::OutsideLight => Binding::Bus { bus: "classroom_i2c", address: 0x23 },
             Point::OutsideTemp => Binding::Bus { bus: "classroom_1wire", address: 0 },
-            Point::ClassroomAllStop => Binding::Pin { pin: "GPIO2" },
-            Point::BlindAuto => Binding::Pin { pin: "GPIO22" },
-            Point::RecuperatorAuto => Binding::Pin { pin: "GPIO23" },
-            Point::BlindUp => Binding::Pin { pin: "GPIO18" },
-            Point::BlindDown => Binding::Pin { pin: "GPIO19" },
-            Point::Recuperator => Binding::Pin { pin: "GPIO20" },
-            Point::Buzzer => Binding::Pin { pin: "GPIO21" },
+            Point::ClassroomAllStop => Binding::Net { net: "ALL_STOP" },
+            Point::BlindAuto => Binding::Net { net: "BLIND_AUTO" },
+            Point::RecuperatorAuto => Binding::Net { net: "RECUPERATOR_AUTO" },
+            Point::BlindUp => Binding::Net { net: "RELAY_BLIND_UP" },
+            Point::BlindDown => Binding::Net { net: "RELAY_BLIND_DOWN" },
+            Point::Recuperator => Binding::Net { net: "RELAY_RECUPERATOR" },
+            Point::Buzzer => Binding::Net { net: "BUZZER" },
         }
     }
 

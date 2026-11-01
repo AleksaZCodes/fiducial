@@ -28,6 +28,7 @@ Built on [Fiducial](https://github.com/AleksaZCodes/fiducial).
 | `topology.toml`: nodes, buses, points, rules, parameters, the timetable | per firmware: `firmware/<role>/src/generated/points.rs` and `params.rs`; `crates/skola-messages/src/generated/topics.rs`; `apps/web/src/generated/points.ts` and `cards.ts`; `migrations/0001_topology.sql` |
 | `crates/skola-messages`: every message, as Rust types | postcard on device links, JSON at the web; `apps/web/src/generated/wire/*.ts` |
 | `messages/*.json`: every string the app shows, including each reason code | `apps/web/src/generated/messages.ts` |
+| `hardware/*/product.toml`: modules and wires per node and variant | `firmware/<role>/src/generated/board.rs`; `hardware/*/generated/wiring.csv` and `bom.csv`; `hardware/roof/variants.md` |
 
 `fid derive --check` fails when any of these no longer follows from its
 declaration. The message crate's tests fail when a reason code has no message
@@ -38,7 +39,7 @@ in a catalog.
 | Phase | |
 |---|---|
 | Messages and topology | done |
-| Hardware from modules, with roof variants А and Б | next |
+| Hardware from modules, with roof variants А and Б | done: `hardware/roof/variants.md` compares them |
 | ESP32-C6 firmware, self-hosted server, PWA, derived diagrams | to do |
 
 The roadmap is the platform's `ROADMAP.md`, *Distributed, self-hosted

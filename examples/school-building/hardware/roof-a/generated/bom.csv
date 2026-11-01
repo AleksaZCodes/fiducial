@@ -1,0 +1,11 @@
+# Derived by fid-topology from hardware/roof-a/product.toml — do not edit.
+part,name,qty,each_rsd,total_rsd,vendor,url,checked
+contact-aux,"Auxiliary contact",3,0,0,"cabinet",,2026-11-01
+float-switch-vertical,"Vertical float switch",2,1150,2300,"Elektro Modul",,2026-11-01
+modbus-soil-probe,"RS-485 Modbus soil probe",2,2000,4000,"other",,2026-11-01
+modbus-temp-probe,"RS-485 Modbus temperature probe",2,1500,3000,"other",,2026-11-01
+relay-2ch-opto,"Relay module, 2 channels, optocoupled",1,350,350,"other",,2026-11-01
+seeed-rs485-breakout-xiao,"Seeed RS-485 Breakout for XIAO",1,990,990,"Malina314",,2026-11-01
+seeed-xiao-esp32c6,"Seeed XIAO ESP32C6",1,799,799,"Malina314",,2026-11-01
+supply-5v-din-mp15s,"5 V 2.4 A DIN supply MP15S-0502400",1,1490,1490,"Malina314",,2026-11-01
+total,,,,12929,,,

@@ -226,7 +226,10 @@ pub fn load(root: &Path, decl: &str) -> Result<Topology> {
     })?;
     let t: Topology =
         toml::from_str(&raw).with_context(|| format!("fid-topology: `{decl}` does not parse"))?;
-    let problems = validate(&t);
+    let mut problems = validate(&t);
+    if problems.is_empty() {
+        problems.extend(hardware_problems(root, &t)?);
+    }
     if !problems.is_empty() {
         bail!(
             "fid-topology: `{decl}` does not hold together:\n  {}",
@@ -234,6 +237,33 @@ pub fn load(root: &Path, decl: &str) -> Result<Topology> {
         );
     }
     Ok(t)
+}
+
+/// Every node's hardware variants against the module library and the
+/// topology: pin roles and bus contracts (validations 3 and 5).
+pub fn hardware_problems(root: &Path, t: &Topology) -> Result<Vec<String>> {
+    let lib = crate::modules::library()?;
+    let mut out = Vec::new();
+    for n in &t.node {
+        for rel in hardware_files(n) {
+            match crate::modules::load(root, rel) {
+                Ok(h) => out.extend(crate::modules::validate(t, n, rel, &h, &lib)),
+                Err(e) => out.push(format!("node `{}`: {e:#}", n.id)),
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// A node's hardware declarations: every variant, and the built one.
+pub fn hardware_files(n: &Node) -> Vec<&String> {
+    let mut files: Vec<&String> = n.variants.iter().collect();
+    if let Some(h) = &n.hardware {
+        if !files.contains(&h) {
+            files.push(h);
+        }
+    }
+    files
 }
 
 pub fn validate(t: &Topology) -> Vec<String> {
@@ -440,9 +470,9 @@ pub fn validate(t: &Topology) -> Vec<String> {
                     ));
                 }
             }
-            if p.bus.is_none() && p.adc.is_none() && p.pin.is_none() {
+            if p.bus.is_none() && p.adc.is_none() && p.pin.is_none() && p.net.is_none() {
                 out.push(format!(
-                    "point `{}`: a sensor is bound to a bus, an ADC channel or a pin",
+                    "point `{}`: a sensor is bound to a bus, an ADC channel, a pin or an analog net",
                     p.id
                 ));
             }

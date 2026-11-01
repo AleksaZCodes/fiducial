@@ -1,0 +1,37 @@
+# Espressif ESP32-C6-DevKitC-1 (ESP32-C6-WROOM-1) — ESP32-C6 datasheet §2.3
+# "Strapping Pins" (GPIO8, GPIO9, GPIO15), §2.2 (USB D-/D+ on GPIO12/13; ADC1
+# on GPIO0–GPIO6); the boot ROM prints on UART0 TX (GPIO16) at power-up.
+id     = "esp32-c6-devkitc-1"
+name   = "ESP32-C6-DevKitC-1 (WROOM-1)"
+kind   = "mcu"
+supply = 3.3
+source = "ESP32-C6 datasheet (Espressif) §2.2–2.3; ESP32-C6-DevKitC-1 user guide"
+price  = { rsd = 990, vendor = "Malina314", checked = "2026-11-01" }
+
+[pins]
+GPIO0 = { gpio = 0, roles = ["adc"] }
+GPIO1 = { gpio = 1, roles = ["adc"] }
+GPIO2 = { gpio = 2, roles = ["adc"] }
+GPIO3 = { gpio = 3, roles = ["adc"] }
+GPIO4 = { gpio = 4, roles = ["adc"] }
+GPIO5 = { gpio = 5, roles = ["adc"] }
+GPIO6 = { gpio = 6, roles = ["adc"] }
+GPIO7 = { gpio = 7, roles = [] }
+GPIO8 = { gpio = 8, roles = ["strapping"] }
+GPIO9 = { gpio = 9, roles = ["strapping"] }
+GPIO10 = { gpio = 10, roles = [] }
+GPIO11 = { gpio = 11, roles = [] }
+GPIO12 = { gpio = 12, roles = ["usb"] }
+GPIO13 = { gpio = 13, roles = ["usb"] }
+GPIO15 = { gpio = 15, roles = ["strapping"] }
+GPIO16 = { gpio = 16, roles = ["boot-driven"] }
+GPIO17 = { gpio = 17, roles = ["uart0-rx"] }
+GPIO18 = { gpio = 18, roles = [] }
+GPIO19 = { gpio = 19, roles = [] }
+GPIO20 = { gpio = 20, roles = [] }
+GPIO21 = { gpio = 21, roles = [] }
+GPIO22 = { gpio = 22, roles = [] }
+GPIO23 = { gpio = 23, roles = [] }
+"3V3" = { roles = ["power"] }
+"5V"  = { roles = ["power"] }
+GND   = { roles = ["ground"] }

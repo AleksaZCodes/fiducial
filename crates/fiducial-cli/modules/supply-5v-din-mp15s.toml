@@ -1,0 +1,11 @@
+# 5 V 2.4 A DIN-rail supply MP15S-0502400.
+id     = "supply-5v-din-mp15s"
+name   = "5 V 2.4 A DIN supply MP15S-0502400"
+kind   = "supply"
+supply = 5.0
+source = "5 V 2.4 A DIN supply MP15S-0502400 datasheet or product page"
+price  = { rsd = 1490, vendor = "Malina314", checked = "2026-11-01" }
+
+[pins]
+"+V" = { roles = ["power"] }
+"-V" = { roles = ["ground"] }

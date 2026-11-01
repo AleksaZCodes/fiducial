@@ -81,17 +81,17 @@ impl Point {
 
     pub const fn binding(self) -> Binding {
         match self {
-            Point::Soil1 => Binding::Adc { channel: "GPIO4" },
-            Point::Soil2 => Binding::Adc { channel: "GPIO5" },
+            Point::Soil1 => Binding::Net { net: "SOIL_1" },
+            Point::Soil2 => Binding::Net { net: "SOIL_2" },
             Point::RoofBare => Binding::Bus { bus: "roof_1wire", address: 0 },
             Point::RoofGreen => Binding::Bus { bus: "roof_1wire", address: 0 },
-            Point::FloatLow => Binding::Pin { pin: "GPIO10" },
-            Point::FloatHigh => Binding::Pin { pin: "GPIO11" },
-            Point::RoofAllStop => Binding::Pin { pin: "GPIO2" },
-            Point::PumpAuto => Binding::Pin { pin: "GPIO22" },
-            Point::ValveAuto => Binding::Pin { pin: "GPIO23" },
-            Point::Pump => Binding::Pin { pin: "GPIO18" },
-            Point::Valve => Binding::Pin { pin: "GPIO19" },
+            Point::FloatLow => Binding::Net { net: "FLOAT_LOW" },
+            Point::FloatHigh => Binding::Net { net: "FLOAT_HIGH" },
+            Point::RoofAllStop => Binding::Net { net: "ALL_STOP" },
+            Point::PumpAuto => Binding::Net { net: "PUMP_AUTO" },
+            Point::ValveAuto => Binding::Net { net: "VALVE_AUTO" },
+            Point::Pump => Binding::Net { net: "RELAY_PUMP" },
+            Point::Valve => Binding::Net { net: "RELAY_VALVE" },
         }
     }
 

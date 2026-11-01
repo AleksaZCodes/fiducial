@@ -1,0 +1,12 @@
+# Vertical float switch, reed contact, stainless — closed while wet; a broken
+# wire reads as open.
+id     = "float-switch-vertical"
+name   = "Vertical float switch"
+kind   = "switch"
+protocol = "digital"
+source = "Vertical float switch datasheet or product page"
+price  = { rsd = 1150, vendor = "Elektro Modul", checked = "2026-11-01" }
+
+[pins]
+C1 = { roles = ["contact"] }
+C2 = { roles = ["contact"] }

@@ -19,6 +19,7 @@ mod kicad;
 mod legal;
 mod lock;
 mod migration;
+mod modules;
 mod ownership;
 mod pipeline;
 mod place;

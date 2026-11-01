@@ -1,0 +1,12 @@
+# Active buzzer, 3.3 V.
+id     = "buzzer-active-3v3"
+name   = "Active buzzer 3.3 V"
+kind   = "actuator"
+protocol = "digital"
+supply = 3.3
+source = "Active buzzer 3.3 V datasheet or product page"
+price  = { rsd = 100, vendor = "other", checked = "2026-11-01" }
+
+[pins]
+"+" = { roles = ["input"] }
+"-" = { roles = ["ground"] }

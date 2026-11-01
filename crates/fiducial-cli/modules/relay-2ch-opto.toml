@@ -1,0 +1,14 @@
+# Two-channel optocoupled relay module, 5 V, active-low inputs.
+id     = "relay-2ch-opto"
+name   = "Relay module, 2 channels, optocoupled"
+kind   = "relay"
+protocol = "digital"
+supply = 5.0
+source = "Relay module, 2 channels, optocoupled datasheet or product page"
+price  = { rsd = 350, vendor = "other", checked = "2026-11-01" }
+
+[pins]
+VCC = { roles = ["power"] }
+GND = { roles = ["ground"] }
+IN1 = { roles = ["input"] }
+IN2 = { roles = ["input"] }

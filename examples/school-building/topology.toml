@@ -15,7 +15,7 @@ runtime    = "embassy-esp"
 firmware   = "roof"
 hardware   = "hardware/roof-b/product.toml"
 variants   = ["hardware/roof-a/product.toml", "hardware/roof-b/product.toml"]
-interfaces = ["wifi", "onewire0", "adc"]
+interfaces = ["wifi", "onewire0", "uart1", "adc"]
 
 [[node]]
 id         = "classroom_1"
@@ -43,6 +43,12 @@ broker   = "server"
 connect  = ["roof.wifi", "classroom_1.wifi", "server.eth0"]
 
 [[bus]]
+id      = "roof_rs485"
+type    = "rs485"
+protocol = "modbus-rtu"
+connect = ["roof.uart1"]
+
+[[bus]]
 id      = "roof_1wire"
 type    = "onewire"
 connect = ["roof.onewire0"]
@@ -67,7 +73,7 @@ quantity    = "soil_moisture"
 unit        = "%"
 range       = [0, 100]
 tolerance   = "5 %"
-adc         = "GPIO4"
+net         = "SOIL_1"
 calibration = { dry = 0, wet = 100 }
 
 [[point]]
@@ -78,7 +84,7 @@ quantity    = "soil_moisture"
 unit        = "%"
 range       = [0, 100]
 tolerance   = "5 %"
-adc         = "GPIO5"
+net         = "SOIL_2"
 calibration = { dry = 0, wet = 100 }
 
 [[point]]
@@ -107,43 +113,43 @@ display   = true
 id   = "float_low"
 node = "roof"
 kind = "contact"
-pin  = "GPIO10"
+net  = "FLOAT_LOW"
 
 [[point]]
 id   = "float_high"
 node = "roof"
 kind = "contact"
-pin  = "GPIO11"
+net  = "FLOAT_HIGH"
 
 [[point]]
 id   = "roof_all_stop"
 node = "roof"
 kind = "contact"
-pin  = "GPIO2"
+net  = "ALL_STOP"
 
 [[point]]
 id   = "pump_auto"
 node = "roof"
 kind = "contact"
-pin  = "GPIO22"
+net  = "PUMP_AUTO"
 
 [[point]]
 id   = "valve_auto"
 node = "roof"
 kind = "contact"
-pin  = "GPIO23"
+net  = "VALVE_AUTO"
 
 [[point]]
 id   = "pump"
 node = "roof"
 kind = "actuator"
-pin  = "GPIO18"
+net  = "RELAY_PUMP"
 
 [[point]]
 id   = "valve"
 node = "roof"
 kind = "actuator"
-pin  = "GPIO19"
+net  = "RELAY_VALVE"
 
 [[rule]]
 id     = "irrigation"
@@ -232,45 +238,45 @@ bus       = "classroom_1wire"
 id   = "classroom_all_stop"
 node = "classroom_1"
 kind = "contact"
-pin  = "GPIO2"
+net  = "ALL_STOP"
 
 [[point]]
 id   = "blind_auto"
 node = "classroom_1"
 kind = "contact"
-pin  = "GPIO22"
+net  = "BLIND_AUTO"
 
 [[point]]
 id   = "recuperator_auto"
 node = "classroom_1"
 kind = "contact"
-pin  = "GPIO23"
+net  = "RECUPERATOR_AUTO"
 
 [[point]]
 id        = "blind_up"
 node      = "classroom_1"
 kind      = "actuator"
-pin       = "GPIO18"
+net  = "RELAY_BLIND_UP"
 interlock = "blind_down"
 
 [[point]]
 id        = "blind_down"
 node      = "classroom_1"
 kind      = "actuator"
-pin       = "GPIO19"
+net  = "RELAY_BLIND_DOWN"
 interlock = "blind_up"
 
 [[point]]
 id   = "recuperator"
 node = "classroom_1"
 kind = "actuator"
-pin  = "GPIO20"
+net  = "RELAY_RECUPERATOR"
 
 [[point]]
 id   = "buzzer"
 node = "classroom_1"
 kind = "actuator"
-pin  = "GPIO21"
+net  = "BUZZER"
 
 [[rule]]
 id     = "blinds"
