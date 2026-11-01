@@ -630,6 +630,26 @@ session, which starts from the owner's `.docx` template and prior paper
 (`docs/paper/README.md`) — so item 5 targets that template (Pandoc's
 `--reference-doc`), not an IEEE LaTeX one.
 
+### Distributed, self-hosted products — *multiplying* 🟡
+
+Several controllers, a Linux host and one web app, declared once in
+`topology.toml` (`docs/specs/2026-11-01-topology-is-a-declaration.md`). The
+acceptance test is the school smart-building maquette: roof and classroom
+ESP32-C6 controllers, a Raspberry Pi server with Mosquitto, a Rust server and a
+PWA. Ordered by cost of delay:
+
+| Phase | Item | Class | State |
+|---|---|---|---|
+| 0 | Decisions and STACK rows: topology, self-hosted target, ESP32-C6 firmware, transliteration | debt-accruing | ✅ |
+| 1 | One message declaration, two encodings (postcard on device links, JSON typed by `ts-rs` at the web) | debt-accruing | ⬜ |
+| 2 | `topology.toml` and `fid-topology`: firmware members, points, params, topics, TS cards, migrations | multiplying | ⬜ |
+| 3 | Hardware built from modules, with variants and derived wiring | multiplying | ⬜ |
+| 4 | `firmware-esp32c6` capability | terminal | ⬜ |
+| 5 | Self-hosted server stack: `sqlite`, `native` auth, `ollama`, `compose`, broker ACL from `can()` | terminal | ⬜ |
+| 6 | The web app as a static export served by the server | terminal | ⬜ |
+| 7 | Derived documentation: topology, wiring, rules, sequence and storage diagrams | multiplying | ⬜ |
+| 8 | CAN / CAN-FD with ISO-TP, and a Linux RT runtime — gated on a product | terminal | ⬜ |
+
 ### Physical products — outline, region, part, cost ✅
 
 **Shipped 2026-09-30** as the `hardware` capability, with input tracking in
