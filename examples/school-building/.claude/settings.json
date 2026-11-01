@@ -1,6 +1,0 @@
-{
-  "extraKnownMarketplaces": {
-    "fiducial": { "source": { "source": "github", "repo": "AleksaZCodes/fiducial" } }
-  },
-  "enabledPlugins": { "fiducial@fiducial": true }
-}

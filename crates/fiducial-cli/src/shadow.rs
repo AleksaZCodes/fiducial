@@ -39,8 +39,11 @@ const NOT_FACTS: [&str; 8] = [
     "freshness",
 ];
 
-const CODE: [&str; 11] = [
+/// Hand-written source in any language a product's firmware or apps use: web,
+/// Rust, C and C++ (ESP-IDF, Zephyr, Arduino, vendor SDKs) and Python.
+const CODE: [&str; 19] = [
     ".ts", ".tsx", ".js", ".jsx", ".mjs", ".svelte", ".vue", ".astro", ".rs", ".html", ".css",
+    ".c", ".h", ".cpp", ".hpp", ".cc", ".ino", ".py", ".go",
 ];
 
 #[derive(Debug, Clone)]
@@ -346,6 +349,7 @@ fn is_import(line: &str) -> bool {
         "mod ",
         "pub mod ",
         "include!",
+        "#include",
         "export * from",
         "export {",
     ]
@@ -483,6 +487,15 @@ fn strip_line_comment<'a>(line: &'a str, rel: &str) -> &'a str {
     if t.starts_with("//") || t.starts_with("*") || t.starts_with("/*") {
         return "";
     }
+    if rel.ends_with(".py") {
+        if t.starts_with('#') {
+            return "";
+        }
+        return match line.find(" #") {
+            Some(i) => &line[..i],
+            None => line,
+        };
+    }
     match line.find(" // ") {
         Some(i) => &line[..i],
         None => line,
@@ -580,6 +593,32 @@ mod tests {
         ] {
             assert!(!distinctive(s), "{s}");
         }
+    }
+
+    #[test]
+    fn a_c_firmware_that_includes_the_tables_is_scanned_like_rust() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("protocol.toml"), "[usb]\nvendor_id = 0x2e8a\n").unwrap();
+        std::fs::create_dir_all(root.join("firmware/main")).unwrap();
+        std::fs::write(
+            root.join("firmware/main/app.c"),
+            "#include \"messages.h\"\nint vid = 0x2e8a; // the vendor\n",
+        )
+        .unwrap();
+        let p = Pipeline {
+            name: "protocol".into(),
+            executor: "fid-protocol".into(),
+            outputs: vec!["firmware/main/generated/messages.h".into()],
+            ..Default::default()
+        };
+        let found = copies(root, &[&p]);
+        assert!(
+            found
+                .iter()
+                .any(|m| m.contains("firmware/main/app.c:2: types 11914")),
+            "{found:?}"
+        );
     }
 
     #[test]

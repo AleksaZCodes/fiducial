@@ -8,7 +8,7 @@
 
 ## Context
 
-The first distributed product's controllers are ESP32-C6 boards, either the
+The controllers a distributed product is first built on are ESP32-C6 boards, either the
 DevKitC (WROOM-1) or the Seeed XIAO. The input design proposed `esp-idf-svc`
 (std on FreeRTOS), `espflash`, and OTA with rollback. Records already in this
 repository decide otherwise:
@@ -44,6 +44,10 @@ The product owner flashes over USB-C and wants no OTA in this product.
 
   Each module carries these in its library entry. The XIAO's D6 (UART0 TX)
   can never take a contact to GND.
+
+This decides the platform's own ESP32-C6 template, not what a product may
+use: `topology` derives its firmware tables in Rust, C or JSON, so a product
+on ESP-IDF, Arduino or Zephyr stays consistent with the same declaration.
 
 ## Why not the alternatives
 

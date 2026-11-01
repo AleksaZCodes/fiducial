@@ -127,15 +127,39 @@ pub struct Cost {
     pub ceiling_rsd: f64,
 }
 
-pub fn library() -> Result<BTreeMap<String, ModuleDef>> {
-    LIBRARY
-        .iter()
-        .map(|s| {
-            let m: ModuleDef = toml::from_str(s).context("module library entry")?;
-            Ok((m.id.clone(), m))
-        })
-        .collect()
+/// The module library: the platform's entries, then the product's own in
+/// `hardware/modules/*.toml`, which add parts and replace a platform entry of
+/// the same id. Any controller or sensor a product uses can be described there
+/// without a platform release.
+pub fn library(root: &Path) -> Result<BTreeMap<String, ModuleDef>> {
+    let mut lib = BTreeMap::new();
+    for s in LIBRARY {
+        let m: ModuleDef = toml::from_str(s).context("module library entry")?;
+        lib.insert(m.id.clone(), m);
+    }
+    let dir = root.join(PRODUCT_MODULES);
+    let mut files: Vec<_> = std::fs::read_dir(&dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|e| e == "toml"))
+        .collect();
+    files.sort();
+    for f in files {
+        let raw = std::fs::read_to_string(&f)?;
+        let m: ModuleDef = toml::from_str(&raw).with_context(|| {
+            format!(
+                "{PRODUCT_MODULES}/{} does not parse",
+                f.file_name().unwrap_or_default().to_string_lossy()
+            )
+        })?;
+        lib.insert(m.id.clone(), m);
+    }
+    Ok(lib)
 }
+
+pub const PRODUCT_MODULES: &str = "hardware/modules";
 
 pub fn load(root: &Path, rel: &str) -> Result<Hardware> {
     let raw = std::fs::read_to_string(root.join(rel))
@@ -506,14 +530,19 @@ pub fn render_wiring(h: &Hardware, rel: &str) -> String {
     s
 }
 
-pub fn render_board_rs(h: &Hardware, lib: &BTreeMap<String, ModuleDef>, rel: &str) -> String {
+/// The controller pin each net lands on, as `.rs`, `.h` or `.json`.
+pub fn render_board(
+    h: &Hardware,
+    lib: &BTreeMap<String, ModuleDef>,
+    rel: &str,
+    ext: &str,
+) -> Result<String> {
     let mcu = h
         .module
         .iter()
         .find(|m| m.id == h.board.mcu)
         .and_then(|m| lib.get(&m.part));
-    let mut s = format!("// Derived by fid-topology from {rel} — do not edit.\n\n");
-    let mut seen = BTreeSet::new();
+    let mut pins: Vec<(String, u8)> = Vec::new();
     for w in &h.wire {
         for e in &w.ends {
             let Some(pin) = e.strip_prefix(&format!("{}.", h.board.mcu)) else {
@@ -523,12 +552,39 @@ pub fn render_board_rs(h: &Hardware, lib: &BTreeMap<String, ModuleDef>, rel: &st
                 continue;
             };
             let name = w.net.replace(['-', ' ', '.'], "_").to_ascii_uppercase();
-            if seen.insert(name.clone()) {
-                s.push_str(&format!("pub const {name}: u8 = {gpio};\n"));
+            if !pins.iter().any(|(n, _)| *n == name) {
+                pins.push((name, gpio));
             }
         }
     }
-    s
+    Ok(match ext {
+        "rs" => {
+            let mut s = format!("// Derived by fid-topology from {rel} — do not edit.\n\n");
+            for (n, g) in &pins {
+                s.push_str(&format!("pub const {n}: u8 = {g};\n"));
+            }
+            s
+        }
+        "h" => {
+            let mut s = format!("/* Derived by fid-topology from {rel} — do not edit. */\n#ifndef FID_BOARD_H\n#define FID_BOARD_H\n\n");
+            for (n, g) in &pins {
+                s.push_str(&format!("#define PIN_{n} {g}\n"));
+            }
+            s.push_str("\n#endif /* FID_BOARD_H */\n");
+            s
+        }
+        "json" => {
+            let m: serde_json::Map<String, serde_json::Value> = pins
+                .iter()
+                .map(|(n, g)| (n.clone(), serde_json::json!(g)))
+                .collect();
+            serde_json::to_string_pretty(&serde_json::json!({
+                "_": format!("Derived by fid-topology from {rel} — do not edit."),
+                "pins": m,
+            }))? + "\n"
+        }
+        other => bail!("fid-topology: no pin table in `.{other}` (supported: rs, h, json)"),
+    })
 }
 
 fn colour_hex(name: Option<&str>) -> &'static str {
@@ -769,7 +825,7 @@ mod tests {
 
     #[test]
     fn the_library_parses_and_knows_the_c6_pin_rules() {
-        let lib = library().unwrap();
+        let lib = library(std::path::Path::new("/nonexistent")).unwrap();
         let c6 = &lib["esp32-c6-devkitc-1"];
         assert!(c6.pins["GPIO8"].roles.contains(&"strapping".to_string()));
         assert!(c6.pins["GPIO4"].roles.contains(&"adc".to_string()));
@@ -883,7 +939,28 @@ ends = ["mcu.GPIO18", "relays.IN1"]
     fn check(hw: &str) -> String {
         let t: Topology = toml::from_str(TOPO).unwrap();
         let h: Hardware = toml::from_str(hw).unwrap();
-        validate(&t, &t.node[0], "hw.toml", &h, &library().unwrap()).join("\n")
+        validate(
+            &t,
+            &t.node[0],
+            "hw.toml",
+            &h,
+            &library(std::path::Path::new("/nonexistent")).unwrap(),
+        )
+        .join("\n")
+    }
+
+    #[test]
+    fn a_product_adds_its_own_module_without_a_platform_release() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join(PRODUCT_MODULES)).unwrap();
+        std::fs::write(
+            dir.path().join(PRODUCT_MODULES).join("my-mcu.toml"),
+            "id = \"my-mcu\"\nname = \"My MCU\"\nkind = \"mcu\"\nsource = \"its datasheet\"\nprice = { rsd = 100, vendor = \"v\", checked = \"2026-11-01\" }\n\n[pins]\nP0 = { gpio = 0, roles = [\"adc\"] }\n",
+        )
+        .unwrap();
+        let lib = library(dir.path()).unwrap();
+        assert!(lib["my-mcu"].pins["P0"].roles.contains(&"adc".to_string()));
+        assert!(lib.contains_key("esp32-c6-devkitc-1"));
     }
 
     #[test]

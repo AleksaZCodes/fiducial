@@ -8,7 +8,7 @@
 
 ## Context
 
-The first distributed product ships in Serbian Cyrillic. A naive Latin →
+A distributed product built in Serbia ships in Cyrillic. A naive Latin →
 Cyrillic transliteration of its documents turned:
 
 - `24 V` into `24 В`;
@@ -29,7 +29,7 @@ derivation transliterates **words** and keeps these **Latin**:
 3. identifiers, acronyms and protocol names (`MQTT`, `RS-485`, `I²C`, `SQLite`,
    `ESP32-C6`, `Next.js`);
 4. pin names, topic strings, file paths and code (`GPIO18`,
-   `skola/roof/stanje`, `compose.yaml`);
+   `site/roof/state`, `compose.yaml`);
 5. a token that mixes letters and digits, or contains `.`, `/`, `_` or `-`
    between letters.
 

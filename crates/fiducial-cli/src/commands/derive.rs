@@ -2598,40 +2598,65 @@ fn run_fid_topology(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         .map(String::as_str)
         .unwrap_or(topo::DECLARATION);
     let t = topo::load(working_dir, decl)?;
-    let lib = crate::modules::library()?;
+    let lib = crate::modules::library(working_dir)?;
     let variant_dir = |rel: &str| {
         Path::new(rel)
             .parent()
             .map(|d| d.to_string_lossy().replace('\\', "/"))
             .unwrap_or_default()
     };
-    let mut expected: Vec<String> = Vec::new();
+    let role_of = |out: &str| -> String {
+        out.strip_prefix("firmware/")
+            .and_then(|r| r.split('/').next())
+            .unwrap_or_default()
+            .to_string()
+    };
+    let has = |role: &str, stem: &str| {
+        pipeline.outputs.iter().any(|o| {
+            role_of(o) == role
+                && Path::new(o).file_stem().and_then(|s| s.to_str()) == Some(stem)
+                && Path::new(o)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|e| topo::FIRMWARE_EXTENSIONS.contains(&e))
+        })
+    };
+    let mut missing: Vec<String> = Vec::new();
     for r in t.roles() {
-        expected.push(format!("firmware/{r}/src/generated/points.rs"));
-        expected.push(format!("firmware/{r}/src/generated/params.rs"));
+        let mut stems = vec!["points", "params"];
         if t.first_node_of(&r).is_some_and(|n| n.hardware.is_some()) {
-            expected.push(format!("firmware/{r}/src/generated/board.rs"));
+            stems.push("board");
+        }
+        for stem in stems {
+            if !has(&r, stem) {
+                missing.push(format!(
+                    "firmware/{r}/…/{stem}.<{}> (the extension is the firmware's language)",
+                    topo::FIRMWARE_EXTENSIONS.join("|")
+                ));
+            }
         }
     }
     for n in &t.node {
+        let mut expected = Vec::new();
         for f in topo::hardware_files(n) {
             let d = variant_dir(f);
-            expected.push(format!("{d}/generated/wiring.csv"));
-            expected.push(format!("{d}/generated/bom.csv"));
-            expected.push(format!("{d}/generated/wiring.svg"));
+            for name in ["wiring.csv", "bom.csv", "wiring.svg"] {
+                expected.push(format!("{d}/generated/{name}"));
+            }
         }
         if n.variants.len() > 1 {
             expected.push(format!("hardware/{}/variants.md", n.id));
         }
+        missing.extend(
+            expected
+                .into_iter()
+                .filter(|o| !pipeline.outputs.contains(o)),
+        );
     }
-    let missing: Vec<String> = expected
-        .into_iter()
-        .filter(|o| !pipeline.outputs.contains(o))
-        .collect();
     if !missing.is_empty() {
         bail!(
-            "fid-topology: {decl} declares firmware that pipelines/{}.toml does not derive — add to \
-             `outputs`:\n  {}",
+            "fid-topology: {decl} declares firmware or hardware that pipelines/{}.toml does not \
+             derive — add to `outputs`:\n  {}",
             pipeline.name,
             missing.join("\n  ")
         );
@@ -2646,9 +2671,15 @@ fn run_fid_topology(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             .file_name()
             .and_then(|f| f.to_str())
             .unwrap_or_default();
-        let role = out
-            .strip_prefix("firmware/")
-            .and_then(|r| r.split('/').next())
+        let role_owned = role_of(out);
+        let role = role_owned.as_str();
+        let stem = Path::new(out)
+            .file_stem()
+            .and_then(|f| f.to_str())
+            .unwrap_or_default();
+        let ext = Path::new(out)
+            .extension()
+            .and_then(|f| f.to_str())
             .unwrap_or_default();
         let variant_of = |name: &str| {
             t.node
@@ -2678,24 +2709,28 @@ fn run_fid_topology(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
                 };
                 crate::modules::render_variants(&t, n, working_dir, &lib)?
             }
-            "board.rs" if !role.is_empty() => {
+            _ if !role.is_empty() && stem == "board" => {
                 let Some(h) = t.first_node_of(role).and_then(|n| n.hardware.clone()) else {
                     bail!("fid-topology: output `{out}`: firmware `{role}` runs on no node with hardware");
                 };
-                crate::modules::render_board_rs(&crate::modules::load(working_dir, &h)?, &lib, &h)
+                crate::modules::render_board(&crate::modules::load(working_dir, &h)?, &lib, &h, ext)?
             }
-            "points.rs" if !role.is_empty() => topo::render_points_rs(&t, role, decl),
-            "params.rs" if !role.is_empty() => topo::render_params_rs(&t, role, decl),
-            "topics.rs" => topo::render_topics_rs(&t, decl),
+            _ if !role.is_empty() && stem == "points" && ext != "ts" => {
+                topo::render_points(&t, role, decl, ext)?
+            }
+            _ if !role.is_empty() && stem == "params" => topo::render_params(&t, role, decl, ext)?,
+            _ if stem == "topics" => topo::render_topics(&t, decl, ext)?,
             "points.ts" => topo::render_points_ts(&t, decl),
             "cards.ts" => topo::render_cards_ts(&t, decl),
             f if f.ends_with(".sql") => topo::render_migration(&t, decl, &dialect)?,
             _ => bail!(
-                "fid-topology: unknown output `{out}` (supported: firmware/<role>/src/generated/points.rs, \
-                 …/params.rs, topics.rs, points.ts, cards.ts, migrations/*.sql)"
+                "fid-topology: unknown output `{out}` (supported: firmware/<role>/…/points, params and \
+                 board as .rs, .h or .json; topics as .rs, .h or .json; points.ts; cards.ts; \
+                 migrations/*.sql; per hardware variant wiring.csv, wiring.svg, bom.csv; \
+                 hardware/<node>/variants.md)"
             ),
         };
-        if (file == "points.rs" || file == "params.rs") && t.first_node_of(role).is_none() {
+        if !role.is_empty() && t.first_node_of(role).is_none() {
             bail!("fid-topology: output `{out}` is for firmware `{role}`, which no node runs");
         }
         write_output(working_dir, out, &content)?;

@@ -10,8 +10,8 @@
 
 One product has been one board running one firmware. `fid add firmware <target>`
 writes one member per MCU family, and `hardware/product.toml` describes one
-board. The first distributed product (a school building with a roof controller,
-one controller per classroom, a Raspberry Pi server and a web app) has facts
+board. A distributed product (a building with a controller per room, a
+Raspberry Pi server and a web app) has facts
 that belong to none of those files:
 
 - which computers exist and what runs on each;
@@ -27,7 +27,7 @@ are fully determined by these facts.
 
 ## Decision
 
-`topology.toml` at the product root declares six kinds:
+`topology.toml` at the product root declares these kinds:
 
 | Kind | Is |
 |---|---|
@@ -37,10 +37,21 @@ are fully determined by these facts.
 | `[[point]]` | one measured or commanded quantity: unit, range, tolerance, binding, and the rules it `decides` or `display = true` |
 | `[[parameter]]` | a runtime-editable value: unit, range, default, the rule that reads it |
 | `[[schedule]]` | a runtime-editable weekly timetable per scope |
+| `[[rule]]` | control logic on one firmware role: the points it reads and the actuators it drives |
+| `[[topic]]` | a message channel and its direction; generic defaults when none is declared |
+| `[[unit]]` | a unit beyond the platform's list |
+
+Everything a product's stack decides is open, not a list the platform
+keeps: a node's `target`, `runtime` and `language` are free text, a bus type
+is any lowercase name, topics and units are declared, and modules beyond the
+platform's library live in the product's `hardware/modules/`. Firmware
+tables are generated in the language the output's extension names (`.rs`,
+`.h`, `.json`), so a stack the platform has never heard of reads the same
+facts and the same `--check` holds it to them.
 
 The `topology` capability's pipeline, executor `fid-topology`, derives from it:
 
-- the firmware members, and `points.rs` and `params.rs` per member;
+- per firmware role, point, parameter and pin tables in `.rs`, `.h` or `.json`;
 - the product's topic table;
 - TypeScript point types and app cards;
 - SQL migrations for readings, roll-ups, parameters, schedules, command state,
@@ -58,11 +69,10 @@ The `topology` capability's pipeline, executor `fid-topology`, derives from it:
 5. the pin rules of the MCU family hold, as data;
 6. parameters, rules and points close: every parameter names a rule, every
    `decides` feeds a rule that reads it, and every rule input is a point;
-7. every node's target and runtime are buildable.
 
 Nodes sharing a `firmware` value share one member. Per-instance identity
 (device ID, topic prefix, broker credentials, Wi-Fi) is provisioned at first
-flash and never compiled in, so a second classroom is one `[[node]]` and its
+flash and never compiled in, so a second room is one `[[node]]` and its
 points.
 
 A parameter is a declared fact (unit, range, default) whose *value* is runtime

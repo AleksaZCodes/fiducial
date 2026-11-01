@@ -401,7 +401,7 @@ BODY = [
      "retrieval-augmented generation, so that agents are given the "
      "declarations and documentation a task needs rather than whole "
      "repositories; to refine the platform by applying it to new products, "
-     "the first a school building of several controllers and a server; "
+     "including systems of several controllers and a server; "
      "and to measure and lower the tokens agents spend, reasoning tokens "
      "above all. Fiducial and its example are open source [@fiducial]."),
 ]

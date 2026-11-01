@@ -10,25 +10,48 @@ reasoning.
 | Kind | Is | Keys |
 |---|---|---|
 | `[[system]]` | an isolation boundary | `id`, `nodes` |
-| `[[node]]` | one computer | `id`, `kind` (`mcu` · `host`), `target`, `runtime`, `firmware` (MCU), `apps` (host), `hardware`, `variants`, `interfaces` |
+| `[[node]]` | one computer | `id`, `kind` (`mcu` · `host`), `firmware` (MCU), `apps` (host), `hardware`, `variants`, `interfaces`; `target`, `runtime`, `language` as free text |
 | `[[bus]]` | a medium and its protocol | `id`, `type` (`i2c` · `spi` · `uart` · `rs485` · `onewire` · `ip` · `can` · `can-fd` · `usb`), `protocol`, `tls`, `broker`, `connect = ["<node>.<interface>"]` |
 | `[[point]]` | one measured or driven quantity | `id`, `node`, `kind` (`sensor` · `actuator` · `contact`), `quantity`, `unit`, `range`, `tolerance`, a binding (`bus` + `address`, `adc`, `pin` or `net`), `calibration`, `interlock`, `display` |
 | `[[rule]]` | control logic on one firmware role | `id`, `scope` (a `firmware` value), `reads` (points), `drives` (actuators), `doc` |
 | `[[parameter]]` | a value a person edits at runtime | `id`, `scope`, `unit`, `range`, `default`, `rule`, `limits` (the point it draws a limit line on) |
 | `[[schedule]]` | a weekly timetable edited at runtime | `id`, `scope`, `granularity` (`"5 min"`), `default_when_missing` (`occupied` · `empty`) |
+| `[[topic]]` | a message channel between nodes and the server | `id`, `direction` (`up` · `down` · `will`), `retained`, `doc`. None declared: `state`, `command`, `ack`, `parameters`, `schedule`, `online` |
+| `[[unit]]` | a unit the platform does not know | `symbol` |
 
 Nodes that share a `firmware` value run one firmware and must declare the
 same points. Per-instance identity (device ID, topic prefix, credentials,
-Wi-Fi) is provisioned at first flash, so a second classroom is one more
+Wi-Fi) is provisioned at first flash, so a second room is one more
 `[[node]]` and its points: no code changes.
+
+## Any firmware
+
+Fiducial does not need to support a firmware stack for the stack to stay
+consistent. The tables are generated in the language the output's extension
+names, so Embassy, ESP-IDF, Zephyr, Arduino, a vendor SDK or MicroPython all
+read the same declaration:
+
+| Extension | For | Shape |
+|---|---|---|
+| `.rs` | Rust | an enum per table with `id()`, `from_id()` and one `const fn` per field |
+| `.h` | C, C++ | an enum and one `#define` per field: `POINT_CO2_ADDRESS` |
+| `.json` | anything else | `{ "entries": [...], "constants": {...} }` |
+
+A bus `type`, a node's `target`, `runtime` and `language`, a topic and a unit
+are all open: a product declares what it uses. A controller or sensor the
+platform's module library lacks goes in `hardware/modules/<id>.toml` (the
+same shape as the platform's entries, pin roles included); an entry there
+with a platform id replaces it. The shadow-copy scan in `--check` reads C,
+C++ and Python as well as Rust, so a pin or address typed into hand-written
+firmware is caught whatever the language.
 
 ## What `fid derive` writes
 
 | Output | From |
 |---|---|
-| `firmware/<role>/src/generated/points.rs` | the role's points: enum, units, ranges, bindings, interlocks |
-| `firmware/<role>/src/generated/params.rs` | the role's parameters and schedules: defaults, bounds, `accepts()` |
-| `…/topics.rs` | topic suffixes, which are retained, every node and its system |
+| `firmware/<role>/…/points.{rs,h,json}` | the role's points: ids, units, ranges, bindings, interlocks |
+| `firmware/<role>/…/params.{rs,h,json}` | the role's parameters and schedules: defaults and bounds |
+| `…/topics.{rs,h,json}` | the topics, their direction and retention, every node's system, target, runtime and language |
 | `…/points.ts` | points, parameters, nodes and rules for the web |
 | `…/cards.ts` | one card per sensor; limit lines only for parameters that limit it |
 | `migrations/*.sql` | readings, hourly roll-ups, parameter values, schedules, device state, warnings, descriptions |
@@ -95,7 +118,7 @@ Derive checks every variant against the library, where pin rules are data:
 Per variant it derives `<dir>/generated/wiring.csv`, `wiring.svg` (the
 controller, each module and every wire, in its colour) and `bom.csv` (price,
 vendor, date checked). For the built hardware of each firmware role it
-derives `firmware/<role>/src/generated/board.rs` (one constant per net). For
+derives `firmware/<role>/…/board.{rs,h,json}` (the controller pin of each net). For
 a node with several variants it derives `hardware/<node>/variants.md`, which
 compares controller-and-sensor cost, total module cost, spare pins and buses.
 

@@ -12,4 +12,9 @@ outputs  = [
 # topology.toml in; per firmware role a point table and a parameter table,
 # one topic table for every node, the web's point types and cards, and the
 # server's schema. A firmware role added to topology.toml fails derive until
-# its two outputs are listed here.
+# its outputs are listed here.
+#
+# The extension picks the firmware's language: `.rs` for Rust (Embassy or any
+# other), `.h` for C and C++ (ESP-IDF, Zephyr, Arduino, a vendor SDK), `.json`
+# for anything else. The path is the firmware's own layout, under
+# firmware/<role>/.

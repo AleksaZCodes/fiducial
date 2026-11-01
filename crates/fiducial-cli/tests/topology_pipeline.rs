@@ -123,7 +123,7 @@ fn a_new_firmware_role_fails_until_its_outputs_are_listed() {
     let out = fid(&root, &["derive"]);
     assert!(!out.status.success());
     assert!(
-        text(&out).contains("firmware/roof/src/generated/points.rs"),
+        text(&out).contains("firmware/roof/…/points.<rs|h|json>"),
         "{}",
         text(&out)
     );

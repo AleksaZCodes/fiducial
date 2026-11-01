@@ -16,10 +16,10 @@ Every server-side adapter assumes Cloudflare or Supabase:
 | `auth` | `supabase` only |
 | `ai` | `openrouter`, implemented in TypeScript only "because there is no Rust-side consumer" |
 
-A school building has to run on a Raspberry Pi 4 on the school network. It
+A building's controllers have to be served from a Raspberry Pi 4 on the local network. It
 must have no account at any vendor and keep working without the internet. A
 contract with one implementation has never been tested as a contract. This
-product is the second implementation of `database`, `auth`, `ai` and `deploy`.
+target is the second implementation of `database`, `auth`, `ai` and `deploy`.
 
 ARCHITECTURE §5.1 puts server glue in TypeScript.
 

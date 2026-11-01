@@ -14,24 +14,20 @@ use serde::Deserialize;
 
 pub const DECLARATION: &str = "topology.toml";
 
+/// Units every product knows. A product adds its own with `[[unit]]`.
 const UNITS: [&str; 18] = [
     "ppm", "%", "°C", "lx", "V", "mV", "A", "mA", "W", "kWh", "Pa", "hPa", "mm", "m", "s", "min",
     "h", "L",
 ];
-const MCU_TARGETS: [&str; 5] = [
-    "riscv32imac-unknown-none-elf",
-    "thumbv6m-none-eabi",
-    "thumbv7em-none-eabihf",
-    "thumbv8m.main-none-eabihf",
-    "xtensa-esp32s3-none-elf",
-];
-const MCU_RUNTIMES: [&str; 3] = ["embassy-esp", "embassy-rp", "embassy-stm32"];
-const HOST_RUNTIMES: [&str; 2] = ["linux-compose", "linux-rt"];
-const BUS_TYPES: [&str; 9] = [
-    "i2c", "spi", "uart", "rs485", "onewire", "ip", "can", "can-fd", "usb",
-];
-pub const TOPICS: [&str; 6] = [
-    "stanje", "nalog", "potvrda", "pragovi", "raspored", "online",
+
+/// The topics a node exchanges when `topology.toml` declares none.
+const DEFAULT_TOPICS: [(&str, Direction, bool); 6] = [
+    ("state", Direction::Up, false),
+    ("command", Direction::Down, false),
+    ("ack", Direction::Up, false),
+    ("parameters", Direction::Down, true),
+    ("schedule", Direction::Down, true),
+    ("online", Direction::Will, false),
 ];
 
 #[derive(Debug, Deserialize)]
@@ -51,6 +47,35 @@ pub struct Topology {
     pub parameter: Vec<Parameter>,
     #[serde(default)]
     pub schedule: Vec<Schedule>,
+    #[serde(default)]
+    pub topic: Vec<Topic>,
+    #[serde(default)]
+    pub unit: Vec<Unit>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Topic {
+    pub id: String,
+    pub direction: Direction,
+    #[serde(default)]
+    pub retained: bool,
+    #[serde(default)]
+    pub doc: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Direction {
+    Up,
+    Down,
+    Will,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Unit {
+    pub symbol: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -65,8 +90,12 @@ pub struct System {
 pub struct Node {
     pub id: String,
     pub kind: NodeKind,
-    pub target: String,
-    pub runtime: String,
+    #[serde(default)]
+    pub target: Option<String>,
+    #[serde(default)]
+    pub runtime: Option<String>,
+    #[serde(default)]
+    pub language: Option<String>,
     #[serde(default)]
     pub firmware: Option<String>,
     #[serde(default)]
@@ -175,6 +204,25 @@ pub struct Schedule {
 }
 
 impl Topology {
+    pub fn topics(&self) -> Vec<Topic> {
+        if !self.topic.is_empty() {
+            return self.topic.clone();
+        }
+        DEFAULT_TOPICS
+            .iter()
+            .map(|(id, direction, retained)| Topic {
+                id: id.to_string(),
+                direction: *direction,
+                retained: *retained,
+                doc: String::new(),
+            })
+            .collect()
+    }
+
+    fn knows_unit(&self, u: &str) -> bool {
+        UNITS.contains(&u) || self.unit.iter().any(|x| x.symbol == u)
+    }
+
     pub fn role(&self, node: &str) -> Option<&str> {
         self.node
             .iter()
@@ -242,7 +290,7 @@ pub fn load(root: &Path, decl: &str) -> Result<Topology> {
 /// Every node's hardware variants against the module library and the
 /// topology: pin roles and bus contracts (validations 3 and 5).
 pub fn hardware_problems(root: &Path, t: &Topology) -> Result<Vec<String>> {
-    let lib = crate::modules::library()?;
+    let lib = crate::modules::library(root)?;
     let mut out = Vec::new();
     for n in &t.node {
         for rel in hardware_files(n) {
@@ -276,22 +324,6 @@ pub fn validate(t: &Topology) -> Vec<String> {
         }
         match n.kind {
             NodeKind::Mcu => {
-                if !MCU_TARGETS.contains(&n.target.as_str()) {
-                    out.push(format!(
-                        "node `{}`: target `{}` is not one the firmware workspaces build ({})",
-                        n.id,
-                        n.target,
-                        MCU_TARGETS.join(", ")
-                    ));
-                }
-                if !MCU_RUNTIMES.contains(&n.runtime.as_str()) {
-                    out.push(format!(
-                        "node `{}`: runtime `{}` is not an MCU runtime ({})",
-                        n.id,
-                        n.runtime,
-                        MCU_RUNTIMES.join(", ")
-                    ));
-                }
                 if n.firmware.is_none() {
                     out.push(format!(
                         "node `{}` is an MCU with no `firmware` member",
@@ -310,14 +342,6 @@ pub fn validate(t: &Topology) -> Vec<String> {
             NodeKind::Host => {
                 if n.apps.is_empty() {
                     out.push(format!("node `{}` is a host that runs no `apps`", n.id));
-                }
-                if !HOST_RUNTIMES.contains(&n.runtime.as_str()) {
-                    out.push(format!(
-                        "node `{}`: runtime `{}` has no deploy implementation ({})",
-                        n.id,
-                        n.runtime,
-                        HOST_RUNTIMES.join(", ")
-                    ));
                 }
             }
         }
@@ -345,12 +369,15 @@ pub fn validate(t: &Topology) -> Vec<String> {
 
     let buses: BTreeMap<&str, &Bus> = t.bus.iter().map(|b| (b.id.as_str(), b)).collect();
     for b in &t.bus {
-        if !BUS_TYPES.contains(&b.kind.as_str()) {
+        if b.kind.is_empty()
+            || !b
+                .kind
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        {
             out.push(format!(
-                "bus `{}`: type `{}` is not one of {}",
-                b.id,
-                b.kind,
-                BUS_TYPES.join(", ")
+                "bus `{}`: type `{}` is not a lowercase name (i2c, rs485, can-fd, or the product's own)",
+                b.id, b.kind
             ));
         }
         let mut systems = BTreeSet::new();
@@ -445,8 +472,8 @@ pub fn validate(t: &Topology) -> Vec<String> {
                     "point `{}`: a sensor has a unit — a physical fact is never a bare number",
                     p.id
                 )),
-                Some(u) if !UNITS.contains(&u.as_str()) => out.push(format!(
-                    "point `{}`: unit `{u}` is not one this platform knows ({})",
+                Some(u) if !t.knows_unit(u) => out.push(format!(
+                    "point `{}`: unit `{u}` is not one this platform knows ({}) — declare it with [[unit]]",
                     p.id,
                     UNITS.join(", ")
                 )),
@@ -640,7 +667,7 @@ pub fn validate(t: &Topology) -> Vec<String> {
                 prm.id, prm.default
             ));
         }
-        if !UNITS.contains(&prm.unit.as_str()) {
+        if !t.knows_unit(&prm.unit) {
             out.push(format!(
                 "parameter `{}`: unit `{}` is not one this platform knows",
                 prm.id, prm.unit
@@ -717,193 +744,403 @@ fn f(v: f64) -> String {
     }
 }
 
-pub fn render_points_rs(t: &Topology, role: &str, decl: &str) -> String {
-    let pts = t.points_of_role(role);
-    let mut s = format!(
-        "// Derived by fid-topology from {decl} for firmware `{role}` — do not edit.\n\n\
-         #[derive(Debug, Clone, Copy, PartialEq, Eq)]\n#[repr(u16)]\npub enum Point {{\n"
-    );
-    for (i, p) in pts.iter().enumerate() {
-        s.push_str(&format!("    {} = {},\n", pascal(&p.id), i + 1));
-    }
-    s.push_str("}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Binding {\n    Bus { bus: &'static str, address: u32 },\n    Adc { channel: &'static str },\n    Pin { pin: &'static str },\n    Net { net: &'static str },\n}\n\n");
-    s.push_str(&format!("pub const POINTS: [Point; {}] = [", pts.len()));
-    s.push_str(
-        &pts.iter()
-            .map(|p| format!("Point::{}", pascal(&p.id)))
-            .collect::<Vec<_>>()
-            .join(", "),
-    );
-    s.push_str(
-        "];\n\nimpl Point {\n    pub const fn id(self) -> u16 {\n        self as u16\n    }\n\n",
-    );
-    let arm = |body: &dyn Fn(&Point) -> String, ty: &str, name: &str| {
-        let mut a = format!("    pub const fn {name}(self) -> {ty} {{\n        match self {{\n");
-        for p in &pts {
-            a.push_str(&format!(
-                "            Point::{} => {},\n",
-                pascal(&p.id),
-                body(p)
-            ));
-        }
-        a.push_str("        }\n    }\n");
-        a
-    };
-    s.push_str(&arm(&|p| format!("{:?}", p.id), "&'static str", "name"));
-    s.push('\n');
-    s.push_str(&arm(
-        &|p| match &p.unit {
-            Some(u) => format!("Some({u:?})"),
-            None => "None".into(),
-        },
-        "Option<&'static str>",
-        "unit",
-    ));
-    s.push('\n');
-    s.push_str(&arm(
-        &|p| match p.range {
-            Some([lo, hi]) => format!("Some(({}, {}))", f(lo), f(hi)),
-            None => "None".into(),
-        },
-        "Option<(f32, f32)>",
-        "range",
-    ));
-    s.push('\n');
-    s.push_str(&arm(
-        &|p| {
-            if let (Some(b), Some(a)) = (&p.bus, p.address) {
-                format!("Binding::Bus {{ bus: {b:?}, address: 0x{a:02X} }}")
-            } else if let Some(c) = &p.adc {
-                format!("Binding::Adc {{ channel: {c:?} }}")
-            } else if let Some(pin) = &p.pin {
-                format!("Binding::Pin {{ pin: {pin:?} }}")
-            } else if let Some(n) = &p.net {
-                format!("Binding::Net {{ net: {n:?} }}")
-            } else if let Some(b) = &p.bus {
-                format!("Binding::Bus {{ bus: {b:?}, address: 0 }}")
-            } else {
-                "Binding::Pin { pin: \"\" }".into()
-            }
-        },
-        "Binding",
-        "binding",
-    ));
-    s.push('\n');
-    s.push_str(&arm(
-        &|p| format!("{}", p.calibration.is_some()),
-        "bool",
-        "calibrated",
-    ));
-    s.push('\n');
-    s.push_str(&arm(
-        &|p| match &p.interlock {
-            Some(i) => format!("Some(Point::{})", pascal(i)),
-            None => "None".into(),
-        },
-        "Option<Point>",
-        "interlock",
-    ));
-    s.push_str("}\n");
-    s
+/// The languages firmware tables are generated in, chosen by the output's
+/// extension. Any firmware — Embassy, ESP-IDF, Zephyr, Arduino, a vendor SDK,
+/// MicroPython — reads one of these; `.json` is for every other language.
+pub const FIRMWARE_EXTENSIONS: [&str; 3] = ["rs", "h", "json"];
+
+/// One generated constant, in a language-neutral form.
+enum Value {
+    Int(i64),
+    Float(f64),
+    Str(String),
+    Bool(bool),
+    None,
 }
 
-pub fn render_params_rs(t: &Topology, role: &str, decl: &str) -> String {
-    let prms: Vec<&Parameter> = t.parameter.iter().filter(|p| p.scope == role).collect();
-    let mut s = format!(
-        "// Derived by fid-topology from {decl} for firmware `{role}` — do not edit.\n\n\
-         #[derive(Debug, Clone, Copy, PartialEq, Eq)]\n#[repr(u16)]\npub enum Parameter {{\n"
-    );
-    for (i, p) in prms.iter().enumerate() {
-        s.push_str(&format!("    {} = {},\n", pascal(&p.id), i + 1));
+struct Table {
+    /// `Point`, `Parameter`, `Topic`.
+    name: &'static str,
+    /// Each entry's identifier and its fields, in declaration order.
+    entries: Vec<(String, Vec<(&'static str, Value)>)>,
+    /// Standalone constants: `TIMETABLE_GRANULARITY_MIN`.
+    constants: Vec<(String, Value)>,
+}
+
+fn opt_str(v: &Option<String>) -> Value {
+    v.clone().map(Value::Str).unwrap_or(Value::None)
+}
+
+fn points_table(t: &Topology, role: &str) -> Table {
+    let entries = t
+        .points_of_role(role)
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            let (lo, hi) = match p.range {
+                Some([a, b]) => (Value::Float(a), Value::Float(b)),
+                None => (Value::None, Value::None),
+            };
+            (
+                p.id.clone(),
+                vec![
+                    ("id", Value::Int(i as i64 + 1)),
+                    ("kind", Value::Str(kind_name(p.kind).into())),
+                    ("unit", opt_str(&p.unit)),
+                    ("min", lo),
+                    ("max", hi),
+                    ("bus", opt_str(&p.bus)),
+                    (
+                        "address",
+                        p.address
+                            .map(|a| Value::Int(a as i64))
+                            .unwrap_or(Value::None),
+                    ),
+                    ("net", opt_str(&p.net)),
+                    ("pin", opt_str(&p.pin.clone().or_else(|| p.adc.clone()))),
+                    ("calibrated", Value::Bool(p.calibration.is_some())),
+                    ("interlock", opt_str(&p.interlock)),
+                ],
+            )
+        })
+        .collect();
+    Table {
+        name: "Point",
+        entries,
+        constants: Vec::new(),
     }
-    s.push_str(&format!(
-        "}}\n\npub const PARAMETERS: [Parameter; {}] = [",
-        prms.len()
-    ));
-    s.push_str(
-        &prms
-            .iter()
-            .map(|p| format!("Parameter::{}", pascal(&p.id)))
-            .collect::<Vec<_>>()
-            .join(", "),
-    );
-    s.push_str("];\n\nimpl Parameter {\n    pub const fn id(self) -> u16 {\n        self as u16\n    }\n\n    pub fn from_id(id: u16) -> Option<Parameter> {\n        PARAMETERS.iter().copied().find(|p| p.id() == id)\n    }\n\n");
-    for (name, ty, body) in [
-        (
-            "default",
-            "f32",
-            &(|p: &Parameter| f(p.default)) as &dyn Fn(&Parameter) -> String,
+}
+
+fn params_table(t: &Topology, role: &str) -> Table {
+    let entries = t
+        .parameter
+        .iter()
+        .filter(|p| p.scope == role)
+        .enumerate()
+        .map(|(i, p)| {
+            (
+                p.id.clone(),
+                vec![
+                    ("id", Value::Int(i as i64 + 1)),
+                    ("unit", Value::Str(p.unit.clone())),
+                    ("default", Value::Float(p.default)),
+                    ("min", Value::Float(p.range[0])),
+                    ("max", Value::Float(p.range[1])),
+                    ("rule", Value::Str(p.rule.clone())),
+                ],
+            )
+        })
+        .collect();
+    let constants = t
+        .schedule
+        .iter()
+        .filter(|x| x.scope == role)
+        .flat_map(|x| {
+            [
+                (
+                    format!("{}_GRANULARITY_MIN", upper(&x.id)),
+                    Value::Int(granularity_min(&x.granularity).unwrap_or(5) as i64),
+                ),
+                (
+                    format!("{}_OCCUPIED_WHEN_MISSING", upper(&x.id)),
+                    Value::Bool(x.default_when_missing == "occupied"),
+                ),
+            ]
+        })
+        .collect();
+    Table {
+        name: "Parameter",
+        entries,
+        constants,
+    }
+}
+
+fn topics_table(t: &Topology) -> Table {
+    let entries = t
+        .topics()
+        .iter()
+        .enumerate()
+        .map(|(i, k)| {
+            (
+                k.id.clone(),
+                vec![
+                    ("id", Value::Int(i as i64 + 1)),
+                    ("suffix", Value::Str(k.id.clone())),
+                    (
+                        "direction",
+                        Value::Str(
+                            match k.direction {
+                                Direction::Up => "up",
+                                Direction::Down => "down",
+                                Direction::Will => "will",
+                            }
+                            .into(),
+                        ),
+                    ),
+                    ("retained", Value::Bool(k.retained)),
+                    ("doc", Value::Str(k.doc.clone())),
+                ],
+            )
+        })
+        .collect();
+    let constants = t
+        .node
+        .iter()
+        .flat_map(|n| {
+            let id = upper(&n.id);
+            [
+                (
+                    format!("NODE_{id}_SYSTEM"),
+                    Value::Str(t.system_of(&n.id).unwrap_or_default().into()),
+                ),
+                (format!("NODE_{id}_TARGET"), opt_str(&n.target)),
+                (format!("NODE_{id}_RUNTIME"), opt_str(&n.runtime)),
+                (format!("NODE_{id}_LANGUAGE"), opt_str(&n.language)),
+            ]
+        })
+        .filter(|(_, v)| !matches!(v, Value::None))
+        .collect();
+    Table {
+        name: "Topic",
+        entries,
+        constants,
+    }
+}
+
+fn render(table: &Table, ext: &str, header: &str) -> Result<String> {
+    Ok(match ext {
+        "rs" => render_rs(table, header),
+        "h" => render_h(table, header),
+        "json" => render_json(table),
+        other => bail!(
+            "fid-topology: no firmware table in `.{other}` (supported: {})",
+            FIRMWARE_EXTENSIONS.join(", ")
         ),
-        ("min", "f32", &|p: &Parameter| f(p.range[0])),
-        ("max", "f32", &|p: &Parameter| f(p.range[1])),
-        ("unit", "&'static str", &|p: &Parameter| {
-            format!("{:?}", p.unit)
-        }),
-    ] {
+    })
+}
+
+fn render_rs(t: &Table, header: &str) -> String {
+    let mut s = format!("// {header} — do not edit.\n\n");
+    s.push_str(&format!(
+        "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\n#[repr(u16)]\npub enum {} {{\n",
+        t.name
+    ));
+    for (i, (id, _)) in t.entries.iter().enumerate() {
+        s.push_str(&format!("    {} = {},\n", pascal(id), i + 1));
+    }
+    s.push_str(&format!(
+        "}}\n\npub const ALL: [{}; {}] = [",
+        t.name,
+        t.entries.len()
+    ));
+    s.push_str(
+        &t.entries
+            .iter()
+            .map(|(id, _)| format!("{}::{}", t.name, pascal(id)))
+            .collect::<Vec<_>>()
+            .join(", "),
+    );
+    s.push_str(&format!(
+        "];\n\nimpl {} {{\n    pub const fn id(self) -> u16 {{\n        self as u16\n    }}\n\n",
+        t.name
+    ));
+    s.push_str(&format!(
+        "    pub fn from_id(id: u16) -> Option<{0}> {{\n        ALL.iter().copied().find(|x| x.id() == id)\n    }}\n\n",
+        t.name
+    ));
+    s.push_str("    pub const fn name(self) -> &'static str {\n        match self {\n");
+    for (id, _) in &t.entries {
         s.push_str(&format!(
-            "    pub const fn {name}(self) -> {ty} {{\n        match self {{\n"
+            "            {}::{} => {id:?},\n",
+            t.name,
+            pascal(id)
         ));
-        for p in &prms {
+    }
+    s.push_str("        }\n    }\n");
+    let fields: Vec<&'static str> = t
+        .entries
+        .first()
+        .map(|(_, f)| f.iter().map(|(k, _)| *k).filter(|k| *k != "id").collect())
+        .unwrap_or_default();
+    for field in fields {
+        let vals: Vec<&Value> = t
+            .entries
+            .iter()
+            .map(|(_, f)| {
+                f.iter()
+                    .find(|(k, _)| *k == field)
+                    .map(|(_, v)| v)
+                    .unwrap_or(&Value::None)
+            })
+            .collect();
+        let optional = vals.iter().any(|v| matches!(v, Value::None));
+        let ty = match vals.iter().find(|v| !matches!(v, Value::None)) {
+            Some(Value::Int(_)) => "u32",
+            Some(Value::Float(_)) => "f32",
+            Some(Value::Bool(_)) => "bool",
+            _ => "&'static str",
+        };
+        let ty = if optional {
+            format!("Option<{ty}>")
+        } else {
+            ty.to_string()
+        };
+        s.push_str(&format!(
+            "\n    pub const fn {field}(self) -> {ty} {{\n        match self {{\n"
+        ));
+        for ((id, _), v) in t.entries.iter().zip(&vals) {
+            let lit = rs_lit(v);
+            let lit = if optional && !matches!(v, Value::None) {
+                format!("Some({lit})")
+            } else {
+                lit
+            };
             s.push_str(&format!(
-                "            Parameter::{} => {},\n",
-                pascal(&p.id),
-                body(p)
+                "            {}::{} => {lit},\n",
+                t.name,
+                pascal(id)
             ));
         }
-        s.push_str("        }\n    }\n\n");
+        s.push_str("        }\n    }\n");
     }
-    s.push_str("    pub fn accepts(self, value: f32) -> bool {\n        self.min() <= value && value <= self.max()\n    }\n}\n");
-    for sch in t.schedule.iter().filter(|x| x.scope == role) {
-        s.push_str(&format!(
-            "\npub const {}_GRANULARITY_MIN: u16 = {};\npub const {}_OCCUPIED_WHEN_MISSING: bool = {};\n",
-            upper(&sch.id),
-            granularity_min(&sch.granularity).unwrap_or(5),
-            upper(&sch.id),
-            sch.default_when_missing == "occupied"
-        ));
+    s.push_str("}\n");
+    for (k, v) in &t.constants {
+        let ty = match v {
+            Value::Int(_) => "u32",
+            Value::Float(_) => "f32",
+            Value::Bool(_) => "bool",
+            _ => "&str",
+        };
+        s.push_str(&format!("\npub const {k}: {ty} = {};\n", rs_lit(v)));
     }
     s
 }
 
-pub fn render_topics_rs(t: &Topology, decl: &str) -> String {
+fn rs_lit(v: &Value) -> String {
+    match v {
+        Value::Int(i) => i.to_string(),
+        Value::Float(x) => f(*x),
+        Value::Str(x) => format!("{x:?}"),
+        Value::Bool(b) => b.to_string(),
+        Value::None => "None".into(),
+    }
+}
+
+fn render_h(t: &Table, header: &str) -> String {
+    let guard = format!("FID_{}_H", t.name.to_ascii_uppercase());
+    let prefix = t.name.to_ascii_uppercase();
     let mut s = format!(
-        "// Derived by fid-topology from {decl} — do not edit.\n\n\
-         #[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum Topic {{\n"
+        "/* {header} — do not edit. */\n#ifndef {guard}\n#define {guard}\n\n#include <stdbool.h>\n#include <stdint.h>\n\n"
     );
-    for k in TOPICS {
-        s.push_str(&format!("    {},\n", pascal(k)));
+    s.push_str(&format!("enum {} {{\n", t.name.to_ascii_lowercase()));
+    for (i, (id, _)) in t.entries.iter().enumerate() {
+        s.push_str(&format!("    {prefix}_{} = {},\n", upper(id), i + 1));
     }
-    s.push_str("}\n\npub const TOPICS: [Topic; 6] = [");
-    s.push_str(
-        &TOPICS
-            .iter()
-            .map(|k| format!("Topic::{}", pascal(k)))
-            .collect::<Vec<_>>()
-            .join(", "),
-    );
-    s.push_str("];\n\nimpl Topic {\n    pub const fn suffix(self) -> &'static str {\n        match self {\n");
-    for k in TOPICS {
-        s.push_str(&format!("            Topic::{} => {k:?},\n", pascal(k)));
+    s.push_str("};\n\n");
+    s.push_str(&format!("#define {prefix}_COUNT {}\n", t.entries.len()));
+    for (id, fields) in &t.entries {
+        for (k, v) in fields {
+            if *k == "id" {
+                continue;
+            }
+            let lit = match v {
+                Value::Int(i) => format!("{i}"),
+                Value::Float(x) => format!("{}f", f(*x)),
+                Value::Str(x) => format!("{x:?}"),
+                Value::Bool(b) => {
+                    if *b {
+                        "true".into()
+                    } else {
+                        "false".into()
+                    }
+                }
+                Value::None => continue,
+            };
+            s.push_str(&format!(
+                "#define {prefix}_{}_{} {lit}\n",
+                upper(id),
+                k.to_ascii_uppercase()
+            ));
+        }
     }
-    s.push_str("        }\n    }\n\n    pub const fn retained(self) -> bool {\n        matches!(self, Topic::Pragovi | Topic::Raspored)\n    }\n\n    pub const fn from_device(self) -> bool {\n        matches!(self, Topic::Stanje | Topic::Potvrda)\n    }\n}\n\n");
-    s.push_str("pub struct NodeInfo {\n    pub id: &'static str,\n    pub system: &'static str,\n    pub firmware: Option<&'static str>,\n}\n\n");
-    s.push_str(&format!(
-        "pub const NODES: [NodeInfo; {}] = [\n",
-        t.node.len()
-    ));
-    for n in &t.node {
-        s.push_str(&format!(
-            "    NodeInfo {{ id: {:?}, system: {:?}, firmware: {} }},\n",
-            n.id,
-            t.system_of(&n.id).unwrap_or_default(),
-            n.firmware
-                .as_ref()
-                .map(|f| format!("Some({f:?})"))
-                .unwrap_or_else(|| "None".into())
-        ));
+    for (k, v) in &t.constants {
+        let lit = match v {
+            Value::Int(i) => format!("{i}"),
+            Value::Float(x) => format!("{}f", f(*x)),
+            Value::Str(x) => format!("{x:?}"),
+            Value::Bool(b) => {
+                if *b {
+                    "true".into()
+                } else {
+                    "false".into()
+                }
+            }
+            Value::None => continue,
+        };
+        s.push_str(&format!("#define {k} {lit}\n"));
     }
-    s.push_str("];\n\n#[cfg(feature = \"std\")]\npub fn topic(system: &str, node: &str, kind: Topic) -> std::string::String {\n    std::format!(\"{system}/{node}/{}\", kind.suffix())\n}\n");
+    s.push_str(&format!("\n#endif /* {guard} */\n"));
     s
+}
+
+fn json_value(v: &Value) -> serde_json::Value {
+    match v {
+        Value::Int(i) => serde_json::json!(i),
+        Value::Float(x) => serde_json::json!(x),
+        Value::Str(x) => serde_json::json!(x),
+        Value::Bool(b) => serde_json::json!(b),
+        Value::None => serde_json::Value::Null,
+    }
+}
+
+fn render_json(t: &Table) -> String {
+    let entries: Vec<serde_json::Value> = t
+        .entries
+        .iter()
+        .map(|(id, fields)| {
+            let mut m = serde_json::Map::new();
+            m.insert("name".into(), serde_json::json!(id));
+            for (k, v) in fields {
+                m.insert((*k).into(), json_value(v));
+            }
+            serde_json::Value::Object(m)
+        })
+        .collect();
+    let constants: serde_json::Map<String, serde_json::Value> = t
+        .constants
+        .iter()
+        .map(|(k, v)| (k.clone(), json_value(v)))
+        .collect();
+    let doc = serde_json::json!({
+        "_": "Derived by fid-topology from topology.toml — do not edit.",
+        "entries": entries,
+        "constants": constants,
+    });
+    serde_json::to_string_pretty(&doc).unwrap_or_default() + "\n"
+}
+
+pub fn render_points(t: &Topology, role: &str, decl: &str, ext: &str) -> Result<String> {
+    render(
+        &points_table(t, role),
+        ext,
+        &format!("Derived by fid-topology from {decl} for firmware `{role}`"),
+    )
+}
+
+pub fn render_params(t: &Topology, role: &str, decl: &str, ext: &str) -> Result<String> {
+    render(
+        &params_table(t, role),
+        ext,
+        &format!("Derived by fid-topology from {decl} for firmware `{role}`"),
+    )
+}
+
+pub fn render_topics(t: &Topology, decl: &str, ext: &str) -> Result<String> {
+    render(
+        &topics_table(t),
+        ext,
+        &format!("Derived by fid-topology from {decl}"),
+    )
 }
 
 pub fn render_points_ts(t: &Topology, decl: &str) -> String {
@@ -1052,10 +1289,10 @@ pub fn render_migration(t: &Topology, decl: &str, dialect: &str) -> Result<Strin
 mod tests {
     use super::*;
 
-    const SCHOOL: &str = r#"
+    const SITE: &str = r#"
 [[system]]
-id = "school"
-nodes = ["roof", "classroom_1", "server"]
+id = "site"
+nodes = ["roof", "room_1", "server"]
 
 [[node]]
 id = "roof"
@@ -1066,11 +1303,11 @@ firmware = "roof"
 interfaces = ["wifi"]
 
 [[node]]
-id = "classroom_1"
+id = "room_1"
 kind = "mcu"
 target = "riscv32imac-unknown-none-elf"
 runtime = "embassy-esp"
-firmware = "classroom"
+firmware = "room"
 interfaces = ["wifi", "i2c0"]
 
 [[node]]
@@ -1082,9 +1319,9 @@ apps = ["server", "web"]
 interfaces = ["eth0"]
 
 [[bus]]
-id = "classroom_i2c"
+id = "room_i2c"
 type = "i2c"
-connect = ["classroom_1.i2c0"]
+connect = ["room_1.i2c0"]
 
 [[bus]]
 id = "lan"
@@ -1092,32 +1329,32 @@ type = "ip"
 protocol = "mqtt"
 tls = true
 broker = "server"
-connect = ["roof.wifi", "classroom_1.wifi", "server.eth0"]
+connect = ["roof.wifi", "room_1.wifi", "server.eth0"]
 
 [[point]]
 id = "co2"
-node = "classroom_1"
+node = "room_1"
 kind = "sensor"
 quantity = "co2"
 unit = "ppm"
 range = [400, 5000]
-bus = "classroom_i2c"
+bus = "room_i2c"
 address = 0x62
 
 [[point]]
 id = "humidity"
-node = "classroom_1"
+node = "room_1"
 kind = "sensor"
 quantity = "relative_humidity"
 unit = "%"
 range = [0, 100]
-bus = "classroom_i2c"
+bus = "room_i2c"
 address = 0x62
 display = true
 
 [[point]]
 id = "recuperator"
-node = "classroom_1"
+node = "room_1"
 kind = "actuator"
 net = "RELAY_RECUPERATOR"
 
@@ -1132,13 +1369,13 @@ display = true
 
 [[rule]]
 id = "recuperator"
-scope = "classroom"
+scope = "room"
 reads = ["co2"]
 drives = ["recuperator"]
 
 [[parameter]]
 id = "co2_on"
-scope = "classroom"
+scope = "room"
 unit = "ppm"
 range = [600, 2000]
 default = 1000
@@ -1147,7 +1384,7 @@ limits = "co2"
 
 [[schedule]]
 id = "timetable"
-scope = "classroom"
+scope = "room"
 granularity = "5 min"
 default_when_missing = "occupied"
 "#;
@@ -1157,26 +1394,26 @@ default_when_missing = "occupied"
     }
 
     #[test]
-    fn the_school_holds_together() {
-        assert_eq!(validate(&parse(SCHOOL)), Vec::<String>::new());
+    fn the_site_holds_together() {
+        assert_eq!(validate(&parse(SITE)), Vec::<String>::new());
     }
 
     #[test]
     fn a_bus_across_systems_fails_naming_both() {
-        let s = SCHOOL.replace(
-            "nodes = [\"roof\", \"classroom_1\", \"server\"]",
-            "nodes = [\"roof\", \"classroom_1\"]\n\n[[system]]\nid = \"office\"\nnodes = [\"server\"]",
+        let s = SITE.replace(
+            "nodes = [\"roof\", \"room_1\", \"server\"]",
+            "nodes = [\"roof\", \"room_1\"]\n\n[[system]]\nid = \"office\"\nnodes = [\"server\"]",
         );
         let e = validate(&parse(&s)).join("\n");
         assert!(
-            e.contains("bus `lan` crosses systems `office` and `school`"),
+            e.contains("bus `lan` crosses systems `office` and `site`"),
             "{e}"
         );
     }
 
     #[test]
     fn a_parameter_naming_a_missing_rule_fails() {
-        let s = SCHOOL.replace("rule = \"recuperator\"", "rule = \"ventilation\"");
+        let s = SITE.replace("rule = \"recuperator\"", "rule = \"ventilation\"");
         let e = validate(&parse(&s)).join("\n");
         assert!(
             e.contains("parameter `co2_on` names rule `ventilation`, which is not declared"),
@@ -1186,10 +1423,10 @@ default_when_missing = "occupied"
 
     #[test]
     fn an_orphan_reading_and_an_unknown_unit_fail() {
-        let s = SCHOOL.replace("adc = \"GPIO4\"\ndisplay = true", "adc = \"GPIO4\"");
+        let s = SITE.replace("adc = \"GPIO4\"\ndisplay = true", "adc = \"GPIO4\"");
         let e = validate(&parse(&s)).join("\n");
         assert!(e.contains("point `soil_1` is read by no rule"), "{e}");
-        let s = SCHOOL.replace(
+        let s = SITE.replace(
             "unit = \"ppm\"\nrange = [400",
             "unit = \"parts\"\nrange = [400",
         );
@@ -1197,26 +1434,25 @@ default_when_missing = "occupied"
     }
 
     #[test]
-    fn a_second_classroom_must_declare_the_same_points() {
-        let s = SCHOOL.replace("nodes = [\"roof\", \"classroom_1\", \"server\"]", "nodes = [\"roof\", \"classroom_1\", \"classroom_2\", \"server\"]")
-            + "\n[[node]]\nid = \"classroom_2\"\nkind = \"mcu\"\ntarget = \"riscv32imac-unknown-none-elf\"\nruntime = \"embassy-esp\"\nfirmware = \"classroom\"\n";
+    fn a_second_node_of_one_firmware_must_declare_the_same_points() {
+        let s = SITE.replace("nodes = [\"roof\", \"room_1\", \"server\"]", "nodes = [\"roof\", \"room_1\", \"room_2\", \"server\"]")
+            + "\n[[node]]\nid = \"room_2\"\nkind = \"mcu\"\ntarget = \"riscv32imac-unknown-none-elf\"\nruntime = \"embassy-esp\"\nfirmware = \"room\"\n";
         let e = validate(&parse(&s)).join("\n");
         assert!(
-            e.contains("share firmware `classroom` but declare different points"),
+            e.contains("share firmware `room` but declare different points"),
             "{e}"
         );
     }
 
     #[test]
     fn the_derivations_carry_every_point() {
-        let t = parse(SCHOOL);
-        let rs = render_points_rs(&t, "classroom", DECLARATION);
+        let t = parse(SITE);
+        let rs = render_points(&t, "room", DECLARATION, "rs").unwrap();
         assert!(
-            rs.contains("Co2 = 1,")
-                && rs.contains("Binding::Bus { bus: \"classroom_i2c\", address: 0x62 }"),
+            rs.contains("Co2 = 1,") && rs.contains("Point::Co2 => Some(\"room_i2c\")"),
             "{rs}"
         );
-        let p = render_params_rs(&t, "classroom", DECLARATION);
+        let p = render_params(&t, "room", DECLARATION, "rs").unwrap();
         assert!(
             p.contains("Parameter::Co2On => 1000.0")
                 && p.contains("TIMETABLE_OCCUPIED_WHEN_MISSING: bool = true"),
@@ -1231,9 +1467,55 @@ default_when_missing = "occupied"
             cards.contains("{ point: \"humidity\", unit: \"%\", limits: [] }"),
             "{cards}"
         );
-        let topics = render_topics_rs(&t, DECLARATION);
-        assert!(topics.contains(
-            "NodeInfo { id: \"classroom_1\", system: \"school\", firmware: Some(\"classroom\") }"
-        ));
+        let topics = render_topics(&t, DECLARATION, "rs").unwrap();
+        assert!(
+            topics.contains("Topic::State => \"state\"")
+                && topics.contains("NODE_ROOM_1_SYSTEM: &str = \"site\""),
+            "{topics}"
+        );
+    }
+
+    #[test]
+    fn any_firmware_reads_the_same_tables_in_its_own_language() {
+        let t = parse(SITE);
+        let h = render_points(&t, "room", DECLARATION, "h").unwrap();
+        assert!(
+            h.contains("POINT_CO2 = 1,") && h.contains("#define POINT_CO2_ADDRESS 98"),
+            "{h}"
+        );
+        let p = render_params(&t, "room", DECLARATION, "h").unwrap();
+        assert!(
+            p.contains("#define PARAMETER_CO2_ON_DEFAULT 1000.0f"),
+            "{p}"
+        );
+        let j: serde_json::Value =
+            serde_json::from_str(&render_points(&t, "room", DECLARATION, "json").unwrap()).unwrap();
+        assert_eq!(j["entries"][0]["name"], "co2");
+        assert_eq!(j["entries"][0]["address"], 98);
+        assert!(render_points(&t, "room", DECLARATION, "py").is_err());
+    }
+
+    #[test]
+    fn a_product_names_its_own_topics_runtime_and_units() {
+        let s = SITE.replace(
+            "runtime = \"embassy-esp\"\nfirmware = \"room\"",
+            "runtime = \"zephyr\"\nlanguage = \"c\"\nfirmware = \"room\"",
+        )
+            + "\n[[topic]]\nid = \"telemetry\"\ndirection = \"up\"\n\n[[unit]]\nsymbol = \"dB\"\n";
+        let s = s.replace(
+            "unit = \"%\"\nrange = [0, 100]\nbus",
+            "unit = \"dB\"\nrange = [0, 100]\nbus",
+        );
+        let t = parse(&s);
+        assert_eq!(validate(&t), Vec::<String>::new());
+        let topics = render_topics(&t, DECLARATION, "h").unwrap();
+        assert!(
+            topics.contains("TOPIC_TELEMETRY = 1,") && !topics.contains("TOPIC_STATE"),
+            "{topics}"
+        );
+        assert!(
+            topics.contains("#define NODE_ROOM_1_RUNTIME \"zephyr\""),
+            "{topics}"
+        );
     }
 }

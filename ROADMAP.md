@@ -634,17 +634,17 @@ session, which starts from the owner's `.docx` template and prior paper
 
 Several controllers, a Linux host and one web app, declared once in
 `topology.toml` (`docs/specs/2026-11-01-topology-is-a-declaration.md`). The
-acceptance test is the school smart-building maquette: roof and classroom
-ESP32-C6 controllers, a Raspberry Pi server with Mosquitto, a Rust server and a
-PWA. Ordered by cost of delay:
+platform carries only what generalises: no product lives here, and any
+firmware stack reads the derived tables (`.rs`, `.h` or `.json`). Ordered by
+cost of delay:
 
 | Phase | Item | Class | State |
 |---|---|---|---|
 | 0 | Decisions and STACK rows: topology, self-hosted target, ESP32-C6 firmware, transliteration | debt-accruing | ✅ |
-| 1 | One message declaration, two encodings (postcard on device links, JSON typed by `ts-rs` at the web) | debt-accruing | ✅ |
-| 2 | `topology.toml` and `fid-topology`: points, params, topics, TS cards, migrations; validations 1, 2, 4, 6, 7 | multiplying | ✅ |
-| 3 | Hardware built from modules, with variants and derived wiring (CSV now; SVG with phase 7) | multiplying | ✅ |
-| 4 | `firmware-esp32c6` capability (the product's `no_std` rules crate is done and host-tested) | terminal | 🟡 |
+| 1 | One message declaration, two encodings (postcard on device links, JSON typed by `ts-rs` at the web): a product-side pattern, proved and documented; no platform code needed | debt-accruing | ✅ |
+| 2 | `topology.toml` and `fid-topology`: points, params, topics (declarable), TS cards, migrations, in any firmware language; validations 1, 2, 4, 6 | multiplying | ✅ |
+| 3 | Hardware built from modules, with variants and derived wiring; products extend the module library | multiplying | ✅ |
+| 4 | `firmware-esp32c6` capability: an optional template; any firmware already reads the derived tables | terminal | ⬜ |
 | 5 | Self-hosted server stack: `sqlite`, `native` auth, `ollama`, `compose`, broker ACL from `can()` | terminal | ⬜ |
 | 6 | The web app as a static export served by the server | terminal | ⬜ |
 | 7 | Derived documentation: topology, wiring, rules, sequence and storage diagrams (wiring per variant done) | multiplying | 🟡 |

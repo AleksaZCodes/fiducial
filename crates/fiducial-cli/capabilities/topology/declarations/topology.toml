@@ -6,11 +6,14 @@
 id    = "site"
 nodes = ["controller", "server"]
 
+# `target`, `runtime` and `language` are free text: any toolchain works, and
+# derive passes them through to the generated tables.
 [[node]]
 id         = "controller"
 kind       = "mcu"
 target     = "riscv32imac-unknown-none-elf"
 runtime    = "embassy-esp"
+language   = "rust"
 firmware   = "controller"
 interfaces = ["wifi", "i2c0"]
 
