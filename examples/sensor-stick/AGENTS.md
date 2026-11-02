@@ -6,7 +6,7 @@ re-derive it.
 
 ## Platform
 
-Built on [Fiducial](https://github.com/AleksaZCodes/fiducial) 0.10.1.
+Built on [Fiducial](https://github.com/AleksaZCodes/fiducial) 0.10.2.
 
 - `fid dash` — one read-only view of this product's state; start here
 - `fid doctor` — check for drift before starting work
