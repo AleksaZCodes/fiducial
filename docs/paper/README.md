@@ -86,8 +86,7 @@ solvers, set-point checks, prices and the cut board are in `v0.9.1`, and
 
 For IEEESTEC 2026, on the conference template, in the voice of the author's
 IEEESTEC 2025 paper (Outreach). It cites the release in `Cargo.toml`. After review, its
-title is *Fiducial: Keeping Multidisciplinary Products Built with AI Agents
-Consistent*: the reviewer found "Build Any Robust …" (the platform's thesis,
+title is *Fiducial: Keeping AI-Built Products Consistent*: the reviewer found "Build Any Robust …" (the platform's thesis,
 `thesis.toml`) too broad for two products, and the paper now claims
 consistency between artifacts, not correctness of the declared facts.
 `response-to-review.md` answers the review point by point.
@@ -105,7 +104,8 @@ consistency between artifacts, not correctness of the declared facts.
   - the fourth (F1–F20, `fourth_cases.py`), by a separate agent, aimed at
     the five classes the third revealed: 14/20 on 0.10.0.
 
-  Every miss fell into one of five classes, each closed by one mechanism
+  All but one miss (F17, a matter of meaning) fell into one of five classes,
+  each closed by one mechanism
   (`docs/specs/2026-11-01-mistakes-are-fixed-by-class.md`); the results
   files hold the current release's runs. `--baseline` runs a set with
   derive and `--check` removed, i.e. ordinary CI (compilers, type checks,

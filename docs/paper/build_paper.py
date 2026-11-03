@@ -25,7 +25,7 @@ TEMPLATE, FIGS, OUT = sys.argv[1:4]
 # lines stay as the template has them.
 HEADER = ["IEEESTEC – 19th Student Projects Conference, Niš, 2026."]
 
-TITLE = "Fiducial: Keeping Multidisciplinary Products Built with AI Agents Consistent"
+TITLE = "Fiducial: Keeping AI-Built Products Consistent"
 
 AUTHOR = [
     "Aleksa Zdravković",
@@ -46,6 +46,13 @@ _SUM = _RESULTS["summary"]
 _BY_ID = {r["id"]: r for r in _RESULTS["results"]}
 VERSION = _re.search(r'^version\s*=\s*"([^"]+)"',
                      (_HERE.parents[1] / "Cargo.toml").read_text(), _re.M).group(1)
+# The release the results were measured on, which must be the one cited.
+RES_VERSION = _SUM["fid"].removeprefix("fid ")
+assert RES_VERSION == VERSION, \
+    f"the results are from {RES_VERSION} but the release is {VERSION}: rerun the sets"
+# How many capabilities the platform ships, counted rather than remembered.
+_CAPS = len([d for d in (_HERE.parents[1] / "crates/fiducial-cli/capabilities").iterdir()
+             if d.is_dir()])
 
 def _count(gate):
     """How many markers a gate caught first."""
@@ -101,8 +108,9 @@ ABSTRACT = (
     "correct remains for the person to judge. On three sets of 20 realistic "
     "mistakes, each written after the checks it tests, the checks caught "
     f"{_F1['heldout']}, {_F1['independent']} and {_F1['fourth']} on first "
-    "run, where the same projects’ ordinary CI caught none. Every miss fell "
-    "into one of five classes, each now closed by one mechanism."
+    "run, where the same projects’ ordinary CI caught none. All but one "
+    "miss fell into one of five classes of mistake; with one fix for each "
+    f"class, the checks now catch {_H + _I + _F} of the 60."
 )
 
 KEYWORDS = (
@@ -122,6 +130,26 @@ BODY = [
      "case can be written in minutes, so one person can now attempt a whole "
      "product."),
     ("p",
+     "Such a product is more than code. It has a circuit board and an "
+     "enclosure, firmware that runs on the board, and an app or web page. "
+     "It has text in every language it supports – translations, also called "
+     "internationalization. It has a visual identity of colours, fonts and "
+     "a logo, and a design system: the shared rules that keep its look the "
+     "same and readable everywhere. Around these sit legal pages, "
+     "search-engine metadata, a database schema and deployment settings. "
+     "These parts look separate, but they share facts: a sensor’s pin is on "
+     "the schematic and in the firmware, a brand colour is in the page, the "
+     "logo and the case, and a label must exist in every language."),
+    ("p",
+     "This paper argues that there is a real advantage in centralizing all "
+     "of this: the knowledge, the design system and the conventions in one "
+     "place, and the work in one monorepository, a single repository that "
+     "holds many parts or projects [@monorepo]. Here the board, firmware, "
+     "app and brand live together. Kept in a structured way, they also "
+     "become reusable: a brand declared once supplies its colours, logo and "
+     "3D renderings wherever needed. Fiducial is built on this idea and "
+     "covers all of the above."),
+    ("p",
      "Building such products – first Outreach [@outreach], an off-grid "
      "messaging system of radios, gateways, an app and printed cases, and "
      "then the platform described here – has shown where the difficulty has "
@@ -137,9 +165,9 @@ BODY = [
      "checked."),
     ("p",
      "Agents speed this problem up rather than remove it. An agent sees only "
-     "the codebase it works in, and its output is usually right but never "
-     "guaranteed; more code, written faster in more disconnected places, "
-     "gives an inconsistent product sooner."),
+     "the code it works in, and its output is usually right but never "
+     "guaranteed, so more code written faster in more places gives an "
+     "inconsistent product sooner."),
     ("p",
      "What is missing is one shared and checked context for every "
      "discipline: a single place where a product’s facts live, from which "
@@ -161,9 +189,9 @@ BODY = [
      "managing inconsistencies between views [@nuseibeh], [@herzig]. They "
      "are the closest in spirit, but the model lives in a specialised "
      "graphical tool, code is still written by hand beside it, and an agent "
-     "cannot easily work in it. Engineering suites instead link two tools, "
-     "such as a circuit board and its mechanical model [@altium]; the "
-     "firmware, the app and the translations stay outside."),
+     "cannot easily work in it. Engineering suites link two tools, such as a "
+     "circuit board and its mechanical model [@altium]; the firmware, app "
+     "and translations stay outside."),
     ("p",
      "Design-as-code tools write hardware as text – a circuit in atopile "
      "[@atopile], a case in build123d [@build123d] – which makes it writable "
@@ -172,23 +200,12 @@ BODY = [
      "cost would still copy the board’s facts. Interface languages such as "
      "Protocol Buffers [@protobuf] declare a message once for both sides, "
      "which removes the drift met in Outreach, but only for messages."),
-    ("table", "Existing Approaches and Where They Stop",
-     ("Approach", "Keeps in agreement", "Stops at"), [
-        ("Model-based engineering", "views of one model",
-         "graphical tool; code by hand"),
-        ("ECAD–MCAD links", "board and case", "two disciplines, two tools"),
-        ("Design as code", "one discipline", "facts shared with others"),
-        ("Interface languages", "messages, both sides", "everything else"),
-        ("Build systems, CI", "outputs with files", "two files that disagree"),
-        ("Agent context files", "nothing; they advise", "not enforced"),
-        ("Fiducial", "every declared fact", "facts not yet declared"),
-    ], (1500, 1550, 1500)),
     ("p",
      "Build systems such as Bazel [@bazel] and Nix [@nix] rebuild exactly "
      "what changed, identifying results by fingerprints of their inputs. "
      "They make sure outputs follow from files, not that files agree with "
      "each other: the same fact typed into two files builds without "
-     "complaint, in them and in a CI pipeline built on them."),
+     "complaint."),
     ("p",
      "Coding agents follow context files such as AGENTS.md [@agentsmd], "
      "which describe a repository’s rules but do not enforce them, and the "
@@ -200,6 +217,17 @@ BODY = [
      "without an outside signal [@huang]. A known answer is to pair a "
      "generator that can be wrong with a checker that cannot "
      "[@kambhampati], but no existing checker spans a whole product."),
+    ("table", "Existing Approaches and Where They Stop",
+     ("Approach", "Keeps in agreement", "Stops at"), [
+        ("Model-based engineering", "views of one model",
+         "graphical tool; code by hand"),
+        ("ECAD–MCAD links", "board and case", "two disciplines, two tools"),
+        ("Design as code", "one discipline", "facts shared with others"),
+        ("Interface languages", "messages, both sides", "everything else"),
+        ("Build systems, CI", "outputs with files", "two files that disagree"),
+        ("Agent context files", "nothing; they advise", "not enforced"),
+        ("Fiducial", "every declared fact", "facts not yet declared"),
+    ], (1500, 1550, 1500)),
     ("p",
      "Fiducial keeps what works in each – text that agents can write, "
      "outputs tied to inputs by fingerprints, established engines for hard "
@@ -225,8 +253,7 @@ BODY = [
     ("p",
      "Derive everything else. Every artifact that depends on a fact is "
      "generated from its declaration by one command and never edited by "
-     "hand. Generation is deterministic, so the product is reproducible and "
-     "any difference is meaningful."),
+     "hand. Generation is deterministic, so any difference is meaningful."),
     ("p",
      "Check every change. Before a change is accepted, checks confirm that "
      "every artifact still matches what its declarations produce and that "
@@ -244,26 +271,25 @@ BODY = [
      "These rules change the role of an AI agent: it still edits "
      "declarations and code, but it is no longer trusted to keep anything "
      "consistent. Its mistakes are not prevented, but many are caught before "
-     "they reach the product, with a message precise enough for the agent "
-     "to correct itself. Hence the name: a fiducial is a fixed reference "
+     "they reach the product, with a message precise enough to correct "
+     "itself. Hence the name: a fiducial is a fixed reference "
      "point, a universal measure that everything is aligned to and compared "
      "against, so it stays uniform. The declarations are that reference for "
      "a product."),
 
     ("h1", "Implementation"),
     ("p",
-     "Fiducial is a command-line tool, fid, built over six weeks by one "
-     "person working with AI agents. Fig. 2 shows how a change moves through "
+     "Fiducial is a command-line tool, fid, built in about two months by "
+     "one person working with AI agents. Fig. 2 shows how a change moves through "
      "its parts."),
     ("h2", "One Structure for Every Product"),
     ("p",
      "fid new creates a product repository with a fixed layout, and fid add "
      "enables capabilities. A capability packages one discipline: its "
      "declarations, the generator that turns them into artifacts, its checks "
-     "and instructions for agents. There are 23, from web applications and "
-     "translations to firmware and hardware. Because every product has the "
-     "same structure, whoever knows one knows them all, and a new product "
-     "starts from parts that already work. fid upgrade brings platform "
+     f"and instructions for agents. There are {_CAPS}, from web applications "
+     "to firmware and hardware. Every product has the same structure, so "
+     "a new one starts from parts that already work. fid upgrade brings platform "
      "improvements into each product while keeping its own edits."),
     ("h2", "One Typed Language Underneath"),
     ("p",
@@ -278,9 +304,7 @@ BODY = [
      "quantities compile into a microcontroller’s firmware, into the fid "
      "tool, and to WebAssembly, which runs them in the browser and on edge "
      "servers. The TypeScript types the web code uses are generated from the "
-     "Rust ones, never written by hand, so the boundary between the two "
-     "languages is not kept in step by hand either. TypeScript is used for interfaces, and "
-     "Python only at build time, to drive the engines."),
+     "Rust ones, never written by hand."),
     ("h2", "Declarations and Generation"),
     ("p",
      "Declarations are plain text files in version control, from the "
@@ -311,28 +335,18 @@ BODY = [
     ("p",
      "Some generation steps are real engineering problems: where to place "
      "the parts on a board, how to connect them, how to build a case around "
-     "them. The first version placed parts with a hand-written search, and "
-     "each new product added special rules until they began to interact. Now "
-     "the platform only writes the problem down and hands it to an "
-     "established engine. A constraint solver, CP-SAT [@cpsat], is given the "
+     "them. Rather than search by hand, the platform writes the problem "
+     "down and hands it to an established engine. A constraint solver, CP-SAT [@cpsat], is given the "
      "rules a placement must satisfy and finds one that does, or proves none "
      "exists; build123d [@build123d] builds the case; KiCad routes and checks the "
      "board. Every placement rule is one of eight general kinds, such as "
      "inside, apart or near, so a new product needs new declarations rather "
      "than new code."),
-    ("fig", "fig2-loop.png",
-     "How a change moves through Fiducial: declarations are edited, "
-     "generation produces the artifacts with the help of established "
-     "engines, and the checks either accept the change or return a message "
-     "naming the declaration at fault."),
-    ("fig", "fig3-sensor-stick.png",
-     "The sensor stick, generated from its declaration: (a) the closed case; "
-     "(b) the routed board inside it, with the sensor under its vent."),
     ("h2", "Agents in the Loop"),
     ("p",
      "Every product carries an AGENTS.md file and one instruction file per "
-     "capability, so any agent starts from the same description of the "
-     "product, and a hook stops it from editing a generated file. Agents fix "
+     "capability, so any agent starts from the same description, and a hook "
+     "stops it editing a generated file. Agents fix "
      "a problem where the fact lives, never in the output. The platform grows "
      "the same way: a mistake that gets past the checks becomes a general "
      "rule for every product."),
@@ -341,62 +355,67 @@ BODY = [
     ("p",
      "The repository contains a complete example: a USB-C stick that "
      "measures temperature and humidity and shows them on a web page "
-     "(Fig. 3), with a printed case, a circuit board, Rust firmware and a "
-     "browser page. The person writes the product declaration, an outline of "
+     "(Fig. 3), with a printed case, a circuit board and Rust firmware. "
+     "The person writes the product declaration, an outline of "
      "its shape, the firmware’s logic and the page; the routed board with "
      "its schematic and bill of materials, the case, the manufacturing files "
      "and the code both sides use to exchange readings are generated. Moving "
      "the sensor to another pin is one changed line: the check fails until "
      "the product is regenerated, after which the board, the firmware’s pin "
-     "map and the page’s types have all followed with no other edit, and a "
-     "pin the chip’s sensor bus cannot use stops the firmware compiling."),
+     "map and the page’s types have all followed with no other edit."),
 
+    ("fig", "fig2-loop.png",
+     "How a change moves through Fiducial: declarations are edited, "
+     "artifacts are generated with established engines, and the checks "
+     "accept the change or name the declaration at fault."),
+    ("fig", "fig3-sensor-stick.png",
+     "The sensor stick, generated from its declaration: (a) the closed case; "
+     "(b) the routed board inside it, with the sensor under its vent."),
     ("h1", "Evaluation"),
     ("p",
-     "Checks are only useful if they catch the mistakes that people and "
-     "agents actually make. The test borrows the idea of mutation testing "
+     "To see whether the checks catch the mistakes that people and agents "
+     "make, the test borrows mutation testing "
      "[@demillo]: a realistic mistake is introduced on purpose, the checks "
      "are run, and the result shows whether they noticed. Each mistake was "
-     "applied to a clean copy of one of two products – a fresh web product "
-     "in English and Serbian, and the sensor stick – the checks ran as in "
-     "continuous integration, and the copy was reset. Four sets of 20 were "
-     "used, each committed before its first run. The first covers eight "
-     "kinds of drift met while building Fiducial and was used to improve it. "
-     "The author wrote the second after the first was fixed; separate agents "
-     "that read only the two products, not the platform, wrote the third and "
-     "the fourth, the fourth aimed at the classes the third revealed. As a "
-     "baseline, every set also ran through ordinary CI alone – the same "
-     "compilers, type checkers and tests, with Fiducial’s two steps removed. "
-     "Three correct changes and two runs with no change tested the opposite "
-     "direction: that the checks do not fail without a reason. Table II gives "
-     "the results."),
+     "applied to a clean copy of one of two products, a fresh web product "
+     "in English and Serbian or the sensor stick, and the checks ran as in "
+     "continuous integration. Four sets of 20 were used. The first covers eight kinds of drift met while building "
+     "Fiducial and was used to improve it. The other three were each "
+     "committed before their first run: the author wrote the second after "
+     "the first was fixed, and separate agents that read only the two "
+     "products, not the platform, wrote the third and the fourth, the fourth "
+     "aimed at the classes the third revealed. As a baseline, every set also "
+     "ran through ordinary CI alone – the same compilers, type checkers and "
+     "tests, without Fiducial’s derive and check steps. Correct changes "
+     "tested the opposite direction: that the checks do not fail without a "
+     "reason. Table II gives, for each set, ordinary CI alone, Fiducial on "
+     f"its first run, and Fiducial {RES_VERSION} now."),
     ("table", "Injected Mistakes Caught",
-     ("Mistakes", "Ordinary CI", "First run", f"Fiducial {VERSION}"), "TABLE1",
+     ("Mistakes", "CI alone", "First run", "Now"), "TABLE1",
      (1660, 1000, 1000, 1000)),
     ("p", "FINDINGS_A"),
     ("p", "FINDINGS_B"),
     ("p",
      "All four sets and their script are in the repository. Only first runs "
      "measure how the checks generalise; the fourth set was aimed at classes "
-     "the author named; and two products have been built, neither yet "
-     "manufactured. The test measures the checks, not whether agents make "
+     "the author named; and only two products have been built. The test "
+     "measures the checks, not whether agents make "
      "fewer mistakes with Fiducial."),
     ("h1", "Conclusion"),
     ("p",
      "AI agents have made writing each part of a product fast, and that has "
      "moved the hard problem to keeping the parts in agreement. Better "
-     "models will move the line between what a person checks and what is "
-     "left to agents, but a probabilistic system cannot guarantee its "
+     "models will move the line between what a person checks and what "
+     "agents do, but a probabilistic system cannot guarantee its "
      "output, and even a deterministic tool is only right about what it was "
      "told. Fiducial answers this at the level of the product rather than "
      "the codebase: it keeps the parts consistent with each other, while "
      "whether each declared fact is true remains the person’s to judge. On "
      "60 mistakes it had not seen, its checks caught "
      f"{_F1['heldout'] + _F1['independent'] + _F1['fourth']} on first run "
-     "where ordinary CI caught none, each with a message that names the "
-     "cause, and every miss fell into one of five classes that are now each "
-     "closed by one mechanism; what remains is meaning, which no declaration "
-     "states. The next steps "
+     "where ordinary CI caught none. All but one miss fell into five classes, now each closed by one "
+     f"mechanism, after which {_H + _I + _F} of the 60 are caught; the last "
+     "is a matter of meaning, which no declaration states. The next steps "
      "are to test it on mistakes written by other people; to explore "
      "retrieval-augmented generation, so that agents are given the "
      "declarations and documentation a task needs rather than whole "
@@ -421,40 +440,40 @@ TABLE1 = [
     ("Correct changes", _ctl(_BASE), "5/5", _ctl(_RESULTS)),
 ]
 
+_MISSES = (20 - _F1["heldout"]) + (20 - _F1["independent"]) + (20 - _F1["fourth"])
 FINDINGS_A = (
     f"On first run the checks caught {_F1['heldout']}, {_F1['independent']} "
     f"and {_F1['fourth']} of the three unseen sets; ordinary CI caught none "
     "of them, and one of the first set, because nothing in it compares one "
-    "artifact with another. Every miss fell into one of five classes: a "
-    "declared value typed again into code, such as a footer spelling out the "
-    "domain; the check itself removed, or run after a step that regenerates "
-    "what it checks; a field that accepts any value of the right shape, such "
-    "as a month that does not exist; a rule from outside the product, such "
-    "as a regulator whose output is not the rail it feeds or a linker script "
-    "larger than the flash chip; and a generator reading a file nobody "
-    "declared."
+    f"artifact with another. All but one of the {_MISSES} misses fell into "
+    "one of five classes: a declared value typed again in code, such as a "
+    "footer spelling out the domain; the check itself removed, or run after "
+    "a step that regenerates what it checks; a field that accepts any value "
+    "of the right shape; a rule from outside the product, such as a flash "
+    "chip’s size; and a generator reading a file nobody declared."
 )
 FINDINGS_B = (
     "Fixing misses one rule at a time had taken the second set to 20 and "
     "left the third at 16, so each class now has one mechanism: a scan for "
-    "declared values in "
-    "hand-written code; a check that CI still runs the gate first; typed "
-    "declarations that reject unknown keys; outside rules kept as data, from "
-    "datasheets, fabrication limits and law; and generators confined to "
-    "their declared inputs. With these, release "
-    f"{VERSION} catches every mistake in the first three sets and {_F} of "
-    "the fourth, and every correct change still passes. The one it misses is "
-    "meaning: a colour pair relabelled as large text passes, because which "
-    "text is large is declared nowhere."
+    "declared values in hand-written code; a check that CI still runs the "
+    "gate, and runs it first; typed declarations that reject unknown keys; outside "
+    "rules kept as data, from datasheets, fabrication limits and law; and "
+    "generators confined to their declared inputs. With these, release "
+    f"{RES_VERSION} catches every mistake in the first three sets and {_F} "
+    "of the fourth, and every correct change still passes. The one it "
+    "misses is a matter of meaning: a colour pair relabelled as large text "
+    "passes, because which text is large is declared nowhere."
 )
 
 REFS = {
-    "claude": "Claude Code documentation. Available at: "
+    "claude": "Anthropic, “Claude Code documentation,” 2026. Available at: "
               "https://docs.anthropic.com/en/docs/claude-code",
     "codex": "OpenAI Codex. Available at: https://openai.com/codex/",
     "outreach": "A. Zdravković, Đ. Jovanović and P. Šubarević, “Outreach: Modular "
                 "AI-enhanced off-grid mesh communication system for remote "
                 "environments,” IEEESTEC – 18th Student Projects Conference, Niš, 2025.",
+    "monorepo": "Monorepo, Wikipedia, The Free Encyclopedia. Available at: "
+                "https://en.wikipedia.org/wiki/Monorepo",
     "fiducial": f"A. Zdravković, Fiducial, release {VERSION}, 2026. Available at: "
                 "https://github.com/AleksaZCodes/fiducial",
     "schmidt": "D. C. Schmidt, “Guest editor’s introduction: Model-driven "
@@ -572,6 +591,11 @@ children = list(body.iterchildren())
 title = next(p for p in d.paragraphs if p.style is not None
              and p.style.name == "paper title")
 set_text(title, TITLE)
+# The template centres the title in a box from 900 twips to 836 twips short
+# of the right edge: a 1872-twip right margin and a -1036 indent. The body's
+# margins are set to 907 above, so the indent that keeps the same box is
+# -71; left at -1036 it pushes the title 0.4 in right of centre.
+title._p.pPr.find(qn("w:ind")).set(qn("w:end"), str(-(1036 - (1872 - 907))))
 
 # Author block: one author, one cell, no borders.
 tbl = d.tables[0]

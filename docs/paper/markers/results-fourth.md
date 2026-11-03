@@ -1,4 +1,4 @@
-# Injected mistakes, fourth set — fid 0.10.1 (9b74e2d)
+# Injected mistakes, fourth set — fid 0.10.2 (7e2caa1)
 
 Markers caught: **19 / 20**. Controls passed: **0 / 0**.
 

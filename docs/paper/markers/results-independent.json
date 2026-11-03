@@ -1,7 +1,7 @@
 {
   "summary": {
-    "fid": "fid 0.10.1",
-    "commit": "9b74e2d",
+    "fid": "fid 0.10.2",
+    "commit": "7e2caa1",
     "set": "independent",
     "baseline": false,
     "markers_caught": 20,
@@ -30,14 +30,14 @@
         {
           "gate": "derive",
           "ok": false,
-          "seconds": 0.24,
+          "seconds": 0.35,
           "message": "  A missing translation is a missing artifact, not a fallback (MISSION.md 1c).\n  ▶ content (shell) ✗\n  error: pipeline `content` exited with exit status: 1\n  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓\nderive-seo: [i18n] declares the locale `de` and messages/de.json does not exist — add the catalog, or remove the locale\n  ▶ seo (shell) ✗\n  error: pipeline `seo` exited with exit status: 1\nError: one or more pipelines failed",
           "output": "  ▶ adapters (fid-adapters) ✓\n  ▶ brand (fid-brand) ✓\nderive-content: collection `posts` has nothing for locale `de`.\n  expected: content/posts/de/\n  A missing translation is a missing artifact, not a fallback (MISSION.md 1c).\n  Write it, or remove `de` from [i18n] locales.\n  ▶ content (shell) ✗\n  error: pipeline `content` exited with exit status: 1\n  ▶ deploy (fid-deploy) ✓\n  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓\n  ▶ i18n (fid-i18n) ✓\n  ▶ identity (fid-identity) ✓\n  ▶ legal (fid-legal) ✓\nrasterize: no outputs declared in pipelines/raster.toml — nothing to render\n  ▶ raster (shell) ✓\n  ▶ schema (fid-schema) ✓\nderive-seo: [i18n] declares the locale `de` and messages/de.json does not exist — add the catalog, or remove the locale\n  ▶ seo (shell) ✗\n  error: pipeline `seo` exited with exit status: 1\n  ▶ thesis (fid-thesis) ✓\nError: one or more pipelines failed"
         },
         {
           "gate": "--check",
           "ok": true,
-          "seconds": 0.15,
+          "seconds": 0.14,
           "message": "✦ fid derive --check — all artifacts fresh",
           "output": ""
         }
@@ -63,14 +63,14 @@
         {
           "gate": "derive",
           "ok": false,
-          "seconds": 0.29,
+          "seconds": 0.25,
           "message": "  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓\n  ▶ i18n (fid-i18n) ✗\n  error: fid-i18n: a locale tag is wrong — dates, numbers and plurals would format for another language or script:\nError: one or more pipelines failed",
           "output": "  ▶ adapters (fid-adapters) ✓\n  ▶ brand (fid-brand) ✓\nwrote apps/web/src/generated/content.ts (1 collection(s), 2 locale(s))\n  ▶ content (shell) ✓\n  ▶ deploy (fid-deploy) ✓\n  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓\n  ▶ i18n (fid-i18n) ✗\n  error: fid-i18n: a locale tag is wrong — dates, numbers and plurals would format for another language or script:\n  messages/sr.json: `locale.tag` \"en-GB\" is a tag for `en`, but this is the `sr` catalog\n  ▶ identity (fid-identity) ✓\n  ▶ legal (fid-legal) ✓\nrasterize: no outputs declared in pipelines/raster.toml — nothing to render\n  ▶ raster (shell) ✓\n  ▶ schema (fid-schema) ✓\nwrote apps/web/src/generated/seo.ts (4 route(s), 2 locale(s))\nwrote apps/web/src/generated/seo.json\nwrote apps/web/public/sitemap.xml (4 url(s))\n  ▶ seo (shell) ✓\n  ▶ thesis (fid-thesis) ✓\nError: one or more pipelines failed"
         },
         {
           "gate": "--check",
           "ok": false,
-          "seconds": 0.14,
+          "seconds": 0.13,
           "message": "✗ fid derive --check failed:\nError: stale artifacts detected",
           "output": "✗ fid derive --check failed:\n  messages/en.json: `locale.tag` is identical to sr — translate it, or declare it in `[i18n] same` if it is the same in every language\nError: stale artifacts detected"
         }
@@ -96,14 +96,14 @@
         {
           "gate": "derive",
           "ok": false,
-          "seconds": 0.24,
+          "seconds": 0.25,
           "message": "derive-content: content/posts/en/hello.md: field `author` is not in the collection's schema.\n  Add it to content.toml, or fix the spelling. A field that is not declared is dropped silently otherwise, which is how a typo becomes a missing paragraph nobody can find.\n  ▶ content (shell) ✗\n  error: pipeline `content` exited with exit status: 1\n  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓\nError: one or more pipelines failed",
           "output": "  ▶ adapters (fid-adapters) ✓\n  ▶ brand (fid-brand) ✓\nderive-content: content/posts/en/hello.md: field `author` is not in the collection's schema.\n  Add it to content.toml, or fix the spelling. A field that is not declared is dropped silently otherwise, which is how a typo becomes a missing paragraph nobody can find.\n  ▶ content (shell) ✗\n  error: pipeline `content` exited with exit status: 1\n  ▶ deploy (fid-deploy) ✓\n  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓\n  ▶ i18n (fid-i18n) ✓\n  ▶ identity (fid-identity) ✓\n  ▶ legal (fid-legal) ✓\nrasterize: no outputs declared in pipelines/raster.toml — nothing to render\n  ▶ raster (shell) ✓\n  ▶ schema (fid-schema) ✓\nwrote apps/web/src/generated/seo.ts (4 route(s), 2 locale(s))\nwrote apps/web/src/generated/seo.json\nwrote apps/web/public/sitemap.xml (4 url(s))\n  ▶ seo (shell) ✓\n  ▶ thesis (fid-thesis) ✓\nError: one or more pipelines failed"
         },
         {
           "gate": "--check",
           "ok": true,
-          "seconds": 0.13,
+          "seconds": 0.15,
           "message": "✦ fid derive --check — all artifacts fresh",
           "output": ""
         }
@@ -128,7 +128,7 @@
         {
           "gate": "--check",
           "ok": false,
-          "seconds": 0.13,
+          "seconds": 0.11,
           "message": "✗ fid derive --check failed:\nError: stale artifacts detected",
           "output": "✗ fid derive --check failed:\n  content.toml: changed since `content` last ran (lock:d1527f99 file:bd342906) — its outputs may no longer follow from it (run `fid derive`)\n  content.toml: changed since `seo` last ran (lock:d1527f99 file:bd342906) — its outputs may no longer follow from it (run `fid derive`)\nError: stale artifacts detected"
         }
@@ -153,7 +153,7 @@
         {
           "gate": "--check",
           "ok": false,
-          "seconds": 0.11,
+          "seconds": 0.13,
           "message": "✗ fid derive --check failed:\n  apps/web/public/sitemap.xml: stale (lock:5c3323e1 file:13fa9808) — run `fid derive`\nError: stale artifacts detected",
           "output": "✗ fid derive --check failed:\n  apps/web/public/sitemap.xml: stale (lock:5c3323e1 file:13fa9808) — run `fid derive`\nError: stale artifacts detected"
         }
@@ -178,14 +178,14 @@
         {
           "gate": "derive",
           "ok": true,
-          "seconds": 0.23,
+          "seconds": 0.26,
           "message": "  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓",
           "output": ""
         },
         {
           "gate": "--check",
           "ok": false,
-          "seconds": 0.13,
+          "seconds": 0.11,
           "message": "✗ fid derive --check failed:\nError: stale artifacts detected",
           "output": "✗ fid derive --check failed:\n  apps/web/src/components/site-footer.tsx:4: types \"Example LLC\", declared in fiducial.toml [brand] legal_name — read it from the generated brand module, so a rename reaches this line\n  apps/web/src/components/site-footer.tsx:4: types \"example.com\", declared in fiducial.toml [brand] domain — read it from the generated brand module, so a rename reaches this line\n  apps/web/src/components/site-footer.tsx:5: types \"example.com\", declared in fiducial.toml [brand] domain — read it from the generated brand module, so a rename reaches this line\n  apps/web/src/components/site-footer.tsx:5: types \"hello@example.com\", declared in fiducial.toml [brand] contact_email — read it from the generated brand module, so a rename reaches this line\nError: stale artifacts detected"
         }
@@ -211,7 +211,7 @@
         {
           "gate": "derive",
           "ok": false,
-          "seconds": 0.28,
+          "seconds": 0.23,
           "message": "  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓\n  ▶ legal (fid-legal) ✗\n  error: [legal] cookie_categories = [\"analytics\"] leaves out \"necessary\" — required in EU (ePrivacy Directive 2002/58/EC Art. 5(3); Telemediengesetz §5 (imprint); EAA 2019/882 (accessibility)). The site sets them whatever is declared, so the declaration has to say so.\nError: one or more pipelines failed",
           "output": "  ▶ adapters (fid-adapters) ✓\n  ▶ brand (fid-brand) ✓\nwrote apps/web/src/generated/content.ts (1 collection(s), 2 locale(s))\n  ▶ content (shell) ✓\n  ▶ deploy (fid-deploy) ✓\n  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓\n  ▶ i18n (fid-i18n) ✓\n  ▶ identity (fid-identity) ✓\n  ▶ legal (fid-legal) ✗\n  error: [legal] cookie_categories = [\"analytics\"] leaves out \"necessary\" — required in EU (ePrivacy Directive 2002/58/EC Art. 5(3); Telemediengesetz §5 (imprint); EAA 2019/882 (accessibility)). The site sets them whatever is declared, so the declaration has to say so.\nrasterize: no outputs declared in pipelines/raster.toml — nothing to render\n  ▶ raster (shell) ✓\n  ▶ schema (fid-schema) ✓\nwrote apps/web/src/generated/seo.ts (4 route(s), 2 locale(s))\nwrote apps/web/src/generated/seo.json\nwrote apps/web/public/sitemap.xml (4 url(s))\n  ▶ seo (shell) ✓\n  ▶ thesis (fid-thesis) ✓\nError: one or more pipelines failed"
         },
@@ -244,7 +244,7 @@
         {
           "gate": "derive",
           "ok": false,
-          "seconds": 0.24,
+          "seconds": 0.23,
           "message": "  ▶ design (fid-design) ✗\n  error: fid-design: `design-system.md`: `fid:shape` chip = \"2rem\" — a chip can be as short as 1.75rem, and a cut deeper than half of that (0.875rem) meets the opposite cut: the element draws as a lozenge, not a box with cut corners.\nError: one or more pipelines failed",
           "output": "  ▶ adapters (fid-adapters) ✓\n  ▶ brand (fid-brand) ✓\nwrote apps/web/src/generated/content.ts (1 collection(s), 2 locale(s))\n  ▶ content (shell) ✓\n  ▶ deploy (fid-deploy) ✓\n  ▶ design (fid-design) ✗\n  error: fid-design: `design-system.md`: `fid:shape` chip = \"2rem\" — a chip can be as short as 1.75rem, and a cut deeper than half of that (0.875rem) meets the opposite cut: the element draws as a lozenge, not a box with cut corners.\n  Keep chip at or under 0.875rem.\n  ▶ i18n (fid-i18n) ✓\n  ▶ identity (fid-identity) ✓\n  ▶ legal (fid-legal) ✓\nrasterize: no outputs declared in pipelines/raster.toml — nothing to render\n  ▶ raster (shell) ✓\n  ▶ schema (fid-schema) ✓\nwrote apps/web/src/generated/seo.ts (4 route(s), 2 locale(s))\nwrote apps/web/src/generated/seo.json\nwrote apps/web/public/sitemap.xml (4 url(s))\n  ▶ seo (shell) ✓\n  ▶ thesis (fid-thesis) ✓\nError: one or more pipelines failed"
         },
@@ -277,16 +277,16 @@
         {
           "gate": "derive",
           "ok": false,
-          "seconds": 0.27,
+          "seconds": 0.29,
           "message": "  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓\n  ▶ schema (fid-schema) ✗\n  error: fid-schema: the database is SQLite, and a migration is not:\n  migrations/0002_grant_audit.sql: SQLite refuses it: near \"(\": syntax error in -- Audit trail for grant changes.\nCREATE TABLE IF NOT EXISTS grant_audit (\n  principal_id TEXT NOT NULL,\n  action       TEXT NOT NULL,\n  at           TIMESTAMPTZ NOT NULL DEFAULT now()\nError: one or more pipelines failed",
           "output": "  ▶ adapters (fid-adapters) ✓\n  ▶ brand (fid-brand) ✓\nwrote apps/web/src/generated/content.ts (1 collection(s), 2 locale(s))\n  ▶ content (shell) ✓\n  ▶ deploy (fid-deploy) ✓\n  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓\n  ▶ i18n (fid-i18n) ✓\n  ▶ identity (fid-identity) ✓\n  ▶ legal (fid-legal) ✓\nrasterize: no outputs declared in pipelines/raster.toml — nothing to render\n  ▶ raster (shell) ✓\n  ▶ schema (fid-schema) ✗\n  error: fid-schema: the database is SQLite, and a migration is not:\n  migrations/0002_grant_audit.sql: SQLite refuses it: near \"(\": syntax error in -- Audit trail for grant changes.\nCREATE TABLE IF NOT EXISTS grant_audit (\n  id           SERIAL PRIMARY KEY,\n  principal_id TEXT NOT NULL,\n  action       TEXT NOT NULL,\n  at           TIMESTAMPTZ NOT NULL DEFAULT now()\n);\n at offset 217\nwrote apps/web/src/generated/seo.ts (4 route(s), 2 locale(s))\nwrote apps/web/src/generated/seo.json\nwrote apps/web/public/sitemap.xml (4 url(s))\n  ▶ seo (shell) ✓\n  ▶ thesis (fid-thesis) ✓\nError: one or more pipelines failed"
         },
         {
           "gate": "--check",
           "ok": false,
-          "seconds": 0.13,
-          "message": "✗ fid derive --check failed:\n  src/migrations.generated.ts: stale — not what this fid (0.10.1) derives from its inputs: an input or the generator changed (run `fid derive`)\nError: stale artifacts detected",
-          "output": "✗ fid derive --check failed:\n  migrations/0002_grant_audit.sql: input to `schema` was never recorded (run `fid derive`)\n  src/migrations.generated.ts: stale — not what this fid (0.10.1) derives from its inputs: an input or the generator changed (run `fid derive`)\nError: stale artifacts detected"
+          "seconds": 0.14,
+          "message": "✗ fid derive --check failed:\n  src/migrations.generated.ts: stale — not what this fid (0.10.2) derives from its inputs: an input or the generator changed (run `fid derive`)\nError: stale artifacts detected",
+          "output": "✗ fid derive --check failed:\n  migrations/0002_grant_audit.sql: input to `schema` was never recorded (run `fid derive`)\n  src/migrations.generated.ts: stale — not what this fid (0.10.2) derives from its inputs: an input or the generator changed (run `fid derive`)\nError: stale artifacts detected"
         }
       ]
     },
@@ -309,16 +309,16 @@
         {
           "gate": "derive",
           "ok": true,
-          "seconds": 0.24,
+          "seconds": 0.33,
           "message": "  ▶ design (fid-design) [12 contrast pairs ok; no app yet — `apps/web/src/app/tokens.css` not written] ✓",
           "output": ""
         },
         {
           "gate": "--check",
           "ok": false,
-          "seconds": 0.13,
+          "seconds": 0.12,
           "message": "✗ fid derive --check failed:\nError: stale artifacts detected",
-          "output": "✗ fid derive --check failed:\n  .github/workflows/ci.yml: modified since scaffold (lock: f19d0d20, file: cfe0fe36). This file is platform-owned — `fid upgrade` will rewrite it, so an edit here will be merged over.\n  .github/workflows/: no step runs `fid derive --check` in the repository root — without it every other check here is advisory. Add the step back (`fid upgrade` restores the scaffolded one).\nError: stale artifacts detected"
+          "output": "✗ fid derive --check failed:\n  .github/workflows/ci.yml: modified since scaffold (lock: 40650a48, file: 9ceaf609). This file is platform-owned — `fid upgrade` will rewrite it, so an edit here will be merged over.\n  .github/workflows/: no step runs `fid derive --check` in the repository root — without it every other check here is advisory. Add the step back (`fid upgrade` restores the scaffolded one).\nError: stale artifacts detected"
         }
       ]
     },
@@ -342,42 +342,42 @@
         {
           "gate": "derive",
           "ok": false,
-          "seconds": 0.06,
+          "seconds": 0.08,
           "message": "  ▶ hardware (fid-hardware) ✗\n  error: hardware/product.toml: part `ldo`: LCSC C6187 is not in hardware/parts.lock — a part nobody checked against LCSC. Run `python3 hardware/parts.py resolve` so its catalog entry is checked against what the board needs\nError: one or more pipelines failed",
           "output": "  ▶ hardware (fid-hardware) ✗\n  error: hardware/product.toml: part `ldo`: LCSC C6187 is not in hardware/parts.lock — a part nobody checked against LCSC. Run `python3 hardware/parts.py resolve` so its catalog entry is checked against what the board needs\npart `ldo` (AMS1117-5.0): its output VO holds 5 V, but 3V3 is declared at 3.3 V in [rails] — AMS1117 datasheet (Advanced Monolithic Systems), Electrical Characteristics\n  ▶ protocol (fid-protocol) ✓\n  ▶ thesis (fid-thesis) ✓\nError: one or more pipelines failed"
         },
         {
           "gate": "--check",
           "ok": false,
-          "seconds": 0.12,
+          "seconds": 0.13,
           "message": "✗ fid derive --check failed:\nError: stale artifacts detected",
           "output": "✗ fid derive --check failed:\n  hardware/product.toml: changed since `hardware` last ran (lock:63211921 file:03dd0ddd) — its outputs may no longer follow from it (run `fid derive`)\nError: stale artifacts detected"
         },
         {
           "gate": "firmware build",
           "ok": true,
-          "seconds": 2.03,
+          "seconds": 2.23,
           "message": "",
           "output": ""
         },
         {
           "gate": "firmware tests",
           "ok": true,
-          "seconds": 0.31,
+          "seconds": 0.36,
           "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
           "output": ""
         },
         {
           "gate": "web test",
           "ok": true,
-          "seconds": 0.15,
-          "message": "# (node:31799) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-hiovqryb/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "seconds": 0.16,
+          "message": "# (node:4029) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-4sm1yzo_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
           "output": ""
         },
         {
           "gate": "type check",
           "ok": true,
-          "seconds": 1.1,
+          "seconds": 1.16,
           "message": "",
           "output": ""
         }
@@ -417,28 +417,28 @@
         {
           "gate": "firmware build",
           "ok": true,
-          "seconds": 1.98,
+          "seconds": 2.05,
           "message": "",
           "output": ""
         },
         {
           "gate": "firmware tests",
           "ok": true,
-          "seconds": 0.22,
+          "seconds": 0.26,
           "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
           "output": ""
         },
         {
           "gate": "web test",
           "ok": true,
-          "seconds": 0.14,
-          "message": "# (node:31918) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-hiovqryb/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "seconds": 0.16,
+          "message": "# (node:4147) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-4sm1yzo_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
           "output": ""
         },
         {
           "gate": "type check",
           "ok": true,
-          "seconds": 0.98,
+          "seconds": 1.12,
           "message": "",
           "output": ""
         }
@@ -464,7 +464,7 @@
         {
           "gate": "derive",
           "ok": false,
-          "seconds": 0.08,
+          "seconds": 0.09,
           "message": "  ▶ hardware (fid-hardware) ✗\n  error: hardware/product.toml: part `c-dec`: near = `mcu.VDD`, but `mcu` has no pin `VDD`\nError: one or more pipelines failed",
           "output": "  ▶ hardware (fid-hardware) ✗\n  error: hardware/product.toml: part `c-dec`: near = `mcu.VDD`, but `mcu` has no pin `VDD`\n  ▶ protocol (fid-protocol) ✓\n  ▶ thesis (fid-thesis) ✓\nError: one or more pipelines failed"
         },
@@ -478,7 +478,7 @@
         {
           "gate": "firmware build",
           "ok": true,
-          "seconds": 1.86,
+          "seconds": 2.05,
           "message": "",
           "output": ""
         },
@@ -492,14 +492,14 @@
         {
           "gate": "web test",
           "ok": true,
-          "seconds": 0.15,
-          "message": "# (node:32038) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-hiovqryb/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "seconds": 0.14,
+          "message": "# (node:4266) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-4sm1yzo_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
           "output": ""
         },
         {
           "gate": "type check",
           "ok": true,
-          "seconds": 1.05,
+          "seconds": 1.09,
           "message": "",
           "output": ""
         }
@@ -525,42 +525,42 @@
         {
           "gate": "derive",
           "ok": false,
-          "seconds": 0.09,
+          "seconds": 0.06,
           "message": "  ▶ hardware (fid-hardware) ✗\n  error: hardware/product.toml: these do not fit on the floor: the board (26 × 79 mm) fits nowhere inside the case, 1.9 mm from its walls, with the chimney's ring of `vent` wholly on it. Move the vent inward, or enlarge the outline.\nError: one or more pipelines failed",
           "output": "  ▶ hardware (fid-hardware) ✗\n  error: hardware/product.toml: these do not fit on the floor: the board (26 × 79 mm) fits nowhere inside the case, 1.9 mm from its walls, with the chimney's ring of `vent` wholly on it. Move the vent inward, or enlarge the outline.\n  ▶ protocol (fid-protocol) ✓\n  ▶ thesis (fid-thesis) ✓\nError: one or more pipelines failed"
         },
         {
           "gate": "--check",
           "ok": false,
-          "seconds": 0.13,
+          "seconds": 0.12,
           "message": "✗ fid derive --check failed:\nError: stale artifacts detected",
           "output": "✗ fid derive --check failed:\n  hardware/outline.svg: changed since `hardware` last ran (lock:0507cf71 file:9b727f67) — its outputs may no longer follow from it (run `fid derive`)\nError: stale artifacts detected"
         },
         {
           "gate": "firmware build",
           "ok": true,
-          "seconds": 1.94,
+          "seconds": 1.87,
           "message": "",
           "output": ""
         },
         {
           "gate": "firmware tests",
           "ok": true,
-          "seconds": 0.2,
+          "seconds": 0.19,
           "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
           "output": ""
         },
         {
           "gate": "web test",
           "ok": true,
-          "seconds": 0.13,
-          "message": "# (node:32156) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-hiovqryb/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "seconds": 0.14,
+          "message": "# (node:4385) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-4sm1yzo_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
           "output": ""
         },
         {
           "gate": "type check",
           "ok": true,
-          "seconds": 1.04,
+          "seconds": 1.1,
           "message": "",
           "output": ""
         }
@@ -592,42 +592,42 @@
         {
           "gate": "derive",
           "ok": true,
-          "seconds": 30.03,
+          "seconds": 32.29,
           "message": "  ▶ hardware (fid-hardware) ✓\n  ▶ protocol (fid-protocol) ✓\n  ▶ thesis (fid-thesis) ✓\n✦ fid derive complete — fiducial.lock updated",
           "output": ""
         },
         {
           "gate": "--check",
           "ok": true,
-          "seconds": 0.21,
+          "seconds": 0.19,
           "message": "✦ fid derive --check — all artifacts fresh",
           "output": ""
         },
         {
           "gate": "firmware build",
           "ok": true,
-          "seconds": 2.11,
+          "seconds": 1.87,
           "message": "",
           "output": ""
         },
         {
           "gate": "firmware tests",
           "ok": true,
-          "seconds": 0.27,
+          "seconds": 0.19,
           "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
           "output": ""
         },
         {
           "gate": "web test",
           "ok": true,
-          "seconds": 0.17,
-          "message": "# (node:32290) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-hiovqryb/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "seconds": 0.14,
+          "message": "# (node:4516) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-4sm1yzo_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
           "output": ""
         },
         {
           "gate": "type check",
           "ok": false,
-          "seconds": 1.16,
+          "seconds": 1.14,
           "message": "web/src/main.ts(17,41): error TS2339: Property 'part' does not exist on type 'never'.\nweb/src/main.ts(19,87): error TS2339: Property 'side' does not exist on type 'never'.",
           "output": "web/src/main.ts(17,41): error TS2339: Property 'part' does not exist on type 'never'.\nweb/src/main.ts(19,87): error TS2339: Property 'side' does not exist on type 'never'."
         }
@@ -653,21 +653,21 @@
         {
           "gate": "derive",
           "ok": false,
-          "seconds": 0.12,
+          "seconds": 0.15,
           "message": "  ▶ protocol (fid-protocol) ✗\n  error: fid-protocol: `protocol.toml` does not hold together:\nError: one or more pipelines failed",
           "output": "  ▶ hardware (fid-hardware) ✓\n  ▶ protocol (fid-protocol) ✗\n  error: fid-protocol: `protocol.toml` does not hold together:\n  message `status`: kind 1 is already `reading`'s — each message needs its own\n  ▶ thesis (fid-thesis) ✓\nError: one or more pipelines failed"
         },
         {
           "gate": "--check",
           "ok": false,
-          "seconds": 0.27,
+          "seconds": 0.25,
           "message": "✗ fid derive --check failed:\nError: stale artifacts detected",
           "output": "✗ fid derive --check failed:\n  protocol.toml: changed since `protocol` last ran (lock:f827bdbf file:f70d4184) — its outputs may no longer follow from it (run `fid derive`)\nError: stale artifacts detected"
         },
         {
           "gate": "firmware build",
           "ok": true,
-          "seconds": 1.98,
+          "seconds": 1.96,
           "message": "",
           "output": ""
         },
@@ -681,14 +681,14 @@
         {
           "gate": "web test",
           "ok": true,
-          "seconds": 0.12,
-          "message": "# (node:32365) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-hiovqryb/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "seconds": 0.14,
+          "message": "# (node:4588) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-4sm1yzo_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
           "output": ""
         },
         {
           "gate": "type check",
           "ok": true,
-          "seconds": 1.02,
+          "seconds": 1.01,
           "message": "",
           "output": ""
         }
@@ -713,35 +713,35 @@
         {
           "gate": "--check",
           "ok": false,
-          "seconds": 0.19,
+          "seconds": 0.2,
           "message": "✗ fid derive --check failed:\nError: stale artifacts detected",
           "output": "✗ fid derive --check failed:\n  protocol.toml: changed since `protocol` last ran (lock:f827bdbf file:a3e696e7) — its outputs may no longer follow from it (run `fid derive`)\nError: stale artifacts detected"
         },
         {
           "gate": "firmware build",
           "ok": true,
-          "seconds": 0.13,
+          "seconds": 0.12,
           "message": "",
           "output": ""
         },
         {
           "gate": "firmware tests",
           "ok": true,
-          "seconds": 0.09,
+          "seconds": 0.11,
           "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
           "output": ""
         },
         {
           "gate": "web test",
           "ok": true,
-          "seconds": 0.16,
-          "message": "# (node:32424) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-hiovqryb/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "seconds": 0.14,
+          "message": "# (node:4647) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-4sm1yzo_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
           "output": ""
         },
         {
           "gate": "type check",
           "ok": true,
-          "seconds": 1.11,
+          "seconds": 0.97,
           "message": "",
           "output": ""
         }
@@ -767,42 +767,42 @@
         {
           "gate": "derive",
           "ok": false,
-          "seconds": 0.17,
+          "seconds": 0.15,
           "message": "  ▶ protocol (fid-protocol) ✗\n  error: fid-protocol: code types what `protocol.toml` declares:\nError: one or more pipelines failed",
           "output": "  ▶ hardware (fid-hardware) ✓\n  ▶ protocol (fid-protocol) ✗\n  error: fid-protocol: code types what `protocol.toml` declares:\n  firmware/rp2040/src/main.rs:61: types a USB ID — use USB_VENDOR_ID / USB_PRODUCT_ID from the generated protocol, declared once in `[usb]`\n  ▶ thesis (fid-thesis) ✓\nError: one or more pipelines failed"
         },
         {
           "gate": "--check",
           "ok": false,
-          "seconds": 0.3,
+          "seconds": 0.21,
           "message": "✗ fid derive --check failed:\nError: stale artifacts detected",
           "output": "✗ fid derive --check failed:\n  firmware/rp2040/src/main.rs:61: types a USB ID — use USB_VENDOR_ID / USB_PRODUCT_ID from the generated protocol, declared once in `[usb]`\nError: stale artifacts detected"
         },
         {
           "gate": "firmware build",
           "ok": true,
-          "seconds": 1.96,
+          "seconds": 1.9,
           "message": "warning: unused imports: `USB_PRODUCT_ID` and `USB_VENDOR_ID`\n  --> rp2040/src/main.rs:31:61\n   |\n31 | use firmware_shared::messages::{reading::comfortable, Band, USB_PRODUCT_ID, USB_VENDOR_ID};\n   |                                                             ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default",
           "output": ""
         },
         {
           "gate": "firmware tests",
           "ok": true,
-          "seconds": 0.1,
+          "seconds": 0.09,
           "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
           "output": ""
         },
         {
           "gate": "web test",
           "ok": true,
-          "seconds": 0.16,
-          "message": "# (node:32499) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-hiovqryb/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "seconds": 0.13,
+          "message": "# (node:4720) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-4sm1yzo_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
           "output": ""
         },
         {
           "gate": "type check",
           "ok": true,
-          "seconds": 1.18,
+          "seconds": 1.03,
           "message": "",
           "output": ""
         }
@@ -828,34 +828,34 @@
           "gate": "--check",
           "ok": false,
           "seconds": 0.21,
-          "message": "✗ fid derive --check failed:\n  hardware/generated/bom.csv: stale — not what this fid (0.10.1) derives from its inputs: an input or the generator changed (run `fid derive`)\n  hardware/generated/bom.csv: stale (lock:1298557c file:084bec94) — run `fid derive`\nError: stale artifacts detected",
-          "output": "✗ fid derive --check failed:\n  hardware/generated/bom.csv: stale — not what this fid (0.10.1) derives from its inputs: an input or the generator changed (run `fid derive`)\n  hardware/generated/bom.csv: stale (lock:1298557c file:084bec94) — run `fid derive`\nError: stale artifacts detected"
+          "message": "✗ fid derive --check failed:\n  hardware/generated/bom.csv: stale — not what this fid (0.10.2) derives from its inputs: an input or the generator changed (run `fid derive`)\n  hardware/generated/bom.csv: stale (lock:1298557c file:084bec94) — run `fid derive`\nError: stale artifacts detected",
+          "output": "✗ fid derive --check failed:\n  hardware/generated/bom.csv: stale — not what this fid (0.10.2) derives from its inputs: an input or the generator changed (run `fid derive`)\n  hardware/generated/bom.csv: stale (lock:1298557c file:084bec94) — run `fid derive`\nError: stale artifacts detected"
         },
         {
           "gate": "firmware build",
           "ok": true,
-          "seconds": 1.85,
+          "seconds": 2.03,
           "message": "",
           "output": ""
         },
         {
           "gate": "firmware tests",
           "ok": true,
-          "seconds": 0.11,
+          "seconds": 0.1,
           "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
           "output": ""
         },
         {
           "gate": "web test",
           "ok": true,
-          "seconds": 0.16,
-          "message": "# (node:32572) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-hiovqryb/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "seconds": 0.14,
+          "message": "# (node:4791) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-4sm1yzo_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
           "output": ""
         },
         {
           "gate": "type check",
           "ok": true,
-          "seconds": 1.07,
+          "seconds": 0.99,
           "message": "",
           "output": ""
         }
@@ -880,7 +880,7 @@
         {
           "gate": "derive",
           "ok": true,
-          "seconds": 0.17,
+          "seconds": 0.15,
           "message": "  ▶ hardware (fid-hardware) ✓\n  ▶ protocol (fid-protocol) ✓\n  ▶ thesis (fid-thesis) ✓\n✦ fid derive complete — fiducial.lock updated",
           "output": ""
         },
@@ -894,28 +894,28 @@
         {
           "gate": "firmware build",
           "ok": true,
-          "seconds": 1.97,
+          "seconds": 1.96,
           "message": "",
           "output": ""
         },
         {
           "gate": "firmware tests",
           "ok": true,
-          "seconds": 0.21,
+          "seconds": 0.19,
           "message": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
           "output": ""
         },
         {
           "gate": "web test",
           "ok": true,
-          "seconds": 0.15,
-          "message": "# (node:32691) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-hiovqryb/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
+          "seconds": 0.14,
+          "message": "# (node:4909) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///tmp/fid-markers-4sm1yzo_/repo/examples/sensor-stick/web/src/reading.test.ts is not specified and it doesn't parse as CommonJS.\n# Subtest: another kind of message is not a reading\nok 2 - another kind of message is not a reading\n# fail 0",
           "output": ""
         },
         {
           "gate": "type check",
           "ok": true,
-          "seconds": 1.12,
+          "seconds": 1.02,
           "message": "",
           "output": ""
         }
