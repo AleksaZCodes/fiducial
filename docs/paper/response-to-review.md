@@ -10,7 +10,7 @@ odgovor na svaku primedbu i opis izmene u radu.
 na skupu koji je korišćen za unapređenje platforme. Zato su dodata još tri
 skupa od po 20 grešaka, svaki sačuvan u repozitorijumu pre prvog pokretanja:
 
-- drugi skup napisao je autor nakon što je verzija 0.9.11 zamrznuta;
+- drugi skup napisao je AI koji je izgradio Fiducial, nakon što je verzija 0.9.11 zamrznuta;
 - treći i četvrti napisali su zasebni agenti koji su čitali samo fajlove dva
   proizvoda, a ne platformu, njena pravila ni istoriju.
 

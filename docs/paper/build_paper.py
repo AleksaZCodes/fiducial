@@ -133,12 +133,12 @@ BODY = [
      "Such a product is more than code. It has a circuit board and an "
      "enclosure, firmware that runs on the board, and an app or web page. "
      "It has text in every language it supports – translations, also called "
-     "internationalization. It has a visual identity of colours, fonts and "
+     "internationalization. It has a visual identity of colors, fonts and "
      "a logo, and a design system: the shared rules that keep its look the "
      "same and readable everywhere. Around these sit legal pages, "
      "search-engine metadata, a database schema and deployment settings. "
      "These parts look separate, but they share facts: a sensor’s pin is on "
-     "the schematic and in the firmware, a brand colour is in the page, the "
+     "the schematic and in the firmware, a brand color is in the page, the "
      "logo and the case, and a label must exist in every language."),
     ("p",
      "This paper argues that there is a real advantage in centralizing all "
@@ -146,7 +146,7 @@ BODY = [
      "place, and the work in one monorepository, a single repository that "
      "holds many parts or projects [@monorepo]. Here the board, firmware, "
      "app and brand live together. Kept in a structured way, they also "
-     "become reusable: a brand declared once supplies its colours, logo and "
+     "become reusable: a brand declared once supplies its colors, logo and "
      "3D renderings wherever needed. Fiducial is built on this idea and "
      "covers all of the above."),
     ("p",
@@ -187,7 +187,7 @@ BODY = [
      "central model and generate or check other views from it [@schmidt], "
      "[@brambilla], in languages such as SysML [@sysml], with methods for "
      "managing inconsistencies between views [@nuseibeh], [@herzig]. They "
-     "are the closest in spirit, but the model lives in a specialised "
+     "are the closest in spirit, but the model lives in a specialized "
      "graphical tool, code is still written by hand beside it, and an agent "
      "cannot easily work in it. Engineering suites link two tools, such as a "
      "circuit board and its mechanical model [@altium]; the firmware, app "
@@ -233,7 +233,7 @@ BODY = [
      "outputs tied to inputs by fingerprints, established engines for hard "
      "problems, and checks that decide – and changes the unit. It tracks "
      "facts rather than files or tools, across every discipline of one "
-     "product, so any fact – a message, a pin, a colour, a size – has "
+     "product, so any fact – a message, a pin, a color, a size – has "
      "exactly one home."),
 
     ("h1", "The Approach"),
@@ -264,7 +264,7 @@ BODY = [
      "wrong sensor address, a resistor of the wrong value – is copied "
      "faithfully into every artifact, and the product is then consistently "
      "wrong. Some such values break a rule and are refused, such as two "
-     "colours with too little contrast or a resistor that puts a voltage "
+     "colors with too little contrast or a resistor that puts a voltage "
      "outside its window, but whether a declaration is right is still "
      "decided by the person, the datasheet and the bench."),
     ("p",
@@ -309,7 +309,7 @@ BODY = [
     ("p",
      "Declarations are plain text files in version control, from the "
      "strings of each language to every part of a board with the net each "
-     "pin connects to. Text was chosen over a graphical modelling tool "
+     "pin connects to. Text was chosen over a graphical modeling tool "
      "because coding agents read and write it well, and every change then "
      "goes through ordinary code review. fid "
      "derive runs each capability’s generator, which reads the declarations "
@@ -326,7 +326,7 @@ BODY = [
      "recorded fingerprint with the repository and fails if a declaration "
      "changed without its artifacts being regenerated, or if a generated "
      "file was edited by hand. Rules: generation refuses declarations that "
-     "break a rule, such as a language missing a string, two colours with too "
+     "break a rule, such as a language missing a string, two colors with too "
      "little contrast, parts that cost more than the declared limit, or a "
      "board that does not fit its case. Consumers: compilers and type "
      "checkers read the generated files, so code that still uses a renamed "
@@ -379,12 +379,14 @@ BODY = [
      "are run, and the result shows whether they noticed. Each mistake was "
      "applied to a clean copy of one of two products, a fresh web product "
      "in English and Serbian or the sensor stick, and the checks ran as in "
-     "continuous integration. Four sets of 20 were used. The first covers eight kinds of drift met while building "
-     "Fiducial and was used to improve it. The other three were each "
-     "committed before their first run: the author wrote the second after "
-     "the first was fixed, and separate agents that read only the two "
-     "products, not the platform, wrote the third and the fourth, the fourth "
-     "aimed at the classes the third revealed. As a baseline, every set also "
+     "continuous integration. Four sets of 20 were used. The first covers "
+     "eight kinds of drift met while building Fiducial and was used to "
+     "improve it, so it is not an independent test. The other three were "
+     "written and saved before their first run, so no mistake could be "
+     "chosen after seeing the result: the second by the AI that built "
+     "Fiducial, after the first set was fixed, and the third and the fourth "
+     "by separate agents that read only the two products, not the platform, "
+     "the fourth aimed at the classes the third revealed. As a baseline, every set also "
      "ran through ordinary CI alone – the same compilers, type checkers and "
      "tests, without Fiducial’s derive and check steps. Correct changes "
      "tested the opposite direction: that the checks do not fail without a "
@@ -397,10 +399,9 @@ BODY = [
     ("p", "FINDINGS_B"),
     ("p",
      "All four sets and their script are in the repository. Only first runs "
-     "measure how the checks generalise; the fourth set was aimed at classes "
-     "the author named; and only two products have been built. The test "
-     "measures the checks, not whether agents make "
-     "fewer mistakes with Fiducial."),
+     "measure how the checks generalize, the fourth set was aimed at classes "
+     "the third revealed, and only two products have been built. The test "
+     "measures the checks, not whether agents make fewer mistakes."),
     ("h1", "Conclusion"),
     ("p",
      "AI agents have made writing each part of a product fast, and that has "
@@ -434,7 +435,7 @@ def _ctl(res):
 
 TABLE1 = [
     ("First, used to improve", f"{_B}/20", f"{_F1['original']}/20", f"{_N}/20"),
-    ("Second, by the author", f"{_HB}/20", f"{_F1['heldout']}/20", f"{_H}/20"),
+    ("Second, by the AI", f"{_HB}/20", f"{_F1['heldout']}/20", f"{_H}/20"),
     ("Third, by an agent", f"{_IB}/20", f"{_F1['independent']}/20", f"{_I}/20"),
     ("Fourth, by an agent", f"{_FB}/20", f"{_F1['fourth']}/20", f"{_F}/20"),
     ("Correct changes", _ctl(_BASE), "5/5", _ctl(_RESULTS)),
@@ -444,7 +445,7 @@ _MISSES = (20 - _F1["heldout"]) + (20 - _F1["independent"]) + (20 - _F1["fourth"
 FINDINGS_A = (
     f"On first run the checks caught {_F1['heldout']}, {_F1['independent']} "
     f"and {_F1['fourth']} of the three unseen sets; ordinary CI caught none "
-    "of them, and one of the first set, because nothing in it compares one "
+    "of them, because nothing in it compares one "
     f"artifact with another. All but one of the {_MISSES} misses fell into "
     "one of five classes: a declared value typed again in code, such as a "
     "footer spelling out the domain; the check itself removed, or run after "
@@ -460,9 +461,10 @@ FINDINGS_B = (
     "rules kept as data, from datasheets, fabrication limits and law; and "
     "generators confined to their declared inputs. With these, release "
     f"{RES_VERSION} catches every mistake in the first three sets and {_F} "
-    "of the fourth, and every correct change still passes. The one it "
-    "misses is a matter of meaning: a colour pair relabelled as large text "
-    "passes, because which text is large is declared nowhere."
+    "of the fourth. The one it "
+    "misses is a mistake of meaning: contrast rules allow a lower ratio "
+    "for large text, and a color pair was relabeled as large text. It passes "
+    "because nothing declares which text really is large."
 )
 
 REFS = {
