@@ -475,54 +475,47 @@ FINDINGS_B = (
 )
 
 REFS = {
-    "claude": "Anthropic, “Claude Code documentation,” 2026. Available at: "
+    "claude": "Anthropic, “Claude Code documentation,” 2026. "
               "https://docs.anthropic.com/en/docs/claude-code",
-    "codex": "OpenAI Codex. Available at: https://openai.com/codex/",
+    "codex": "OpenAI Codex. https://openai.com/codex/",
     "outreach": "A. Zdravković, Đ. Jovanović and P. Šubarević, “Outreach: Modular "
                 "AI-enhanced off-grid mesh communication system for remote "
                 "environments,” IEEESTEC – 18th Student Projects Conference, Niš, 2025.",
     "monorepo": "R. Potvin and J. Levenberg, “Why Google stores billions of "
                 "lines of code in a single repository,” Commun. ACM, vol. 59, "
                 "pp. 78–87, 2016.",
-    "fiducial": f"A. Zdravković, Fiducial, release {VERSION}, 2026. Available at: "
-                "https://github.com/AleksaZCodes/fiducial",
-    "schmidt": "D. C. Schmidt, “Guest editor’s introduction: Model-driven "
-               "engineering,” Computer, vol. 39, no. 2, pp. 25–31, 2006.",
-    "sysml": "S. Friedenthal, A. Moore and R. Steiner, A Practical Guide to "
-             "SysML, 3rd ed. Morgan Kaufmann, 2014.",
-    "nuseibeh": "B. Nuseibeh, S. Easterbrook and A. Russo, “Leveraging "
-                "inconsistency in software development,” Computer, vol. 33, "
-                "no. 4, pp. 24–29, 2000.",
+    "fiducial": f"A. Zdravković, Fiducial, release {VERSION}, 2026. "
+              "https://github.com/AleksaZCodes/fiducial",
+    "schmidt": 'D. C. Schmidt, “Guest editor’s introduction: Model-driven engineering,” Computer, vol. 39, no. 2, pp. 25–31, 2006, doi: 10.1109/MC.2006.58.',
+    "sysml": 'Object Management Group, OMG Systems Modeling Language (SysML), version 2.0, Sept. 2025. https://www.omg.org/spec/SysML/2.0',
+    "nuseibeh": 'B. Nuseibeh, S. Easterbrook and A. Russo, “Leveraging inconsistency in software development,” Computer, vol. 33, no. 4, pp. 24–29, 2000, doi: 10.1109/2.839317.',
     "herzig": "S. J. I. Herzig, A. Qamar and C. J. J. Paredis, “An approach to "
               "identifying inconsistencies in model-based systems engineering,” "
               "Procedia Computer Science, vol. 28, pp. 354–362, 2014.",
-    "altium": "Altium, MCAD CoDesigner, ECAD–MCAD collaboration. Available at: "
-              "https://www.altium.com/",
+    "altium": 'Altium, MCAD CoDesigner technical documentation. https://www.altium.com/documentation/altium-codesigner',
     "atopile": "atopile, a language for designing circuit boards as code. "
-               "Available at: https://github.com/atopile/atopile",
+               "https://github.com/atopile/atopile",
     "build123d": "build123d, a Python CAD library on the OpenCascade kernel. "
-                 "Available at: https://github.com/gumyr/build123d",
-    "protobuf": "Protocol Buffers. Available at: https://protobuf.dev/",
-    "bazel": "Bazel, a build and test tool. Available at: https://bazel.build/",
+                 "https://github.com/gumyr/build123d",
+    "protobuf": "Protocol Buffers. https://protobuf.dev/",
+    "bazel": "Bazel, a build and test tool. https://bazel.build/",
     "nix": "E. Dolstra, M. de Jonge and E. Visser, “Nix: A safe and policy-free "
            "system for software deployment,” in Proc. LISA, 2004, pp. 79–92.",
-    "agentsmd": "AGENTS.md, a format for guiding coding agents. Available at: "
-                "https://agents.md/",
+    "agentsmd": "AGENTS.md, a format for guiding coding agents. "
+              "https://agents.md/",
     "gao": "R. Gao, A. Tahir, P. Liang, T. Susnjak and F. Khomh, “A survey of "
            "bugs in AI-generated code,” arXiv:2512.05239, 2025.",
     "kambhampati": "S. Kambhampati et al., “Position: LLMs can’t plan, but can "
                    "help planning in LLM-Modulo frameworks,” in Proc. ICML, "
                    "PMLR 235, 2024.",
-    "zephyr": "Zephyr Project, Devicetree: docs.zephyrproject.org/latest/build/dts",
-    "cubemx": "STMicroelectronics, STM32CubeMX: st.com/en/development-tools/stm32cubemx",
-    "openapi": "OpenAPI Initiative, OpenAPI Specification: spec.openapis.org",
-    "styledict": "Style Dictionary: github.com/style-dictionary/style-dictionary",
-    "kicad": "KiCad EDA. Available at: https://www.kicad.org/",
-    "cpsat": "L. Perron and F. Didier, CP-SAT, Google OR-Tools. Available at: "
-             "https://developers.google.com/optimization/cp/cp_solver",
-    "demillo": "R. A. DeMillo, R. J. Lipton and F. G. Sayward, “Hints on test data "
-               "selection: Help for the practicing programmer,” Computer, vol. 11, "
-               "no. 4, pp. 34–41, 1978.",
+    "zephyr": 'Zephyr Project, Devicetree. https://docs.zephyrproject.org/latest/build/dts/index.html',
+    "cubemx": 'STMicroelectronics, STM32CubeMX. https://www.st.com/en/development-tools/stm32cubemx.html',
+    "openapi": 'OpenAPI Initiative, OpenAPI Specification. https://spec.openapis.org/oas/latest.html',
+    "styledict": 'Style Dictionary. https://github.com/style-dictionary/style-dictionary',
+    "kicad": "KiCad EDA. https://www.kicad.org/",
+    "cpsat": "L. Perron and F. Didier, CP-SAT, Google OR-Tools. "
+              "https://developers.google.com/optimization/cp/cp_solver",
+    "demillo": 'R. A. DeMillo, R. J. Lipton and F. G. Sayward, “Hints on test data selection: Help for the practicing programmer,” Computer, vol. 11, no. 4, pp. 34–41, 1978, doi: 10.1109/C-M.1978.218136.',
 }
 
 # Number references by first citation, as IEEE style requires: [@key] in the
