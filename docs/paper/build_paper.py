@@ -25,8 +25,7 @@ TEMPLATE, FIGS, OUT = sys.argv[1:4]
 # lines stay as the template has them.
 HEADER = ["IEEESTEC – 19th Student Projects Conference, Niš, 2026."]
 
-TITLE = "Fiducial: Keeping Multidisciplinary Products Built with AI Agents Consistent"
-TITLE_PT = 15
+TITLE = "Fiducial: Keeping AI-Built Products Consistent"
 
 AUTHOR = [
     "Aleksa Zdravković",
@@ -575,13 +574,11 @@ children = list(body.iterchildren())
 title = next(p for p in d.paragraphs if p.style is not None
              and p.style.name == "paper title")
 set_text(title, TITLE)
-# One line, centred on the text block. The template's paragraph carried a
-# negative right indent to make up for its 1872-twip margin, which with the
-# body's margins pushes the line off-centre; and its 24 pt needs two lines
-# for a title this long, so it is set at the largest size that fits one.
-title.paragraph_format.left_indent = docx.shared.Twips(0)
-title.paragraph_format.right_indent = docx.shared.Twips(0)
-title.runs[0].font.size = docx.shared.Pt(TITLE_PT)
+# The template centres the title in a box from 900 twips to 836 twips short
+# of the right edge: a 1872-twip right margin and a -1036 indent. The body's
+# margins are set to 907 above, so the indent that keeps the same box is
+# -71; left at -1036 it pushes the title 0.4 in right of centre.
+title._p.pPr.find(qn("w:ind")).set(qn("w:end"), str(-(1036 - (1872 - 907))))
 
 # Author block: one author, one cell, no borders.
 tbl = d.tables[0]

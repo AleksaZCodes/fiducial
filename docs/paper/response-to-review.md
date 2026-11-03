@@ -1,6 +1,6 @@
 # Odgovor recenzentu — IEEESTEC 2026
 
-**Rad:** Fiducial: Keeping Multidisciplinary Products Built with AI Agents Consistent
+**Rad:** Fiducial: Keeping AI-Built Products Consistent
 (ranije: *Fiducial: Build Any Robust Multidisciplinary Product with AI Agents*)
 
 Zahvaljujem recenzentu na pažljivom čitanju i konkretnim predlozima. Ispod je
@@ -43,8 +43,8 @@ i poglavlje II porede Fiducial sa model-based inženjeringom, ECAD–MCAD alatim
 alatima „dizajn kao kod“, jezicima za opis interfejsa, build sistemima i
 kontekst fajlovima za agente.
 
-**3. Preširok naslov i tvrdnje.** Naslov je promenjen u *Fiducial: Keeping
-Multidisciplinary Products Built with AI Agents Consistent*, a formulacije
+**3. Preširok naslov i tvrdnje.** Naslov je skraćen i promenjen u *Fiducial:
+Keeping AI-Built Products Consistent*, a formulacije
 poput „guarantees“ uklonjene su ili ublažene (npr. „many are caught“ umesto
 tvrdnje da se greške uvek otkrivaju).
 

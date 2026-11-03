@@ -86,8 +86,7 @@ solvers, set-point checks, prices and the cut board are in `v0.9.1`, and
 
 For IEEESTEC 2026, on the conference template, in the voice of the author's
 IEEESTEC 2025 paper (Outreach). It cites the release in `Cargo.toml`. After review, its
-title is *Fiducial: Keeping Multidisciplinary Products Built with AI Agents
-Consistent*: the reviewer found "Build Any Robust …" (the platform's thesis,
+title is *Fiducial: Keeping AI-Built Products Consistent*: the reviewer found "Build Any Robust …" (the platform's thesis,
 `thesis.toml`) too broad for two products, and the paper now claims
 consistency between artifacts, not correctness of the declared facts.
 `response-to-review.md` answers the review point by point.
