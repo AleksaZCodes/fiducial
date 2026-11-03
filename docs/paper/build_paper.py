@@ -130,6 +130,16 @@ BODY = [
      "case can be written in minutes, so one person can now attempt a whole "
      "product."),
     ("p",
+     "Such a product is more than code. It has a circuit board and an "
+     "enclosure, firmware that runs on the board, and an app or web page. "
+     "It has text in every language it supports – translations, also called "
+     "internationalization – so a button’s label exists once per language. "
+     "It has a visual identity: colours, fonts and a logo that must look "
+     "the same and stay readable everywhere. These parts look separate, but "
+     "they share facts: a sensor’s pin is on the schematic and in the "
+     "firmware, a brand colour is in the page, the logo and the case, and a "
+     "label must exist in every language."),
+    ("p",
      "Building such products – first Outreach [@outreach], an off-grid "
      "messaging system of radios, gateways, an app and printed cases, and "
      "then the platform described here – has shown where the difficulty has "
