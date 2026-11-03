@@ -268,9 +268,9 @@ BODY = [
      "generated from its declaration by one command and never edited by "
      "hand. Generation is meant to be deterministic, so any difference is "
      "meaningful: the placement search runs on one worker with a fixed seed "
-     "and a pinned solver version. The autorouter is not, so KiCad’s "
-     "design-rule check judges its output. TODO(Alex): confirm the "
-     "freshness check does not hash the routed copper."),
+     "and a pinned solver version. The autorouter is not, so the routed "
+     "board is a build product judged by KiCad’s design-rule check, not a "
+     "hashed artifact."),
     ("p",
      "Check every change. Before a change is accepted, checks confirm that "
      "every artifact still matches what its declarations produce and that "
@@ -380,7 +380,7 @@ BODY = [
      "are run, and the result shows whether they noticed. Each mistake was "
      "applied to a clean copy of one of two products, a fresh web product "
      "in English and Serbian or the sensor stick, and the checks ran as in "
-     "CI. Four sets of 20 were used. The first covers eight kinds of drift "
+     "CI. Of four sets of 20, the first covers eight kinds of drift "
      "met while building Fiducial and was used to develop it, so it is not "
      "an independent test and is left out of the counts. All 60 mistakes of "
      "the other three sets were written by AI agents and committed to the "
@@ -408,8 +408,9 @@ BODY = [
      "runs are too few to show that the checks raise no false alarms. All 60 "
      "mistakes came from AI agents, possibly of the same model family as "
      "the AI that built Fiducial, so they may share its blind spots. The "
-     "sensor stick is designed and checked but not built; TODO(Alex): "
-     "confirm that no product has been manufactured and tested. The test "
+     "sensor stick is designed and checked, but no hardware product has been "
+     "manufactured and tested yet; a private web app built with Fiducial is "
+     "online and tested. The test "
      "measures the checks, not whether agents make fewer mistakes."),
     ("h1", "Conclusion"),
     ("p",
