@@ -1,4 +1,4 @@
-# Injected mistakes, held-out set — fid 0.10.1 (38ae4ea)
+# Injected mistakes, held-out set — fid 0.10.2 (7e2caa1)
 
 Markers caught: **20 / 20**. Controls passed: **0 / 0**.
 

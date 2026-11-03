@@ -105,7 +105,8 @@ consistency between artifacts, not correctness of the declared facts.
   - the fourth (F1–F20, `fourth_cases.py`), by a separate agent, aimed at
     the five classes the third revealed: 14/20 on 0.10.0.
 
-  Every miss fell into one of five classes, each closed by one mechanism
+  All but one miss (F17, a matter of meaning) fell into one of five classes,
+  each closed by one mechanism
   (`docs/specs/2026-11-01-mistakes-are-fixed-by-class.md`); the results
   files hold the current release's runs. `--baseline` runs a set with
   derive and `--check` removed, i.e. ordinary CI (compilers, type checks,

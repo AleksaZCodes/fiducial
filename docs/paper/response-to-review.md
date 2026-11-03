@@ -17,7 +17,7 @@ skupa od po 20 grešaka, svaki sačuvan u repozitorijumu pre prvog pokretanja:
 Pri prvom pokretanju provere su otkrile 15, 16 i 14 od 20 grešaka iz ta tri
 skupa.
 
-Sve promaknute greške spadaju u pet klasa:
+Sve promaknute greške osim jedne spadaju u pet klasa:
 
 - vrednost iz deklaracije ponovo upisana u kod;
 - uklonjena ili zaobiđena provera u CI-ju;
@@ -26,7 +26,7 @@ Sve promaknute greške spadaju u pet klasa:
 - generator koji čita nedeklarisan fajl.
 
 Popravke jedna po jedna dovele su drugi skup do 20/20, ali treći je i dalje
-ostao na 16. Zato je svaka klasa zatvorena jednim mehanizmom. Verzija 0.10.1
+ostao na 16. Zato je svaka klasa zatvorena jednim mehanizmom. Verzija 0.10.2
 otkriva sve greške iz prva tri skupa i 19 od 20 iz četvrtog. Preostala greška
 je značenjska: par boja preimenovan u „veliki tekst“, a nigde nije deklarisano
 koji je tekst veliki.
