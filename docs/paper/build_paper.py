@@ -133,12 +133,22 @@ BODY = [
      "Such a product is more than code. It has a circuit board and an "
      "enclosure, firmware that runs on the board, and an app or web page. "
      "It has text in every language it supports – translations, also called "
-     "internationalization – so a button’s label exists once per language. "
-     "It has a visual identity: colours, fonts and a logo that must look "
-     "the same and stay readable everywhere. These parts look separate, but "
-     "they share facts: a sensor’s pin is on the schematic and in the "
-     "firmware, a brand colour is in the page, the logo and the case, and a "
-     "label must exist in every language."),
+     "internationalization. It has a visual identity of colours, fonts and "
+     "a logo, and a design system: the shared rules that keep its look the "
+     "same and readable everywhere. Around these sit legal pages, "
+     "search-engine metadata, a database schema and deployment settings. "
+     "These parts look separate, but they share facts: a sensor’s pin is on "
+     "the schematic and in the firmware, a brand colour is in the page, the "
+     "logo and the case, and a label must exist in every language."),
+    ("p",
+     "This paper argues that there is a real advantage in centralizing all "
+     "of this: the knowledge, the design system and the conventions in one "
+     "place, and the work in one monorepository, a single repository that "
+     "holds many parts or projects [@monorepo]. Here the board, firmware, "
+     "app and brand live together. Kept in a structured way, they also "
+     "become reusable: a brand declared once supplies its colours, logo and "
+     "3D renderings wherever needed. Fiducial is built on this idea and "
+     "covers all of the above."),
     ("p",
      "Building such products – first Outreach [@outreach], an off-grid "
      "messaging system of radios, gateways, an app and printed cases, and "
@@ -155,9 +165,9 @@ BODY = [
      "checked."),
     ("p",
      "Agents speed this problem up rather than remove it. An agent sees only "
-     "the codebase it works in, and its output is usually right but never "
-     "guaranteed; more code, written faster in more disconnected places, "
-     "gives an inconsistent product sooner."),
+     "the code it works in, and its output is usually right but never "
+     "guaranteed, so more code written faster in more places gives an "
+     "inconsistent product sooner."),
     ("p",
      "What is missing is one shared and checked context for every "
      "discipline: a single place where a product’s facts live, from which "
@@ -179,9 +189,9 @@ BODY = [
      "managing inconsistencies between views [@nuseibeh], [@herzig]. They "
      "are the closest in spirit, but the model lives in a specialised "
      "graphical tool, code is still written by hand beside it, and an agent "
-     "cannot easily work in it. Engineering suites instead link two tools, "
-     "such as a circuit board and its mechanical model [@altium]; the "
-     "firmware, the app and the translations stay outside."),
+     "cannot easily work in it. Engineering suites link two tools, such as a "
+     "circuit board and its mechanical model [@altium]; the firmware, app "
+     "and translations stay outside."),
     ("p",
      "Design-as-code tools write hardware as text – a circuit in atopile "
      "[@atopile], a case in build123d [@build123d] – which makes it writable "
@@ -243,8 +253,7 @@ BODY = [
     ("p",
      "Derive everything else. Every artifact that depends on a fact is "
      "generated from its declaration by one command and never edited by "
-     "hand. Generation is deterministic, so the product is reproducible and "
-     "any difference is meaningful."),
+     "hand. Generation is deterministic, so any difference is meaningful."),
     ("p",
      "Check every change. Before a change is accepted, checks confirm that "
      "every artifact still matches what its declarations produce and that "
@@ -262,8 +271,8 @@ BODY = [
      "These rules change the role of an AI agent: it still edits "
      "declarations and code, but it is no longer trusted to keep anything "
      "consistent. Its mistakes are not prevented, but many are caught before "
-     "they reach the product, with a message precise enough for the agent "
-     "to correct itself. Hence the name: a fiducial is a fixed reference "
+     "they reach the product, with a message precise enough to correct "
+     "itself. Hence the name: a fiducial is a fixed reference "
      "point, a universal measure that everything is aligned to and compared "
      "against, so it stays uniform. The declarations are that reference for "
      "a product."),
@@ -279,9 +288,8 @@ BODY = [
      "enables capabilities. A capability packages one discipline: its "
      "declarations, the generator that turns them into artifacts, its checks "
      f"and instructions for agents. There are {_CAPS}, from web applications "
-     "to firmware and hardware. Because every product has the "
-     "same structure, whoever knows one knows them all, and a new product "
-     "starts from parts that already work. fid upgrade brings platform "
+     "to firmware and hardware. Every product has the same structure, so "
+     "a new one starts from parts that already work. fid upgrade brings platform "
      "improvements into each product while keeping its own edits."),
     ("h2", "One Typed Language Underneath"),
     ("p",
@@ -327,27 +335,18 @@ BODY = [
     ("p",
      "Some generation steps are real engineering problems: where to place "
      "the parts on a board, how to connect them, how to build a case around "
-     "them. The first version used a hand-written search that every new "
-     "product made more tangled. Now the platform only writes the problem "
-     "down and hands it to an "
-     "established engine. A constraint solver, CP-SAT [@cpsat], is given the "
+     "them. Rather than search by hand, the platform writes the problem "
+     "down and hands it to an established engine. A constraint solver, CP-SAT [@cpsat], is given the "
      "rules a placement must satisfy and finds one that does, or proves none "
      "exists; build123d [@build123d] builds the case; KiCad routes and checks the "
      "board. Every placement rule is one of eight general kinds, such as "
      "inside, apart or near, so a new product needs new declarations rather "
      "than new code."),
-    ("fig", "fig2-loop.png",
-     "How a change moves through Fiducial: declarations are edited, "
-     "artifacts are generated with established engines, and the checks "
-     "accept the change or name the declaration at fault."),
-    ("fig", "fig3-sensor-stick.png",
-     "The sensor stick, generated from its declaration: (a) the closed case; "
-     "(b) the routed board inside it, with the sensor under its vent."),
     ("h2", "Agents in the Loop"),
     ("p",
      "Every product carries an AGENTS.md file and one instruction file per "
-     "capability, so any agent starts from the same description of the "
-     "product, and a hook stops it from editing a generated file. Agents fix "
+     "capability, so any agent starts from the same description, and a hook "
+     "stops it editing a generated file. Agents fix "
      "a problem where the fact lives, never in the output. The platform grows "
      "the same way: a mistake that gets past the checks becomes a general "
      "rule for every product."),
@@ -356,8 +355,8 @@ BODY = [
     ("p",
      "The repository contains a complete example: a USB-C stick that "
      "measures temperature and humidity and shows them on a web page "
-     "(Fig. 3), with a printed case, a circuit board, Rust firmware and a "
-     "browser page. The person writes the product declaration, an outline of "
+     "(Fig. 3), with a printed case, a circuit board and Rust firmware. "
+     "The person writes the product declaration, an outline of "
      "its shape, the firmware’s logic and the page; the routed board with "
      "its schematic and bill of materials, the case, the manufacturing files "
      "and the code both sides use to exchange readings are generated. Moving "
@@ -365,10 +364,17 @@ BODY = [
      "the product is regenerated, after which the board, the firmware’s pin "
      "map and the page’s types have all followed with no other edit."),
 
+    ("fig", "fig2-loop.png",
+     "How a change moves through Fiducial: declarations are edited, "
+     "artifacts are generated with established engines, and the checks "
+     "accept the change or name the declaration at fault."),
+    ("fig", "fig3-sensor-stick.png",
+     "The sensor stick, generated from its declaration: (a) the closed case; "
+     "(b) the routed board inside it, with the sensor under its vent."),
     ("h1", "Evaluation"),
     ("p",
-     "Checks are only useful if they catch the mistakes that people and "
-     "agents actually make. The test borrows the idea of mutation testing "
+     "To see whether the checks catch the mistakes that people and agents "
+     "make, the test borrows mutation testing "
      "[@demillo]: a realistic mistake is introduced on purpose, the checks "
      "are run, and the result shows whether they noticed. Each mistake was "
      "applied to a clean copy of one of two products, a fresh web product "
@@ -392,23 +398,22 @@ BODY = [
     ("p",
      "All four sets and their script are in the repository. Only first runs "
      "measure how the checks generalise; the fourth set was aimed at classes "
-     "the author named; and two products have been built, neither yet "
-     "manufactured. The test measures the checks, not whether agents make "
+     "the author named; and only two products have been built. The test "
+     "measures the checks, not whether agents make "
      "fewer mistakes with Fiducial."),
     ("h1", "Conclusion"),
     ("p",
      "AI agents have made writing each part of a product fast, and that has "
      "moved the hard problem to keeping the parts in agreement. Better "
-     "models will move the line between what a person checks and what is "
-     "left to agents, but a probabilistic system cannot guarantee its "
+     "models will move the line between what a person checks and what "
+     "agents do, but a probabilistic system cannot guarantee its "
      "output, and even a deterministic tool is only right about what it was "
      "told. Fiducial answers this at the level of the product rather than "
      "the codebase: it keeps the parts consistent with each other, while "
      "whether each declared fact is true remains the person’s to judge. On "
      "60 mistakes it had not seen, its checks caught "
      f"{_F1['heldout'] + _F1['independent'] + _F1['fourth']} on first run "
-     "where ordinary CI caught none, each with a message that names the "
-     "cause. All but one miss fell into five classes, now each closed by one "
+     "where ordinary CI caught none. All but one miss fell into five classes, now each closed by one "
      f"mechanism, after which {_H + _I + _F} of the 60 are caught; the last "
      "is a matter of meaning, which no declaration states. The next steps "
      "are to test it on mistakes written by other people; to explore "
@@ -467,6 +472,8 @@ REFS = {
     "outreach": "A. Zdravković, Đ. Jovanović and P. Šubarević, “Outreach: Modular "
                 "AI-enhanced off-grid mesh communication system for remote "
                 "environments,” IEEESTEC – 18th Student Projects Conference, Niš, 2025.",
+    "monorepo": "Monorepo, Wikipedia, The Free Encyclopedia. Available at: "
+                "https://en.wikipedia.org/wiki/Monorepo",
     "fiducial": f"A. Zdravković, Fiducial, release {VERSION}, 2026. Available at: "
                 "https://github.com/AleksaZCodes/fiducial",
     "schmidt": "D. C. Schmidt, “Guest editor’s introduction: Model-driven "
