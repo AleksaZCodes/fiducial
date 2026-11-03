@@ -26,6 +26,7 @@ TEMPLATE, FIGS, OUT = sys.argv[1:4]
 HEADER = ["IEEESTEC – 19th Student Projects Conference, Niš, 2026."]
 
 TITLE = "Fiducial: Keeping Multidisciplinary Products Built with AI Agents Consistent"
+TITLE_PT = 15
 
 AUTHOR = [
     "Aleksa Zdravković",
@@ -180,17 +181,6 @@ BODY = [
      "cost would still copy the board’s facts. Interface languages such as "
      "Protocol Buffers [@protobuf] declare a message once for both sides, "
      "which removes the drift met in Outreach, but only for messages."),
-    ("table", "Existing Approaches and Where They Stop",
-     ("Approach", "Keeps in agreement", "Stops at"), [
-        ("Model-based engineering", "views of one model",
-         "graphical tool; code by hand"),
-        ("ECAD–MCAD links", "board and case", "two disciplines, two tools"),
-        ("Design as code", "one discipline", "facts shared with others"),
-        ("Interface languages", "messages, both sides", "everything else"),
-        ("Build systems, CI", "outputs with files", "two files that disagree"),
-        ("Agent context files", "nothing; they advise", "not enforced"),
-        ("Fiducial", "every declared fact", "facts not yet declared"),
-    ], (1500, 1550, 1500)),
     ("p",
      "Build systems such as Bazel [@bazel] and Nix [@nix] rebuild exactly "
      "what changed, identifying results by fingerprints of their inputs. "
@@ -208,6 +198,17 @@ BODY = [
      "without an outside signal [@huang]. A known answer is to pair a "
      "generator that can be wrong with a checker that cannot "
      "[@kambhampati], but no existing checker spans a whole product."),
+    ("table", "Existing Approaches and Where They Stop",
+     ("Approach", "Keeps in agreement", "Stops at"), [
+        ("Model-based engineering", "views of one model",
+         "graphical tool; code by hand"),
+        ("ECAD–MCAD links", "board and case", "two disciplines, two tools"),
+        ("Design as code", "one discipline", "facts shared with others"),
+        ("Interface languages", "messages, both sides", "everything else"),
+        ("Build systems, CI", "outputs with files", "two files that disagree"),
+        ("Agent context files", "nothing; they advise", "not enforced"),
+        ("Fiducial", "every declared fact", "facts not yet declared"),
+    ], (1500, 1550, 1500)),
     ("p",
      "Fiducial keeps what works in each – text that agents can write, "
      "outputs tied to inputs by fingerprints, established engines for hard "
@@ -451,7 +452,7 @@ FINDINGS_B = (
 )
 
 REFS = {
-    "claude": "Claude Code documentation. Available at: "
+    "claude": "Anthropic, “Claude Code documentation,” 2026. Available at: "
               "https://docs.anthropic.com/en/docs/claude-code",
     "codex": "OpenAI Codex. Available at: https://openai.com/codex/",
     "outreach": "A. Zdravković, Đ. Jovanović and P. Šubarević, “Outreach: Modular "
@@ -574,6 +575,13 @@ children = list(body.iterchildren())
 title = next(p for p in d.paragraphs if p.style is not None
              and p.style.name == "paper title")
 set_text(title, TITLE)
+# One line, centred on the text block. The template's paragraph carried a
+# negative right indent to make up for its 1872-twip margin, which with the
+# body's margins pushes the line off-centre; and its 24 pt needs two lines
+# for a title this long, so it is set at the largest size that fits one.
+title.paragraph_format.left_indent = docx.shared.Twips(0)
+title.paragraph_format.right_indent = docx.shared.Twips(0)
+title.runs[0].font.size = docx.shared.Pt(TITLE_PT)
 
 # Author block: one author, one cell, no borders.
 tbl = d.tables[0]
