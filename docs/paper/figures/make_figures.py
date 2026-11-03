@@ -77,7 +77,7 @@ def render(name, markup):
 def fig1():
     """(a) and (b) side by side, so the figure is short enough for the foot
     of the first column."""
-    outputs = ["schematic", "board", "firmware", "web page"]
+    outputs = ["firmware", "page", "database", "docs"]
     step, bh = 60, 48            # an output box every 60 units, 48 tall
     top = 52                     # below the panel letters
     mid = top + (3 * step + bh) / 2
@@ -86,19 +86,19 @@ def fig1():
         b = [text(x0, 34, letter, anchor="start")]
         b.append(box(x0, mid - 46, 170, 92, fill=src_fill))
         b.append(text(x0 + 85, mid - 8, src_label))
-        b.append(text(x0 + 85, mid + 32, "GPIO 4", family=MONO))
+        b.append(text(x0 + 85, mid + 32, "0.01", family=MONO))
         for i, name in enumerate(outputs):
             y = top + i * step
-            wrong = bad and i == 2
+            wrong = bad and i == 0
             c = RED if wrong else INK
             b.append(box(x0 + 232, y, 240, bh, stroke=c))
             b.append(text(x0 + 244, y + 34, name, anchor="start", fill=c))
-            b.append(text(x0 + 460, y + 34, "8" if wrong else "4", family=MONO,
+            b.append(text(x0 + 460, y + 34, "0.1" if wrong else "0.01", family=MONO,
                           anchor="end", fill=c))
             b.append(arrow(x0 + 170, mid, x0 + 228, y + bh / 2))
         return b
 
-    a = panel(6, "(a)", "white", "SDA pin", True)
+    a = panel(6, "(a)", "white", "scale", True)
     bb = panel(520, "(b)", "#f2f2f2", "declared", False)
     end = top + 3 * step + bh
     a.append(text(242, end + 42, "copied by hand", style="italic"))
