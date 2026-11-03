@@ -192,12 +192,12 @@ BODY = [
 
     ("h1", "Existing Approaches"),
     ("p",
-     "Several kinds of tool address parts of this problem; each keeps one "
-     "kind of fact, or one pair of disciplines, in agreement (Table I)."),
+     "Several kinds of tool address parts of this problem, each keeping one "
+     "kind of fact in agreement (Table I)."),
     ("p",
      "Model-driven and model-based systems engineering keep a design in one "
      "central model and generate or check other views from it [@schmidt], "
-     "[@brambilla], in languages such as the Systems Modeling Language (SysML) [@sysml], with methods for "
+     "in languages such as the Systems Modeling Language (SysML) [@sysml], with methods for "
      "managing inconsistencies between views [@nuseibeh], [@herzig]. They "
      "are the closest in spirit, but the model lives in a specialized "
      "graphical tool, code is still written by hand beside it, and an agent "
@@ -226,8 +226,8 @@ BODY = [
      "Coding agents follow context files such as AGENTS.md [@agentsmd], "
      "which describe a repository’s rules but do not enforce them, and "
      "their output is probabilistic and not guaranteed: a review of 72 "
-     "studies classifies the kinds of bugs found in AI-generated code "
-     "[@gao]. A known answer is to pair a "
+     "studies finds functional bugs, including logic and semantic errors, "
+     "the most common kind in AI-generated code [@gao]. A known answer is to pair a "
      "generator that can be wrong with a checker that cannot "
      "[@kambhampati], but we know of no existing checker that spans a whole "
      "product."),
@@ -304,8 +304,8 @@ BODY = [
      "fid new creates a product repository with a fixed layout, and fid add "
      "enables capabilities. A capability packages one discipline: its "
      "declarations, the generator that turns them into artifacts, its checks "
-     f"and instructions for agents. There are {_CAPS}, from web applications "
-     "to firmware and hardware. Every product has the same structure, so "
+     f"and instructions for agents. There are {_CAPS}, from web "
+     "applications to hardware. Every product has the same structure, so "
      "a new one starts from parts that already work. Each also carries an "
      "AGENTS.md file and one instruction file per capability, and a hook "
      "stops an agent editing a generated file; a mistake that gets past the "
@@ -488,8 +488,6 @@ REFS = {
                 "https://github.com/AleksaZCodes/fiducial",
     "schmidt": "D. C. Schmidt, “Guest editor’s introduction: Model-driven "
                "engineering,” Computer, vol. 39, no. 2, pp. 25–31, 2006.",
-    "brambilla": "M. Brambilla, J. Cabot and M. Wimmer, Model-Driven Software "
-                 "Engineering in Practice, 2nd ed. Morgan & Claypool, 2017.",
     "sysml": "S. Friedenthal, A. Moore and R. Steiner, A Practical Guide to "
              "SysML, 3rd ed. Morgan Kaufmann, 2014.",
     "nuseibeh": "B. Nuseibeh, S. Easterbrook and A. Russo, “Leveraging "
