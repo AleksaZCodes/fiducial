@@ -225,9 +225,9 @@ BODY = [
     ("p",
      "Coding agents follow context files such as AGENTS.md [@agentsmd], "
      "which describe a repository’s rules but do not enforce them, and "
-     "their output is probabilistic and not guaranteed: a survey of 72 "
-     "studies finds functional bugs, mostly in logic and meaning, the most "
-     "common kind in AI-generated code [@gao]. A known answer is to pair a "
+     "their output is probabilistic and not guaranteed: a review of 72 "
+     "studies classifies the kinds of bugs found in AI-generated code "
+     "[@gao]. A known answer is to pair a "
      "generator that can be wrong with a checker that cannot "
      "[@kambhampati], but we know of no existing checker that spans a whole "
      "product."),
@@ -273,7 +273,8 @@ BODY = [
      "hashed artifact."),
     ("p",
      "Check every change. Before a change is accepted, checks confirm that "
-     "every artifact still matches what its declarations produce and that "
+     "every hashed artifact still matches what its declarations produce "
+     "(the routed board is judged by KiCad’s design-rule check) and that "
      "the declarations are valid; a failure names the declaration and the "
      "file at fault."),
     ("p",
@@ -287,7 +288,8 @@ BODY = [
      "These rules change the role of an AI agent: it still edits "
      "declarations and code, but it is no longer trusted to keep anything "
      "consistent. Many of its mistakes are caught before they reach the "
-     "product, with a message precise enough to correct itself. Hence the "
+     "product, with a message such as “field `author` is not in the "
+     "collection’s schema”, meant to be precise enough to correct itself. Hence the "
      "name: a fiducial is a fixed reference point that everything is "
      "aligned to and compared against. The declarations are that reference "
      "for a product."),
@@ -328,7 +330,7 @@ BODY = [
      "capability’s generator, from a typed module of translations to a "
      "firmware pin map or a KiCad circuit board [@kicad]. A lock file "
      "records a cryptographic hash (a short fingerprint of a file’s "
-     "contents) for every input and output, so the platform knows what each "
+     "contents) for every input and every deterministic output, so the platform knows what each "
      "artifact was made from."),
     ("h2", "Checks"),
     ("p",
@@ -374,8 +376,7 @@ BODY = [
      "(b) the routed board inside it, with the sensor under its vent."),
     ("h1", "Evaluation"),
     ("p",
-     "To see whether the checks catch the mistakes that people and agents "
-     "make, the test borrows mutation testing "
+     "To see whether the checks catch realistic mistakes, the test borrows mutation testing "
      "[@demillo]: a realistic mistake is introduced on purpose, the checks "
      "are run, and the result shows whether they noticed. Each mistake was "
      "applied to a clean copy of one of two products, a fresh web product "
@@ -394,8 +395,8 @@ BODY = [
      "derive and check steps. That CI compares no artifact against another, "
      "so its 0 of 60 shows the gap Fiducial fills, not a flaw in those tools. "
      "Correct changes tested that the checks do not fail without a reason. "
-     f"Table II gives the results; Fiducial {RES_VERSION} is the release "
-     "after the fixes."),
+     f"Table II gives the results, with set 1, the development set, shown but "
+     f"not counted; Fiducial {RES_VERSION} is the release after the fixes."),
     ("table", "Injected Mistakes Caught",
      ("Mistakes", "CI alone", "First run", "After fixes, same sets"), "TABLE1",
      (1500, 800, 900, 1460)),
@@ -408,9 +409,8 @@ BODY = [
      "runs are too few to show that the checks raise no false alarms. All 60 "
      "mistakes came from AI agents, possibly of the same model family as "
      "the AI that built Fiducial, so they may share its blind spots. The "
-     "sensor stick is designed and checked, but no hardware product has been "
-     "manufactured and tested yet; a private web app built with Fiducial is "
-     "online and tested. The test "
+     "web product is online and tested; the sensor stick is designed and "
+     "checked, but not yet manufactured and tested. The test "
      "measures the checks, not whether agents make fewer mistakes."),
     ("h1", "Conclusion"),
     ("p",
