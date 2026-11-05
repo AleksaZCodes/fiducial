@@ -66,8 +66,10 @@ fn every_software_capability_derives_and_checks_clean_out_of_the_box() {
         root.join("content/posts/sr").is_dir(),
         "the sample post was not given to sr"
     );
+    let sitemap = std::fs::read_to_string(root.join("apps/web/public/sitemap.xml"))
+        .expect("the sitemap exists");
     assert!(
-        !root.join("public/sitemap.xml").exists(),
-        "brand wrote a second sitemap beside seo's"
+        sitemap.contains("xhtml:link"),
+        "the sitemap is brand's one-URL file, not seo's route list:\n{sitemap}"
     );
 }

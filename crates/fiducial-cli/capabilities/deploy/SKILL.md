@@ -52,12 +52,42 @@ next derive. That is the point: one selection, one place.
 
 ## What is being deployed — `shape`
 
-Two things get deployed to Cloudflare and they are not the same artifact.
+Three things get deployed to Cloudflare and they are not the same artifact.
 
 | `shape` | What it is | `main` | Config lives at |
 |---|---|---|---|
 | `worker` (default) | a standalone Worker at `apps/worker/` | `src/index.ts` — a source file this repo wrote | `apps/worker/wrangler.toml` |
 | `sveltekit` | `apps/web` **is** the Worker, via `@sveltejs/adapter-cloudflare` | `.svelte-kit/cloudflare/_worker.js` — *build output* | the product root |
+| `nextjs` | `apps/web` **is** the Worker, via `@opennextjs/cloudflare` | `.open-next/worker.js` — *build output* | `apps/web/wrangler.jsonc` |
+
+### `nextjs`
+
+Set `shape = "nextjs"` and point `pipelines/deploy.toml`'s `outputs` at
+`apps/web/wrangler.jsonc`. Assets default to `.open-next/assets` bound as
+`ASSETS`, and the name defaults to the product name, as for `sveltekit`.
+
+The capability derives the wrangler config and nothing else. The product still
+adds, in `apps/web`:
+
+```sh
+pnpm add @opennextjs/cloudflare
+pnpm add -D wrangler
+```
+
+an `open-next.config.ts` containing `defineCloudflareConfig()` from
+`@opennextjs/cloudflare`, and two scripts:
+
+```json
+"preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+"deploy":  "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+```
+
+`.open-next/` and `.wrangler/` are build output and are gitignored in a new
+product; ignore them in `biome.json` too, or the linter walks the bundle.
+
+No `route` is written unless `[deploy] route` is declared. A route with a custom
+domain makes `wrangler deploy` create the DNS record, so a first deploy goes to
+`workers.dev` and attaching the domain is a deliberate edit.
 
 Before `shape` existed this capability could only describe the first one, so
 installing it on a SvelteKit product wrote an `apps/worker/wrangler.toml`

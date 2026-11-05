@@ -90,24 +90,24 @@ fn derive_writes_all_five_artifacts() {
     let tmp = tempfile::tempdir().unwrap();
     let root = branded_product(tmp.path());
 
-    let robots = std::fs::read_to_string(root.join("public/robots.txt")).unwrap();
+    let robots = std::fs::read_to_string(root.join("apps/web/public/robots.txt")).unwrap();
     assert!(
         robots.contains("Sitemap: https://example.com/sitemap.xml"),
         "{robots}"
     );
 
-    let sitemap = std::fs::read_to_string(root.join("public/sitemap.xml")).unwrap();
+    let sitemap = std::fs::read_to_string(root.join("apps/web/public/sitemap.xml")).unwrap();
     assert!(sitemap.contains("https://example.com/"), "{sitemap}");
 
-    let manifest = std::fs::read_to_string(root.join("public/site.webmanifest")).unwrap();
+    let manifest = std::fs::read_to_string(root.join("apps/web/public/site.webmanifest")).unwrap();
     let manifest: serde_json::Value = serde_json::from_str(&manifest).unwrap();
     assert_eq!(manifest["name"], "Example");
 
-    let favicon = std::fs::read_to_string(root.join("public/favicon.svg")).unwrap();
+    let favicon = std::fs::read_to_string(root.join("apps/web/public/favicon.svg")).unwrap();
     assert!(favicon.contains("<svg"), "{favicon}");
     assert!(favicon.contains('E'), "initials render: {favicon}");
 
-    let jsonld = std::fs::read_to_string(root.join("public/organization.jsonld")).unwrap();
+    let jsonld = std::fs::read_to_string(root.join("apps/web/public/organization.jsonld")).unwrap();
     let jsonld: serde_json::Value = serde_json::from_str(&jsonld).unwrap();
     assert_eq!(jsonld["@type"], "Organization");
     assert_eq!(jsonld["name"], "Example LLC");
@@ -127,10 +127,10 @@ fn a_changed_declaration_regenerates_every_output() {
     );
     assert!(run(&root, &["derive"]).status.success());
 
-    let robots = std::fs::read_to_string(root.join("public/robots.txt")).unwrap();
+    let robots = std::fs::read_to_string(root.join("apps/web/public/robots.txt")).unwrap();
     assert!(robots.contains("acme.dev"), "{robots}");
 
-    let favicon = std::fs::read_to_string(root.join("public/favicon.svg")).unwrap();
+    let favicon = std::fs::read_to_string(root.join("apps/web/public/favicon.svg")).unwrap();
     assert!(favicon.contains("AR"), "{favicon}");
 }
 
@@ -176,7 +176,7 @@ fn check_catches_a_hand_edited_output() {
     let tmp = tempfile::tempdir().unwrap();
     let root = branded_product(tmp.path());
 
-    std::fs::write(root.join("public/robots.txt"), "hand-edited\n").unwrap();
+    std::fs::write(root.join("apps/web/public/robots.txt"), "hand-edited\n").unwrap();
     let out = run(&root, &["derive", "--check"]);
     assert!(!out.status.success());
     assert!(text(&out).contains("robots.txt"));

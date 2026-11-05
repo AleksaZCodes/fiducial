@@ -539,6 +539,45 @@ fn the_sveltekit_shape_injects_no_variable_of_its_own() {
     );
 }
 
+/// A Next.js product deployed through `@opennextjs/cloudflare`: `apps/web` is
+/// the Worker, and both its entrypoint and its assets are `.open-next/`
+/// build output.
+///
+/// The shape did not exist, so a Next.js product could only declare a
+/// standalone Worker whose `src/index.ts` is a file it does not have, and kept
+/// its real `wrangler.jsonc` untracked and hand-written.
+#[test]
+fn the_nextjs_shape_points_at_opennexts_build_output() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = sveltekit_product(tmp.path());
+    let config_path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&config_path).unwrap();
+    std::fs::write(
+        &config_path,
+        config
+            .replace("shape = \"sveltekit\"", "shape = \"nextjs\"")
+            .replace("upoznaj-biznis", "aleksa-works"),
+    )
+    .unwrap();
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "fid derive: {}", text(&out));
+
+    let cfg = std::fs::read_to_string(root.join("wrangler.jsonc")).expect("wrangler.jsonc");
+    assert!(cfg.contains("\".open-next/worker.js\""), "{cfg}");
+    assert!(
+        cfg.contains("\"directory\": \".open-next/assets\""),
+        "{cfg}"
+    );
+    assert!(cfg.contains("\"binding\": \"ASSETS\""), "{cfg}");
+    assert!(cfg.contains("\"name\": \"aleksa-works\""), "{cfg}");
+    assert!(!cfg.contains("src/index.ts"), "{cfg}");
+    assert!(!cfg.contains(".svelte-kit"), "{cfg}");
+    assert!(
+        !cfg.contains("FIDUCIAL_PRODUCT"),
+        "the web app already imports the brand module: {cfg}"
+    );
+}
+
 /// The Worker shape keeps it: there, the name is `<product>-worker` and no
 /// bundle carries the product's identity, so the variable is the only thing
 /// that does.

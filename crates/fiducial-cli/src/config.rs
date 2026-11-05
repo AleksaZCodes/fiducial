@@ -459,7 +459,7 @@ pub struct Deploy {
 
     /// Where the adapter writes the static assets it wants served.
     ///
-    /// Only read for `shape = "sveltekit"`, and defaulted to the adapter's own
+    /// Only read for `shape = "sveltekit"` and `"nextjs"`, and defaulted to the adapter's own
     /// output directory — a product that has not moved it declares nothing.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub assets_directory: String,
@@ -509,6 +509,8 @@ pub enum DeployShape {
     Worker,
     /// A SvelteKit app deployed through `@sveltejs/adapter-cloudflare`.
     SvelteKit,
+    /// A Next.js app deployed through `@opennextjs/cloudflare`.
+    NextJs,
 }
 
 impl Deploy {
@@ -536,18 +538,24 @@ impl Deploy {
         match self.shape.as_str() {
             "" | "worker" => Ok(DeployShape::Worker),
             "sveltekit" => Ok(DeployShape::SvelteKit),
+            "nextjs" => Ok(DeployShape::NextJs),
             other => bail!(
                 "[deploy] shape = \"{other}\" is not a shape this executor knows. \
-                 Use \"worker\" (a standalone Worker at apps/worker/) or \
-                 \"sveltekit\" (apps/web IS the Worker, via adapter-cloudflare)."
+                 Use \"worker\" (a standalone Worker at apps/worker/), \
+                 \"sveltekit\" (apps/web IS the Worker, via adapter-cloudflare) or \
+                 \"nextjs\" (apps/web IS the Worker, via @opennextjs/cloudflare)."
             ),
         }
     }
 
-    /// Where `@sveltejs/adapter-cloudflare` writes what it wants served.
-    pub fn resolved_assets_directory(&self) -> &str {
+    /// Where the shape's adapter writes what it wants served: SvelteKit's
+    /// `.svelte-kit/cloudflare`, OpenNext's `.open-next/assets`.
+    pub fn resolved_assets_directory(&self, shape: DeployShape) -> &str {
         if self.assets_directory.is_empty() {
-            ".svelte-kit/cloudflare"
+            match shape {
+                DeployShape::NextJs => ".open-next/assets",
+                DeployShape::SvelteKit | DeployShape::Worker => ".svelte-kit/cloudflare",
+            }
         } else {
             &self.assets_directory
         }
