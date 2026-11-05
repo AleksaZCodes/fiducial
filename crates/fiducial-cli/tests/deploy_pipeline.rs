@@ -592,3 +592,88 @@ fn the_worker_shape_still_names_its_product() {
         wrangler(&root)
     );
 }
+
+// ── Custom domains and workers.dev ───────────────────────────────────────────
+//
+// `route` renders wrangler's `route`, which is a **zone** route: it matches
+// traffic already arriving at Cloudflare and creates no DNS record. For a
+// product whose Worker *is* the site that is almost never what is meant, and it
+// was the only thing `[deploy]` could say — so `aleksa.works` hand-edited its
+// derived `wrangler.jsonc` to get a custom domain, which is the one thing this
+// capability exists to prevent.
+
+/// `custom_domain = true` switches the single `route` string for the `routes`
+/// entry that makes Cloudflare create the record and the certificate.
+#[test]
+fn a_custom_domain_route_renders_as_a_routes_entry() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = sveltekit_product(tmp.path());
+    let config_path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&config_path).unwrap();
+    std::fs::write(
+        &config_path,
+        config.replace(
+            "[deploy]\n",
+            "[deploy]\nroute = \"aleksa.works\"\ncustom_domain = true\n",
+        ),
+    )
+    .unwrap();
+    assert!(run(&root, &["derive"]).status.success());
+
+    let cfg = std::fs::read_to_string(root.join("wrangler.jsonc")).expect("wrangler.jsonc");
+    assert!(cfg.contains("\"custom_domain\": true"), "{cfg}");
+    assert!(cfg.contains("\"pattern\": \"aleksa.works\""), "{cfg}");
+    assert!(
+        !cfg.contains("\"route\":"),
+        "a zone route and a custom domain are different fields, not two \
+         spellings of one: {cfg}"
+    );
+}
+
+/// Without the flag, `route` keeps meaning exactly what it has always meant.
+/// An existing product's generated config must not change shape underneath it.
+#[test]
+fn a_plain_route_is_still_a_zone_route() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = sveltekit_product(tmp.path());
+    let config_path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&config_path).unwrap();
+    std::fs::write(
+        &config_path,
+        config.replace("[deploy]\n", "[deploy]\nroute = \"aleksa.works/*\"\n"),
+    )
+    .unwrap();
+    assert!(run(&root, &["derive"]).status.success());
+
+    let cfg = std::fs::read_to_string(root.join("wrangler.jsonc")).expect("wrangler.jsonc");
+    assert!(cfg.contains("\"route\": \"aleksa.works/*\""), "{cfg}");
+    assert!(!cfg.contains("custom_domain"), "{cfg}");
+}
+
+/// Declaring any route flips wrangler's `workers_dev` default to off, silently,
+/// which takes down the URL a deploy gets checked against. So it is declarable,
+/// and *omitted* when undeclared — stating `false` is not the same as saying
+/// nothing.
+#[test]
+fn workers_dev_is_written_only_when_declared() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = sveltekit_product(tmp.path());
+    let config_path = root.join("fiducial.toml");
+    let before = std::fs::read_to_string(&config_path).unwrap();
+
+    assert!(run(&root, &["derive"]).status.success());
+    let cfg = std::fs::read_to_string(root.join("wrangler.jsonc")).unwrap();
+    assert!(
+        !cfg.contains("workers_dev"),
+        "undeclared must mean absent, not false: {cfg}"
+    );
+
+    std::fs::write(
+        &config_path,
+        before.replace("[deploy]\n", "[deploy]\nworkers_dev = true\n"),
+    )
+    .unwrap();
+    assert!(run(&root, &["derive"]).status.success());
+    let cfg = std::fs::read_to_string(root.join("wrangler.jsonc")).unwrap();
+    assert!(cfg.contains("\"workers_dev\": true"), "{cfg}");
+}

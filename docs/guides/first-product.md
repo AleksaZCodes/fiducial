@@ -122,6 +122,7 @@ $ fid doctor
   ✓ no pending codemod migrations
   ✓ tooling: 1 command(s) present
   ✓ CI runs `fid derive --check` for this product
+  ✓ CI pins fiducial-cli X.Y.Z
 
 ✦ fiducial doctor: clean
 ```

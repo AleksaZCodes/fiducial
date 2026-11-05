@@ -472,6 +472,42 @@ pub struct Deploy {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub route: String,
 
+    /// Whether `route` is a **custom domain** rather than a zone route.
+    ///
+    /// The distinction is not cosmetic, and getting it wrong fails the deploy
+    /// rather than producing something subtly off:
+    ///
+    /// - A **zone route** (`"route": "example.com/*"`) matches traffic that
+    ///   already arrives at Cloudflare. It needs a proxied DNS record for that
+    ///   hostname to exist, and `wrangler deploy` will not create one. On a
+    ///   registrar's parked apex it fails with `code: 100117`.
+    /// - A **custom domain** (`"routes": [{ "pattern": …, "custom_domain":
+    ///   true }]`) makes Cloudflare create the DNS record and issue the
+    ///   certificate itself.
+    ///
+    /// For a product whose Worker *is* the site — `sveltekit` and `nextjs` —
+    /// the custom domain is almost always what is meant, and it was
+    /// inexpressible here until this field existed. `aleksa.works` therefore
+    /// hand-edited the derived `wrangler.jsonc`, which is the single thing this
+    /// capability exists to prevent.
+    ///
+    /// Left `false` so an existing product's generated config does not change
+    /// shape under it: a zone route is what `route` has always meant.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub custom_domain: bool,
+
+    /// Whether the Worker also answers on its `workers.dev` subdomain.
+    ///
+    /// `None` means "do not write the field", which is not the same as `false`:
+    /// wrangler's own default is on when no route is declared and **off when
+    /// one is**, so a product that declares a route silently loses the URL it
+    /// has been checking deploys against. That happened on the first
+    /// `aleksa.works` custom-domain deploy and took the preview URL down with
+    /// it, which is why this is declarable at all rather than left to the
+    /// default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workers_dev: Option<bool>,
+
     /// What is being deployed — and it is not the same artifact in both cases.
     ///
     /// `worker` (the default) is a standalone Worker at `apps/worker/`, whose
