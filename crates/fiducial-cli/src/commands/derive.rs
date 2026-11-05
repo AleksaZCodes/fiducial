@@ -1438,6 +1438,13 @@ struct DeployPlan {
     compatibility_date: String,
     compatibility_flags: Vec<String>,
     route: String,
+    /// Whether `route` is a custom domain rather than a zone route. The two are
+    /// different wrangler fields, not two spellings of one.
+    custom_domain: bool,
+    /// Whether to state `workers_dev` at all, and what to state. `None` leaves
+    /// it out, which is not `Some(false)` — wrangler's default flips to off the
+    /// moment a route is declared.
+    workers_dev: Option<bool>,
     /// `(directory, binding)` for a SvelteKit product's static assets.
     assets: Option<(String, String)>,
     observability: bool,
@@ -1592,6 +1599,8 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
         compatibility_date: d.compatibility_date.clone(),
         compatibility_flags: d.compatibility_flags.clone(),
         route: d.route.clone(),
+        custom_domain: d.custom_domain,
+        workers_dev: d.workers_dev,
         assets,
         observability: d.observability,
         vars,
@@ -1635,7 +1644,22 @@ fn render_wrangler_toml(p: &DeployPlan) -> String {
         out.push_str(&format!("compatibility_flags = [{}]\n", flags.join(", ")));
     }
     if !p.route.is_empty() {
-        out.push_str(&format!("\nroute = \"{}\"\n", p.route));
+        if p.custom_domain {
+            // Cloudflare creates the DNS record and the certificate for a
+            // custom domain. A bare `route` is a zone route and does neither.
+            out.push_str(&format!(
+                "\n# Cloudflare creates the DNS record and certificate for this.\n\
+                 [[routes]]\npattern = \"{}\"\ncustom_domain = true\n",
+                p.route
+            ));
+        } else {
+            out.push_str(&format!("\nroute = \"{}\"\n", p.route));
+        }
+    }
+    if let Some(on) = p.workers_dev {
+        // Stated rather than left default: declaring any route flips wrangler's
+        // default to off, silently.
+        out.push_str(&format!("\nworkers_dev = {on}\n"));
     }
     if p.observability {
         out.push_str("\n[observability]\nenabled = true\n");
@@ -1721,7 +1745,19 @@ fn render_wrangler_jsonc(p: &DeployPlan) -> String {
         fields.push(format!("  \"compatibility_flags\": [{}]", flags.join(", ")));
     }
     if !p.route.is_empty() {
-        fields.push(format!("  \"route\": {}", q(&p.route)));
+        if p.custom_domain {
+            fields.push(format!(
+                "  // Cloudflare creates the DNS record and certificate for this.\n  \"routes\": [{{ \"pattern\": {}, \"custom_domain\": true }}]",
+                q(&p.route)
+            ));
+        } else {
+            fields.push(format!("  \"route\": {}", q(&p.route)));
+        }
+    }
+    if let Some(on) = p.workers_dev {
+        fields.push(format!(
+            "  // Stated, not defaulted: declaring a route turns this off.\n  \"workers_dev\": {on}"
+        ));
     }
     if p.observability {
         fields.push("  \"observability\": { \"enabled\": true }".to_string());

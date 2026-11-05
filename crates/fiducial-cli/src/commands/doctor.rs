@@ -84,6 +84,9 @@ pub fn run() -> Result<()> {
         issues.extend(gate.into_iter().map(|g| g.trim().to_string()));
     }
 
+    // ── 13. Is the `fid` version CI installs still current? ───────────────
+    check_ci_pin(&root, &mut warnings, &mut ok);
+
     // ── Report ────────────────────────────────────────────────────────────
     for msg in &ok {
         println!("  ✓ {msg}");
@@ -555,6 +558,79 @@ fn check_upstream_templates(
     }
 }
 
+/// The `fiducial-cli` version CI installs, against the one this binary is.
+///
+/// # Why this is not covered by the template check
+///
+/// `ci.yml` carries the platform version as a `{{version}}` stamp, and
+/// `templates::upstream_changed` compares a template at the version the product
+/// *recorded* precisely so that a moving stamp does not read as drift. That is
+/// right for every other template and wrong for this one line, because here the
+/// version is not a stamp — it is the whole behaviour. The pin decides which
+/// `fid` runs the gate.
+///
+/// So the pin goes stale silently, and the failure is specific and confusing:
+/// CI installs an old `fid` that does not know a field the product now declares,
+/// and the gate fails on the *product* for being invalid rather than on itself
+/// for being old. `aleksa-works` pinned 0.9.4 against a config declaring
+/// `shape = "nextjs"`, which 0.9.4 rejects by name — the error named the
+/// product's config, not the pin.
+///
+/// # Why a warning and not an issue
+///
+/// An older pin is a correct state while a product is deliberately held back,
+/// and a newer one is normal for a few minutes after a release. Neither is a
+/// broken repository, so neither should fail `fid doctor`. What is not
+/// acceptable is finding out from a red CI run.
+///
+/// A missing or unparseable workflow is silent: `crate::gate` already reports a
+/// product whose CI does not run the gate at all, and saying it twice trains
+/// people to skim.
+fn check_ci_pin(root: &Path, warnings: &mut Vec<String>, ok: &mut Vec<String>) {
+    let path = root.join(".github/workflows/ci.yml");
+    let Ok(body) = std::fs::read_to_string(&path) else {
+        return;
+    };
+
+    let Some(pinned) = pinned_cli_version(&body) else {
+        return;
+    };
+
+    if pinned == PLATFORM_VERSION {
+        ok.push(format!("CI pins fiducial-cli {PLATFORM_VERSION}"));
+    } else {
+        warnings.push(format!(
+            ".github/workflows/ci.yml pins fiducial-cli {pinned}, but this is \
+             {PLATFORM_VERSION} — CI is gating with a different `fid` than you are. \
+             Edit the `cargo install fiducial-cli --version` line to {PLATFORM_VERSION}. \
+             `fid upgrade` leaves it alone on purpose, so nothing else will."
+        ));
+    }
+}
+
+/// The version in a `cargo install fiducial-cli --version <v>` line, if any.
+///
+/// Deliberately a scan for the two tokens rather than a YAML parse: the line may
+/// be a `run:` scalar, a block, or one command in a `&&` chain, and a parser
+/// that understands all three is more to get wrong than this is. A commented-out
+/// line is skipped, because a product that has commented the install out has
+/// already told `crate::gate` it is not running the gate.
+fn pinned_cli_version(body: &str) -> Option<String> {
+    body.lines()
+        .map(str::trim)
+        .filter(|l| !l.starts_with('#'))
+        .filter(|l| l.contains("cargo install") && l.contains("fiducial-cli"))
+        .find_map(|l| {
+            let mut toks = l.split_whitespace();
+            while let Some(t) = toks.next() {
+                if t == "--version" {
+                    return toks.next().map(|v| v.trim_matches('"').to_string());
+                }
+            }
+            None
+        })
+}
+
 fn check_pending_migrations(
     cfg: &Config,
     lock: &Lock,
@@ -728,4 +804,45 @@ pub(crate) fn platform_drift(root: &Path, lock: &Lock, enabled: &[String]) -> (V
     }
 
     (drifted, owned_edits)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pinned_cli_version;
+
+    #[test]
+    fn reads_the_version_from_the_scaffolded_install_step() {
+        let y = "      - name: Install fid\n        run: cargo install fiducial-cli --version 0.9.4 --locked\n";
+        assert_eq!(pinned_cli_version(y).as_deref(), Some("0.9.4"));
+    }
+
+    /// The line may be one command in a chain rather than the whole `run:`.
+    #[test]
+    fn reads_it_out_of_a_chained_command() {
+        let y =
+            "        run: rustup update && cargo install fiducial-cli --version 0.10.5 --locked\n";
+        assert_eq!(pinned_cli_version(y).as_deref(), Some("0.10.5"));
+    }
+
+    /// A commented-out install is not a pin. `crate::gate` already reports a
+    /// product whose CI does not run the gate, and saying it twice teaches
+    /// people to skim both.
+    #[test]
+    fn a_commented_out_install_is_not_a_pin() {
+        let y = "      # run: cargo install fiducial-cli --version 0.9.4 --locked\n";
+        assert_eq!(pinned_cli_version(y), None);
+    }
+
+    /// An unpinned install has no version to compare, and `no-unpinned-cli-fetch`
+    /// is the rule that cares about it.
+    #[test]
+    fn an_unpinned_install_yields_nothing() {
+        let y = "        run: cargo install fiducial-cli --locked\n";
+        assert_eq!(pinned_cli_version(y), None);
+    }
+
+    #[test]
+    fn a_workflow_without_the_install_yields_nothing() {
+        assert_eq!(pinned_cli_version("jobs:\n  ci:\n    steps: []\n"), None);
+    }
 }
