@@ -3,8 +3,9 @@
 //!
 //! Three properties, because each fails differently:
 //!
-//! 1. A scaffolded product has the switch, on. "It should be there" is only
-//!    true if a fresh `fid new` carries it.
+//! 1. A scaffolded product has the switch, on, and its agent instructions ask
+//!    for review. "It should be there" is only true if a fresh `fid new`
+//!    carries it. Its CI does not run it: see the test for why.
 //! 2. `--no-advise` sets the starting value and does not make a one-time
 //!    decision: editing the line flips review either way later.
 //! 3. Switching it off asks nothing, and changes nothing a build reads.
@@ -44,7 +45,7 @@ fn config(root: &Path) -> String {
 }
 
 #[test]
-fn a_new_product_has_review_on_and_the_pipeline_asks_for_it() {
+fn a_new_product_has_review_on_and_the_agent_is_told_to_run_it_but_ci_is_not() {
     let tmp = tempfile::tempdir().expect("tempdir");
     assert!(run(tmp.path(), &["new", "p"]).status.success());
     let root = tmp.path().join("p");
@@ -53,15 +54,18 @@ fn a_new_product_has_review_on_and_the_pipeline_asks_for_it() {
     assert!(cfg.contains("[advise]"), "{cfg}");
     assert!(cfg.contains("enabled = true"), "{cfg}");
 
-    let ci = std::fs::read_to_string(root.join(".github/workflows/ci.yml")).unwrap();
-    assert!(ci.contains("fid advise"), "{ci}");
-    assert!(
-        ci.contains("continue-on-error: true"),
-        "advice must never gate a merge: {ci}"
-    );
-
     let agents = std::fs::read_to_string(root.join("AGENTS.md")).unwrap();
     assert!(agents.contains("fid advise"), "{agents}");
+
+    // A model's verdict varies run to run, and the useful part is the agent
+    // fixing what it agrees with and asking again. Neither belongs in a job
+    // that finishes after the push, so CI must not run it, install it, or
+    // be handed its key.
+    let ci = std::fs::read_to_string(root.join(".github/workflows/ci.yml")).unwrap();
+    assert!(!ci.contains("OPENROUTER_API_KEY"), "{ci}");
+    assert!(!ci.contains("npm install"), "{ci}");
+    assert!(!ci.contains("run: fid advise"), "{ci}");
+    assert!(!ci.contains("- name: fid advise"), "{ci}");
 }
 
 #[test]

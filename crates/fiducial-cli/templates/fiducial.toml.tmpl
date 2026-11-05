@@ -17,11 +17,12 @@ enabled = false
 enabled = []
 
 [advise]
-# Advisory review (`fid advise`) is part of how this product is worked on: run
-# before calling a change done, and as a non-blocking step on pull requests. It
-# asks a model what no deterministic check can, needs a key (`fid advise key
-# set`, or OPENROUTER_API_KEY in the environment and in CI), and never gates
-# anything. Set false at any time to switch the asking off; nothing else reads it.
+# Advisory review (`fid advise`) is part of how this product is worked on: the
+# agent runs it before calling a change done, fixes what it agrees with, and runs
+# it again. It asks models what no deterministic check can, needs a key (`fid
+# advise key set`, or OPENROUTER_API_KEY in the environment), and never gates
+# anything, so it is not a CI step. Set false at any time to switch the asking
+# off; nothing else reads it.
 enabled = true
 
 [guard]
