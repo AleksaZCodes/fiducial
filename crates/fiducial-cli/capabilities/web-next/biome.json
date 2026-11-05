@@ -16,6 +16,14 @@
     "lineWidth": 100
   },
   "files": {
-    "ignore": ["**/.next/**", "**/node_modules/**", "**/generated/**", "**/app/tokens.css"]
+    "ignore": [
+      "**/.next/**",
+      "**/.open-next/**",
+      "**/.wrangler/**",
+      "**/node_modules/**",
+      "**/generated/**",
+      "**/app/tokens.css",
+      "**/public/**"
+    ]
   }
 }

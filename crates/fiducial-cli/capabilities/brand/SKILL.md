@@ -10,11 +10,11 @@ everything else is generated in.
 ```
 [brand] in fiducial.toml      ← you edit this
   ↓  fid derive                (pipeline: brand — executor fid-brand)
-public/robots.txt
-public/sitemap.xml
-public/site.webmanifest
-public/favicon.svg
-public/organization.jsonld    ← generated: never hand-edit these
+apps/web/public/robots.txt
+apps/web/public/sitemap.xml
+apps/web/public/site.webmanifest
+apps/web/public/favicon.svg
+apps/web/public/organization.jsonld    ← generated: never hand-edit these
   ↓
 fid derive --check            ← fails if any is missing or stale
 ```
@@ -142,7 +142,7 @@ not something to fake by editing the generated file — add real `<url>` entries
 to `pipelines/brand.toml`'s neighbourhood in your own build step until then, or
 extend the pipeline.
 
-**3 · The output paths assume Next.js's `public/`.** A SvelteKit product edits
+**3 · The output paths assume Next.js's `apps/web/public/`.** A SvelteKit product edits
 `pipelines/brand.toml`'s `outputs` to point at `apps/web/static/…` instead —
 the declaration does not move, only where the derivation lands.
 

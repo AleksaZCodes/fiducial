@@ -1463,7 +1463,7 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
         match shape {
             // A SvelteKit product's Worker *is* the product, so `-worker`
             // would be noise in the one place a name is load-bearing.
-            DeployShape::SvelteKit => product.clone(),
+            DeployShape::SvelteKit | DeployShape::NextJs => product.clone(),
             DeployShape::Worker => format!("{product}-worker"),
         }
     } else {
@@ -1476,6 +1476,8 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
     let main = if d.main.is_empty() {
         match shape {
             DeployShape::SvelteKit => ".svelte-kit/cloudflare/_worker.js".to_string(),
+            // `opennextjs-cloudflare build` writes the Worker here.
+            DeployShape::NextJs => ".open-next/worker.js".to_string(),
             DeployShape::Worker => "src/index.ts".to_string(),
         }
     } else {
@@ -1486,8 +1488,8 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
     // serves the adapter's static output, through a binding — omit it and
     // every asset 404s while the Worker itself looks healthy.
     let assets = match shape {
-        DeployShape::SvelteKit => Some((
-            d.resolved_assets_directory().to_string(),
+        DeployShape::SvelteKit | DeployShape::NextJs => Some((
+            d.resolved_assets_directory(shape).to_string(),
             d.resolved_assets_binding().to_string(),
         )),
         DeployShape::Worker => None,
@@ -1503,7 +1505,7 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
     // capability at all.
     let mut vars: Vec<(String, String)> = match shape {
         DeployShape::Worker => vec![("FIDUCIAL_PRODUCT".into(), product.clone())],
-        DeployShape::SvelteKit => Vec::new(),
+        DeployShape::SvelteKit | DeployShape::NextJs => Vec::new(),
     };
     for (k, v) in &d.vars {
         // A product's own var wins over the derived one rather than appearing
