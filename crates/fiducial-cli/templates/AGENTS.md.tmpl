@@ -13,6 +13,10 @@ Built on [Fiducial](https://github.com/AleksaZCodes/fiducial) {{version}}.
 - `fid derive` — run pipelines; `--check` fails CI on stale artifacts
 - `fid graph` — the facts → pipelines → artifacts DAG
 - `fid upgrade` — pull upstream template and package updates
+- `fid advise --base <default branch>` — advisory review, run before calling a
+  change done. It never gates and never edits; read what it says and decide.
+  It needs a key (`fid advise key set`, or `OPENROUTER_API_KEY`), and does
+  nothing if `[advise] enabled = false` in `fiducial.toml`
 
 `fid dash --json` is the machine-readable form of the same facts. Prefer it over
 re-deriving product state by reading files: it already reports what is stale,

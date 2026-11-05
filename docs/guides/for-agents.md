@@ -90,7 +90,13 @@ fid doctor           # config, lock, template integrity, migrations
 fid derive --check   # every artifact still matches its declaration
 cargo test --workspace --all-features    # if the product has Rust
 pnpm test            # if the product has JS
+fid advise --base main   # advisory review; skip if [advise] enabled = false
 ```
+
+`fid advise` asks a model about what no deterministic check can reach. It needs a
+key, exits 0 whatever it finds, and is switched off for a product by
+`[advise] enabled = false` in `fiducial.toml`. Read what it says; it decides
+nothing.
 
 `fid derive --check` is the one people skip. It is also the one that catches the
 specific failure this platform exists to prevent.

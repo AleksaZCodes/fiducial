@@ -57,6 +57,9 @@ pub struct Config {
     /// not added the `legal` capability carries no empty `[legal]` block.
     #[serde(default, skip_serializing_if = "Legal::is_empty")]
     pub legal: Legal,
+    /// `[advise]` — whether advisory review is part of this product's procedure.
+    #[serde(default, skip_serializing_if = "Advise::is_empty")]
+    pub advise: Advise,
 
     /// Every other top-level block, kept verbatim.
     ///
@@ -83,6 +86,36 @@ pub struct Config {
         skip_serializing_if = "std::collections::BTreeMap::is_empty"
     )]
     pub extra: std::collections::BTreeMap<String, toml::Value>,
+}
+
+/// `[advise]` — is advisory review part of this product's procedure.
+///
+/// On by default, and **off by declaration**: setting `enabled = false` is the
+/// escape hatch (principle 3), usable at any point in a product's life, not a
+/// choice that has to be made at `fid new`. It lives in `fiducial.toml` because
+/// a switch that exists only in someone's shell or a CI dashboard cannot be
+/// reviewed, reverted or known about by an agent (principle 4).
+///
+/// It switches the *asking* off and nothing else. `fid derive`, `fid doctor`
+/// and the guard never read it, so it cannot change a build — the property
+/// `tests/determinism.rs` holds for the key holds for this too.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Advise {
+    /// Absent means on: a product that predates this block is not silently
+    /// opted out of the procedure.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+}
+
+impl Advise {
+    pub fn is_empty(&self) -> bool {
+        self.enabled.is_none()
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.unwrap_or(true)
+    }
 }
 
 /// `[ai]` — what an AI gateway needs that nothing can derive.

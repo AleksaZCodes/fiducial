@@ -22,6 +22,7 @@ pub fn run(
     locales: Option<&str>,
     default_locale: Option<&str>,
     full: bool,
+    no_advise: bool,
 ) -> Result<()> {
     validate_name(name)?;
     // Foundations are opt-in. `--locales` names them explicitly and implies
@@ -59,6 +60,29 @@ pub fn run(
         for (rel_path, template) in templates::FULL_ONLY_FILES {
             write_template(&dest, rel_path, template, name, &mut lock)?;
         }
+    }
+
+    // The switch is a line in `fiducial.toml`, not a scaffold-time branch, so
+    // `--no-advise` only chooses its starting value. Replaced exactly, and an
+    // absent line is an error: a scripted replacement that matches nothing
+    // would report success and leave review on.
+    if no_advise {
+        let path = dest.join("fiducial.toml");
+        let text = std::fs::read_to_string(&path).context("reading fiducial.toml")?;
+        let from = "[advise]";
+        let Some(at) = text.find(from) else {
+            bail!("fiducial.toml has no [advise] block to switch off");
+        };
+        let tail = &text[at..];
+        let Some(rel) = tail.find("enabled = true") else {
+            bail!("the [advise] block has no `enabled = true` line to switch off");
+        };
+        let mut out = String::with_capacity(text.len());
+        out.push_str(&text[..at + rel]);
+        out.push_str("enabled = false");
+        out.push_str(&text[at + rel + "enabled = true".len()..]);
+        std::fs::write(&path, out).context("writing fiducial.toml")?;
+        println!("  advisory review switched off ([advise] enabled = false)");
     }
 
     // Write fiducial.lock — after all templates are recorded.

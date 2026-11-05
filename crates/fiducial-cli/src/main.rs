@@ -214,6 +214,19 @@ kind of implicit fact this platform exists to delete. Name a locale set other
 than the default and this must be named too."
         )]
         default_locale: Option<String>,
+
+        /// Start with advisory review switched off
+        #[arg(
+            long,
+            long_help = "\
+Advisory review (`fid advise`) is part of a product's procedure by default: the
+scaffolded CI runs it on pull requests and the agent instructions ask for it
+before a change is called done. This writes `[advise] enabled = false` instead.
+
+It is a starting value, not a decision that has to be made now. The switch is a
+line in `fiducial.toml`, so it can be flipped either way at any point."
+        )]
+        no_advise: bool,
     },
 
     /// Add an app, module, or firmware target to this product
@@ -841,7 +854,14 @@ fn main() -> Result<()> {
             locales,
             default_locale,
             full,
-        } => commands::new::run(&name, locales.as_deref(), default_locale.as_deref(), full),
+            no_advise,
+        } => commands::new::run(
+            &name,
+            locales.as_deref(),
+            default_locale.as_deref(),
+            full,
+            no_advise,
+        ),
         Commands::Add { target } => commands::add::run(target),
         Commands::Capability { action } => commands::capability::run(action),
         Commands::Derive { check, pipeline } => commands::derive::run(check, pipeline),
@@ -883,6 +903,9 @@ fn main() -> Result<()> {
             json,
             strict,
         } => {
+            if commands::advise::announce_if_off() {
+                return Ok(());
+            }
             // `--thesis` wins over `--facts` when both are given rather than
             // silently reviewing declarations: the thesis is the narrower,
             // more deliberate request, and picking it makes the mistake
