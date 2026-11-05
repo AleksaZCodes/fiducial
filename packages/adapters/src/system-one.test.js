@@ -152,7 +152,7 @@ describe('OpenRouterSystemOne', () => {
     await s.decide({ state: STATE, questions: QUESTIONS })
 
     assert.equal(calls[0].body.model, OPENROUTER_DEFAULT_MODEL)
-    assert.equal(calls[0].body.model, 'typesafe/jev-latest')
+    assert.equal(calls[0].body.model, '~typesafe/jev-latest')
     assert.deepEqual(calls[0].body.state, STATE)
     assert.deepEqual(calls[0].body.questions, QUESTIONS)
   })

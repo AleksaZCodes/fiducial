@@ -150,7 +150,7 @@ pub struct Ai {
 /// oversight. `[ai] model` has no safe default because any model the platform
 /// picked would be a vendor choice made for the product, and would age into an
 /// id that no longer exists. The decision vendors publish a *tracking alias* —
-/// `typesafe/jev-latest` through the gateway, `jev-latest` direct — which by
+/// `~typesafe/jev-latest` through the gateway, `jev-latest` direct — which by
 /// definition names the current model, so defaulting to it neither picks a
 /// version nor rots. Declaring `model` pins a version instead, which is what a
 /// product wants once an answer distribution matters to it.

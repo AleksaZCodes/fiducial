@@ -155,7 +155,7 @@ describe("end to end", () => {
       assert.equal(s.captured.auth, "Bearer sk-or-v1-stub");
 
       const body = s.captured.bodies[0];
-      assert.equal(body.model, "typesafe/jev-latest");
+      assert.equal(body.model, "~typesafe/jev-latest");
       assert.ok(typeof body.state === "object");
       assert.ok(body.state.diff.includes("board_thickness"));
       assert.ok(body.session_id.startsWith("advise-diff-"));
