@@ -913,3 +913,120 @@ fn no_published_package_ships_its_tests() {
         offenders.join("\n")
     );
 }
+
+/// Every changeset names a package the npm workspace actually has.
+///
+/// # The failure this closes
+///
+/// `changesets` versions **npm** packages. The fifteen Rust crates are versioned
+/// by `[workspace.package] version` in the root `Cargo.toml` and released by
+/// `fid release`, and `changesets` has never heard of them. So a changeset
+/// naming `fiducial-cli` is not a mis-scoped bump — it is a package that does
+/// not exist, and `changeset version` exits 1 on it:
+///
+/// ```text
+/// Error: Found changeset ninety-doors-deploy for package fiducial-cli
+///        which is not in the workspace
+/// ```
+///
+/// That ran on `main`, after merge, in the release workflow. Nothing on the pull
+/// request looked at the changeset's package name, so a Rust-only change that
+/// correctly bumped `Cargo.toml` and correctly passed `fid release check` still
+/// broke releases for the whole repository — and the only signal was a red job
+/// on `main` that nobody is watching at merge time.
+///
+/// A Rust-only change needs **no changeset at all**. The `Cargo.toml` bump is
+/// its whole release story, and `fid release check` already gates that.
+///
+/// # Why a test rather than a lint in the workflow
+///
+/// The workflow is where the breakage surfaced, but a check added there runs
+/// only on `main`, which is exactly too late. Here it runs on every pull
+/// request, in the same job as every other hygiene rule, and fails before merge.
+#[test]
+fn changesets_name_packages_that_exist() {
+    let root = workspace_root();
+    let changeset_dir = root.join(".changeset");
+
+    // Every name the npm workspace publishes, from the globs pnpm is given.
+    let mut known: Vec<String> = Vec::new();
+    for dir in [
+        root.join("packages"),
+        root.join("crates/fiducial-cli/components"),
+    ] {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let manifest = entry.path().join("package.json");
+            if !manifest.is_file() {
+                continue;
+            }
+            let text = std::fs::read_to_string(&manifest).expect("package.json is readable");
+            let parsed: serde_json::Value =
+                serde_json::from_str(&text).expect("package.json is valid JSON");
+            if let Some(name) = parsed.get("name").and_then(|v| v.as_str()) {
+                known.push(name.to_string());
+            }
+        }
+    }
+    assert!(
+        !known.is_empty(),
+        "found no workspace package.json files — this test would pass vacuously"
+    );
+
+    let Ok(entries) = std::fs::read_dir(&changeset_dir) else {
+        return; // No .changeset/ at all is not this test's business.
+    };
+
+    let mut problems: Vec<String> = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        // `README.md` is documentation and `config.json` is configuration.
+        if !name.ends_with(".md") || name == "README.md" {
+            continue;
+        }
+        let text = std::fs::read_to_string(&path).expect("changeset is readable");
+
+        // A changeset's front matter is `"<package>": <bump>` lines between two
+        // `---` fences. Parsed by scanning for the quoted key rather than with a
+        // YAML crate: the shape is fixed by the tool that writes it, and a
+        // dependency here would be a dependency for one test.
+        let mut in_front_matter = false;
+        for line in text.lines() {
+            let trimmed = line.trim();
+            if trimmed == "---" {
+                if in_front_matter {
+                    break;
+                }
+                in_front_matter = true;
+                continue;
+            }
+            if !in_front_matter || trimmed.is_empty() {
+                continue;
+            }
+            let Some((raw_pkg, _bump)) = trimmed.split_once(':') else {
+                continue;
+            };
+            let pkg = raw_pkg.trim().trim_matches('"').trim_matches('\'');
+            if pkg.is_empty() || known.iter().any(|k| k == pkg) {
+                continue;
+            }
+            problems.push(format!(
+                "  .changeset/{name} names `{pkg}`, which is not an npm workspace package"
+            ));
+        }
+    }
+
+    assert!(
+        problems.is_empty(),
+        "changesets version npm packages only. The Rust crates take their version from \
+         `[workspace.package]` in the root Cargo.toml and are released by `fid release`, so a \
+         Rust-only change needs no changeset. `changeset version` exits 1 on an unknown name, \
+         which breaks the release workflow on main rather than the pull request:\n\n{}\n\n\
+         Known packages: {}\n",
+        problems.join("\n"),
+        known.join(", ")
+    );
+}
