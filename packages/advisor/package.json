@@ -31,13 +31,14 @@
     "src/cli.js",
     "src/gather.js",
     "src/key.js",
+    "src/review.js",
     "README.md"
   ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test src/advisor.test.js src/review.test.js src/endtoend.test.js src/review-e2e.test.js"
+    "test": "node --test src/advisor.test.js src/review.test.js src/endtoend.test.js src/review-e2e.test.js src/package.test.js"
   },
   "dependencies": {
     "@fiducial/adapters": "workspace:*"
