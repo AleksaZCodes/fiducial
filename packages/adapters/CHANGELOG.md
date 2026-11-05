@@ -1,5 +1,11 @@
 # @fiducial/adapters
 
+## 0.4.1
+
+### Patch Changes
+
+- 0f3caef: The OpenRouter default decisions model is `~typesafe/jev-latest`. OpenRouter publishes "latest" aliases with a leading `~`, so the previous default, `typesafe/jev-latest`, was rejected with HTTP 400 and `fid advise` skipped every run with the default configuration.
+
 ## 0.4.0
 
 ### Minor Changes
