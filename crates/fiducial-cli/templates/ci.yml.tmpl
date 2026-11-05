@@ -26,8 +26,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Install fid
         run: cargo install fiducial-cli --version {{version}} --locked
@@ -40,16 +38,8 @@ jobs:
       - name: fid derive --check
         run: fid derive --check
 
-      # Advisory review of the pull request, for what no deterministic check
-      # can judge. `continue-on-error` is the point, not a shortcut: a model's
-      # verdict varies, so it is read by a person and never gates a merge.
-      # With no OPENROUTER_API_KEY secret it says so and exits 0, and with
-      # `[advise] enabled = false` in fiducial.toml it asks nothing at all.
-      - name: fid advise (advisory, never blocks)
-        if: github.event_name == 'pull_request'
-        continue-on-error: true
-        env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        run: |
-          npm install -g @fiducial/advisor@0.3.0
-          fid advise --base origin/${{ github.base_ref }}
+      # `fid advise` is deliberately not a step here. It is a model's opinion,
+      # so its answer varies run to run, and a pipeline is where answers must
+      # not. It is also a conversation: the agent that made the change runs it
+      # before committing, fixes what it agrees with, and runs it again. That
+      # loop cannot happen in a job that finishes after the push.
