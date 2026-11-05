@@ -14,8 +14,12 @@ Built on [Fiducial](https://github.com/AleksaZCodes/fiducial) {{version}}.
 - `fid graph` — the facts → pipelines → artifacts DAG
 - `fid upgrade` — pull upstream template and package updates
 - `fid advise --base <default branch>` — advisory review, run before calling a
-  change done. It never gates and never edits; read what it says and decide.
-  It needs a key (`fid advise key set`, or `OPENROUTER_API_KEY`), and does
+  change done. Two models read it in structural units: calibrated judgments, and
+  a reasoning model checking it against this file and `MISSION.md`, with a list
+  of documents the change may have left stale. Treat every item as a claim to
+  verify: fix it, or say why it stands, and update the documents the change made
+  untrue (never `docs/specs/`, which is append-only). It never gates and never
+  edits. It needs a key (`fid advise key set`, or `OPENROUTER_API_KEY`), and does
   nothing if `[advise] enabled = false` in `fiducial.toml`
 
 `fid dash --json` is the machine-readable form of the same facts. Prefer it over

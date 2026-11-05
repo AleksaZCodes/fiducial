@@ -37,7 +37,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test src/advisor.test.js src/endtoend.test.js"
+    "test": "node --test src/advisor.test.js src/review.test.js src/endtoend.test.js src/review-e2e.test.js"
   },
   "dependencies": {
     "@fiducial/adapters": "workspace:*"

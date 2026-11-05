@@ -93,10 +93,18 @@ pnpm test            # if the product has JS
 fid advise --base main   # advisory review; skip if [advise] enabled = false
 ```
 
-`fid advise` asks a model about what no deterministic check can reach. It needs a
-key, exits 0 whatever it finds, and is switched off for a product by
-`[advise] enabled = false` in `fiducial.toml`. Read what it says; it decides
-nothing.
+`fid advise` asks models about what no deterministic check can reach. It splits
+the change into structural units and asks two: System One for calibrated
+judgments, and a reasoning model that reads each unit against the product's own
+`AGENTS.md` and `MISSION.md` and then looks across the whole change for
+documentation it left stale. Derived outputs, lockfiles and unmodified platform
+files are skipped by name. It needs a key, exits 0 whatever it finds, and is
+switched off for a product by `[advise] enabled = false` in `fiducial.toml`.
+
+It decides nothing, and neither does it edit. Its output is a worklist for you:
+verify each item against the code, fix it or write one line saying why it
+stands, update the documents the change made untrue, and run it again. Never
+edit `docs/specs/`; add a new dated decision.
 
 `fid derive --check` is the one people skip. It is also the one that catches the
 specific failure this platform exists to prevent.
