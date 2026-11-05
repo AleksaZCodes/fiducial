@@ -585,3 +585,33 @@ export function weigh(
 
   return findings.sort((a, b) => b.score - a.score);
 }
+
+/**
+ * Combine findings from several units into one list.
+ *
+ * The same question is asked of every unit, so the same key can come back more
+ * than once. Keeping each would print one finding N times; keeping the first
+ * would hide a firmer read from a later unit. The strongest probability wins, a
+ * firm read in any unit makes the finding firm, and the units that raised it are
+ * kept so a reader knows where to look.
+ */
+export function mergeFindings(perUnit) {
+  const byKey = new Map();
+  for (const { label, findings } of perUnit) {
+    for (const f of findings) {
+      const seen = byKey.get(f.key);
+      if (!seen) {
+        byKey.set(f.key, { ...f, units: [label] });
+        continue;
+      }
+      seen.units.push(label);
+      if (f.probability > seen.probability) {
+        seen.probability = f.probability;
+        seen.score = f.score;
+        seen.title = f.title;
+      }
+      seen.firm = seen.firm || f.firm;
+    }
+  }
+  return [...byKey.values()].sort((a, b) => b.score - a.score);
+}

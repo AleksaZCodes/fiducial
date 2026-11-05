@@ -16,6 +16,14 @@ enabled = false
 # Installed capability identifiers added by `fid add`.
 enabled = []
 
+[advise]
+# Advisory review (`fid advise`) is part of how this product is worked on: run
+# before calling a change done, and as a non-blocking step on pull requests. It
+# asks a model what no deterministic check can, needs a key (`fid advise key
+# set`, or OPENROUTER_API_KEY in the environment and in CI), and never gates
+# anything. Set false at any time to switch the asking off; nothing else reads it.
+enabled = true
+
 [guard]
 # Active portable guard rules. Command names match only in command position —
 # never inside quoted strings or as another command's argument (§11 of the

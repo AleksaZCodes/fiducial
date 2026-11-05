@@ -206,8 +206,41 @@ pub fn run(cmd: AdviseCmd) -> Result<()> {
         AdviseCmd::Key(KeyCmd::Set { vendor }) => key_set(&vendor),
         AdviseCmd::Key(KeyCmd::Show) => key_show(),
         AdviseCmd::Key(KeyCmd::Unset) => key_unset(),
-        AdviseCmd::Status => delegate(&["status"]),
+        AdviseCmd::Status => {
+            if announce_if_off() {
+                return Ok(());
+            }
+            delegate(&["status"])
+        }
     }
+}
+
+/// True, after saying so, when this product has switched advisory review off.
+///
+/// The switch is `[advise] enabled = false` in `fiducial.toml`: declared, in
+/// git, and flippable at any point. Outside a product (no `fiducial.toml` up
+/// the tree) there is nothing to have switched off, so review stays available.
+/// Key management is deliberately not gated: a key is per-developer, not
+/// per-product.
+pub fn announce_if_off() -> bool {
+    let Ok(cwd) = std::env::current_dir() else {
+        return false;
+    };
+    let Ok(root) = crate::config::Config::find_root(&cwd) else {
+        return false;
+    };
+    let Ok(config) = crate::config::Config::load(&root.join("fiducial.toml")) else {
+        return false;
+    };
+    if config.advise.is_enabled() {
+        return false;
+    }
+    println!("✦ fid advise — switched off for this product.");
+    println!();
+    println!("  fiducial.toml has `[advise] enabled = false`, so nothing was asked and");
+    println!("  nothing left this machine. Remove the line, or set it to true, to turn");
+    println!("  review back on. `fid derive`, `fid doctor` and the guard never read it.");
+    true
 }
 
 /// Read a key from stdin and store it.

@@ -14,7 +14,8 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 /** Run git, returning stdout, or `null` when git fails or is absent. */
@@ -288,6 +289,311 @@ export function fitDiff(diff, maxChars = 60_000) {
     }
   }
   return { diff: kept.join(""), omitted };
+}
+
+/**
+ * Paths whose content is derived, opaque or platform-owned, so a reviewer
+ * reading them learns nothing the product can act on. Capability skills and
+ * agent files are rewritten by `fid upgrade` and AGENTS.md says not to edit
+ * them, so a finding about one cannot be fixed by the product. The rest: `fid derive --check` already proves a derived file matches its
+ * declaration, and a lockfile or a font is not prose.
+ *
+ * They are skipped by name and reported by name. The earlier behaviour was to
+ * fill the budget in diff order and report whatever was left as "too large",
+ * which dropped a page component to make room for a 3,000-line generated
+ * module.
+ */
+export function isDerivedPath(path) {
+  return (
+    /(^|\/)generated\//.test(path) ||
+    /(^|\/)(pnpm-lock\.yaml|package-lock\.json|yarn\.lock|Cargo\.lock|fiducial\.lock)$/.test(path) ||
+    /\.(woff2?|ttf|otf|png|jpe?g|gif|webp|avif|ico|pdf|zip|min\.js|min\.css|map|tsbuildinfo)$/i.test(path) ||
+    /(^|\/)(\.next|\.open-next|node_modules|dist)\//.test(path) ||
+    /^\.(fiducial\/skills|claude\/skills|claude\/agents)\//.test(path)
+  );
+}
+
+/**
+ * Files `fiducial.lock` tracks whose content still hashes to what the platform
+ * wrote.
+ *
+ * These are the platform's, not the product's: a capability script, a skill
+ * file, a scaffolded config nobody has touched. Reviewing them reports on code
+ * the product owner cannot change here, and it drowns the product's own files
+ * — the first real run returned 88 findings, many of them about unmodified
+ * template scripts. `fid derive --check` already proves they are intact, so
+ * they are skipped by name. A file the product edits stops matching the hash
+ * and is reviewed like any other.
+ */
+export function untouchedPlatformFiles(cwd) {
+  let lock;
+  try {
+    lock = readFileSync(join(cwd, "fiducial.lock"), "utf8");
+  } catch {
+    return new Set();
+  }
+  const untouched = new Set();
+  const re = /\[templates\."([^"]+)"\]\nsource_version = "[^"]*"\nhash = "([0-9a-f]+)"/g;
+  for (const [, path, hash] of lock.matchAll(re)) {
+    try {
+      const bytes = readFileSync(join(cwd, path));
+      if (createHash("sha256").update(bytes).digest("hex") === hash) untouched.add(path);
+    } catch {
+      continue;
+    }
+  }
+  return untouched;
+}
+
+/**
+ * Every path a pipeline declares as its output.
+ *
+ * `pipelines/*.toml` is where the platform already says which files are
+ * derived. Reading it keeps this package from guessing: a reviewer told a
+ * generated sitemap is "hand-written" is wrong, and `fid derive --check` is the
+ * gate that proves it intact, so these are skipped by name.
+ */
+export function derivedOutputs(cwd) {
+  const out = new Set();
+  let names = [];
+  try {
+    names = readdirSync(join(cwd, "pipelines")).filter((n) => n.endsWith(".toml"));
+  } catch {
+    return out;
+  }
+  for (const name of names) {
+    let text = "";
+    try {
+      text = readFileSync(join(cwd, "pipelines", name), "utf8");
+    } catch {
+      continue;
+    }
+    const block = /^outputs\s*=\s*\[([\s\S]*?)\]/m.exec(text);
+    if (!block) continue;
+    for (const [, path] of block[1].matchAll(/"([^"]+)"/g)) out.add(path);
+  }
+  return out;
+}
+
+/** Every tracked path, so a reviewer can tell "unchanged" from "missing". */
+export function repoFiles(cwd, limit = 3000) {
+  return (git(["ls-files"], cwd) ?? "").split("\n").filter(Boolean).slice(0, limit);
+}
+
+/**
+ * Break a diff into structural units, each small enough to review alone.
+ *
+ * A unit is a file. A file larger than the budget is split at its hunk
+ * boundaries, every piece keeping the file's header so it still says which file
+ * it is. Small neighbouring files are then packed together by directory, so a
+ * change that touches twenty tiny content files is one unit rather than twenty
+ * requests, and two files in one directory are read side by side.
+ *
+ * Nothing is dropped to fit: a unit is added instead. `skipped` names what was
+ * left out on purpose (see `isDerivedPath`) and why.
+ */
+export function splitDiff(
+  diff,
+  maxChars = 40_000,
+  { tiny = 4_000, mergeTo = 12_000, skip = () => false } = {},
+) {
+  const files = diff.split(/(?=^diff --git )/m).filter((c) => c.trim());
+  const skipped = [];
+  const pieces = [];
+
+  for (const chunk of files) {
+    const name = /^diff --git a\/(\S+)/m.exec(chunk)?.[1] ?? "(unnamed)";
+    if (isDerivedPath(name) || skip(name)) {
+      skipped.push(name);
+      continue;
+    }
+    if (chunk.length <= maxChars) {
+      pieces.push({ file: name, diff: chunk });
+      continue;
+    }
+    const head = chunk.slice(0, chunk.search(/^@@ /m) === -1 ? chunk.length : chunk.search(/^@@ /m));
+    let current = head;
+    let part = 1;
+    for (const hunk of chunk.slice(head.length).split(/(?=^@@ )/m)) {
+      if (current.length > head.length && current.length + hunk.length > maxChars) {
+        pieces.push({ file: `${name} (part ${part++})`, diff: current });
+        current = head;
+      }
+      current += hunk;
+    }
+    if (current.length > head.length) {
+      pieces.push({ file: part > 1 ? `${name} (part ${part})` : name, diff: current });
+    }
+  }
+
+  pieces.sort((a, b) => a.file.localeCompare(b.file));
+  const dirOf = (file) => file.split("/").slice(0, -1).slice(0, 3).join("/");
+
+  const units = [];
+  for (const piece of pieces) {
+    const last = units[units.length - 1];
+    if (
+      last &&
+      last.dir === dirOf(piece.file) &&
+      last.diff.length + piece.diff.length <= maxChars
+    ) {
+      last.diff += piece.diff;
+      last.files.push(piece.file);
+    } else {
+      units.push({ dir: dirOf(piece.file), files: [piece.file], diff: piece.diff });
+    }
+  }
+
+  // A change of many tiny files in many directories would otherwise be one
+  // request each. Units under `tiny` characters are packed with their
+  // neighbours, across directories, up to `mergeTo` — still never past
+  // `maxChars`, and a unit that is not tiny is left alone.
+  const packed = [];
+  for (const unit of units) {
+    const last = packed[packed.length - 1];
+    if (
+      last &&
+      last.diff.length < tiny &&
+      unit.diff.length < tiny &&
+      last.diff.length + unit.diff.length <= Math.min(mergeTo, maxChars)
+    ) {
+      last.diff += unit.diff;
+      last.files.push(...unit.files);
+      last.dir = "";
+    } else {
+      packed.push({ ...unit, files: [...unit.files] });
+    }
+  }
+
+  return {
+    units: packed.map((u, i) => ({
+      id: i + 1,
+      label: u.files.length === 1 ? u.files[0] : `${u.dir || "mixed"}${u.dir ? "/" : ""} (${u.files.length} files)`,
+      files: u.files,
+      diff: u.diff,
+    })),
+    skipped,
+  };
+}
+
+/**
+ * The rules a change is judged against: the repository's own, verbatim.
+ *
+ * `AGENTS.md` is the agent context and `MISSION.md` is why it is shaped that
+ * way. They are read from the working tree rather than summarised here, because
+ * a summary is a second copy of the rules and the first thing to drift from
+ * them. Each is capped so one enormous file cannot crowd out the change.
+ */
+export function collectRules(cwd, maxChars = 40_000) {
+  const rules = {};
+  for (const name of ["AGENTS.md", "MISSION.md"]) {
+    const text = readIfText(cwd, name, 400_000);
+    if (text?.trim()) rules[name] = text.length > maxChars ? text.slice(0, maxChars) : text;
+  }
+  return rules;
+}
+
+/** Documents that are written once and never edited: decisions are append-only. */
+const APPEND_ONLY = /(^|\/)docs\/specs\//;
+const NOT_DOCS = /(^|\/)(CHANGELOG\.md|LICENSE\.md|node_modules\/|docs\/paper\/|docs\/prose\.lock)/;
+const GENERIC_NAMES = new Set([
+  "index", "page", "layout", "readme", "main", "lib", "utils", "util", "types",
+  "config", "mod", "test", "tests", "style", "styles", "global", "globals",
+]);
+
+/**
+ * Which documents may have gone stale, found by name rather than by hope.
+ *
+ * Documentation drifts because nothing connects an edit to the sentence that
+ * describes it. This is the connection, made cheaply and over-inclusively: a
+ * document that was not changed but names a file the change touched is a
+ * candidate, and so is a flag the change adds that no document mentions. The
+ * model then reads each against the diff and reports only the ones that are
+ * actually wrong, which is the same split every other check here uses.
+ *
+ * `docs/specs/` is excluded from the stale list on purpose. A decision there is
+ * a record of what was believed, so the right response to a change is a new
+ * dated decision, not an edit.
+ */
+export function docsDrift(cwd, files, diff, { limit = 30, skip = () => false } = {}) {
+  const tracked = (git(["ls-files", "*.md", "**/*.md"], cwd) ?? "").split("\n").filter(Boolean);
+  const docs = [...new Set(tracked)].filter((d) => !NOT_DOCS.test(d));
+  const changed = new Set(files);
+
+  const sources = files.filter((f) => !f.endsWith(".md") && !isDerivedPath(f) && !skip(f));
+  const tokens = new Set();
+  for (const f of sources) {
+    tokens.add(f);
+    const base = f.split("/").pop().replace(/\.[^.]+$/, "");
+    if (base.length >= 6 && !GENERIC_NAMES.has(base.toLowerCase())) tokens.add(base);
+  }
+
+  const stale = [];
+  const corpus = [];
+  for (const doc of docs) {
+    const text = readIfText(cwd, doc, 400_000);
+    if (text === null) continue;
+    corpus.push(text);
+    if (changed.has(doc) || APPEND_ONLY.test(doc)) continue;
+    const lines = text.split("\n");
+    let hits = 0;
+    for (let i = 0; i < lines.length && hits < 3; i++) {
+      const token = [...tokens].find((t) => lines[i].includes(t));
+      if (token) {
+        stale.push({ doc, line: i + 1, token });
+        hits++;
+      }
+    }
+  }
+
+  const joined = corpus.join("\n");
+  const undocumented = [];
+  for (const { file, text } of addedLines(diff)) {
+    if (!file || file.endsWith(".md") || isDerivedPath(file) || skip(file)) continue;
+    for (const flag of text.match(/--[a-z][a-z0-9]+(?:-[a-z0-9]+)*/g) ?? []) {
+      if (!joined.includes(flag) && !undocumented.some((u) => u.token === flag)) {
+        undocumented.push({ token: flag, file });
+      }
+    }
+  }
+
+  const docChanged = files.some((f) => f.endsWith(".md") && !APPEND_ONLY.test(f));
+  return {
+    stale: stale.slice(0, limit),
+    undocumented: undocumented.slice(0, 15),
+    noDocsChanged: sources.length > 0 && !docChanged,
+  };
+}
+
+/** Files with their added and removed line counts, for the cross-cutting pass. */
+export function diffStat(diff) {
+  const stat = [];
+  for (const chunk of diff.split(/(?=^diff --git )/m)) {
+    const name = /^diff --git a\/(\S+)/m.exec(chunk)?.[1];
+    if (!name) continue;
+    let add = 0;
+    let del = 0;
+    for (const line of chunk.split("\n")) {
+      if (line.startsWith("+") && !line.startsWith("+++")) add++;
+      else if (line.startsWith("-") && !line.startsWith("---")) del++;
+    }
+    stat.push({ file: name, add, del });
+  }
+  return stat;
+}
+
+/** Run `fn` over `items`, at most `limit` at a time, keeping result order. */
+export async function mapLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }
 
 /**

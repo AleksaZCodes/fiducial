@@ -214,6 +214,19 @@ kind of implicit fact this platform exists to delete. Name a locale set other
 than the default and this must be named too."
         )]
         default_locale: Option<String>,
+
+        /// Start with advisory review switched off
+        #[arg(
+            long,
+            long_help = "\
+Advisory review (`fid advise`) is part of a product's procedure by default: the
+scaffolded CI runs it on pull requests and the agent instructions ask for it
+before a change is called done. This writes `[advise] enabled = false` instead.
+
+It is a starting value, not a decision that has to be made now. The switch is a
+line in `fiducial.toml`, so it can be flipped either way at any point."
+        )]
+        no_advise: bool,
     },
 
     /// Add an app, module, or firmware target to this product
@@ -698,9 +711,25 @@ IT CANNOT BREAK ANYTHING
   or the model is overloaded. Pass --strict to opt into a non-zero exit for a
   hook of your own — never wire it into a gate that must not flake.
 
+TWO MODELS, IN UNITS
+  A change is split into structural units (a file, the hunks of a large file, or
+  a directory of small ones) and every unit is reviewed on its own, so a large
+  change costs more requests rather than a truncated review. Derived files and
+  lockfiles are skipped by name.
+
+    system one    typed, calibrated judgments, one request per unit
+    reasoning     a second model reads each unit against this product's own
+                  AGENTS.md and MISSION.md, then looks at the whole change for
+                  stale documentation; it needs the OpenRouter key and defaults
+                  to anthropic/claude-haiku-5.5 (FIDUCIAL_REVIEW_MODEL changes it)
+
+  The report ends with what the agent that ran the command should do: verify
+  each item against the code, fix it or say why it stands, and update the
+  documents the change made untrue. `--no-review` asks system one only.
+
 SEEING WHAT LEAVES THE MACHINE
-  This sends your diff to a third-party API. `--dry-run` resolves no key, sends
-  nothing, and prints the exact request body instead.
+  This sends your diff to third-party APIs. `--dry-run` resolves no key, sends
+  nothing, and prints the plan: every unit, the models, and the rules sent.
 
 EXAMPLES
   fid advise                                  review uncommitted changes
@@ -732,7 +761,7 @@ EXAMPLES
         /// What was actually asked for, so scope can be judged against it
         #[arg(long, value_name = "TEXT")]
         task: Option<String>,
-        /// Print the request body and send nothing
+        /// Print the plan, every unit and what would be sent, and send nothing
         #[arg(long)]
         dry_run: bool,
         /// Machine-readable output
@@ -741,6 +770,9 @@ EXAMPLES
         /// Exit non-zero on a firm finding. Never use in a gate that must not flake.
         #[arg(long)]
         strict: bool,
+        /// Ask system one only, not the reasoning model
+        #[arg(long)]
+        no_review: bool,
     },
 
     /// Documentation freshness, including prose nothing can generate
@@ -841,7 +873,14 @@ fn main() -> Result<()> {
             locales,
             default_locale,
             full,
-        } => commands::new::run(&name, locales.as_deref(), default_locale.as_deref(), full),
+            no_advise,
+        } => commands::new::run(
+            &name,
+            locales.as_deref(),
+            default_locale.as_deref(),
+            full,
+            no_advise,
+        ),
         Commands::Add { target } => commands::add::run(target),
         Commands::Capability { action } => commands::capability::run(action),
         Commands::Derive { check, pipeline } => commands::derive::run(check, pipeline),
@@ -882,7 +921,11 @@ fn main() -> Result<()> {
             dry_run,
             json,
             strict,
+            no_review,
         } => {
+            if commands::advise::announce_if_off() {
+                return Ok(());
+            }
             // `--thesis` wins over `--facts` when both are given rather than
             // silently reviewing declarations: the thesis is the narrower,
             // more deliberate request, and picking it makes the mistake
@@ -912,6 +955,9 @@ fn main() -> Result<()> {
             }
             if strict {
                 args.push("--strict".into());
+            }
+            if no_review {
+                args.push("--no-review".into());
             }
             let borrowed: Vec<&str> = args.iter().map(String::as_str).collect();
             commands::advise::delegate(&borrowed)

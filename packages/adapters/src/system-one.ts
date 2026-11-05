@@ -453,8 +453,14 @@ function normalize(data: WireResponse, vendor: string, fallbackModel: string): S
 
 const OPENROUTER_DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions";
 
-/** Default when `[system-one] model` is unset. Tracks the newest Jev. */
-export const OPENROUTER_DEFAULT_MODEL = "typesafe/jev-latest";
+/**
+ * Default when `[system-one] model` is unset. Tracks the newest Jev.
+ *
+ * The leading `~` is part of the id: OpenRouter publishes every "latest" alias
+ * as `~vendor/name-latest`. `typesafe/jev-latest` without it is not a model, so
+ * the default answered HTTP 400 and every advisory run was skipped.
+ */
+export const OPENROUTER_DEFAULT_MODEL = "~typesafe/jev-latest";
 
 /**
  * System One through OpenRouter's Decisions router.

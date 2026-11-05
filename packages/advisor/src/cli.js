@@ -38,18 +38,38 @@ import {
   THESIS_QUESTIONS,
   THESIS_WEIGHTS,
   duplicateOfQuestion,
+  mergeFindings,
   weigh,
 } from "./checks.js";
 import {
   addedLines,
   collectDiff,
+  collectRules,
   collectThesis,
+  derivedOutputs,
+  diffStat,
+  docsDrift,
   existingDeclarations,
-  fitDiff,
+  isDerivedPath,
+  mapLimit,
   numericCandidates,
+  repoFiles,
   restatements,
+  splitDiff,
+  untouchedPlatformFiles,
 } from "./gather.js";
 import { credentialsPath, resolveKey } from "./key.js";
+import { AGENT_BRIEF, REVIEW_DEFAULT_MODEL, reviewAll } from "./review.js";
+
+/**
+ * How much of a change one request carries. System One answers every question
+ * about each unit, so its units are smaller; the reasoning model has a very
+ * large window and is given more at once so related files are read together.
+ */
+const SYSTEM_ONE_UNIT_CHARS = 40_000;
+const REVIEW_UNIT_CHARS = 120_000;
+/** Requests in flight at once, per model. */
+const CONCURRENCY = 4;
 
 const args = process.argv.slice(2);
 const command = args[0] ?? "diff";
@@ -87,7 +107,7 @@ function client() {
       resolved.vendor === "openrouter"
         ? new OpenRouterSystemOne(resolved.env, model, fetchImpl)
         : new TypeSafeSystemOne(resolved.env, model, fetchImpl);
-    return { impl, source: resolved.source, vendor: resolved.vendor };
+    return { impl, source: resolved.source, vendor: resolved.vendor, env: resolved.env, fetchImpl };
   } catch (err) {
     return { error: err.message };
   }
@@ -100,21 +120,63 @@ function finish(findings) {
 }
 
 function printFindings(findings, meta) {
+  const reviewFindings = meta.review?.findings ?? [];
+
   if (json) {
-    console.log(JSON.stringify({ findings, ...meta }, null, 2));
+    const { review, ...rest } = meta;
+    console.log(
+      JSON.stringify(
+        {
+          findings,
+          ...rest,
+          ...(review
+            ? {
+                review: {
+                  model: review.model,
+                  findings: review.findings,
+                  skipped: review.skipped,
+                  requests: review.requests,
+                },
+              }
+            : {}),
+          ...(meta.units !== undefined ? { next_steps: AGENT_BRIEF } : {}),
+        },
+        null,
+        2,
+      ),
+    );
     return;
   }
 
-  if (findings.length === 0) {
-    console.log(`✦ fid advise — nothing to flag in ${meta.scope}`);
+  const notes = () => {
     if (meta.omitted?.length) {
       console.log(`  note: ${meta.omitted.length} file(s) too large to review: ${meta.omitted.join(", ")}`);
     }
+    if (meta.skippedFiles?.length) {
+      console.log(`  skipped on purpose (derived output, opaque, or an unmodified platform file): ${meta.skippedFiles.join(", ")}`);
+    }
+    for (const f of meta.failedUnits ?? []) {
+      console.log(`  not reviewed by system one: ${f.unit} (${f.reason})`);
+    }
+    for (const s of meta.review?.skipped ?? []) {
+      console.log(`  not reviewed by the reasoning model: ${s.unit} (${s.reason})`);
+    }
+  };
+
+  if (findings.length === 0 && reviewFindings.length === 0) {
+    console.log(`✦ fid advise — nothing to flag in ${meta.scope}`);
+    notes();
     return;
   }
 
-  console.log(`✦ fid advise — ${findings.length} thing(s) worth a look in ${meta.scope}`);
+  const total = findings.length + reviewFindings.length;
+  console.log(`✦ fid advise — ${total} thing(s) worth a look in ${meta.scope}`);
   console.log();
+
+  if (findings.length > 0) {
+    console.log("  Judgments (system one, calibrated)");
+    console.log();
+  }
   for (const f of findings) {
     // The probability is printed, not hidden behind a word like "warning".
     // These answers are calibrated, so the number is information the reader can
@@ -122,17 +184,35 @@ function printFindings(findings, meta) {
     const mark = f.firm ? "▲" : "·";
     console.log(`  ${mark} ${f.title}  [${(f.probability * 100).toFixed(0)}%]`);
     console.log(`    ${f.advice}`);
+    if (f.units?.length > 1) {
+      console.log(`    ↳ raised in ${f.units.length} units: ${f.units.slice(0, 3).join(", ")}`);
+    }
     if (f.evidence?.length) {
       for (const e of f.evidence.slice(0, 4)) console.log(`    ↳ ${e}`);
     }
     console.log();
   }
-  console.log("  Advisory only — nothing here blocks anything. `▲` is a firm read, `·` a hint.");
-  if (meta.omitted?.length) {
-    console.log(`  note: ${meta.omitted.length} file(s) too large to review: ${meta.omitted.join(", ")}`);
+
+  if (reviewFindings.length > 0) {
+    console.log(`  Review (${meta.review.model ?? "reasoning model"}, against this repo's rules)`);
+    console.log();
+    for (const f of reviewFindings) {
+      const mark = f.severity === "fix" ? "▲" : "·";
+      console.log(`  ${mark} ${f.file}${f.line ? `:${f.line}` : ""}${f.rule ? `  [${f.rule}]` : ""}`);
+      console.log(`    ${f.problem}`);
+      if (f.fix) console.log(`    fix: ${f.fix}`);
+      console.log();
+    }
   }
+
+  console.log("  Advisory only — nothing here blocks anything. `▲` is a firm read, `·` something to check.");
+  notes();
   if (meta.cost !== undefined) {
-    console.log(`  cost: $${meta.cost.toFixed(6)} · model: ${meta.model}`);
+    console.log(`  cost: $${meta.cost.toFixed(6)} · models: ${[meta.model, meta.review?.model].filter(Boolean).join(", ")}`);
+  }
+  if (meta.units !== undefined) {
+    console.log();
+    for (const line of AGENT_BRIEF.split("\n")) console.log(`  ${line}`);
   }
 }
 
@@ -182,93 +262,162 @@ if (command === "diff") {
     process.exit(0);
   }
 
-  const { diff, omitted } = fitDiff(raw);
-  const added = addedLines(diff);
-  const candidates = numericCandidates(added);
+  const task = flag("task");
   const declarations = existingDeclarations(cwd);
 
-  // The whole question set goes in one request: questions are evaluated in
-  // parallel and in isolation, so seven cost barely more latency than one and
-  // none of them can bias another.
-  const questions = { ...DIFF_QUESTIONS };
-  if (candidates.length === 0) {
-    // Nothing mechanical to judge, so do not ask — an answer about an empty
-    // list is noise, and this is the hybrid split doing its job.
-    delete questions.bare_quantity;
-  }
+  // The change is reviewed in structural units, by both models, so neither is
+  // shown a truncated slice and a large change costs more requests instead of
+  // a worse review. System One gets smaller units than the reasoning model: it
+  // answers every question about each one, so its input is what bounds it.
+  const untouched = untouchedPlatformFiles(cwd);
+  const derived = derivedOutputs(cwd);
+  const skip = (name) => untouched.has(name) || derived.has(name);
+  const { units, skipped: skippedFiles } = splitDiff(raw, SYSTEM_ONE_UNIT_CHARS, { skip });
 
-  const task = flag("task");
-  if (!task) {
-    // `unrequested_scope` compares the diff against what was asked. With
-    // nothing to compare against it degrades into "does this diff contain
-    // anything I would not have written", which a model will answer and which
-    // means nothing. Same discipline as dropping `bare_quantity` with no
-    // candidates: a question whose input is missing is not asked.
-    delete questions.unrequested_scope;
-  }
-
-  const state = {
-    ...(task ? { task } : {}),
-    changed_files: files,
-    diff,
-    numeric_candidates: candidates.map((x) => `${x.file}:${x.line} ${x.name} = ${x.value}`),
-    existing_declarations: declarations,
+  const unitState = (unit) => {
+    const candidates = numericCandidates(addedLines(unit.diff));
+    // A question whose input is missing is not asked: an answer about an empty
+    // list, or about "what was asked" with nothing asked, is noise.
+    const questions = { ...DIFF_QUESTIONS };
+    if (candidates.length === 0) delete questions.bare_quantity;
+    if (!task) delete questions.unrequested_scope;
+    return {
+      candidates,
+      questions,
+      state: {
+        ...(task ? { task } : {}),
+        changed_files: files,
+        unit_files: unit.files,
+        diff: unit.diff,
+        numeric_candidates: candidates.map((x) => `${x.file}:${x.line} ${x.name} = ${x.value}`),
+        existing_declarations: declarations,
+      },
+    };
   };
 
+  const rules = collectRules(cwd);
+  const docs = docsDrift(cwd, files, raw, { skip });
+  const stat = diffStat(raw).filter((s) => !isDerivedPath(s.file) && !skip(s.file));
+  const reviewUnits = splitDiff(raw, REVIEW_UNIT_CHARS, { skip }).units;
+  const repo = repoFiles(cwd);
+  const reviewModel = process.env.FIDUCIAL_REVIEW_MODEL || REVIEW_DEFAULT_MODEL;
+  // The reasoning model is reached through OpenRouter's chat endpoint, so it
+  // needs that key. A TypeSafe-only key still gets System One.
+  const reviewing = !has("no-review") && (dryRun || c.vendor === "openrouter");
+
   if (dryRun) {
-    const body = { state, questions };
+    const plan = units.map((u) => ({ id: u.id, label: u.label, files: u.files, chars: u.diff.length, ...unitState(u) }));
     if (json) {
-      console.log(JSON.stringify(body, null, 2));
+      console.log(
+        JSON.stringify(
+          {
+            units: plan,
+            skipped_files: skippedFiles,
+            review: reviewing
+              ? { model: reviewModel, requests: reviewUnits.length + 1, docs, rules: Object.keys(rules) }
+              : null,
+          },
+          null,
+          2,
+        ),
+      );
     } else {
-      console.log(`✦ fid advise --dry-run — nothing sent. This is the exact request body.`);
+      console.log(`✦ fid advise --dry-run — nothing sent. This is the plan.`);
       console.log();
       console.log(`  scope             ${scope}`);
       console.log(`  changed files     ${files.length}`);
-      console.log(`  diff sent         ${diff.length} chars`);
-      console.log(`  files omitted     ${omitted.length ? omitted.join(", ") : "none"}`);
-      console.log(`  questions asked   ${Object.keys(questions).join(", ")}`);
-      console.log(`  numeric candidates ${candidates.length}`);
-      for (const x of candidates.slice(0, 8)) {
-        console.log(`    ↳ ${x.file}:${x.line}  ${x.name} = ${x.value}`);
+      console.log(`  skipped files     ${skippedFiles.length ? skippedFiles.join(", ") : "none"}`);
+      console.log(`  system one        ${units.length} request(s), one per unit`);
+      for (const u of plan) {
+        console.log(`    ↳ ${u.label}  ${u.chars} chars  ${Object.keys(u.questions).length} questions`);
       }
-      console.log(`  declarations sent ${Object.keys(declarations).length}`);
+      if (reviewing) {
+        console.log(`  review model      ${reviewModel}`);
+        console.log(`    ↳ ${reviewUnits.length} unit request(s) + 1 overview`);
+        console.log(`    ↳ rules sent: ${Object.keys(rules).join(", ") || "none"}`);
+        console.log(`    ↳ docs that may be stale: ${docs.stale.length}, undocumented flags: ${docs.undocumented.length}`);
+      } else {
+        console.log(`  review model      off (--no-review, or no OpenRouter key)`);
+      }
       console.log();
-      console.log("  Add --json to see the full body verbatim.");
+      console.log("  Add --json to see every unit's request verbatim.");
     }
     process.exit(0);
   }
 
-  let response;
-  try {
-    response = await c.impl.decide({
-      state,
-      questions,
-      sessionId: `advise-diff-${Date.now()}`,
-    });
-  } catch (err) {
-    // A model that is down must never be the reason a commit cannot happen.
-    if (json) console.log(JSON.stringify({ findings: [], skipped: String(err.message ?? err) }));
-    else console.log(`✦ fid advise — skipped: ${err.message ?? err}`);
+  // Every unit is asked at once, a few at a time. Questions inside a request
+  // are evaluated in parallel and in isolation, and units are independent, so
+  // none of them can bias another.
+  const sysOne = mapLimit(units, CONCURRENCY, async (unit) => {
+    const { state, questions, candidates } = unitState(unit);
+    try {
+      const response = await c.impl.decide({
+        state,
+        questions,
+        sessionId: `advise-diff-${Date.now()}-${unit.id}`,
+      });
+      return { unit, candidates, response };
+    } catch (err) {
+      return { unit, candidates, error: String(err.message ?? err) };
+    }
+  });
+
+  const reasoning = reviewing
+    ? reviewAll({
+        apiKey: c.env.OPENROUTER_API_KEY,
+        fetchImpl: c.fetchImpl,
+        model: reviewModel,
+        units: reviewUnits,
+        stat,
+        docs,
+        files,
+        repo,
+        rules,
+        task,
+        concurrency: CONCURRENCY,
+      })
+    : Promise.resolve(null);
+
+  const [answered, reviewed] = await Promise.all([sysOne, reasoning]);
+
+  const worked = answered.filter((a) => a.response);
+  const failed = answered.filter((a) => a.error);
+  // A model that is down must never be the reason a commit cannot happen — but
+  // when *neither* answered, the report says so instead of claiming all clear.
+  if (worked.length === 0 && (!reviewed || reviewed.findings.length === 0) && (failed.length > 0 || reviewed?.skipped.length)) {
+    const why = failed[0]?.error ?? reviewed?.skipped[0]?.reason ?? "no model answered";
+    if (json) console.log(JSON.stringify({ findings: [], skipped: why }));
+    else console.log(`✦ fid advise — skipped: ${why}`);
     process.exit(0);
   }
 
-  const findings = weigh(response.answers);
+  const findings = mergeFindings(
+    worked.map((a) => ({ label: a.unit.label, findings: weigh(a.response.answers) })),
+  );
 
   // Attach the mechanically-found evidence, so a finding points at real lines
   // rather than asking the reader to trust a description.
+  const allCandidates = worked.flatMap((a) => a.candidates);
   for (const f of findings) {
     if (f.key === "bare_quantity") {
-      f.evidence = candidates.map((x) => `${x.file}:${x.line}  ${x.name} = ${x.value}`);
+      f.evidence = allCandidates.map((x) => `${x.file}:${x.line}  ${x.name} = ${x.value}`);
     }
   }
 
+  const cost =
+    worked.reduce((sum, a) => sum + (a.response.usage.cost ?? 0), 0) + (reviewed?.cost ?? 0);
+
   printFindings(findings, {
     scope,
-    omitted,
-    cost: response.usage.cost,
-    model: response.model,
+    skippedFiles,
+    units: units.length,
+    failedUnits: failed.map((f) => ({ unit: f.unit.label, reason: f.error })),
+    review: reviewed,
+    docs,
+    cost,
+    model: worked[0]?.response.model,
   });
-  finish(findings);
+  finish([...findings, ...(reviewed?.findings ?? []).map((f) => ({ ...f, firm: f.severity === "fix" }))]);
 }
 
 // ── facts ─────────────────────────────────────────────────────────────────────

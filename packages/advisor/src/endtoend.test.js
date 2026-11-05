@@ -150,12 +150,12 @@ describe("end to end", () => {
   it("sends the documented request shape and a bearer token", async () => {
     const s = await stub(CLEAN);
     try {
-      await runCli(repo(), s.url, ["diff"]);
+      await runCli(repo(), s.url, ["diff", "--no-review"]);
       assert.equal(s.captured.count, 1);
       assert.equal(s.captured.auth, "Bearer sk-or-v1-stub");
 
       const body = s.captured.bodies[0];
-      assert.equal(body.model, "typesafe/jev-latest");
+      assert.equal(body.model, "~typesafe/jev-latest");
       assert.ok(typeof body.state === "object");
       assert.ok(body.state.diff.includes("board_thickness"));
       assert.ok(body.session_id.startsWith("advise-diff-"));
@@ -172,7 +172,7 @@ describe("end to end", () => {
   it("reports a clean diff and exits 0", async () => {
     const s = await stub(CLEAN);
     try {
-      const r = await runCli(repo(), s.url, ["diff"]);
+      const r = await runCli(repo(), s.url, ["diff", "--no-review"]);
       assert.equal(r.code, 0);
       assert.match(r.stdout, /nothing to flag/);
     } finally {
@@ -183,7 +183,7 @@ describe("end to end", () => {
   it("ranks findings, marks firmness, and prints evidence and cost", async () => {
     const s = await stub(DIRTY);
     try {
-      const r = await runCli(repo(), s.url, ["diff"]);
+      const r = await runCli(repo(), s.url, ["diff", "--no-review"]);
       assert.equal(r.code, 0);
 
       // Weighted ranking: duplicate_declaration (1.0 × 0.93) must lead.
@@ -206,14 +206,14 @@ describe("end to end", () => {
     // commit or a hook fails.
     const a = await stub(DIRTY);
     try {
-      assert.equal((await runCli(repo(), a.url, ["diff"])).code, 0);
+      assert.equal((await runCli(repo(), a.url, ["diff", "--no-review"])).code, 0);
     } finally {
       await a.close();
     }
 
     const b = await stub(DIRTY);
     try {
-      assert.equal((await runCli(repo(), b.url, ["diff", "--strict"])).code, 1);
+      assert.equal((await runCli(repo(), b.url, ["diff", "--no-review", "--strict"])).code, 1);
     } finally {
       await b.close();
     }
@@ -226,7 +226,7 @@ describe("end to end", () => {
     };
     const s = await stub(hintsOnly);
     try {
-      assert.equal((await runCli(repo(), s.url, ["diff", "--strict"])).code, 0);
+      assert.equal((await runCli(repo(), s.url, ["diff", "--no-review", "--strict"])).code, 0);
     } finally {
       await s.close();
     }
@@ -235,7 +235,7 @@ describe("end to end", () => {
   it("emits machine-readable findings with --json", async () => {
     const s = await stub(DIRTY);
     try {
-      const r = await runCli(repo(), s.url, ["diff", "--json"]);
+      const r = await runCli(repo(), s.url, ["diff", "--no-review", "--json"]);
       const parsed = JSON.parse(r.stdout);
       assert.ok(Array.isArray(parsed.findings));
       assert.equal(parsed.findings[0].key, "duplicate_declaration");
@@ -250,7 +250,7 @@ describe("end to end", () => {
     // A model that is down must never be why a commit cannot happen.
     const s = await stub({ error: { message: "upstream exploded" } }, 500);
     try {
-      const r = await runCli(repo(), s.url, ["diff"]);
+      const r = await runCli(repo(), s.url, ["diff", "--no-review"]);
       assert.equal(r.code, 0);
       assert.match(r.stdout, /skipped/);
     } finally {
@@ -262,7 +262,7 @@ describe("end to end", () => {
     // The state this was actually written in: a valid key with no balance.
     const s = await stub({ error: { code: 402, message: "Insufficient credits" } }, 402);
     try {
-      const r = await runCli(repo(), s.url, ["diff"]);
+      const r = await runCli(repo(), s.url, ["diff", "--no-review"]);
       assert.equal(r.code, 0);
       assert.match(r.stdout, /skipped/);
       assert.match(r.stdout, /Insufficient credits/);
@@ -280,7 +280,7 @@ describe("end to end", () => {
       execFileSync("git", ["status", "--porcelain"], { cwd: dir, encoding: "utf8" });
     try {
       const before = status();
-      await runCli(dir, s.url, ["diff"]);
+      await runCli(dir, s.url, ["diff", "--no-review"]);
       assert.equal(status(), before);
     } finally {
       await s.close();
