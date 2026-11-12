@@ -1453,6 +1453,8 @@ struct DeployPlan {
     r2: Option<String>,
     queue: Option<String>,
     kv: Vec<(String, String)>,
+    /// `(binding, class)`.
+    durable_objects: Vec<(String, String)>,
     secrets: Vec<String>,
 }
 
@@ -1608,6 +1610,11 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
         r2,
         queue,
         kv,
+        durable_objects: d
+            .durable_objects
+            .iter()
+            .map(|o| (o.binding.clone(), o.class.clone()))
+            .collect(),
         secrets: secrets.into_iter().map(str::to_string).collect(),
     })
 }
@@ -1696,6 +1703,20 @@ fn render_wrangler_toml(p: &DeployPlan) -> String {
         out.push_str("[[queues.producers]]\n");
         out.push_str("binding = \"QUEUE\"\n");
         out.push_str(&format!("queue = \"{queue}\"\n"));
+    }
+    for (binding, class) in &p.durable_objects {
+        out.push_str("\n# [deploy.durable_objects] — a class this Worker exports.\n");
+        out.push_str("[[durable_objects.bindings]]\n");
+        out.push_str(&format!("name = \"{binding}\"\nclass_name = \"{class}\"\n"));
+    }
+    if !p.durable_objects.is_empty() {
+        let classes: Vec<String> = p
+            .durable_objects
+            .iter()
+            .map(|(_, c)| format!("\"{c}\""))
+            .collect();
+        out.push_str("\n[[migrations]]\ntag = \"v1\"\n");
+        out.push_str(&format!("new_sqlite_classes = [{}]\n", classes.join(", ")));
     }
     for (binding, id) in &p.kv {
         out.push_str("\n# [deploy.kv_namespaces] — this product's own namespace.\n");
@@ -1805,6 +1826,20 @@ fn render_wrangler_jsonc(p: &DeployPlan) -> String {
         fields.push(format!(
             "  // [deploy.kv_namespaces] — this product's own namespaces. The id is\n  // load-bearing: point a deploy at a different one and the data is\n  // silently gone rather than missing.\n  \"kv_namespaces\": [\n{}\n  ]",
             entries.join(",\n")
+        ));
+    }
+
+    if !p.durable_objects.is_empty() {
+        let bindings: Vec<String> = p
+            .durable_objects
+            .iter()
+            .map(|(b, c)| format!("    {{ \"name\": {}, \"class_name\": {} }}", q(b), q(c)))
+            .collect();
+        let classes: Vec<String> = p.durable_objects.iter().map(|(_, c)| q(c)).collect();
+        fields.push(format!(
+            "  // [deploy.durable_objects] — classes exported from `main`.\n  \"durable_objects\": {{ \"bindings\": [\n{}\n  ] }},\n  \"migrations\": [{{ \"tag\": \"v1\", \"new_sqlite_classes\": [{}] }}]",
+            bindings.join(",\n"),
+            classes.join(", ")
         ));
     }
 
