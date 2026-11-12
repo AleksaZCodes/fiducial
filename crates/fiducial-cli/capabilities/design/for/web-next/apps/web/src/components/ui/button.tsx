@@ -76,12 +76,12 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "cham-sm text-primary-foreground [--edge:var(--primary)] [--fill:var(--primary)] hover:[--fill:color-mix(in_oklch,var(--primary),black_10%)]",
+          "shape-control text-primary-foreground [--edge:var(--primary)] [--fill:var(--primary)] hover:[--fill:color-mix(in_oklch,var(--primary),black_10%)]",
         destructive:
-          "cham-sm text-white [--edge:var(--destructive)] [--fill:var(--destructive)] hover:[--fill:color-mix(in_oklch,var(--destructive),black_10%)] focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
-        outline: "cham-sm cham-outline",
+          "shape-control text-white [--edge:var(--destructive)] [--fill:var(--destructive)] hover:[--fill:color-mix(in_oklch,var(--destructive),black_10%)] focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
+        outline: "shape-control shape-outline",
         secondary:
-          "cham-sm text-secondary-foreground [--edge:var(--border)] [--fill:var(--secondary)] hover:[--fill:color-mix(in_oklch,var(--secondary),black_4%)]",
+          "shape-control text-secondary-foreground [--edge:var(--border)] [--fill:var(--secondary)] hover:[--fill:color-mix(in_oklch,var(--secondary),black_4%)]",
         ghost: "hover:bg-muted hover:text-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },

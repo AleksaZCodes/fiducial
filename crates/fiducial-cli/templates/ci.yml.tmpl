@@ -11,24 +11,69 @@
 
 name: CI
 
+# ── What this costs, and why it is this small ────────────────────────────────
+#
+# One job, on pull requests, in well under a minute. Three decisions keep it
+# there, and each replaced something that spent a private repository's Actions
+# allowance without checking anything more:
+#
+#   · `fid` is DOWNLOADED, not compiled. `cargo install fiducial-cli` builds the
+#     CLI and its dependency tree on every run — minutes, to then run two checks
+#     that take a second. Each platform release carries a prebuilt binary.
+#   · It runs on `pull_request` only. `push` to the default branch re-ran the
+#     same checks on the commit a pull request had just passed them on.
+#   · It checks consistency and nothing else. Lint, types, tests and the build
+#     are run where the change is made — `fid doctor && fid derive --check` and
+#     the product's own scripts, before pushing — and the deploy's own build
+#     (Workers Builds, when that is how the product ships) compiles it again
+#     for free. This job exists to catch the one thing a local run cannot
+#     prove to anyone else: that what was pushed is internally consistent.
+#
+# Run it by hand from the Actions tab (`workflow_dispatch`) when you want the
+# gate on a branch without a pull request.
+
 on:
-  push:
-    branches: [main]
   pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   fiducial:
     name: fiducial checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # The `fid` that gates this product. `fid doctor` warns when this is not
+      # the version you are running locally; `fid upgrade` leaves it alone.
+      FID_VERSION: "{{version}}"
     steps:
       - uses: actions/checkout@v4
 
+      # The release's prebuilt binary, verified against its published checksum.
+      # Falls back to compiling only when that release has no binary.
       - name: Install fid
-        run: cargo install fiducial-cli --version {{version}} --locked
+        run: |
+          asset="fid-${FID_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          url="https://github.com/AleksaZCodes/fiducial/releases/download/v${FID_VERSION}/${asset}"
+          if curl -fsSL "$url" -o "$asset" && curl -fsSL "$url.sha256" -o "$asset.sha256" \
+            && [ "$(cut -d' ' -f1 "$asset.sha256")" = "$(sha256sum "$asset" | cut -d' ' -f1)" ]; then
+            mkdir -p "$HOME/.local/bin"
+            tar -xzf "$asset" -C "$HOME/.local/bin" fid
+            rm -f "$asset" "$asset.sha256"
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          else
+            echo "::warning::no prebuilt fid ${FID_VERSION} — compiling it, which is slow"
+            cargo install fiducial-cli --version "${FID_VERSION}" --locked
+          fi
 
       # Config, lock, template integrity, pending migrations.
       - name: fid doctor

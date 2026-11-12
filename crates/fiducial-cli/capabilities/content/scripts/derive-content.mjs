@@ -8,6 +8,7 @@
 // See docs/specs/2026-09-19-content-is-one-layer.md.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { pathToFileURL } from "node:url";
 import { frontmatter as fm } from "./frontmatter.mjs";
 
 const at = (p) => new URL(`../${p}`, import.meta.url);
@@ -169,171 +170,185 @@ function checkSchema(meta, schema, where) {
   }
 }
 
-// ── Load ─────────────────────────────────────────────────────────────────────
-const cfg = parseToml(read("fiducial.toml"));
-const locales = cfg.i18n?.locales ?? [];
-if (!Array.isArray(locales) || locales.length === 0) {
-  fail("[i18n] declares no locales. This capability requires `i18n`.");
-}
+// ── Main ─────────────────────────────────────────────────────────────────────
+// Everything below runs only when this file is the script node was started
+// with. `parseToml` above is imported by other derivers (`derive-cms.mjs`,
+// `media-keys.mjs`, `pull-media.mjs`), and without this guard an import ran
+// the whole content derivation as a side effect: it read `content/**`, which
+// the importing pipeline never declared as an input, and rewrote
+// `generated/content.ts`, which it never declared as an output. Under
+// `fid derive` the first of those is refused by the read sandbox, so a fresh
+// product with `cms` installed could not derive at all.
+const isMain =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) main();
 
-const decl = parseToml(read("content.toml"));
-const collections = decl.collections ?? {};
-if (Object.keys(collections).length === 0) fail("content.toml declares no collections");
+function main() {
+  const cfg = parseToml(read("fiducial.toml"));
+  const locales = cfg.i18n?.locales ?? [];
+  if (!Array.isArray(locales) || locales.length === 0) {
+    fail("[i18n] declares no locales. This capability requires `i18n`.");
+  }
 
-const out = { locales, collections: {} };
+  const decl = parseToml(read("content.toml"));
+  const collections = decl.collections ?? {};
+  if (Object.keys(collections).length === 0) fail("content.toml declares no collections");
 
-for (const [name, spec] of Object.entries(collections)) {
-  const kind = spec.kind ?? "collection";
-  const schema = spec.schema ?? {};
-  const wantsBody = (spec.body ?? "none") === "rich";
-  const byLocale = {};
+  const out = { locales, collections: {} };
 
-  for (const loc of locales) {
-    const dir = `content/${name}/${loc}`;
-    if (!existsSync(at(dir))) {
-      // MISSION.md 1c: a missing translation is a missing artifact, not a
-      // fallback. Serving the default locale's copy here is the tempting
-      // behaviour and the wrong one — the reader is never told, and a
-      // journalist or customer quotes text in the wrong language.
+  for (const [name, spec] of Object.entries(collections)) {
+    const kind = spec.kind ?? "collection";
+    const schema = spec.schema ?? {};
+    const wantsBody = (spec.body ?? "none") === "rich";
+    const byLocale = {};
+
+    for (const loc of locales) {
+      const dir = `content/${name}/${loc}`;
+      if (!existsSync(at(dir))) {
+        // MISSION.md 1c: a missing translation is a missing artifact, not a
+        // fallback. Serving the default locale's copy here is the tempting
+        // behaviour and the wrong one — the reader is never told, and a
+        // journalist or customer quotes text in the wrong language.
+        fail(
+          `collection \`${name}\` has nothing for locale \`${loc}\`.\n` +
+            `  expected: ${dir}/\n` +
+            `  A missing translation is a missing artifact, not a fallback ` +
+            `(MISSION.md 1c).\n  Write it, or remove \`${loc}\` from [i18n] locales.`,
+        );
+      }
+      const files = readdirSync(at(dir))
+        .filter((f) => f.endsWith(".md"))
+        .sort();
+      if (kind === "singleton" && files.length !== 1) {
+        fail(`singleton \`${name}\` (${loc}) must hold exactly one entry, found ${files.length}`);
+      }
+      byLocale[loc] = files.map((f) => {
+        const where = `${dir}/${f}`;
+        const { meta, body } = frontmatter(read(where), where);
+        checkSchema(meta, schema, where);
+        if (body && !wantsBody)
+          fail(`${where}: collection declares body = "none" but this entry has one`);
+        if (!body && wantsBody)
+          fail(`${where}: collection declares body = "rich" but this entry has none`);
+        return { slug: f.replace(/\.md$/, ""), ...meta, ...(wantsBody ? { body } : {}) };
+      });
+    }
+
+    // Set parity. A collection carrying an entry in one language and not another
+    // is not translated — it is two different collections, and the gap is
+    // invisible on whichever page you happen to be reading.
+    const sets = locales.map((l) =>
+      byLocale[l]
+        .map((e) => e.slug)
+        .sort()
+        .join("|"),
+    );
+    if (new Set(sets).size > 1) {
+      const detail = locales
+        .map((l) => `    ${l}: ${byLocale[l].map((e) => e.slug).join(", ") || "(none)"}`)
+        .join("\n");
       fail(
-        `collection \`${name}\` has nothing for locale \`${loc}\`.\n` +
-          `  expected: ${dir}/\n` +
-          `  A missing translation is a missing artifact, not a fallback ` +
-          `(MISSION.md 1c).\n  Write it, or remove \`${loc}\` from [i18n] locales.`,
+        `collection \`${name}\` does not carry the same entries in every locale.\n\n${detail}\n\n` +
+          `  An entry exists in every locale, or it exists in none.`,
       );
     }
-    const files = readdirSync(at(dir))
-      .filter((f) => f.endsWith(".md"))
-      .sort();
-    if (kind === "singleton" && files.length !== 1) {
-      fail(`singleton \`${name}\` (${loc}) must hold exactly one entry, found ${files.length}`);
-    }
-    byLocale[loc] = files.map((f) => {
-      const where = `${dir}/${f}`;
-      const { meta, body } = frontmatter(read(where), where);
-      checkSchema(meta, schema, where);
-      if (body && !wantsBody)
-        fail(`${where}: collection declares body = "none" but this entry has one`);
-      if (!body && wantsBody)
-        fail(`${where}: collection declares body = "rich" but this entry has none`);
-      return { slug: f.replace(/\.md$/, ""), ...meta, ...(wantsBody ? { body } : {}) };
-    });
+
+    out.collections[name] = { kind, route: spec.route ?? "", byLocale };
   }
 
-  // Set parity. A collection carrying an entry in one language and not another
-  // is not translated — it is two different collections, and the gap is
-  // invisible on whichever page you happen to be reading.
-  const sets = locales.map((l) =>
-    byLocale[l]
-      .map((e) => e.slug)
-      .sort()
-      .join("|"),
-  );
-  if (new Set(sets).size > 1) {
-    const detail = locales
-      .map((l) => `    ${l}: ${byLocale[l].map((e) => e.slug).join(", ") || "(none)"}`)
+  // ── Types come from the schema, not from the data ────────────────────────────
+  // Inferring an entry's shape from `as const` data means an EMPTY collection
+  // types as `never`, and every read of it is a compile error — so a declared
+  // blog with no posts yet cannot be rendered. That is backwards: the schema in
+  // content.toml is the declaration, the entries are its instances, and the type
+  // should follow the declaration.
+  const TS = {
+    string: "string",
+    // A media key (`press/gallery/icon.png`), not a URL and not a file path.
+    // `mediaUrl()` turns it into something a browser can fetch.
+    media: "string",
+    date: "string",
+    number: "number",
+    boolean: "boolean",
+    "string[]": "readonly string[]",
+  };
+  const pascal = (s) => s.replace(/(^|[-_])(\w)/g, (_, __, c) => c.toUpperCase());
+
+  const ifaces = [];
+  const entryUnion = [];
+  for (const [name, spec] of Object.entries(collections)) {
+    const iface = `${pascal(name)}Entry`;
+    const fields = Object.entries(spec.schema ?? {})
+      .map(([f, t]) => `  ${f}: ${TS[t] ?? "string"}`)
       .join("\n");
-    fail(
-      `collection \`${name}\` does not carry the same entries in every locale.\n\n${detail}\n\n` +
-        `  An entry exists in every locale, or it exists in none.`,
-    );
+    const body = (spec.body ?? "none") === "rich" ? "\n  body: string" : "";
+    ifaces.push(`export interface ${iface} {\n  slug: string\n${fields}${body}\n}`);
+    entryUnion.push(`  ${JSON.stringify(name)}: ${iface}`);
   }
 
-  out.collections[name] = { kind, route: spec.route ?? "", byLocale };
+  // ── Emit ─────────────────────────────────────────────────────────────────────
+  const lines = [
+    "// Generated by `fid derive` (pipeline: content) from content.toml and content/.",
+    "// Do not edit — edit the declarations and re-derive.",
+    "//",
+    "// PLAIN DATA. This module imports nothing, and must not: no React, no Svelte,",
+    "// no framework. That is what makes a port mechanical — moving between web",
+    "// frameworks is rewriting markup against a data module that does not change.",
+    "// The pipeline asserts it, so the property cannot quietly rot.",
+    "",
+    `export const content = ${JSON.stringify(out, null, 2)} as const`,
+    "",
+    "export type Locale = (typeof content.locales)[number]",
+    "export type CollectionName = keyof typeof content.collections",
+    "",
+    ...ifaces,
+    "",
+    "/** Entry shape per collection, derived from content.toml's schema. */",
+    "export interface EntryOf {",
+    ...entryUnion,
+    "}",
+    "",
+    "/**",
+    " * Every entry in a collection, for one locale.",
+    " *",
+    " * The cast is load-bearing. `as const` above gives the data literal types,",
+    " * which is right for `locales` and wrong for entries: an empty collection",
+    " * would be `readonly []` and its element type `never`, so a declared blog",
+    " * with no posts could not be read at all. The schema is the declaration, so",
+    " * the schema is the type.",
+    " */",
+    "export function entries<N extends CollectionName>(name: N, locale: Locale) {",
+    "  return content.collections[name].byLocale[locale] as unknown as readonly EntryOf[N][]",
+    "}",
+    "",
+    "/**",
+    " * The one entry of a singleton.",
+    " *",
+    " * `.at(0)` rather than `[0]`: `as const` makes an empty collection a",
+    " * `readonly []`, and indexing that is a type error rather than `undefined`.",
+    " * A declared-but-empty collection is a normal state — it is how a blog",
+    " * exists before its first post — so the accessors tolerate it.",
+    " */",
+    "export function single<N extends CollectionName>(name: N, locale: Locale) {",
+    "  return entries(name, locale).at(0)",
+    "}",
+    "",
+    "/** One entry by slug, or undefined. */",
+    "export function entry<N extends CollectionName>(name: N, locale: Locale, slug: string) {",
+    "  return entries(name, locale).find((e) => e.slug === slug)",
+    "}",
+    "",
+  ];
+  const rendered = lines.join("\n");
+
+  // The assertion that keeps the promise above true.
+  if (/\bfrom\s+["'](react|svelte|next\/|\$app\/)/.test(rendered)) {
+    fail("the generated module imports a framework; it must stay plain data");
+  }
+
+  const target = "apps/web/src/generated/content.ts";
+  mkdirSync(dirname(at(target).pathname), { recursive: true });
+  writeFileSync(at(target), rendered);
+  const n = Object.keys(out.collections).length;
+  console.log(`wrote ${target} (${n} collection(s), ${locales.length} locale(s))`);
 }
-
-// ── Types come from the schema, not from the data ────────────────────────────
-// Inferring an entry's shape from `as const` data means an EMPTY collection
-// types as `never`, and every read of it is a compile error — so a declared
-// blog with no posts yet cannot be rendered. That is backwards: the schema in
-// content.toml is the declaration, the entries are its instances, and the type
-// should follow the declaration.
-const TS = {
-  string: "string",
-  // A media key (`press/gallery/icon.png`), not a URL and not a file path.
-  // `mediaUrl()` turns it into something a browser can fetch.
-  media: "string",
-  date: "string",
-  number: "number",
-  boolean: "boolean",
-  "string[]": "readonly string[]",
-};
-const pascal = (s) => s.replace(/(^|[-_])(\w)/g, (_, __, c) => c.toUpperCase());
-
-const ifaces = [];
-const entryUnion = [];
-for (const [name, spec] of Object.entries(collections)) {
-  const iface = `${pascal(name)}Entry`;
-  const fields = Object.entries(spec.schema ?? {})
-    .map(([f, t]) => `  ${f}: ${TS[t] ?? "string"}`)
-    .join("\n");
-  const body = (spec.body ?? "none") === "rich" ? "\n  body: string" : "";
-  ifaces.push(`export interface ${iface} {\n  slug: string\n${fields}${body}\n}`);
-  entryUnion.push(`  ${JSON.stringify(name)}: ${iface}`);
-}
-
-// ── Emit ─────────────────────────────────────────────────────────────────────
-const lines = [
-  "// Generated by `fid derive` (pipeline: content) from content.toml and content/.",
-  "// Do not edit — edit the declarations and re-derive.",
-  "//",
-  "// PLAIN DATA. This module imports nothing, and must not: no React, no Svelte,",
-  "// no framework. That is what makes a port mechanical — moving between web",
-  "// frameworks is rewriting markup against a data module that does not change.",
-  "// The pipeline asserts it, so the property cannot quietly rot.",
-  "",
-  `export const content = ${JSON.stringify(out, null, 2)} as const`,
-  "",
-  "export type Locale = (typeof content.locales)[number]",
-  "export type CollectionName = keyof typeof content.collections",
-  "",
-  ...ifaces,
-  "",
-  "/** Entry shape per collection, derived from content.toml's schema. */",
-  "export interface EntryOf {",
-  ...entryUnion,
-  "}",
-  "",
-  "/**",
-  " * Every entry in a collection, for one locale.",
-  " *",
-  " * The cast is load-bearing. `as const` above gives the data literal types,",
-  " * which is right for `locales` and wrong for entries: an empty collection",
-  " * would be `readonly []` and its element type `never`, so a declared blog",
-  " * with no posts could not be read at all. The schema is the declaration, so",
-  " * the schema is the type.",
-  " */",
-  "export function entries<N extends CollectionName>(name: N, locale: Locale) {",
-  "  return content.collections[name].byLocale[locale] as unknown as readonly EntryOf[N][]",
-  "}",
-  "",
-  "/**",
-  " * The one entry of a singleton.",
-  " *",
-  " * `.at(0)` rather than `[0]`: `as const` makes an empty collection a",
-  " * `readonly []`, and indexing that is a type error rather than `undefined`.",
-  " * A declared-but-empty collection is a normal state — it is how a blog",
-  " * exists before its first post — so the accessors tolerate it.",
-  " */",
-  "export function single<N extends CollectionName>(name: N, locale: Locale) {",
-  "  return entries(name, locale).at(0)",
-  "}",
-  "",
-  "/** One entry by slug, or undefined. */",
-  "export function entry<N extends CollectionName>(name: N, locale: Locale, slug: string) {",
-  "  return entries(name, locale).find((e) => e.slug === slug)",
-  "}",
-  "",
-];
-const rendered = lines.join("\n");
-
-// The assertion that keeps the promise above true.
-if (/\bfrom\s+["'](react|svelte|next\/|\$app\/)/.test(rendered)) {
-  fail("the generated module imports a framework; it must stay plain data");
-}
-
-const target = "apps/web/src/generated/content.ts";
-mkdirSync(dirname(at(target).pathname), { recursive: true });
-writeFileSync(at(target), rendered);
-const n = Object.keys(out.collections).length;
-console.log(`wrote ${target} (${n} collection(s), ${locales.length} locale(s))`);

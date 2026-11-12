@@ -2453,7 +2453,15 @@ fn render_adapters_factory(config: &Config) -> Result<String> {
         imports.push(vendor_ts_import(toml_key, vendor));
         let class = vendor_ts_class(toml_key, vendor);
         let extra = vendor_extra_args(toml_key, vendor, config);
-        fields.push(format!("    {field_name}: new {class}(env{extra}),"));
+        // A getter, constructed on first read and kept. A vendor class
+        // throws from its constructor when its binding or secret is absent —
+        // deliberately, so a misconfiguration is a deploy-time error — and a
+        // factory that built all of them up front turned one missing secret
+        // into the loss of every adapter: a product with `ai = "openrouter"`
+        // and no key yet could not open its database.
+        fields.push(format!(
+            "    get {field_name}() {{\n      return (made.{field_name} ??= new {class}(env{extra}));\n    }},"
+        ));
     }
 
     let auth_vendor = adapters.get("auth").unwrap_or("none");
@@ -2474,6 +2482,8 @@ fn render_adapters_factory(config: &Config) -> Result<String> {
          \n\
          // eslint-disable-next-line @typescript-eslint/no-explicit-any\n\
          export function createAdapters(env?: any): AdapterSet {{\n\
+         \u{20}\u{20}// Each adapter is built the first time it is read, then reused.\n\
+         \u{20}\u{20}const made: Partial<AdapterSet> = {{}};\n\
          \u{20}\u{20}return {{\n\
          {}\n\
          \u{20}\u{20}}};\n\

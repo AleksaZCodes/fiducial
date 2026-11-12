@@ -316,7 +316,7 @@ fn the_declared_model_reaches_the_factory() {
     assert!(run(&root, &["derive"]).status.success());
     let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
     assert!(
-        factory.contains("ai: new OpenRouterAi(env, \"anthropic/claude-opus-5\"),"),
+        factory.contains("made.ai ??= new OpenRouterAi(env, \"anthropic/claude-opus-5\")"),
         "{factory}"
     );
 }
@@ -370,7 +370,7 @@ fn ai_none_needs_no_model() {
 
     assert!(run(&root, &["derive"]).status.success());
     let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
-    assert!(factory.contains("ai: new NoneAi(env),"), "{factory}");
+    assert!(factory.contains("made.ai ??= new NoneAi(env)"), "{factory}");
 }
 
 /// The same hole, on the axis that existed before `[ai]` did.
@@ -390,4 +390,28 @@ fn changing_only_a_vendor_makes_the_factory_stale() {
     let out = run(&root, &["derive", "--check"]);
     assert!(!out.status.success(), "{}", text(&out));
     assert!(text(&out).contains("not what this fid"), "{}", text(&out));
+}
+
+/// One unconfigured vendor must not cost the product every other adapter.
+///
+/// The factory used to construct all of them when it was called. A vendor
+/// class throws from its constructor when its secret is missing — on purpose —
+/// so a product with `ai = "openrouter"` and no key yet could not reach its
+/// database either: `createAdapters(env)` threw before returning anything.
+/// Each adapter is now built when it is first read.
+#[test]
+fn the_factory_builds_each_adapter_only_when_it_is_read() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "ai", "openrouter");
+    set_ai_model(&root, "anthropic/claude-opus-5");
+
+    assert!(run(&root, &["derive"]).status.success());
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("get ai() {"), "{factory}");
+    assert!(factory.contains("get database() {"), "{factory}");
+    assert!(
+        !factory.contains("ai: new OpenRouterAi("),
+        "an adapter is constructed eagerly: {factory}"
+    );
 }

@@ -23,7 +23,10 @@
       "**/node_modules/**",
       "**/generated/**",
       "**/app/tokens.css",
-      "**/public/**"
+      "**/wrangler.jsonc",
+      "**/public/**",
+      "scripts/**",
+      "tools/**"
     ]
   }
 }
