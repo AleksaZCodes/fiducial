@@ -478,8 +478,14 @@ fn the_generated_jsonc_parses_once_comments_are_stripped() {
     // A declared Durable Object is bound and migrated as SQLite-backed, the
     // only kind the free plan accepts.
     assert_eq!(value["durable_objects"]["bindings"][0]["name"], "REALTIME");
-    assert_eq!(value["durable_objects"]["bindings"][0]["class_name"], "RealtimeDO");
-    assert_eq!(value["migrations"][0]["new_sqlite_classes"][0], "RealtimeDO");
+    assert_eq!(
+        value["durable_objects"]["bindings"][0]["class_name"],
+        "RealtimeDO"
+    );
+    assert_eq!(
+        value["migrations"][0]["new_sqlite_classes"][0],
+        "RealtimeDO"
+    );
 }
 
 /// `fid derive --check` gates it like any other artifact.
