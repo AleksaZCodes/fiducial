@@ -51,6 +51,9 @@ Every row carries a status, and the statuses are honest:
 | --- | --- | --- |
 | SSR framework | **Next.js** (App Router) | Decided |
 | Second framework | **SvelteKit** | Decided |
+| Content-first framework | **Astro** (islands, zero JS by default) | Candidate — roadmap: *A stack chosen per app* |
+| React, routes and loaders | **React Router** (framework mode) | Candidate — roadmap: *A stack chosen per app* |
+| React, full-stack typed | **TanStack Start** | Candidate — roadmap: *A stack chosen per app* |
 | Static / PWA | Next.js `output: "export"` on Cloudflare Workers Static Assets | Decided |
 | Styling | **Tailwind v4**, CSS-first (`@theme`, no config file) | Decided |
 | Design tokens | `@fiducial/tokens` — OKLCH palette as CSS custom properties | Decided |
@@ -81,6 +84,9 @@ Every row carries a status, and the statuses are honest:
 | Analytics | **DuckDB over R2** | Decided |
 | Transactional email | **Resend**, via `@fiducial/email` | Decided |
 | CMS | **Payload** | Candidate — ROP-proven, not yet platform-generalized |
+| Content editor (git-based) | **Decap** (default, derived from `content.toml`), plus **Pages CMS**, **Keystatic**, **TinaCMS** chosen per app | Decap decided; others candidates |
+| Backend framework | **Hono** (Workers-native; Node for a self-hosted target) | Candidate — roadmap: *A stack chosen per app* |
+| ORM | **Drizzle** over the `database` contract (D1, Postgres, SQLite) | Candidate — roadmap: *A stack chosen per app* |
 | Docs site | **VitePress** | Decided |
 | Self-hosted server | **Rust `axum` + `tokio`**, `sqlx` — a recorded exception to TypeScript server glue (`2026-11-01-a-self-hosted-target`) | Decided |
 | Self-hosted database | **SQLite (WAL)** — raw readings 30 days, hourly roll-ups kept | Decided |
