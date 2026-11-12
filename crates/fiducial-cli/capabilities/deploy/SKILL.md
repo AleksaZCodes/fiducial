@@ -220,6 +220,13 @@ vars               = { SPOTS_DEFAULT = "14" }
 [[deploy.kv_namespaces]]
 binding = "SPOTS"
 id      = "a6a236c7ea344ddca04548dd4c90fb44"
+
+# Classes this Worker exports and binds (SQLite-backed, as the free plan
+# requires). `RealtimeDO` is `@fiducial/realtime`'s broadcast/presence room;
+# re-export it from `main` (`export { RealtimeDO } from "@fiducial/realtime/durable-object"`).
+[[deploy.durable_objects]]
+binding = "REALTIME"
+class   = "RealtimeDO"
 ```
 
 ```toml

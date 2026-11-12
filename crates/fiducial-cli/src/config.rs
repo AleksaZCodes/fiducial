@@ -552,6 +552,14 @@ pub struct Deploy {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub kv_namespaces: Vec<KvNamespace>,
 
+    /// Durable Object classes this Worker exports and binds. Like KV, a fact
+    /// about the product's own Worker rather than a vendor choice. The class
+    /// must be exported from `main` (for the Next.js shape, a one-line
+    /// re-export beside OpenNext's handler). Declared as SQLite-backed, the
+    /// only kind the free plan allows.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub durable_objects: Vec<DurableObject>,
+
     /// Plain environment variables. Values are **not** secrets — those are
     /// named in a comment and set with `wrangler secret put`, never written
     /// into a file in the repository.
@@ -569,6 +577,16 @@ pub struct KvNamespace {
     /// and **load-bearing**: point a deploy at a different id and the data is
     /// silently gone rather than missing.
     pub id: String,
+}
+
+/// One Durable Object binding: the name the Worker reads, and the class it is.
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct DurableObject {
+    /// The binding name in the Worker, e.g. `REALTIME`.
+    pub binding: String,
+    /// The exported class, e.g. `RealtimeDO` (from `@fiducial/realtime`).
+    pub class: String,
 }
 
 /// Which artifact `fid-deploy` is describing.
@@ -595,6 +613,7 @@ impl Deploy {
             && self.route.is_empty()
             && self.shape.is_empty()
             && self.kv_namespaces.is_empty()
+            && self.durable_objects.is_empty()
             && self.vars.is_empty()
     }
 

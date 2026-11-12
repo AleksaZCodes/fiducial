@@ -10,12 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 fn fid() -> PathBuf {
-    let mut path = std::env::current_exe().expect("test binary path");
-    path.pop();
-    if path.ends_with("deps") {
-        path.pop();
-    }
-    path.join("fid")
+    PathBuf::from(env!("CARGO_BIN_EXE_fid"))
 }
 
 fn run(cwd: &Path, args: &[&str]) -> Output {
@@ -383,7 +378,8 @@ fn sveltekit_product(tmp: &Path) -> PathBuf {
     let config = format!(
         "{config}\n[adapters]\ndeploy = \"cloudflare\"\n\n\
          [[deploy.kv_namespaces]]\nbinding = \"SPOTS\"\n\
-         id = \"a6a236c7ea344ddca04548dd4c90fb44\"\n",
+         id = \"a6a236c7ea344ddca04548dd4c90fb44\"\n\n\
+         [[deploy.durable_objects]]\nbinding = \"REALTIME\"\nclass = \"RealtimeDO\"\n",
     );
     std::fs::write(&config_path, config).unwrap();
 
@@ -474,6 +470,17 @@ fn the_generated_jsonc_parses_once_comments_are_stripped() {
     assert_eq!(value["name"], "upoznaj-biznis");
     assert_eq!(value["kv_namespaces"][0]["binding"], "SPOTS");
     assert_eq!(value["assets"]["binding"], "ASSETS");
+    // A declared Durable Object is bound and migrated as SQLite-backed, the
+    // only kind the free plan accepts.
+    assert_eq!(value["durable_objects"]["bindings"][0]["name"], "REALTIME");
+    assert_eq!(
+        value["durable_objects"]["bindings"][0]["class_name"],
+        "RealtimeDO"
+    );
+    assert_eq!(
+        value["migrations"][0]["new_sqlite_classes"][0],
+        "RealtimeDO"
+    );
 }
 
 /// `fid derive --check` gates it like any other artifact.
