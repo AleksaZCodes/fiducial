@@ -111,14 +111,31 @@ one level down.
   parser will silently lose a wrapped summary and turn a list into an empty
   string, which is how this was first found.
 
-## Interface text
+## Settings and interface text
 
-Every string the interface shows (`messages/<locale>.json`) is editable too, in
-every language side by side, as the **Interface text** file collection. Its
-fields are read from the default language's file, so a new key appears in the
-editor with no declaration, and nothing lists a message by name. Together with
-the content collections (and `shared` ones for settings that are not
-translated), that is everything on the site that a person changes.
+Two files are not collections of entries, so the editor offers them as a
+**Settings** group of file forms, with the fields read from the files
+themselves:
+
+- `settings.toml`: the links and facts that are the same in every language
+  (typed once; exported as `settings` from the generated content module). List
+  more TOML files in `[cms] settings = [...]`, and add them to the `cms`
+  pipeline's `inputs` as well, which is what lets the deriver read them.
+- `messages/<locale>.json`: every string the interface prints, one entry per
+  language.
+
+A new key in either file appears in its form on the next derive, and nothing
+lists a message by name. Together with the content collections, that is
+everything on the site that a person changes.
+
+A **singleton** is offered as one named file per language, not as a one-entry
+folder: the editor lists an unnamed record for a folder of one and loads it
+blank when the title field is empty.
+
+`[cms.selects]`, `[cms.hints]` and `[cms.relations]` refine a field: a fixed
+list of choices, help text, and a searchable pick from another collection (a
+field named `related<Collection>` points at that collection with no
+declaration).
 
 What stays in code: the build's own declarations (`fiducial.toml`,
 `design-system.md`). They carry comments and structure the editor would

@@ -92,54 +92,80 @@ fn importing_the_content_deriver_has_no_side_effects() {
     );
 }
 
-/// Everything the interface says is editable, in every language, and a
-/// collection can declare itself shared so its values are typed once.
+/// Everything the interface says is editable, in every language, and settings
+/// that are the same in every language are one file.
 ///
 /// The editor used to cover only the markdown collections, so a button label
-/// or a page title meant opening a JSON file. The interface text is now a file
-/// collection read from the default language's `messages/<locale>.json`.
+/// or a link meant opening a data file. `messages/<locale>.json` (one entry per
+/// language) and `settings.toml` are now a Settings group of file forms, read
+/// from the files, and `settings.toml` is exported typed from the content module.
 #[test]
-fn the_editor_covers_interface_text_and_shared_settings() {
+fn the_editor_covers_interface_text_and_settings() {
     let tmp = tempfile::tempdir().unwrap();
     let root = cms_product(tmp.path());
-
-    // A settings collection whose values are the same in every language.
-    let content = root.join("content.toml");
-    let declared = std::fs::read_to_string(&content).unwrap();
     std::fs::write(
-        &content,
-        format!(
-            "{declared}\n[collections.settings]\nkind = \"singleton\"\nschema = {{ survey_url = \"string\" }}\nbody = \"none\"\nshared = true\nroute = \"\"\n"
-        ),
+        root.join("settings.toml"),
+        "survey_url = \"https://example.test/s\"\n\n[credits]\nmaker = \"Name\"\n",
     )
     .unwrap();
-    for locale in ["en", "sr"] {
-        let dir = root.join("content/settings").join(locale);
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(
-            dir.join("site.md"),
-            "---\nsurvey_url: https://example.test/s\n---\n",
-        )
-        .unwrap();
-    }
 
     let out = run(&root, &["derive"]);
     assert!(out.status.success(), "{}", text(&out));
     let config = std::fs::read_to_string(root.join("tools/cms/config.yml")).unwrap();
 
-    // The interface text: one file collection, every language, structure set
-    // on it alone.
-    assert!(config.contains("name: ui-text"), "{config}");
-    assert!(config.contains("multiple_files"), "{config}");
-    assert!(config.contains("messages/{{locale}}.json"), "{config}");
+    assert!(config.contains("name: settings"), "{config}");
+    assert!(config.contains("file: messages/en.json"), "{config}");
+    assert!(config.contains("file: messages/sr.json"), "{config}");
+    assert!(config.contains("file: settings.toml"), "{config}");
+    assert!(config.contains("name: survey_url"), "{config}");
+    assert!(config.contains("name: maker"), "{config}");
 
-    // Shared: the editor keeps the copies in step rather than asking twice.
-    let settings = &config[config.find("name: settings").expect("settings collection")..];
-    let settings = &settings[..settings.find("name: ui-text").unwrap_or(settings.len())];
-    let fields = &settings[settings.find("fields:").expect("its fields")..];
-    assert!(fields.contains("i18n: duplicate"), "{fields}");
-    assert!(!fields.contains("i18n: true"), "{fields}");
+    // The same file, typed, from the generated content module.
+    let module = std::fs::read_to_string(root.join("apps/web/src/generated/content.ts")).unwrap();
+    assert!(module.contains("export const settings"), "{module}");
+    assert!(module.contains("https://example.test/s"), "{module}");
 
     let out = run(&root, &["derive", "--check"]);
     assert!(out.status.success(), "{}", text(&out));
+}
+
+/// Partial dates and lists of small records, from a product that needed both.
+/// A key that is not declared inside a record fails the derive, as an
+/// undeclared field does.
+#[test]
+fn partial_dates_and_object_lists_are_checked() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = cms_product(tmp.path());
+    let content = root.join("content.toml");
+    let declared = std::fs::read_to_string(&content).unwrap();
+    std::fs::write(
+        &content,
+        format!(
+            "{declared}\n[collections.works]\nkind = \"collection\"\nschema = {{ title = \"string\", started = \"partial-date\", links = \"object[]\" }}\nbody = \"none\"\nroute = \"\"\n\n[collections.works.objects]\nlinks = {{ label = \"string\", url = \"string\" }}\n"
+        ),
+    )
+    .unwrap();
+    let entry = |extra: &str| {
+        format!(
+            "---\ntitle: A\nstarted: 2026-03\nlinks:\n  - label: Home\n    url: https://example.test\n{extra}---\n"
+        )
+    };
+    for locale in ["en", "sr"] {
+        let dir = root.join("content/works").join(locale);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("a.md"), entry("")).unwrap();
+    }
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "{}", text(&out));
+
+    // An undeclared key in a record is refused.
+    let bad = "---\ntitle: A\nstarted: \"2026\"\nlinks:\n  - label: Home\n    url: https://example.test\n    extra: no\n---\n";
+    std::fs::write(root.join("content/works/en/a.md"), bad).unwrap();
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success(), "an undeclared record key must fail");
+    assert!(
+        text(&out).contains("is not declared in content.toml"),
+        "{}",
+        text(&out)
+    );
 }

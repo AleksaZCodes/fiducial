@@ -16,7 +16,7 @@
 //
 // What it does NOT do: invent a content model. Every collection here exists
 // because a declaration says so.
-import { mkdirSync, readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { parseToml } from "./derive-content.mjs";
 
@@ -31,6 +31,9 @@ const cms = cfg.cms ?? {};
 // Uploads land in the gitignored staging directory, keyed the way content
 // refers to media everywhere else. `pnpm media:push` syncs them to the bucket.
 const mediaDir = cms.media_dir ?? "media";
+// The URL the site serves that directory at. A stored image value is this plus
+// the file's path, so what the picker saves is what the page can load.
+const publicBase = cms.public_base ?? "";
 // Where a loose upload goes: one whose entry has no collection of its own,
 // or one made from the Media tab rather than from a field.
 //
@@ -40,6 +43,12 @@ const mediaDir = cms.media_dir ?? "media";
 // Each collection's own folder is what its image picker shows, which is where
 // an entry's images are actually found.
 const mediaPrefix = cms.media_prefix ?? "site/uploads";
+// select: `[cms.selects]` maps "collection.field" → ["opt1", "opt2", ...]
+// hint:   `[cms.hints]`   maps "collection.field" → "hint text"
+const selects = cms.selects ?? {};
+const hints = cms.hints ?? {};
+
+const language = (l) => new Intl.DisplayNames(["en"], { type: "language" }).of(l) ?? l;
 
 const collections = parseToml(read("content.toml")).collections ?? {};
 
@@ -47,10 +56,23 @@ const collections = parseToml(read("content.toml")).collections ?? {};
 const WIDGET = {
   string: { widget: "string" },
   date: { widget: "datetime", date_format: "YYYY-MM-DD", time_format: false, picker_utc: true },
+  "partial-date": {
+    widget: "datetime",
+    date_format: "YYYY-MM-DD",
+    time_format: false,
+    picker_utc: true,
+  },
   number: { widget: "number", value_type: "int" },
   boolean: { widget: "boolean" },
-  "string[]": { widget: "list" },
+  "string[]": { widget: "list", field: { name: "item", label: "Item", widget: "string" } },
   media: { widget: "image", allow_multiple: false },
+};
+
+const MAY_BE_EMPTY = {
+  string: { required: false, default: "" },
+  "string[]": { required: false, default: [] },
+  media: { required: false, default: "" },
+  "partial-date": { required: false, default: "" },
 };
 
 /**
@@ -68,7 +90,7 @@ const WIDGET = {
  */
 const mediaFolders = (prefix) => ({
   media_folder: `/${mediaDir}/${prefix}`,
-  public_folder: prefix,
+  public_folder: `${publicBase}/${prefix}`,
 });
 
 // The folders are set on the COLLECTION, not on each media field: an image
@@ -93,79 +115,140 @@ function label(name) {
 // side by side, which is the point: a missing translation is visible while you
 // are writing rather than at the next build.
 const out = [];
+
+// `[cms.relations]` maps "collection.field" to the collection it points at, so the
+// field is a searchable dropdown of that collection's entries, not a slug typed by hand.
+const relations = { ...(cms.relations ?? {}) };
+// Any field named `related<Collection>` points at that collection, so a new link
+// kind is a field in content.toml and nothing else.
+for (const [name, spec] of Object.entries(collections)) {
+  for (const f of Object.keys(spec.schema ?? {})) {
+    const m = /^related([A-Z]\w*)$/.exec(f);
+    const target = m ? m[1].charAt(0).toLowerCase() + m[1].slice(1) : "";
+    if (target && collections[target]) relations[`${name}.${f}`] ??= target;
+  }
+}
+const titleKey = (target) =>
+  ["title", "name", "headline"].find((k) => k in (collections[target]?.schema ?? {})) ?? "slug";
+
+function buildField(name, spec, f, t, inLocale) {
+  const key = `${name}.${f}`;
+  const opts = selects[key];
+  const hint = hints[key];
+  // Facts that do not change with the language (dates, numbers, switches, choices, pictures,
+  // links to other entries, addresses) are written once in the default language and copied
+  // to the others. Text is written per language.
+  const sameEverywhere =
+    ["date", "partial-date", "number", "boolean", "media"].includes(t) ||
+    relations[key] ||
+    selects[key] ||
+    /^(href|url|link)$/.test(f);
+  const i18n = inLocale ? { i18n: sameEverywhere ? "duplicate" : true } : {};
+  if (t === "object[]") {
+    const shape = Object.entries(spec.objects?.[f] ?? {});
+    return {
+      name: f,
+      label: label(f),
+      widget: "list",
+      label_singular: label(f).replace(/s$/, ""),
+      summary: `{{fields.${(shape.find(([, kt]) => kt !== "media") ?? shape[0] ?? ["label"])[0]}}}`,
+      ...(inLocale ? { i18n: true } : {}),
+      required: false,
+      default: [],
+      ...(hint ? { hint } : {}),
+      fields: shape.map(([k, kt]) =>
+        field(k, kt, {
+          ...MAY_BE_EMPTY[kt],
+          ...(hints[`${key}.${k}`] ? { hint: hints[`${key}.${k}`] } : {}),
+        }),
+      ),
+    };
+  }
+  if (relations[key]) {
+    const target = relations[key];
+    const many = t === "string[]";
+    return {
+      name: f,
+      label: label(f),
+      widget: "relation",
+      collection: target,
+      search_fields: [titleKey(target)],
+      value_field: "{{slug}}",
+      display_fields: [titleKey(target)],
+      multiple: many,
+      ...i18n,
+      required: false,
+      default: many ? [] : "",
+      ...(hint ? { hint } : {}),
+    };
+  }
+  if (opts) {
+    return {
+      name: f,
+      label: label(f),
+      widget: "select",
+      options: opts,
+      ...i18n,
+      required: false,
+      default: opts[0] ?? "",
+      ...(hint ? { hint } : {}),
+    };
+  }
+  return field(f, t, {
+    ...i18n,
+    ...MAY_BE_EMPTY[t],
+    ...(hint ? { hint } : {}),
+  });
+}
+
+const bodyField = (inLocale) => ({
+  name: "body",
+  label: "Body",
+  widget: "markdown",
+  required: false,
+  ...(inLocale ? { i18n: true } : {}),
+});
+
 for (const [name, spec] of Object.entries(collections)) {
   const prefix = spec.media ?? name;
-  const fields = Object.entries(spec.schema ?? {}).map(([f, t]) =>
-    // A date is the same instant in every language; duplicating it keeps the
-    // locales from drifting apart by a day.
-    //
-    // `shared = true` is a collection whose values are the same in every
-    // language (links, ids, settings): the editor keeps the copies in step
-    // instead of asking for each one to be typed again.
-    field(f, t, { i18n: t === "date" || spec.shared ? "duplicate" : true }),
-  );
-  if (spec.body === "rich") {
-    fields.push({
-      name: "body",
-      label: "Body",
-      widget: "markdown",
-      i18n: spec.shared ? "duplicate" : true,
+  const schema = Object.entries(spec.schema ?? {});
+
+  if (spec.kind === "singleton") {
+    // A singleton is one named file per language, not a one-entry folder. A folder
+    // collection of one lists an unnamed record and loads blank when the title field
+    // is empty; a file entry is always found by its path and always has a name.
+    out.push({
+      name,
+      label: label(name),
+      files: locales.map((l) => ({
+        name: `${name}-${l}`,
+        label: `${label(name)}: ${language(l)}`,
+        file: `content/${name}/${l}/${name}.md`,
+        format: "frontmatter",
+        ...mediaFolders(prefix),
+        fields: [
+          ...schema.map(([f, t]) => buildField(name, spec, f, t, false)),
+          ...(spec.body === "rich" ? [bodyField(false)] : []),
+        ],
+      })),
     });
+    continue;
   }
+
   out.push({
     name,
     label: label(name),
     folder: `content/${name}`,
     ...mediaFolders(prefix),
-    create: spec.kind !== "singleton",
-    delete: spec.kind !== "singleton",
+    create: true,
+    delete: true,
     slug: "{{slug}}",
     extension: "md",
     format: "frontmatter",
     i18n: true,
-    fields,
-  });
-}
-
-// ── Interface text ───────────────────────────────────────────────────────────
-// Every string the interface shows lives in `messages/<locale>.json`. It is
-// not a collection of entries, it is one document per language, so it is a
-// Decap FILE collection: one file, every language side by side. The fields are
-// read from the default language's file, so adding a key to it adds the field,
-// and nothing here lists a message by name.
-//
-// Decap's `multiple_files` structure is set on this collection alone; the
-// content collections above keep `multiple_folders`.
-const messagesFile = `messages/${defaultLocale}.json`;
-if (has(messagesFile)) {
-  const tree = JSON.parse(read(messagesFile));
-  // A string that has a line break, or is long, gets a text area; the rest a
-  // single line. `{placeholders}` and `[highlight]` marks are part of the
-  // text and are left for the editor to keep.
-  const fieldsOf = (node) =>
-    Object.entries(node).map(([key, value]) =>
-      value && typeof value === "object"
-        ? { name: key, label: label(key), widget: "object", collapsed: true, i18n: true, fields: fieldsOf(value) }
-        : {
-            name: key,
-            label: label(key),
-            widget: /\n/.test(value) || String(value).length > 90 ? "text" : "string",
-            i18n: true,
-          },
-    );
-  out.push({
-    name: "ui-text",
-    label: "Interface text",
-    i18n: { structure: "multiple_files", locales, default_locale: defaultLocale },
-    files: [
-      {
-        name: "messages",
-        label: "Interface text",
-        file: "messages/{{locale}}.json",
-        format: "json",
-        i18n: true,
-        fields: fieldsOf(tree),
-      },
+    fields: [
+      ...schema.map(([f, t]) => buildField(name, spec, f, t, true)),
+      ...(spec.body === "rich" ? [bodyField(true)] : []),
     ],
   });
 }
@@ -234,15 +317,15 @@ if (has("press/docs") || has("press/stories")) {
       i18n: true,
       fields: [
         ...STORY_FIELDS.map(([f, t]) =>
-        f === "angle"
-          ? {
-              name: "angle",
-              label: "Angle",
-              widget: "select",
-              options: ANGLES,
-              i18n: "duplicate",
-            }
-          : field(f, t, { i18n: t === "date" ? "duplicate" : true }),
+          f === "angle"
+            ? {
+                name: "angle",
+                label: "Angle",
+                widget: "select",
+                options: ANGLES,
+                i18n: "duplicate",
+              }
+            : field(f, t, { i18n: t === "date" ? "duplicate" : true }),
         ),
         // The story itself. It was missing, which made the editor a form for
         // everything about a story except the story.
@@ -251,6 +334,53 @@ if (has("press/docs") || has("press/stories")) {
     });
   }
 }
+
+// ── Settings: the facts that are not entries ─────────────────────────────────
+// `settings.toml` (links, ids, a form's address: the same in every language) and
+// `messages/<locale>.json` (every string the interface prints) are files, not
+// collections of entries, so they are file collections. Their fields are read
+// from the files themselves, so a new key appears in the form on the next
+// derive and nothing is declared twice.
+//
+// `[cms] settings` lists the TOML files to offer; it defaults to `settings.toml`.
+const walkFields = (value) =>
+  Object.entries(value).map(([k, v]) => {
+    if (Array.isArray(v)) return { name: k, label: label(k), widget: "list", required: false };
+    if (v && typeof v === "object") {
+      return { name: k, label: label(k), widget: "object", collapsed: true, fields: walkFields(v) };
+    }
+    if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      return { name: k, label: label(k), ...WIDGET.date, required: false };
+    }
+    // A line break, or a long string, gets a text area; the rest one line.
+    // `{placeholders}` and `[highlight]` marks are part of the text.
+    const long = typeof v === "string" && (/\n/.test(v) || v.length > 90);
+    return { name: k, label: label(k), widget: long ? "text" : "string", required: false };
+  });
+
+const settings = [];
+for (const file of cms.settings ?? ["settings.toml"]) {
+  if (!has(file)) continue;
+  settings.push({
+    name: file.replace(/\.toml$/, "").replace(/[^\w-]/g, "-"),
+    label: label(file.replace(/\.toml$/, "")),
+    file,
+    format: "toml",
+    fields: walkFields(parseToml(read(file))),
+  });
+}
+for (const l of locales) {
+  if (has(`messages/${l}.json`)) {
+    settings.push({
+      name: `messages-${l}`,
+      label: `Interface text: ${language(l)}`,
+      file: `messages/${l}.json`,
+      format: "json",
+      fields: walkFields(JSON.parse(read(`messages/${l}.json`))),
+    });
+  }
+}
+if (settings.length > 0) out.push({ name: "settings", label: "Settings", files: settings });
 
 // ── The config ───────────────────────────────────────────────────────────────
 // Written as YAML by hand rather than through a dependency: this is a fixed,
@@ -296,13 +426,13 @@ const config = {
   local_backend: true,
   locale: defaultLocale,
   media_folder: `${mediaDir}/${mediaPrefix}`,
-  public_folder: mediaPrefix,
+  public_folder: `${publicBase}/${mediaPrefix}`,
   i18n: { structure: "multiple_folders", locales, default_locale: defaultLocale },
   collections: out,
 };
 
 const header = [
-  "# Generated by `node scripts/derive-cms.mjs` from content.toml, press/, messages/ and",
+  "# Generated by `node scripts/derive-cms.mjs` from content.toml, press/, settings.toml, messages/ and",
   "# `[i18n]` in fiducial.toml. Do not edit — change the declaration and",
   "# re-derive. `fid derive --check` fails if this file is stale.",
   "",

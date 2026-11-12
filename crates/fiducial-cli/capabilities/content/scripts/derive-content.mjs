@@ -140,22 +140,57 @@ function isCalendarDate(v) {
 // A field outside the schema is an error rather than extra data. It is almost
 // always a typo, and a typo that silently disappears from a page is the reason
 // this is checked at all.
-function checkSchema(meta, schema, where) {
+// A partial date is what a year-only or month-only fact needs: empty (not yet
+// known), a `[PLACEHOLDER]` waiting to be filled, `YYYY`, `YYYY-MM`, or a real day.
+function isPartialDate(v) {
+  if (typeof v !== "string") return false;
+  if (v === "" || /\[[A-Z][^\]]*\]/.test(v)) return true;
+  if (/^\d{4}$/.test(v)) return true;
+  if (/^\d{4}-(0[1-9]|1[0-2])$/.test(v)) return true;
+  return isCalendarDate(v);
+}
+
+// A list of small records (a gallery's image and caption, a project's links).
+// Each record's shape is declared in `[collections.<name>.objects]`, and an
+// undeclared key fails the same way an undeclared field does.
+function checkObjects(v, shape, field, where) {
+  for (const [i, item] of v.entries()) {
+    const at = `${where}: \`${field}\` item ${i + 1}`;
+    if (typeof item !== "object" || item === null || Array.isArray(item)) {
+      fail(`${at} should be an object with ${Object.keys(shape).join(", ")}`);
+    }
+    for (const [k, type] of Object.entries(shape)) {
+      if (!(k in item)) fail(`${at}: missing \`${k}\``);
+      const ok = type === "number" ? typeof item[k] === "number" : typeof item[k] === "string";
+      if (!ok) fail(`${at}: \`${k}\` should be ${type}, got ${JSON.stringify(item[k])}`);
+    }
+    for (const k of Object.keys(item)) {
+      if (!(k in shape)) fail(`${at}: \`${k}\` is not declared in content.toml`);
+    }
+  }
+  return true;
+}
+
+function checkSchema(meta, schema, where, objects = {}) {
   for (const [field, type] of Object.entries(schema)) {
     if (!(field in meta)) fail(`${where}: missing required field \`${field}\` (${type})`);
     const v = meta[field];
     const ok =
-      type === "string[]"
-        ? Array.isArray(v)
-        : type === "number"
-          ? typeof v === "number"
-          : type === "boolean"
-            ? typeof v === "boolean"
-            : type === "media"
-              ? typeof v === "string"
-              : type === "date"
-              ? isCalendarDate(v)
-              : typeof v === "string";
+      type === "object[]"
+        ? Array.isArray(v) && checkObjects(v, objects[field] ?? {}, field, where)
+        : type === "string[]"
+          ? Array.isArray(v)
+          : type === "number"
+            ? typeof v === "number"
+            : type === "boolean"
+              ? typeof v === "boolean"
+              : type === "media"
+                ? typeof v === "string"
+                : type === "date"
+                  ? isCalendarDate(v)
+                  : type === "partial-date"
+                    ? isPartialDate(v)
+                    : typeof v === "string";
     if (!ok) fail(`${where}: field \`${field}\` should be ${type}, got ${JSON.stringify(v)}`);
   }
   for (const field of Object.keys(meta)) {
@@ -194,6 +229,11 @@ function main() {
   const collections = decl.collections ?? {};
   if (Object.keys(collections).length === 0) fail("content.toml declares no collections");
 
+  // `settings.toml` is optional. Parsed with the same reader as `content.toml`,
+  // so the two cannot disagree about what TOML is.
+  const settings = existsSync(at("settings.toml"))
+    ? parseToml(readFileSync(at("settings.toml"), "utf8"))
+    : {};
   const out = { locales, collections: {} };
 
   for (const [name, spec] of Object.entries(collections)) {
@@ -225,7 +265,7 @@ function main() {
       byLocale[loc] = files.map((f) => {
         const where = `${dir}/${f}`;
         const { meta, body } = frontmatter(read(where), where);
-        checkSchema(meta, schema, where);
+        checkSchema(meta, schema, where, spec.objects ?? {});
         if (body && !wantsBody)
           fail(`${where}: collection declares body = "none" but this entry has one`);
         if (!body && wantsBody)
@@ -268,6 +308,7 @@ function main() {
     // `mediaUrl()` turns it into something a browser can fetch.
     media: "string",
     date: "string",
+    "partial-date": "string",
     number: "number",
     boolean: "boolean",
     "string[]": "readonly string[]",
@@ -278,8 +319,14 @@ function main() {
   const entryUnion = [];
   for (const [name, spec] of Object.entries(collections)) {
     const iface = `${pascal(name)}Entry`;
+    const tsOf = (f, t) =>
+      t === "object[]"
+        ? `readonly { ${Object.entries(spec.objects?.[f] ?? {})
+            .map(([k, v]) => `${k}: ${TS[v] ?? "string"}`)
+            .join("; ")} }[]`
+        : (TS[t] ?? "string");
     const fields = Object.entries(spec.schema ?? {})
-      .map(([f, t]) => `  ${f}: ${TS[t] ?? "string"}`)
+      .map(([f, t]) => `  ${f}: ${tsOf(f, t)}`)
       .join("\n");
     const body = (spec.body ?? "none") === "rich" ? "\n  body: string" : "";
     ifaces.push(`export interface ${iface} {\n  slug: string\n${fields}${body}\n}`);
@@ -297,6 +344,13 @@ function main() {
     "// The pipeline asserts it, so the property cannot quietly rot.",
     "",
     `export const content = ${JSON.stringify(out, null, 2)} as const`,
+    "",
+    "/**",
+    " * The site's settings: `settings.toml`, the facts that are the same in every",
+    " * language (links, ids, a form's address). One file, so each is written once;",
+    " * the editor offers it as a form. Empty when the product has no such file.",
+    " */",
+    `export const settings = ${JSON.stringify(settings, null, 2)} as const`,
     "",
     "export type Locale = (typeof content.locales)[number]",
     "export type CollectionName = keyof typeof content.collections",
