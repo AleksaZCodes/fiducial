@@ -107,12 +107,7 @@ fn steps() -> Vec<Step> {
 }
 
 fn fid() -> PathBuf {
-    let mut path = std::env::current_exe().expect("test binary path");
-    path.pop();
-    if path.ends_with("deps") {
-        path.pop();
-    }
-    path.join("fid")
+    PathBuf::from(env!("CARGO_BIN_EXE_fid"))
 }
 
 fn captures_dir() -> PathBuf {
