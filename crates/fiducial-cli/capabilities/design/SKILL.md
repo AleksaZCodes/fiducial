@@ -565,3 +565,16 @@ A Svelte product gets its primitives from `fid add component <name>
 --framework svelte`, and the platform's Svelte components use `bits-ui`
 directly rather than a copied UI kit — a capability template may depend on a
 package, never on another capability's copied file.
+
+## Layering
+
+Sticky chrome (a header, a footer bar) sits at `z-50`. Anything that opens over
+the page (a menu, a popover, the language picker's list) takes `--z-overlay`
+(1000, declared in `marks.css`), which clears the header and the z-100 grain.
+
+Put it on the **positioner**, not the popup. A Base UI popup is wrapped in a
+positioner, and the positioner is the element that is placed; a `z-index` on the
+popup inside it does nothing, the positioner stays at `auto`, and the list
+paints under a sticky header. That is how a menu once slid under the navbar.
+The shipped dropdown menu and the language picker already do this; follow them
+for any new overlay.

@@ -19,6 +19,22 @@
    `tokens.css`.
    ──────────────────────────────────────────────────────────────────────────── */
 
+/* Layering: one rule, in one place.
+
+   Sticky chrome (a header, a footer bar) sits at `z-50`. Anything that opens
+   OVER the page — a menu, a popover, the language picker's list — sits at
+   `--z-overlay`, above all of it.
+
+   The number alone is not the rule; where it goes is. A Base UI popup is
+   wrapped in a *positioner*, and it is the positioner that is placed, so it is
+   the positioner that needs the `z-index`. Put it on the popup inside and it
+   does nothing at all: the popup is not positioned, so the positioner stays at
+   `auto` and paints beneath a sticky header however high the number is. That
+   is how a menu opening from a footer once slid under the navbar. */
+:root {
+  --z-overlay: 1000;
+}
+
 @layer components {
   /* ── Named type steps live in tokens.css ──────────────────────────────────
      They used to be written here by hand. They are now derived from the

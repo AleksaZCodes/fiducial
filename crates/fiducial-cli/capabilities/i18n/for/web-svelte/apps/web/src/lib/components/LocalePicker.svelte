@@ -181,7 +181,7 @@
     background: var(--popover, var(--background, #fff));
     color: var(--popover-foreground, var(--foreground, inherit));
     box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);
-    z-index: 60;
+    z-index: var(--z-overlay, 1000);
   }
   :global(.fid-locale-item) {
     display: flex;
