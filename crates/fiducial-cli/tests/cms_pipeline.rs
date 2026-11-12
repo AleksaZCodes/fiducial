@@ -91,3 +91,55 @@ fn importing_the_content_deriver_has_no_side_effects() {
         "importing the deriver rewrote its artifact"
     );
 }
+
+/// Everything the interface says is editable, in every language, and a
+/// collection can declare itself shared so its values are typed once.
+///
+/// The editor used to cover only the markdown collections, so a button label
+/// or a page title meant opening a JSON file. The interface text is now a file
+/// collection read from the default language's `messages/<locale>.json`.
+#[test]
+fn the_editor_covers_interface_text_and_shared_settings() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = cms_product(tmp.path());
+
+    // A settings collection whose values are the same in every language.
+    let content = root.join("content.toml");
+    let declared = std::fs::read_to_string(&content).unwrap();
+    std::fs::write(
+        &content,
+        format!(
+            "{declared}\n[collections.settings]\nkind = \"singleton\"\nschema = {{ survey_url = \"string\" }}\nbody = \"none\"\nshared = true\nroute = \"\"\n"
+        ),
+    )
+    .unwrap();
+    for locale in ["en", "sr"] {
+        let dir = root.join("content/settings").join(locale);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("site.md"),
+            "---\nsurvey_url: https://example.test/s\n---\n",
+        )
+        .unwrap();
+    }
+
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let config = std::fs::read_to_string(root.join("tools/cms/config.yml")).unwrap();
+
+    // The interface text: one file collection, every language, structure set
+    // on it alone.
+    assert!(config.contains("name: ui-text"), "{config}");
+    assert!(config.contains("multiple_files"), "{config}");
+    assert!(config.contains("messages/{{locale}}.json"), "{config}");
+
+    // Shared: the editor keeps the copies in step rather than asking twice.
+    let settings = &config[config.find("name: settings").expect("settings collection")..];
+    let settings = &settings[..settings.find("name: ui-text").unwrap_or(settings.len())];
+    let fields = &settings[settings.find("fields:").expect("its fields")..];
+    assert!(fields.contains("i18n: duplicate"), "{fields}");
+    assert!(!fields.contains("i18n: true"), "{fields}");
+
+    let out = run(&root, &["derive", "--check"]);
+    assert!(out.status.success(), "{}", text(&out));
+}

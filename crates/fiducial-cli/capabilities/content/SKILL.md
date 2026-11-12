@@ -191,3 +191,17 @@ the first would be invalid and would also break the big target.
 `entries` and `href` come in from the product. Which collection it is, where
 it lives and what the section is called are product facts; the shape of a card
 is not.
+
+## Settings that are the same in every language
+
+Declare a collection `shared = true` when its values are not translated: links,
+ids, a form's address. It is usually a `kind = "singleton"` (one entry per
+language), and the editor keeps the copies in step, so a link is typed once.
+
+```toml
+[collections.settings]
+kind   = "singleton"
+shared = true
+body   = "none"
+schema = { survey_url = "string", pitch_video = "string" }
+```

@@ -110,3 +110,16 @@ one level down.
   sequences. `scripts/frontmatter.mjs` reads those. A line-wise `key: value`
   parser will silently lose a wrapped summary and turn a list into an empty
   string, which is how this was first found.
+
+## Interface text
+
+Every string the interface shows (`messages/<locale>.json`) is editable too, in
+every language side by side, as the **Interface text** file collection. Its
+fields are read from the default language's file, so a new key appears in the
+editor with no declaration, and nothing lists a message by name. Together with
+the content collections (and `shared` ones for settings that are not
+translated), that is everything on the site that a person changes.
+
+What stays in code: the build's own declarations (`fiducial.toml`,
+`design-system.md`). They carry comments and structure the editor would
+flatten, and they change how the product is built rather than what it says.
