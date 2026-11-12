@@ -162,7 +162,7 @@ fid dash --section ci
 $ fid dash --section ci
 
 CI
-  CI                           on push, pull_request  [checks artifact freshness]
+  CI                           on pull_request, workflow_dispatch  [checks artifact freshness]
                                  └ fid derive --check
   (declared workflows, not live run status — dash makes no network calls)
 ```

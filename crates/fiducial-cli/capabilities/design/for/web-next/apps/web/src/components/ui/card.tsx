@@ -45,7 +45,7 @@ function Card({ className, render, ...props }: useRender.ComponentProps<"div">) 
     render,
     props: mergeProps<"div">(
       {
-        className: cn("cham flex flex-col gap-6 py-6 text-card-foreground", className),
+        className: cn("shape-panel flex flex-col gap-6 py-6 text-card-foreground", className),
       },
       props,
     ),

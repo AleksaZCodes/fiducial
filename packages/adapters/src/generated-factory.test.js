@@ -187,7 +187,7 @@ describe('the generated adapter factory compiles', () => {
     // A factory that emitted nothing would typecheck trivially.
     const factory = readFileSync(join(allReal, 'src/adapters.generated.ts'), 'utf8')
     for (const contract of ['database', 'storage', 'email', 'diagnostics', 'botProtection', 'queue', 'newsletter', 'ai']) {
-      assert.match(factory, new RegExp(`${contract}:\\s*new `), `${contract} is not constructed`)
+      assert.match(factory, new RegExp(`get ${contract}\\(\\)[^]*?new `), `${contract} is not constructed`)
     }
     assert.match(factory, /export function createAuth\(/)
   })

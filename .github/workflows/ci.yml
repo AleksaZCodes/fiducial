@@ -18,6 +18,43 @@ env:
   CARGO_INCREMENTAL: 0
 
 jobs:
+  # ── What changed ───────────────────────────────────────────────────────────
+  # Every job below runs only when the part of the repository it checks was
+  # touched: a web template does not build firmware, a spine crate does not
+  # scaffold a Next.js app. The groups are declared once, in
+  # `scripts/ci-changes.sh`. A change to CI itself, a schedule, or a manual run
+  # turns everything on.
+  changes:
+    name: what changed
+    runs-on: ubuntu-latest
+    outputs:
+      spine: ${{ steps.groups.outputs.spine }}
+      crates: ${{ steps.groups.outputs.crates }}
+      cli: ${{ steps.groups.outputs.cli }}
+      firmware: ${{ steps.groups.outputs.firmware }}
+      hardware: ${{ steps.groups.outputs.hardware }}
+      js: ${{ steps.groups.outputs.js }}
+      identity: ${{ steps.groups.outputs.identity }}
+      adapters: ${{ steps.groups.outputs.adapters }}
+      web: ${{ steps.groups.outputs.web }}
+      docs: ${{ steps.groups.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: groups
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          case "$EVENT" in
+            pull_request) scripts/ci-changes.sh "$PR_BASE" "$HEAD_SHA" ;;
+            push)         scripts/ci-changes.sh "$PUSH_BASE" "$HEAD_SHA" ;;
+            *)            scripts/ci-changes.sh --all ;;
+          esac | tee -a "$GITHUB_OUTPUT"
+
   # ── L0 spine: 4-target matrix ─────────────────────────────────────────────
   #
   # fiducial-core is #![no_std] and must compile for every target, every commit.
@@ -26,6 +63,8 @@ jobs:
   # thumbv6m-none-eabi and thumbv7em-none-eabihf every commit."
   spine:
     name: spine (${{ matrix.target.triple }})
+    needs: changes
+    if: needs.changes.outputs.spine == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -107,6 +146,8 @@ jobs:
   # ── Host: full workspace build + tests ────────────────────────────────────
   rust:
     name: Rust (host)
+    needs: changes
+    if: needs.changes.outputs.crates == 'true'
     runs-on: ubuntu-latest
     steps:
       # Full history, because `tests/commit_hygiene.rs` needs `origin/main` to
@@ -154,6 +195,8 @@ jobs:
   # ── Docs: the terminal captures in the guides are real and current ────────
   docs:
     name: docs (captures fresh)
+    needs: changes
+    if: needs.changes.outputs.crates == 'true' || needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -201,6 +244,8 @@ jobs:
   # ── WASM: wasm-pack build ─────────────────────────────────────────────────
   wasm-pack:
     name: wasm-pack (fiducial-wasm)
+    needs: changes
+    if: needs.changes.outputs.spine == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -225,6 +270,8 @@ jobs:
   # ── Firmware: RP2040 check ────────────────────────────────────────────────
   firmware:
     name: firmware (RP2040 + STM32)
+    needs: changes
+    if: needs.changes.outputs.firmware == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -356,6 +403,8 @@ jobs:
   # regenerate packages/wasm-bridge/src/generated.ts, then checks for drift.
   types-pipeline:
     name: types pipeline (--check)
+    needs: changes
+    if: needs.changes.outputs.crates == 'true' || needs.changes.outputs.js == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -379,6 +428,8 @@ jobs:
   # against the BoardInterface schema. No atopile/KiCad needed in CI.
   eda-pipeline:
     name: EDA pipeline (schema check)
+    needs: changes
+    if: needs.changes.outputs.hardware == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -398,6 +449,8 @@ jobs:
   # Runs unit tests that verify extrusion, STL header, and GLB magic bytes.
   mesh-gen:
     name: mesh generation (STL + GLB)
+    needs: changes
+    if: needs.changes.outputs.hardware == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -425,6 +478,8 @@ jobs:
   # and assert against its JSON, including that dash writes nothing.
   workbench:
     name: workbench (fid dash)
+    needs: changes
+    if: needs.changes.outputs.crates == 'true' || needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -454,6 +509,8 @@ jobs:
   # bumps WIRE_VERSION without updating docs/compat/matrix.toml (or vice-versa).
   release:
     name: release (fid release check)
+    needs: changes
+    if: needs.changes.outputs.crates == 'true' || needs.changes.outputs.js == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -499,6 +556,8 @@ jobs:
   # and "signed, always" are assertions here, not hopes.
   ota:
     name: ota (fiducial-ota)
+    needs: changes
+    if: needs.changes.outputs.spine == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -530,6 +589,8 @@ jobs:
   # ── JavaScript / TypeScript ───────────────────────────────────────────────
   js:
     name: JS/TS
+    needs: changes
+    if: needs.changes.outputs.js == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -564,6 +625,8 @@ jobs:
   # this job runs the full test suite plus the WASM no-default-features build.
   sim:
     name: sim (fiducial-sim)
+    needs: changes
+    if: needs.changes.outputs.spine == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -589,6 +652,8 @@ jobs:
   # tests. No live Supabase connection — mock adapters only.
   realtime:
     name: realtime (@fiducial/realtime)
+    needs: changes
+    if: needs.changes.outputs.js == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -619,6 +684,8 @@ jobs:
   # the two levels quietly disagreeing. Same mechanism as the protocol vectors.
   identity:
     name: identity (one rule, both languages)
+    needs: changes
+    if: needs.changes.outputs.identity == 'true'
     runs-on: ubuntu-latest
     # The grants schema is generated for two dialects, and node has no
     # Postgres. Without a real server the Postgres half is only ever asserted
@@ -714,6 +781,8 @@ jobs:
   # it is its own job and its own script rather than part of `pnpm test`.
   adapters:
     name: adapters (the generated factory compiles)
+    needs: changes
+    if: needs.changes.outputs.adapters == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -762,6 +831,8 @@ jobs:
   # install, typecheck and build. See scripts/verify-web-next.sh.
   web-next-scaffold:
     name: web-next (a fresh product installs, typechecks, builds)
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -790,6 +861,8 @@ jobs:
   # and asserts the aggregated JSON is correct.
   portfolio:
     name: portfolio (workbench v1)
+    needs: changes
+    if: needs.changes.outputs.crates == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

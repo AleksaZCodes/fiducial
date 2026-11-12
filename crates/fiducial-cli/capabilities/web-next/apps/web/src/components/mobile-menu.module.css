@@ -4,8 +4,17 @@
    capability, and a template that renders invisibly there is worse than one
    that renders plainly. */
 
+/* In a layer, so the `className` the component documents can win.
+   Tailwind 4 puts its utilities in `@layer utilities`, and an unlayered rule
+   outranks every layered one whatever its specificity — so `md:hidden` on the
+   trigger did nothing, and the burger showed at every width. */
+@layer components {
+  .burger {
+    display: inline-flex;
+  }
+}
+
 .burger {
-  display: inline-flex;
   padding: 0.375rem;
   border: 1px solid var(--border, currentColor);
   border-radius: var(--radius-sm, 3px);

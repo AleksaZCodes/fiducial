@@ -602,7 +602,7 @@ fn check_ci_pin(root: &Path, warnings: &mut Vec<String>, ok: &mut Vec<String>) {
         warnings.push(format!(
             ".github/workflows/ci.yml pins fiducial-cli {pinned}, but this is \
              {PLATFORM_VERSION} — CI is gating with a different `fid` than you are. \
-             Edit the `cargo install fiducial-cli --version` line to {PLATFORM_VERSION}. \
+             Set `FID_VERSION` (or the `cargo install fiducial-cli --version` line) to {PLATFORM_VERSION}. \
              `fid upgrade` leaves it alone on purpose, so nothing else will."
         ));
     }
@@ -616,6 +616,21 @@ fn check_ci_pin(root: &Path, warnings: &mut Vec<String>, ok: &mut Vec<String>) {
 /// line is skipped, because a product that has commented the install out has
 /// already told `crate::gate` it is not running the gate.
 fn pinned_cli_version(body: &str) -> Option<String> {
+    // The current template declares the version once, as `FID_VERSION: "x"`,
+    // and both the download and the compile fallback read it. Looked for
+    // first: under that template the `cargo install` line names the variable,
+    // not a version.
+    let declared = body
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.starts_with('#'))
+        .find_map(|l| l.strip_prefix("FID_VERSION:"))
+        .map(|v| v.trim().trim_matches(|c| c == '"' || c == '\'').to_string())
+        .filter(|v| !v.is_empty() && !v.contains('$'));
+    if declared.is_some() {
+        return declared;
+    }
+
     body.lines()
         .map(str::trim)
         .filter(|l| !l.starts_with('#'))
@@ -827,6 +842,15 @@ mod tests {
     /// A commented-out install is not a pin. `crate::gate` already reports a
     /// product whose CI does not run the gate, and saying it twice teaches
     /// people to skim both.
+    #[test]
+    fn the_declared_fid_version_is_the_pin() {
+        let y = "    env:\n      FID_VERSION: \"0.11.2\"\n    steps:\n      - run: cargo install fiducial-cli --version \"${FID_VERSION}\" --locked\n";
+        assert_eq!(pinned_cli_version(y).as_deref(), Some("0.11.2"));
+        // Commented out, it is not a pin.
+        let y = "      # FID_VERSION: \"0.11.2\"\n";
+        assert_eq!(pinned_cli_version(y), None);
+    }
+
     #[test]
     fn a_commented_out_install_is_not_a_pin() {
         let y = "      # run: cargo install fiducial-cli --version 0.9.4 --locked\n";

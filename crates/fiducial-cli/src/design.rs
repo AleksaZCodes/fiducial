@@ -378,8 +378,24 @@ pub fn parse(md: &str) -> Result<DesignSystem> {
 
     let color: ColorBlock =
         toml::from_str(need("color")?).context("parsing the `fid:color` block")?;
-    let roles: BTreeMap<String, TypeRole> =
+    // `one_voice` sits beside the four roles and is not one of them: it is the
+    // written-down decision to set display and body in one family. It is
+    // lifted out before the roles are read, so a role table stays a role table.
+    let mut type_table: toml::Table =
         toml::from_str(need("type")?).context("parsing the `fid:type` block")?;
+    let one_voice = match type_table.remove("one_voice") {
+        None => None,
+        Some(toml::Value::String(reason)) if !reason.trim().is_empty() => Some(reason),
+        Some(_) => bail!(
+            "`one_voice` in the `fid:type` block must be a sentence saying why \
+             display and body share a family.\n  \
+             It is a decision, and a decision with no reason is the default \
+             it was meant to replace."
+        ),
+    };
+    let roles: BTreeMap<String, TypeRole> = toml::Value::Table(type_table)
+        .try_into()
+        .context("parsing the `fid:type` block")?;
     let scale_body = need("scale")?;
     let scale: ScaleBlock = toml::from_str(scale_body).context("parsing the `fid:scale` block")?;
     let shape: Shape = toml::from_str(need("shape")?).context("parsing the `fid:shape` block")?;
@@ -422,12 +438,29 @@ pub fn parse(md: &str) -> Result<DesignSystem> {
             );
         }
     }
-    if roles["display"].family == roles["body"].family {
+    // One family for both is refused by default and allowed on purpose. The
+    // default exists because a collapsed pair is what an undecided system
+    // produces; the escape hatch exists because a product whose identity *is*
+    // one face (lettering taken from a device, a wordmark family) has decided,
+    // and principle 3 says an abstraction without a way out is a wall.
+    let same_family = roles["display"].family == roles["body"].family;
+    if same_family && one_voice.is_none() {
         bail!(
             "display and body are both `{}`.\n  \
              Four roles exist so the headline is not the paragraph at a larger \
-             size; collapsing them gives one voice at six sizes.",
+             size; collapsing them gives one voice at six sizes.\n  \
+             If one face is the decision, write it down in the `fid:type` block:\n    \
+             one_voice = \"why this product has a single typeface\"",
             roles["display"].family
+        );
+    }
+    if !same_family && one_voice.is_some() {
+        bail!(
+            "`one_voice` is declared, but display is `{}` and body is `{}`.\n  \
+             The exemption describes a system this file no longer declares; \
+             remove it, or it will excuse a collapse nobody decided on later.",
+            roles["display"].family,
+            roles["body"].family
         );
     }
 
@@ -839,9 +872,10 @@ impl DesignSystem {
                 );
                 for (name, _, note) in steps {
                     s.push_str(&format!(
-                        "  .shape-{name} {{ /* {note} */\n    border: var(--border-w) solid var(--border);\n    border-radius: 0;\n  }}\n"
+                        "  .shape-{name} {{ /* {note} */\n    border-radius: 0;\n  }}\n"
                     ));
                 }
+                s.push_str(SHAPE_SURFACE);
             }
             // `round` and anything a future strategy adds: a real border and a
             // real radius, which is what a shadcn-shaped component expects.
@@ -853,13 +887,10 @@ impl DesignSystem {
                 );
                 for (name, _, note) in steps {
                     s.push_str(&format!(
-                        "  .shape-{name} {{ /* {note} */\n    border: var(--border-w) solid var(--border);\n    border-radius: var(--corner-{name});\n  }}\n"
+                        "  .shape-{name} {{ /* {note} */\n    border-radius: var(--corner-{name});\n  }}\n"
                     ));
                 }
-                s.push_str(
-                    "  .shape-outline {\n    background: var(--background);\n  }\n  \
-                     .shape-outline:hover {\n    background: var(--muted);\n  }\n",
-                );
+                s.push_str(SHAPE_SURFACE);
                 // No default shadow here, deliberately. Under `chamfer` the
                 // weighted edge is the only elevation available and a flat cut
                 // looks unfinished, so weight is the default there. Under
@@ -978,6 +1009,16 @@ impl DesignSystem {
         s.push_str("\n@theme inline {\n");
         for slot in COLOR_INLINE_ORDER {
             if self.light.contains_key(*slot) {
+                s.push_str(&format!("  --color-{slot}: var(--{slot});\n"));
+            }
+        }
+        // A slot the product added (`signal`, `success`, a brand tint) is a
+        // declared colour like any other. It used to reach `:root` and stop
+        // there, so `text-signal` did not exist and the call site wrote
+        // `text-[var(--signal)]` — the arbitrary value the declaration is
+        // meant to make unnecessary.
+        for slot in self.light.keys() {
+            if !COLOR_INLINE_ORDER.contains(&slot.as_str()) {
                 s.push_str(&format!("  --color-{slot}: var(--{slot});\n"));
             }
         }
@@ -1141,6 +1182,26 @@ impl DesignSystem {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
+/// The surface every non-chamfer `.shape-*` class paints, in the same two
+/// variables the chamfered ones use.
+///
+/// `--edge` and `--fill` are the contract between a component and its shape.
+/// A shipped component sets them per variant (`[--fill:var(--primary)]`) and
+/// names what it is (`.shape-control`); the strategy decides how that is
+/// drawn. Under `chamfer` the element's background is the edge and a
+/// pseudo-element is the fill, because a clip cuts a real border off. Under
+/// `round` and `square` they are simply the border colour and the background.
+///
+/// These classes used to set only a border and a radius here, and read neither
+/// variable — so a component written against the contract had no fill at all
+/// under `round`, which is why the shipped button and card kept hardcoding
+/// `.cham` and a product that declared `round` still got cut corners.
+const SHAPE_SURFACE: &str = "  .shape-panel, .shape-control, .shape-chip {\n    \
+     --edge: var(--border);\n    --fill: var(--card);\n    \
+     border: var(--border-w) solid var(--edge);\n    background: var(--fill);\n  }\n  \
+     .shape-outline {\n    --fill: var(--background);\n  }\n  \
+     .shape-outline:hover {\n    --fill: var(--muted);\n  }\n";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1266,6 +1327,34 @@ small = "eyebrow"
         let doc = DOC.replace("family = \"Source Serif 4\"", "family = \"Chakra Petch\"");
         let err = parse(&doc).unwrap_err().to_string();
         assert!(err.contains("six sizes"), "{err}");
+    }
+
+    #[test]
+    fn one_family_is_allowed_when_the_decision_is_written_down() {
+        let doc = DOC
+            .replace("family = \"Source Serif 4\"", "family = \"Chakra Petch\"")
+            .replace(
+                "```toml fid:type\n",
+                "```toml fid:type\none_voice = \"the device's lettering is one face\"\n",
+            );
+        parse(&doc).expect("a declared single voice parses");
+    }
+
+    #[test]
+    fn one_voice_needs_a_reason_and_a_collapse_to_excuse() {
+        let empty = DOC
+            .replace("family = \"Source Serif 4\"", "family = \"Chakra Petch\"")
+            .replace("```toml fid:type\n", "```toml fid:type\none_voice = \"\"\n");
+        let err = parse(&empty).unwrap_err().to_string();
+        assert!(err.contains("must be a sentence"), "{err}");
+
+        // Two families and an exemption: the exemption is stale.
+        let stale = DOC.replace(
+            "```toml fid:type\n",
+            "```toml fid:type\none_voice = \"left over\"\n",
+        );
+        let err = parse(&stale).unwrap_err().to_string();
+        assert!(err.contains("no longer declares"), "{err}");
     }
 
     #[test]
@@ -1599,6 +1688,56 @@ title = "hero""#,
             !round.contains("clip-path: polygon("),
             "round must not clip anything"
         );
+    }
+
+    #[test]
+    fn every_strategy_paints_the_edge_and_fill_a_component_sets() {
+        // A shipped component says `shape-control [--fill:var(--primary)]`.
+        // That has to be a filled button whichever way the corner is cut, or
+        // the component only works under the strategy it was written against.
+        for strategy in ["chamfer", "round", "square"] {
+            let doc = DOC.replace(
+                r#"strategy = "chamfer""#,
+                &format!(r#"strategy = "{strategy}""#),
+            );
+            let css = parse(&doc).unwrap().generate_css("x");
+            assert!(css.contains("var(--fill)"), "{strategy} never reads --fill");
+            assert!(css.contains("var(--edge)"), "{strategy} never reads --edge");
+            assert!(
+                css.contains(".shape-outline"),
+                "{strategy} has no outline surface"
+            );
+        }
+    }
+
+    #[test]
+    fn the_shipped_components_name_what_they_are_not_how_they_are_cut() {
+        // The other half of the same bug: `.shape-*` existed and nothing used
+        // it. Comments may discuss `.cham`; a class list may not contain it.
+        for (name, source) in [
+            ("button.tsx", include_str!("../capabilities/design/for/web-next/apps/web/src/components/ui/button.tsx")),
+            ("card.tsx", include_str!("../capabilities/design/for/web-next/apps/web/src/components/ui/card.tsx")),
+            ("dropdown-menu.tsx", include_str!("../capabilities/design/for/web-next/apps/web/src/components/ui/dropdown-menu.tsx")),
+        ] {
+            for (n, line) in source.lines().enumerate() {
+                let code = line.trim_start();
+                if code.starts_with('*') || code.starts_with("//") || code.starts_with("/*") {
+                    continue;
+                }
+                assert!(
+                    !code.contains("cham"),
+                    "{name}:{} hardcodes a chamfer in code: {line}",
+                    n + 1
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_colour_the_product_added_is_a_utility_too() {
+        let doc = DOC.replace("[light]\n", "[light]\nsignal = \"#006D95\"\n");
+        let css = parse(&doc).unwrap().generate_css("x");
+        assert!(css.contains("--color-signal: var(--signal);"), "{css}");
     }
 
     #[test]

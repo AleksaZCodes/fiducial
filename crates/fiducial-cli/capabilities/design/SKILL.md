@@ -110,6 +110,35 @@ Under the `chamfer` corner strategy, three changes and no others:
 Under `round`, only the surface tokens differ and upstream's classes mostly
 stand as shipped.
 
+### `--edge` and `--fill` are the contract, under every strategy
+
+The shipped button, card and menu name what they are — `.shape-control`,
+`.shape-panel` — and set two variables per variant:
+`[--edge:var(--primary)] [--fill:var(--primary)]`. The generated `.shape-*`
+classes paint those two under **every** strategy: as a clipped edge and an
+inset fill under `chamfer`, as a border colour and a background under `round`
+and `square`. A component you adapt should do the same, so that changing
+`strategy` re-renders it instead of breaking it. `.cham-*` is for one element
+you want cut for its own sake, in any product.
+
+### A colour you add is a utility
+
+Any slot in `[light]` — not only the shadcn set — is mapped into Tailwind, so a
+product that declares `signal = "…"` writes `text-signal` and `bg-signal`, never
+`text-[var(--signal)]`. Add it to the measured pairs if it carries text.
+
+### One typeface, on purpose
+
+`display` and `body` in the same family is refused: it is what an undecided
+system produces. A product whose identity is one face declares that it decided:
+
+```toml
+one_voice = "The lettering on the device is one squared face."
+```
+
+It needs a reason, and it is refused in turn if the two roles later differ —
+an exemption nobody removed would excuse the next collapse silently.
+
 ## Design skills
 
 Install these once per product. They are the taste and review layer that sits

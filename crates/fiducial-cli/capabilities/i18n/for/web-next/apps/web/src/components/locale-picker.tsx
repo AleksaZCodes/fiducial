@@ -6,6 +6,7 @@ import { Menu } from "@base-ui/react/menu";
 import * as Flags from "country-flag-icons/react/3x2";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import styles from "./locale-picker.module.css";
 
 /**
@@ -88,10 +89,44 @@ export function LocalePicker({
    */
   href?: (target: Locale) => string;
 }) {
+  // A product that passes `href` never reads the query string, so it must not
+  // pay for reading it. `useSearchParams()` opts a statically rendered page
+  // out of prerendering unless it sits under a Suspense boundary: without
+  // this split, `next build` failed on every static page that showed the
+  // picker, and the usual fix — wrapping the whole picker in
+  // `<Suspense fallback={null}>` — removed it from the served HTML, which is
+  // the opposite of "each row a real, crawlable link".
+  if (href) return <PickerMenu locale={locale} variant={variant} hrefFor={href} />;
+  return (
+    <Suspense fallback={null}>
+      <QueryPicker locale={locale} variant={variant} />
+    </Suspense>
+  );
+}
+
+/** The default strategy, `?lang=`: the only one that needs the current query. */
+function QueryPicker({ locale, variant }: { locale: Locale; variant: LocalePickerVariant }) {
   const pathname = usePathname();
   const search = useSearchParams().toString();
   const url = `${pathname}${search ? `?${search}` : ""}`;
-  const hrefFor = href ?? ((target: Locale) => queryLocaleHref(url, target));
+  return (
+    <PickerMenu
+      locale={locale}
+      variant={variant}
+      hrefFor={(target: Locale) => queryLocaleHref(url, target)}
+    />
+  );
+}
+
+function PickerMenu({
+  locale,
+  variant,
+  hrefFor,
+}: {
+  locale: Locale;
+  variant: LocalePickerVariant;
+  hrefFor: (target: Locale) => string;
+}) {
   const icon = variant === "icon";
 
   return (
