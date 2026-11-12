@@ -151,7 +151,7 @@ function PickerMenu({
       </Menu.Trigger>
 
       <Menu.Portal>
-        <Menu.Positioner align="end" sideOffset={6}>
+        <Menu.Positioner className={styles.positioner} align="end" sideOffset={6}>
           <Menu.Popup className={styles.menu}>
             {locales.map((l) => {
               const current = l === locale;

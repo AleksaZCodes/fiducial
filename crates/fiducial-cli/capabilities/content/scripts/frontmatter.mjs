@@ -1,30 +1,14 @@
 // The frontmatter reader, shared by every deriver that reads an entry.
 //
-// ## Why this is more than three lines
+// It reads the subset of YAML a writer emits for frontmatter: scalars, quoted
+// scalars, wrapped (folded) scalars, block sequences, flow sequences, and
+// block sequences of flat mappings (`- label: x` followed by `  value: y`).
+// Not a YAML implementation: no anchors, no nested mappings below a list item,
+// no block scalars (`|`, `>`), because nothing writes those here and a parser
+// that pretended to handle them would be the more dangerous failure.
 //
-// It used to be one regex per line: `key: value`, take the rest of the line.
-// That reads what a person writes by hand and nothing else. The content editor
-// (`pnpm cms`) writes YAML the way a YAML library writes it, and the first
-// entry saved through it came back as:
-//
-//     summary: A sentence long enough that the writer wrapped it
-//       across two lines
-//     tags:
-//       - brand
-//       - logo
-//
-// Both are ordinary YAML and both were unreadable: the summary lost everything
-// after the first line, and `tags` came out as an empty string, which failed
-// the schema check with a message about a field the author never touched.
-//
-// So this reads the subset a YAML writer actually emits for frontmatter:
-// scalars, quoted scalars, wrapped (folded) scalars, block sequences and flow
-// sequences. Not a YAML implementation — no anchors, no nested mappings, no
-// block scalars (`|`, `>`), because nothing writes those here and a parser
-// that pretends to handle them would be the more dangerous failure.
-//
-// Anything it cannot read, it reports. Silence is what made the first version
-// look like it worked.
+// Anything it cannot read, it reports. Silence made the first version look like
+// it worked.
 
 /** A single scalar: quoted string, number, boolean, or plain text. */
 export function parseScalar(raw) {
@@ -45,6 +29,10 @@ export function parseScalar(raw) {
   return v;
 }
 
+const KEY = /^([A-Za-z_][\w-]*):(?:\s+(.*)|\s*)$/;
+const DASH_KEY = /^(\s*)-\s+([A-Za-z_][\w-]*):(?:\s+(.*)|\s*)$/;
+const DASH = /^(\s*)-(?:\s+(.*)|\s*)$/;
+
 /**
  * `---` block → an object, plus the body after it.
  *
@@ -58,44 +46,78 @@ export function frontmatter(md, onError = () => {}) {
     return { meta: {}, body: md.trim() };
   }
 
+  // A writer folds a long value onto indented lines, quoted or not. Unfold
+  // first, so a value is read whole whichever kind of line it started on. A line
+  // starts something new when it is a dash, a top-level key, or a key at the
+  // indent of the mapping the last dash opened; anything else continues.
+  const lines = [];
+  let objectIndent = -1;
+  for (const raw of m[1].split("\n")) {
+    const line = raw.replace(/\r$/, "");
+    const text = line.trim();
+    if (!text || text.startsWith("#")) continue;
+    const indent = line.length - line.trimStart().length;
+    const dashKey = DASH_KEY.exec(line);
+    if (dashKey) {
+      objectIndent = indent + 2;
+      lines.push(line);
+    } else if (DASH.test(line)) {
+      objectIndent = -1;
+      lines.push(line);
+    } else if (indent === 0 && KEY.test(line)) {
+      objectIndent = -1;
+      lines.push(line);
+    } else if (objectIndent >= 0 && indent === objectIndent && KEY.test(text)) {
+      lines.push(line);
+    } else if (lines.length > 0) {
+      lines[lines.length - 1] += ` ${text}`;
+    } else {
+      lines.push(line);
+    }
+  }
+
   const meta = {};
-  const lines = m[1].split("\n");
   let key = null;
+  let current = null;
 
   for (const line of lines) {
-    if (!line.trim() || line.trim().startsWith("#")) continue;
-
-    // `  - item` continues the sequence under the key above it.
-    const item = line.match(/^\s+-\s*(.*)$/);
-    if (item && key) {
+    const dashKey = DASH_KEY.exec(line);
+    if (dashKey && key) {
       if (!Array.isArray(meta[key])) meta[key] = meta[key] === "" ? [] : [meta[key]];
-      meta[key].push(parseScalar(item[1]));
+      current = { [dashKey[2]]: parseScalar(dashKey[3] ?? "") };
+      meta[key].push(current);
       continue;
     }
 
-    const kv = line.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
-    if (kv) {
-      key = kv[1];
-      const raw = kv[2].trim();
-      // `alt: The Acme icon: a white drop` is not YAML — a plain scalar may not
-      // contain ": ". This reader would happily take the rest of the line, and
-      // did, which is how twelve entries sat in the repository being read
-      // correctly here and rejected by every real YAML parser, including the
-      // content editor's. Quote the value.
+    const dash = DASH.exec(line);
+    if (dash && key) {
+      current = null;
+      if (!Array.isArray(meta[key])) meta[key] = meta[key] === "" ? [] : [meta[key]];
+      meta[key].push(parseScalar(dash[2] ?? ""));
+      continue;
+    }
+
+    const indented = /^\s+/.test(line);
+    const kv = KEY.exec(line.trim());
+    if (indented && kv && current) {
+      current[kv[1]] = parseScalar(kv[2] ?? "");
+      continue;
+    }
+
+    const top = KEY.exec(line);
+    if (top) {
+      key = top[1];
+      current = null;
+      const raw = (top[2] ?? "").trim();
+      // `alt: The Acme icon: a white drop` is not YAML: a plain scalar may not
+      // contain ": ". Quote the value.
       if (raw && !/^["'[|>]/.test(raw) && (raw.includes(": ") || raw.endsWith(":"))) {
         onError(
           `\`${key}\` contains a colon and is not quoted, which is not valid YAML.\n` +
             `  Write it as: ${key}: "${raw.replace(/"/g, '\\"')}"`,
         );
       }
-      meta[key] = parseScalar(kv[2]);
-      continue;
-    }
-
-    // An indented line that is not a sequence item is the rest of a wrapped
-    // scalar: YAML folds it onto the line above with a single space.
-    if (/^\s+\S/.test(line) && key && typeof meta[key] === "string") {
-      meta[key] = `${meta[key]} ${line.trim()}`.trim();
+      meta[key] = parseScalar(raw);
       continue;
     }
 

@@ -51,7 +51,14 @@
   background: var(--popover, var(--background, #fff));
   color: var(--popover-foreground, var(--foreground, inherit));
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);
-  z-index: 60;
+}
+
+/* The positioner is what is placed, so it carries the layer: a z-index on
+   `.menu` inside it does nothing, and the list slid under a sticky header.
+   `--z-overlay` comes from the design capability; the fallback is for a
+   product without it, and is above any header a product is likely to have. */
+.positioner {
+  z-index: var(--z-overlay, 1000);
 }
 
 .item {

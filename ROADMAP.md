@@ -670,6 +670,92 @@ when a product needs one); the deprecated `eda` capability, removed in
 the next minor release (a breaking change, so not in a patch; 0.10.0 went to
 the class-level gate changes) — `hardware` owns the board.
 
+### A stack chosen per app — *multiplying* ⬜
+
+Today every web product is Next.js (or SvelteKit), its data is D1 or Supabase
+behind the `database` contract, and its content editor is Decap. That is the
+right default and the wrong ceiling: a portfolio, a dashboard and a typed
+full-stack app do not want the same framework, and forcing them into one is how
+a product ends up fighting its scaffold. This item adds the options and, more
+importantly, the **rule for choosing**, so the choice is made per app, declared
+once, and never guessed.
+
+**What is added** (each a row below, each ⬜ until built):
+
+| Concern | Added | Chosen when |
+|---|---|---|
+| ⬜ **Astro** | `web-astro` capability, `shape = "astro"` | The app is content-first: a marketing site, a portfolio, docs, a blog. Zero JavaScript by default and islands for the interactive parts, so a page that is mostly words ships mostly words. React or Svelte islands reuse the platform's components. This is the one the roadmap ranks first: it fits most of what products here actually are |
+| ⬜ **React Router v8** | `web-router` capability (framework mode) | A React app that is routes and loaders more than server components: a dashboard, an internal tool, an SPA with a thin server. It deploys to Workers and pairs with Hono for its API |
+| ⬜ **TanStack Start (React)** | `web-start` capability | A full-stack React app where end-to-end types matter: typed server functions, TanStack Router and Query, a lot of client state. The choice over Next.js when the app does not want the App Router's server-component model |
+| ⬜ **Hono** | `api-hono` capability, `apps/api` | A backend for anything, mostly the Astro and SPA cases that have no route handlers of their own. Workers-native, tiny, built on Web standards, and its typed RPC client carries request and response types to the front end. The same app runs on Node for a self-hosted target |
+| ⬜ **Drizzle ORM** | `orm-drizzle` capability | An app that wants typed queries over D1, Postgres (Supabase) or self-hosted SQLite. It is a layer over the `database` contract, not a replacement: the contract and its `Migrator` stay, and the app opts in |
+| ⬜ **Pages CMS** | `cms` editor `pages` | Editors who are not technical and should not run anything locally: a hosted editor over the repository, any framework, no build coupling |
+| ⬜ **Keystatic** | `cms` editor `keystatic` | Code-first teams on Astro or Next.js: a TypeScript schema, local and GitHub modes, deep framework integration |
+| ⬜ **TinaCMS** | `cms` editor `tina` | Editors who need to edit on the page itself, with visual editing. Accepts a service dependency (Tina Cloud, or self-hosted) that the others avoid |
+
+Decap stays, and stays the default: it needs no service and no account.
+
+**The rule for choosing is the deliverable.** It is declared per app, not per
+product, because one product legitimately has an Astro marketing site, a React
+Router dashboard and a Hono API:
+
+```toml
+[apps.web]        # the public site
+framework = "astro"
+editor    = "keystatic"
+
+[apps.dashboard]
+framework = "react-router"
+api       = "hono"
+orm       = "drizzle"
+```
+
+`fid new` asks what the app *is* (content site, dashboard, full-stack app,
+API) and writes the default that answer implies, with the reason in a comment.
+A default is a recommendation recorded in the file, never a silent behaviour:
+an existing app is never switched, and a choice that does not fit (an editor
+that needs a framework the app is not on) fails `fid doctor` with the reason
+rather than generating something that half works.
+
+**Where it lands.**
+- The declaration: `Config` in `crates/fiducial-cli/src/config.rs` gains
+  `[apps.<name>]`; `DeployShape` in the same file gains the new shapes, and
+  `deploy_plan` in `commands/derive.rs` already branches on shape, which is the
+  place an Astro or Hono Worker's entry and assets are decided.
+- One capability per framework under `crates/fiducial-cli/capabilities/`
+  (`web-astro`, `web-router`, `web-start`, `api-hono`, `orm-drizzle`),
+  following `web-next` and `web-svelte`. The framework-independent parts the
+  existing capabilities already carry (design tokens, `i18n`, `content`,
+  `seo`, the adapters factory) must not be copied into each; where a template
+  assumes Next.js, split it by framework the way `design/for/web-next/` does.
+- The editors: `capabilities/cms/scripts/derive-cms.mjs` derives Decap's config
+  from `content.toml`, `messages/` and `[i18n]`. Each new editor is another
+  deriver from the **same** declarations, selected by `[cms] editor`, so the
+  content model is still declared once and switching editor is a re-derive.
+  The `shared` collections and the interface-text file collection must reach
+  each editor, or the new editors cover less than Decap does.
+- Drizzle: the schema in TypeScript is the declaration, and the SQL it
+  generates feeds the existing `Migrator`; do not keep a second, hand-written
+  SQL copy of the same tables.
+
+**Resolve first.**
+- Verify each framework's current major when the work starts, per
+  **Framework currency**; do not copy a version from this paragraph. React
+  Router "v8" and TanStack Start's maturity on Workers are the two to check.
+- Whether the Next.js shape keeps OpenNext, or the Astro and Start shapes show a
+  simpler Workers deploy that Next.js should converge on.
+- That the `content` capability's generated accessors (`entries`, `single`)
+  have a framework-neutral form, since Astro's own content collections overlap
+  with them. One of the two must be the declaration; the other is derived.
+- Hono's relation to the demo-style WebSocket case: a Durable Object is bound
+  through `[[deploy.durable_objects]]` and needs a Worker entry that wraps the
+  framework's handler, as Outreach's `worker.ts` does. Each shape needs that
+  entry to be a supported part of the shape, not a per-product workaround.
+
+**Do not** add a framework because it is current. Each earns a place by being
+the right answer to a question `fid new` asks, and a capability nobody would be
+steered to is a capability to maintain for nothing.
+
 ### On demand ✅
 
 None of these block a product; each is added when wanted, through the system

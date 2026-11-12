@@ -191,3 +191,41 @@ the first would be invalid and would also break the big target.
 `entries` and `href` come in from the product. Which collection it is, where
 it lives and what the section is called are product facts; the shape of a card
 is not.
+
+## Settings that are the same in every language
+
+A link, an id or a form's address is not translated, so it does not belong in a
+collection with one copy per language. Put it in `settings.toml`, once:
+
+```toml
+survey_url  = "https://example.test/form"
+pitch_video = "pitch.mp4"
+
+[credits]
+maker = "Name"
+```
+
+`fid derive` exports it from the generated content module as `settings`, typed
+as the file is, and the content editor offers it as a form. Nothing is declared
+twice: the file is the declaration, and a new key shows up in both on the next
+derive.
+
+## Field types beyond the basics
+
+- `partial-date`: a year-only or month-only fact. Empty, a `[PLACEHOLDER]`,
+  `YYYY`, `YYYY-MM` or a real day.
+- `object[]`: a list of small records (a gallery's image and caption, a
+  project's links). Declare each record's shape beside the collection:
+
+```toml
+[collections.works]
+schema = { links = "object[]" }
+
+[collections.works.objects]
+links = { label = "string", url = "string" }
+```
+
+An undeclared key inside a record fails the derive the same way an undeclared
+field does.
+
+A singleton's file is named after its collection: `content/<name>/<locale>/<name>.md`.
