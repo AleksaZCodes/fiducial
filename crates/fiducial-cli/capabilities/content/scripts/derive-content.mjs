@@ -229,11 +229,16 @@ function main() {
   const collections = decl.collections ?? {};
   if (Object.keys(collections).length === 0) fail("content.toml declares no collections");
 
-  // `settings.toml` is optional. Parsed with the same reader as `content.toml`,
-  // so the two cannot disagree about what TOML is.
-  const settings = existsSync(at("settings.toml"))
-    ? parseToml(readFileSync(at("settings.toml"), "utf8"))
-    : {};
+  // `settings.json` is optional: the facts that are the same in every language.
+  // JSON because every editor reads and writes it (Keystatic cannot do TOML) and
+  // because it is data with no comments to lose.
+  if (existsSync(at("settings.toml"))) {
+    fail(
+      "settings.toml is no longer read: settings are `settings.json`.\n" +
+        "  Convert it once (keys and nesting stay as they are), then delete the TOML file.",
+    );
+  }
+  const settings = existsSync(at("settings.json")) ? JSON.parse(read("settings.json")) : {};
   const out = { locales, collections: {} };
 
   for (const [name, spec] of Object.entries(collections)) {
@@ -346,7 +351,7 @@ function main() {
     `export const content = ${JSON.stringify(out, null, 2)} as const`,
     "",
     "/**",
-    " * The site's settings: `settings.toml`, the facts that are the same in every",
+    " * The site's settings: `settings.json`, the facts that are the same in every",
     " * language (links, ids, a form's address). One file, so each is written once;",
     " * the editor offers it as a form. Empty when the product has no such file.",
     " */",

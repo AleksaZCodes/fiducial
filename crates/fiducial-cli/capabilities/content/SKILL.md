@@ -161,10 +161,10 @@ jurisdiction, because it is derived from a fact rather than authored.
 Built, as the `cms` capability, and built the way this section said to: a *view
 over this model*. It reads `content.toml` for the schema, reads and writes
 entry files, and stops — you commit. Git stays the store. `fid add cms`, then
-`pnpm cms`.
+`pnpm dev` in `apps/cms` (Keystatic by default, Tina by declaration).
 
 Its config is derived from this declaration, so the editor's fields follow the
-schema. Do not hand-edit `tools/cms/config.yml`.
+schema. Do not hand-edit `apps/cms/keystatic.config.ts` or `apps/cms/tina/`.
 
 A hosted CMS with its own database would become the source of truth instead,
 which breaks the property everything here rests on — that the declaration is a file
@@ -195,15 +195,19 @@ is not.
 ## Settings that are the same in every language
 
 A link, an id or a form's address is not translated, so it does not belong in a
-collection with one copy per language. Put it in `settings.toml`, once:
+collection with one copy per language. Put it in `settings.json`, once:
 
-```toml
-survey_url  = "https://example.test/form"
-pitch_video = "pitch.mp4"
-
-[credits]
-maker = "Name"
+```json
+{
+  "survey_url": "https://example.test/form",
+  "pitch_video": "pitch.mp4",
+  "credits": { "maker": "Name" }
+}
 ```
+
+JSON, not TOML: every content editor reads and writes it, and Keystatic cannot
+read TOML at all. (`content.toml` is the platform's own declaration, not
+content, so it stays TOML.)
 
 `fid derive` exports it from the generated content module as `settings`, typed
 as the file is, and the content editor offers it as a form. Nothing is declared
@@ -228,4 +232,4 @@ links = { label = "string", url = "string" }
 An undeclared key inside a record fails the derive the same way an undeclared
 field does.
 
-A singleton's file is named after its collection: `content/<name>/<locale>/<name>.md`.
+A singleton's file is named after its collection: `content/<name>/<locale>/<name>.md`

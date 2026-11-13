@@ -1,22 +1,26 @@
-// content.toml + press/ + [i18n]  →  tools/cms/config.yml
+// content.toml + press/ + messages/ + settings.json + [i18n]  →  apps/cms/*
 //
 // The editor's shape is derived, never written by hand.
 //
-// Decap CMS needs a config listing every collection, every field and every
-// widget. That is the same information `content.toml` already declares and the
-// same layout `press/` already has, so writing it out again would be a second
-// declaration of the content model — and the one that silently drifts, because
-// nothing renders from it. An editor offering a field the schema does not have
-// writes a file `fid derive` then rejects; an editor missing a field leaves it
-// blank on every entry created through it.
+// A content editor needs every collection, field and widget listed. That is the
+// information `content.toml` already declares and `press/`, `messages/` and
+// `settings.json` already hold, so a hand-written editor config would be a
+// second declaration of the content model — the copy that drifts silently,
+// because nothing renders from it. An editor offering a field the schema lacks
+// writes an entry `fid derive` then rejects; one missing a field leaves it empty
+// on everything made through it.
 //
-// So this reads the declarations and emits the config, and `fid derive --check`
-// holds the two together. Change a collection's schema and the editor changes
-// with it on the next derive.
+// So this reads the declarations, builds ONE neutral model of what is editable,
+// and emits it for the editors we support:
 //
-// What it does NOT do: invent a content model. Every collection here exists
-// because a declaration says so.
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+//   keystatic  apps/cms/keystatic.config.ts   (default)
+//   tina       apps/cms/tina/config.ts
+//
+// Both configs are always written and both edit the same files — plain `.md`
+// with YAML frontmatter, plain `.json` — so changing `[cms] editor` is a
+// derive and an install, never a content migration. `apps/cms/package.json` is
+// derived too, so only the chosen editor's packages are installed.
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { parseToml } from "./derive-content.mjs";
 
@@ -25,102 +29,35 @@ const read = (p) => readFileSync(at(p), "utf8");
 const has = (p) => existsSync(at(p));
 
 const cfg = parseToml(read("fiducial.toml"));
+const productName = cfg.product?.name ?? "site";
 const locales = cfg.i18n?.locales ?? ["en"];
-const defaultLocale = cfg.i18n?.default ?? locales[0];
 const cms = cfg.cms ?? {};
-// Uploads land in the gitignored staging directory, keyed the way content
-// refers to media everywhere else. `pnpm media:push` syncs them to the bucket.
+const EDITORS = ["keystatic", "tina"];
+const editor = cms.editor ?? "keystatic";
+if (!EDITORS.includes(editor)) {
+  throw new Error(`[cms] editor = "${editor}" is not one of: ${EDITORS.join(", ")}`);
+}
+// Uploads are staged in a gitignored directory and stored in content as KEYS
+// (`site/blog/photo.png`), never URLs. `pnpm media:push` syncs them to the bucket.
 const mediaDir = cms.media_dir ?? "media";
-// The URL the site serves that directory at. A stored image value is this plus
-// the file's path, so what the picker saves is what the page can load.
-const publicBase = cms.public_base ?? "";
-// Where a loose upload goes: one whose entry has no collection of its own,
-// or one made from the Media tab rather than from a field.
-//
-// The Media tab shows exactly this folder and no other. Decap's media library
-// is FLAT — the proxy lists the files directly inside a folder and does not
-// walk into subdirectories — so there is no "everything" view to point it at.
-// Each collection's own folder is what its image picker shows, which is where
-// an entry's images are actually found.
-const mediaPrefix = cms.media_prefix ?? "site/uploads";
-// select: `[cms.selects]` maps "collection.field" → ["opt1", "opt2", ...]
-// hint:   `[cms.hints]`   maps "collection.field" → "hint text"
-const selects = cms.selects ?? {};
-const hints = cms.hints ?? {};
-
-const language = (l) => new Intl.DisplayNames(["en"], { type: "language" }).of(l) ?? l;
+const selects = cms.selects ?? {}; // "collection.field" → ["a", "b"]
+const hints = cms.hints ?? {}; //     "collection.field" → "help text"
 
 const collections = parseToml(read("content.toml")).collections ?? {};
-
-/** Schema type → Decap widget. Unknown types fall back to a plain string. */
-const WIDGET = {
-  string: { widget: "string" },
-  date: { widget: "datetime", date_format: "YYYY-MM-DD", time_format: false, picker_utc: true },
-  "partial-date": {
-    widget: "datetime",
-    date_format: "YYYY-MM-DD",
-    time_format: false,
-    picker_utc: true,
-  },
-  number: { widget: "number", value_type: "int" },
-  boolean: { widget: "boolean" },
-  "string[]": { widget: "list", field: { name: "item", label: "Item", widget: "string" } },
-  media: { widget: "image", allow_multiple: false },
-};
-
-const MAY_BE_EMPTY = {
-  string: { required: false, default: "" },
-  "string[]": { required: false, default: [] },
-  media: { required: false, default: "" },
-  "partial-date": { required: false, default: "" },
-};
-
-/**
- * Where a collection's images live, on disk and in the key space.
- *
- * These two have to agree with how keys are actually written, because of how
- * the editor resolves an existing one: it takes the **file name** out of the
- * stored value and looks for it under the field's `media_folder`. So a key of
- * `<prefix>/<file>` resolves, and `<prefix>/<extra>/<file>` does not — it asks
- * the proxy for a path that was never there, which is a 500 in the console and
- * a broken thumbnail on the page.
- *
- * `media` on the collection declares the prefix; the default is the
- * collection's own name, which is the shape a new collection should use.
- */
-const mediaFolders = (prefix) => ({
-  media_folder: `/${mediaDir}/${prefix}`,
-  public_folder: `${publicBase}/${prefix}`,
-});
-
-// The folders are set on the COLLECTION, not on each media field: an image
-// dropped into a markdown body is the collection's too, and a field-level
-// folder leaves the body editor on the global default — which is how a post's
-// inline images ended up being looked for under the uploads prefix.
-const field = (name, type, extra = {}) => ({
-  name,
-  label: label(name),
-  ...(WIDGET[type] ?? WIDGET.string),
-  ...extra,
-});
-
-function label(name) {
+const language = (l) => new Intl.DisplayNames(["en"], { type: "language" }).of(l) ?? l;
+const label = (name) => {
   const words = name.replace(/[-_]/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2");
   return words.charAt(0).toUpperCase() + words.slice(1);
-}
+};
 
-// ── Collections from content.toml ────────────────────────────────────────────
-// `content/<collection>/<locale>/<slug>.md` is exactly Decap's
-// `multiple_folders` i18n structure, so these are editable in every language
-// side by side, which is the point: a missing translation is visible while you
-// are writing rather than at the next build.
-const out = [];
+// ── The neutral model ────────────────────────────────────────────────────────
+// A field is `{ name, label, type, ...}`; type is one of
+//   text · long · date · partial · number · bool · list · media · select ·
+//   relation · objects · object · body
 
-// `[cms.relations]` maps "collection.field" to the collection it points at, so the
-// field is a searchable dropdown of that collection's entries, not a slug typed by hand.
+// A field named `related<Collection>` points at that collection with no
+// declaration; `[cms.relations]` says so for the rest.
 const relations = { ...(cms.relations ?? {}) };
-// Any field named `related<Collection>` points at that collection, so a new link
-// kind is a field in content.toml and nothing else.
 for (const [name, spec] of Object.entries(collections)) {
   for (const f of Object.keys(spec.schema ?? {})) {
     const m = /^related([A-Z]\w*)$/.exec(f);
@@ -128,317 +65,265 @@ for (const [name, spec] of Object.entries(collections)) {
     if (target && collections[target]) relations[`${name}.${f}`] ??= target;
   }
 }
-const titleKey = (target) =>
-  ["title", "name", "headline"].find((k) => k in (collections[target]?.schema ?? {})) ?? "slug";
 
-function buildField(name, spec, f, t, inLocale) {
-  const key = `${name}.${f}`;
-  const opts = selects[key];
-  const hint = hints[key];
-  // Facts that do not change with the language (dates, numbers, switches, choices, pictures,
-  // links to other entries, addresses) are written once in the default language and copied
-  // to the others. Text is written per language.
-  const sameEverywhere =
-    ["date", "partial-date", "number", "boolean", "media"].includes(t) ||
-    relations[key] ||
-    selects[key] ||
-    /^(href|url|link)$/.test(f);
-  const i18n = inLocale ? { i18n: sameEverywhere ? "duplicate" : true } : {};
+const TYPE = { string: "text", date: "date", "partial-date": "partial", number: "number", boolean: "bool", "string[]": "list", media: "media" };
+
+function modelField(coll, spec, f, t) {
+  const key = `${coll}.${f}`;
+  const base = { name: f, label: label(f), hint: hints[key] };
   if (t === "object[]") {
     const shape = Object.entries(spec.objects?.[f] ?? {});
     return {
-      name: f,
-      label: label(f),
-      widget: "list",
-      label_singular: label(f).replace(/s$/, ""),
-      summary: `{{fields.${(shape.find(([, kt]) => kt !== "media") ?? shape[0] ?? ["label"])[0]}}}`,
-      ...(inLocale ? { i18n: true } : {}),
-      required: false,
-      default: [],
-      ...(hint ? { hint } : {}),
-      fields: shape.map(([k, kt]) =>
-        field(k, kt, {
-          ...MAY_BE_EMPTY[kt],
-          ...(hints[`${key}.${k}`] ? { hint: hints[`${key}.${k}`] } : {}),
-        }),
-      ),
+      ...base,
+      type: "objects",
+      fields: shape.map(([k, kt]) => ({
+        name: k,
+        label: label(k),
+        type: TYPE[kt] ?? "text",
+        prefix: spec.media ?? coll,
+        hint: hints[`${key}.${k}`],
+      })),
     };
   }
-  if (relations[key]) {
-    const target = relations[key];
-    const many = t === "string[]";
-    return {
-      name: f,
-      label: label(f),
-      widget: "relation",
-      collection: target,
-      search_fields: [titleKey(target)],
-      value_field: "{{slug}}",
-      display_fields: [titleKey(target)],
-      multiple: many,
-      ...i18n,
-      required: false,
-      default: many ? [] : "",
-      ...(hint ? { hint } : {}),
-    };
-  }
-  if (opts) {
-    return {
-      name: f,
-      label: label(f),
-      widget: "select",
-      options: opts,
-      ...i18n,
-      required: false,
-      default: opts[0] ?? "",
-      ...(hint ? { hint } : {}),
-    };
-  }
-  return field(f, t, {
-    ...i18n,
-    ...MAY_BE_EMPTY[t],
-    ...(hint ? { hint } : {}),
-  });
+  if (relations[key]) return { ...base, type: "relation", target: relations[key], many: t === "string[]" };
+  if (selects[key]) return { ...base, type: "select", options: selects[key] };
+  return { ...base, type: TYPE[t] ?? "text", prefix: spec.media ?? coll };
 }
 
-const bodyField = (inLocale) => ({
-  name: "body",
-  label: "Body",
-  widget: "markdown",
-  required: false,
-  ...(inLocale ? { i18n: true } : {}),
-});
+const bodyField = { name: "body", label: "Body", type: "body" };
+const entries = []; // { group, key, kind: "collection" | "file" | "data", label, path, fields, ... }
+const keyOf = (name, locale) => `${name.replace(/-(\w)/g, (_, c) => c.toUpperCase())}_${locale}`;
 
 for (const [name, spec] of Object.entries(collections)) {
-  const prefix = spec.media ?? name;
   const schema = Object.entries(spec.schema ?? {});
-
-  if (spec.kind === "singleton") {
-    // A singleton is one named file per language, not a one-entry folder. A folder
-    // collection of one lists an unnamed record and loads blank when the title field
-    // is empty; a file entry is always found by its path and always has a name.
-    out.push({
-      name,
-      label: label(name),
-      files: locales.map((l) => ({
-        name: `${name}-${l}`,
-        label: `${label(name)}: ${language(l)}`,
-        file: `content/${name}/${l}/${name}.md`,
-        format: "frontmatter",
-        ...mediaFolders(prefix),
-        fields: [
-          ...schema.map(([f, t]) => buildField(name, spec, f, t, false)),
-          ...(spec.body === "rich" ? [bodyField(false)] : []),
-        ],
-      })),
-    });
-    continue;
+  const fields = [
+    ...schema.map(([f, t]) => modelField(name, spec, f, t)),
+    ...(spec.body === "rich" ? [bodyField] : []),
+  ];
+  for (const locale of locales) {
+    if (spec.kind === "singleton") {
+      entries.push({ group: label(name), key: keyOf(name, locale), kind: "file", locale, label: `${label(name)} (${language(locale)})`, path: `content/${name}/${locale}/${name}`, fields });
+    } else {
+      // Entries are named by one text field, the first of title / name / headline.
+      const title = ["title", "name", "headline"].find((k) => spec.schema?.[k] === "string") ?? schema.find(([, t]) => t === "string")?.[0];
+      if (!title) throw new Error(`collection \`${name}\` has no string field to name entries by; add a \`title\``);
+      entries.push({ group: label(name), key: keyOf(name, locale), kind: "collection", locale, label: `${label(name)} (${language(locale)})`, path: `content/${name}/${locale}`, title, fields });
+    }
   }
-
-  out.push({
-    name,
-    label: label(name),
-    folder: `content/${name}`,
-    ...mediaFolders(prefix),
-    create: true,
-    delete: true,
-    slug: "{{slug}}",
-    extension: "md",
-    format: "frontmatter",
-    i18n: true,
-    fields: [
-      ...schema.map(([f, t]) => buildField(name, spec, f, t, true)),
-      ...(spec.body === "rich" ? [bodyField(true)] : []),
-    ],
-  });
 }
 
-// ── The press room ───────────────────────────────────────────────────────────
-// `press/<locale>/stories/*.md` puts the locale ABOVE the collection, which is
-// the opposite of Decap's `multiple_folders` (`<folder>/<locale>/<slug>`). So
-// the stories of each language are their own collection rather than one
-// collection edited in two languages. That is a real loss — the two are not
-// side by side — and the alternative was moving the press layout to suit the
-// editor, which is the tail wagging the dog.
-const STORY_FIELDS = [
-  ["title", "string"],
-  ["angle", "string"],
-  ["date", "date"],
-  ["summary", "string"],
-  ["cover", "media"],
-  ["cover_alt", "string"],
-];
-// The angles a story can take, from the capability's own list. A free-text
-// angle would not match `press.angle.*` in the message catalogue, and the label
-// on the press page would come out blank.
-const ANGLES = ["origin", "technical", "customer", "failure", "milestone", "people", "market"];
-
-// The press room, whose layout nests the locale under each collection exactly
-// as `content/` does — press/docs/<locale>/ and press/stories/<locale>/ — so
-// both are folder collections the editor shows in every language side by side.
-// A file collection cannot do that: Decap supports i18n on one only as a
-// single file holding every language, which is not how these are written.
-if (has("press/docs") || has("press/stories")) {
-  if (has("press/docs")) {
-    out.push({
-      name: "press-docs",
-      label: "Press: boilerplate and facts",
-      folder: "press/docs",
-      // Two fixed documents per locale, not a list someone adds to.
-      create: false,
-      delete: false,
-      extension: "md",
-      format: "frontmatter",
-      i18n: true,
-      // These two documents are body only — there is no title to infer an
-      // entry name from, and Decap says so loudly. The file name is the name:
-      // `boilerplate` and `facts` are what they are called everywhere else.
-      fields: [
-        // A title, because an entry list with nothing to name entries by
-        // renders the whole document as its own label. It is the document's
-        // name in that language, not a heading the press page prints.
-        { name: "title", label: "Name", widget: "string", i18n: true },
-        { name: "body", label: "Text", widget: "markdown", i18n: true },
-      ],
-    });
+// The press room nests the locale under each collection, like `content/`.
+if (has("press/docs")) {
+  for (const locale of locales) {
+    entries.push({ group: "Press: boilerplate and facts", key: keyOf("pressDocs", locale), kind: "collection", locale, label: `Press documents (${language(locale)})`, path: `press/docs/${locale}`, title: "title", fields: [{ name: "title", label: "Name", type: "text" }, { name: "body", label: "Text", type: "body" }] });
   }
-
-  if (has("press/stories")) {
-    out.push({
-      name: "press-stories",
-      label: "Press stories",
-      folder: "press/stories",
-      ...mediaFolders("press/stories"),
-      create: true,
-      delete: true,
-      slug: "{{slug}}",
-      extension: "md",
-      format: "frontmatter",
-      i18n: true,
+}
+if (has("press/stories")) {
+  // A free-text angle would not match `press.angle.*` in the message catalogue.
+  const angles = ["origin", "technical", "customer", "failure", "milestone", "people", "market"];
+  for (const locale of locales) {
+    entries.push({
+      group: "Press stories", key: keyOf("pressStories", locale), kind: "collection", locale, label: `Press stories (${language(locale)})`, path: `press/stories/${locale}`, title: "title",
       fields: [
-        ...STORY_FIELDS.map(([f, t]) =>
-          f === "angle"
-            ? {
-                name: "angle",
-                label: "Angle",
-                widget: "select",
-                options: ANGLES,
-                i18n: "duplicate",
-              }
-            : field(f, t, { i18n: t === "date" ? "duplicate" : true }),
-        ),
-        // The story itself. It was missing, which made the editor a form for
-        // everything about a story except the story.
-        { name: "body", label: "Story", widget: "markdown", i18n: true },
+        { name: "title", label: "Title", type: "text" },
+        { name: "angle", label: "Angle", type: "select", options: angles },
+        { name: "date", label: "Date", type: "date" },
+        { name: "summary", label: "Summary", type: "text" },
+        { name: "cover", label: "Cover", type: "media", prefix: "press/stories" },
+        { name: "cover_alt", label: "Cover alt", type: "text" },
+        { name: "body", label: "Story", type: "body" },
       ],
     });
   }
 }
 
-// ── Settings: the facts that are not entries ─────────────────────────────────
-// `settings.toml` (links, ids, a form's address: the same in every language) and
-// `messages/<locale>.json` (every string the interface prints) are files, not
-// collections of entries, so they are file collections. Their fields are read
-// from the files themselves, so a new key appears in the form on the next
-// derive and nothing is declared twice.
-//
-// `[cms] settings` lists the TOML files to offer; it defaults to `settings.toml`.
-const walkFields = (value) =>
-  Object.entries(value).map(([k, v]) => {
-    if (Array.isArray(v)) return { name: k, label: label(k), widget: "list", required: false };
-    if (v && typeof v === "object") {
-      return { name: k, label: label(k), widget: "object", collapsed: true, fields: walkFields(v) };
+// Files that are not collections of entries: the fields come from the files
+// themselves, so a new key appears in its form on the next derive and nothing
+// lists a message by name.
+const fromJson = (value) =>
+  Object.entries(value).flatMap(([k, v]) => {
+    if (!/^[\w-]+$/.test(k)) return []; // a key an editor cannot address
+    const base = { name: k, label: label(k) };
+    if (Array.isArray(v)) {
+      const first = v.find((x) => x && typeof x === "object");
+      return [first ? { ...base, type: "objects", fields: fromJson(first) } : { ...base, type: "list" }];
     }
-    if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
-      return { name: k, label: label(k), ...WIDGET.date, required: false };
-    }
-    // A line break, or a long string, gets a text area; the rest one line.
-    // `{placeholders}` and `[highlight]` marks are part of the text.
+    if (v && typeof v === "object") return [{ ...base, type: "object", fields: fromJson(v) }];
+    if (typeof v === "boolean") return [{ ...base, type: "bool" }];
+    if (typeof v === "number") return [{ ...base, type: "number" }];
     const long = typeof v === "string" && (/\n/.test(v) || v.length > 90);
-    return { name: k, label: label(k), widget: long ? "text" : "string", required: false };
+    return [{ ...base, type: long ? "long" : "text" }];
   });
 
-const settings = [];
-for (const file of cms.settings ?? ["settings.toml"]) {
-  if (!has(file)) continue;
-  settings.push({
-    name: file.replace(/\.toml$/, "").replace(/[^\w-]/g, "-"),
-    label: label(file.replace(/\.toml$/, "")),
-    file,
-    format: "toml",
-    fields: walkFields(parseToml(read(file))),
-  });
+const dataFiles = [];
+for (const file of ["settings.json", ...(cms.settings ?? [])]) {
+  if (has(file)) dataFiles.push({ key: file.replace(/\.json$/, "").replace(/[^\w]/g, "_"), label: label(file.replace(/\.json$/, "")), path: file.replace(/\.json$/, ""), fields: fromJson(JSON.parse(read(file))) });
 }
-for (const l of locales) {
-  if (has(`messages/${l}.json`)) {
-    settings.push({
-      name: `messages-${l}`,
-      label: `Interface text: ${language(l)}`,
-      file: `messages/${l}.json`,
-      format: "json",
-      fields: walkFields(JSON.parse(read(`messages/${l}.json`))),
-    });
+for (const locale of locales) {
+  if (has(`messages/${locale}.json`)) {
+    dataFiles.push({ key: `messages_${locale}`, label: `Interface text (${language(locale)})`, path: `messages/${locale}`, fields: fromJson(JSON.parse(read(`messages/${locale}.json`))) });
   }
 }
-if (settings.length > 0) out.push({ name: "settings", label: "Settings", files: settings });
+for (const d of dataFiles) entries.push({ group: "Settings", kind: "data", ...d });
 
-// ── The config ───────────────────────────────────────────────────────────────
-// Written as YAML by hand rather than through a dependency: this is a fixed,
-// shallow shape that this file alone produces, and a serialiser would be a
-// package to keep current for thirty lines of output.
-function yaml(value, indent = 0) {
-  const pad = "  ".repeat(indent);
-  if (Array.isArray(value)) {
-    return value
-      .map((v) => {
-        const body = yaml(v, indent + 1);
-        return typeof v === "object" && v !== null
-          ? `${pad}- ${body.trimStart()}`
-          : `${pad}- ${body.trim()}`;
-      })
-      .join("\n");
+// ── Emit: Keystatic ──────────────────────────────────────────────────────────
+// Keystatic rejects `..` in a path and resolves the rest against the directory
+// the server runs in, so `dev.mjs` starts it from the repository root and every
+// path here is repository-relative.
+const J = JSON.stringify;
+
+function ksField(f, e) {
+  const o = `label: ${J(f.label)}${f.hint ? `, description: ${J(f.hint)}` : ""}`;
+  switch (f.type) {
+    case "long": return `fields.text({ ${o}, multiline: true })`;
+    case "date": return `fields.date({ ${o} })`;
+    case "partial": return `fields.text({ label: ${J(f.label)}, description: ${J(f.hint ?? "YYYY, YYYY-MM or YYYY-MM-DD")} })`;
+    case "number": return `fields.integer({ ${o} })`;
+    case "bool": return `fields.checkbox({ ${o} })`;
+    case "list": return `fields.array(fields.text({ label: "Item" }), { label: ${J(f.label)}, itemLabel: (p) => p.value })`;
+    // The directory is the gitignored staging area and `publicPath` the key
+    // prefix, so what the picker stores is exactly a media key.
+    case "media": return `fields.image({ ${o}, directory: ${J(`${mediaDir}/${f.prefix}`)}, publicPath: ${J(`${f.prefix}/`)} })`;
+    case "select": return `fields.select({ ${o}, options: [${f.options.map((v) => `{ label: ${J(v)}, value: ${J(v)} }`).join(", ")}], defaultValue: ${J(f.options[0] ?? "")} })`;
+    case "relation": {
+      const target = keyOf(f.target, e.locale);
+      return f.many
+        ? `fields.array(fields.relationship({ label: "Entry", collection: ${J(target)} }), { label: ${J(f.label)}, itemLabel: (p) => p.value ?? "" })`
+        : `fields.relationship({ ${o}, collection: ${J(target)} })`;
+    }
+    case "objects": {
+      const first = f.fields[0]?.name;
+      return `fields.array(fields.object({ ${f.fields.map((x) => `${J(x.name)}: ${ksField(x, e)}`).join(", ")} }), { label: ${J(f.label)}, itemLabel: (p) => ${first ? `String(p.fields[${J(first)}].value ?? "")` : '""'} })`;
+    }
+    case "object": return `fields.object({ ${f.fields.map((x) => `${J(x.name)}: ${ksField(x, e)}`).join(", ")} }, { label: ${J(f.label)} })`;
+    case "body": return `fields.markdoc({ label: ${J(f.label)}, extension: "md" })`;
+    default: return `fields.text({ ${o} })`;
   }
-  if (value && typeof value === "object") {
-    return Object.entries(value)
-      .map(([k, v]) => {
-        if (Array.isArray(v) || (v && typeof v === "object")) {
-          return `${pad}${k}:\n${yaml(v, indent + 1)}`;
-        }
-        return `${pad}${k}: ${scalar(v)}`;
-      })
-      .join("\n");
-  }
-  return `${pad}${scalar(value)}`;
 }
-const scalar = (v) => {
-  if (typeof v === "boolean" || typeof v === "number") return String(v);
-  const s = String(v);
-  // Quote anything that is not plainly a word: `{{slug}}` unquoted is a YAML
-  // flow mapping, not a template.
-  return /^[\w./\- ]+$/.test(s) && !/^\s|\s$/.test(s) ? s : JSON.stringify(s);
+
+function ksEntry(e) {
+  const schema = e.fields
+    .map((f) => {
+      // The file name is the entry's identity and must match in every language,
+      // so the slug is editable at creation rather than derived from a translation.
+      if (e.kind === "collection" && f.name === e.title) {
+        return `    ${J(f.name)}: fields.slug({ name: { label: ${J(f.label)} }, slug: { label: "File name", description: "The same in every language." } }),`;
+      }
+      return `    ${J(f.name)}: ${ksField(f, e)},`;
+    })
+    .join("\n");
+  const body = e.fields.some((f) => f.type === "body");
+  const format = e.kind === "data" ? `format: "json"` : body ? `format: { contentField: "body" }` : `format: { data: "yaml" }`;
+  if (e.kind === "collection") {
+    return `    ${e.key}: collection({\n      label: ${J(e.label)},\n      path: ${J(`${e.path}/*`)},\n      slugField: ${J(e.title)},\n      ${format},\n      schema: {\n${schema}\n      },\n    }),`;
+  }
+  return `    ${e.key}: singleton({\n      label: ${J(e.label)},\n      path: ${J(`${e.path}`)},\n      ${format},\n      schema: {\n${schema}\n      },\n    }),`;
+}
+
+const groups = {};
+for (const e of entries) (groups[e.group] ??= []).push(e.key);
+const navigation = Object.fromEntries(Object.entries(groups));
+
+const keystatic = `// Generated by \`fid derive\` (pipeline: cms) from content.toml, press/, messages/,
+// settings.json and [i18n]. Do not edit — change the declaration and re-derive.
+// \`fid derive --check\` fails if this file is stale.
+//
+// Paths are relative to the repository root, where the editor runs. Entries are plain
+// \`.md\` with YAML frontmatter: the same files Tina edits, so switching
+// \`[cms] editor\` never means converting content.
+import { collection, config, fields, singleton } from "@keystatic/core";
+
+export default config({
+  storage: { kind: "local" },
+  ui: {
+    brand: { name: ${J(productName)} },
+    navigation: ${J(navigation, null, 6).replace(/\n}$/, "\n    }")},
+  },
+  collections: {
+${entries.filter((e) => e.kind === "collection").map(ksEntry).join("\n")}
+  },
+  singletons: {
+${entries.filter((e) => e.kind !== "collection").map(ksEntry).join("\n")}
+  },
+});
+`;
+
+// ── Emit: Tina ───────────────────────────────────────────────────────────────
+// Tina's strengths are visual editing and editing on the page itself; it costs a
+// service dependency (Tina Cloud or self-hosted) once editing is hosted. Locally
+// it needs neither. Two honest differences from Keystatic, both because Tina
+// stores different values: a picture is a text field holding the media KEY
+// (Tina's image picker would store a path), and a relation is the entry's slug
+// as text (Tina's reference stores a file path).
+function tinaField(f) {
+  const base = `name: ${J(f.name)}, label: ${J(f.label)}${f.hint ? `, description: ${J(f.hint)}` : ""}`;
+  switch (f.type) {
+    case "long": return `{ type: "string", ${base}, ui: { component: "textarea" } }`;
+    case "date": return `{ type: "datetime", ${base} }`;
+    case "number": return `{ type: "number", ${base} }`;
+    case "bool": return `{ type: "boolean", ${base} }`;
+    case "list": return `{ type: "string", list: true, ${base} }`;
+    case "select": return `{ type: "string", ${base}, options: ${J(f.options)} }`;
+    case "objects": return `{ type: "object", list: true, ${base}, fields: [${f.fields.map(tinaField).join(", ")}] }`;
+    case "object": return `{ type: "object", ${base}, fields: [${f.fields.map(tinaField).join(", ")}] }`;
+    case "body": return `{ type: "rich-text", name: "body", label: ${J(f.label)}, isBody: true }`;
+    case "media": return `{ type: "string", ${base.replace(/description: [^,]*,?/, "")}, description: ${J(`Media key under ${f.prefix}/ (staged in ${mediaDir}/, synced by pnpm media:push)`)} }`;
+    case "relation": return `{ type: "string", ${base}, description: ${J(`Slug of an entry in ${f.target}`)}${f.many ? ", list: true" : ""} }`;
+    default: return `{ type: "string", ${base} }`;
+  }
+}
+
+function tinaCollection(e) {
+  const title = e.kind === "collection" ? e.title : null;
+  const fields = e.fields.map((f) => (f.name === title ? tinaField(f).replace(" }", ", isTitle: true, required: true }") : tinaField(f))).join(",\n      ");
+  const file = e.kind === "collection" ? null : e.path.split("/").pop();
+  const dir = e.kind === "collection" ? e.path : e.path.split("/").slice(0, -1).join("/");
+  const format = e.kind === "data" ? "json" : "md";
+  const only = file ? `\n    match: { include: ${J(file)} },\n    ui: { allowedActions: { create: false, delete: false } },` : "";
+  return `  {\n    name: ${J(e.key)},\n    label: ${J(e.label)},\n    path: ${J(dir || ".")},\n    format: ${J(format)},${only}\n    fields: [\n      ${fields},\n    ],\n  }`;
+}
+
+const tina = `// Generated by \`fid derive\` (pipeline: cms) from content.toml, press/, messages/,
+// settings.json and [i18n]. Do not edit — change the declaration and re-derive.
+//
+// Edits the same \`.md\` and \`.json\` files as Keystatic. Run with \`pnpm dev\` in
+// apps/cms when \`[cms] editor = "tina"\`.
+import { defineConfig } from "tinacms";
+
+export default defineConfig({
+  branch: "main",
+  // Local mode: the repository root, three levels up from this file, is the content store.
+  localContentPath: "../../../",
+  build: { outputFolder: "admin", publicFolder: "public" },
+  schema: {
+    collections: [
+${entries.map(tinaCollection).join(",\n")},
+    ],
+  },
+});
+`;
+
+// ── Emit: the editor workspace's package.json ────────────────────────────────
+const pkg = {
+  name: `@${productName}/cms`,
+  version: "0.1.0",
+  private: true,
+  scripts: {
+    dev: editor === "tina" ? "node dev.mjs here tinacms dev" : "node dev.mjs root next dev apps/cms --port 4321",
+  },
+  dependencies:
+    editor === "tina"
+      ? { "@tinacms/cli": "^4.0.5", tinacms: "^3.15.2", react: "^19.0.0", "react-dom": "^19.0.0" }
+      : { "@keystatic/core": "^0.6.9", "@keystatic/next": "^5.0.5", next: "^16.0.0", react: "^19.0.0", "react-dom": "^19.0.0" },
+  devDependencies: { "@types/node": "^22.0.0", "@types/react": "^19.0.0", "@types/react-dom": "^19.0.0", typescript: "^7.0.0" },
 };
 
-const config = {
-  // `git-gateway` is a placeholder the local proxy never uses. `pnpm cms`
-  // serves this editor against the working tree, so edits are ordinary file
-  // changes you review and commit like any other.
-  backend: { name: "git-gateway" },
-  local_backend: true,
-  locale: defaultLocale,
-  media_folder: `${mediaDir}/${mediaPrefix}`,
-  public_folder: `${publicBase}/${mediaPrefix}`,
-  i18n: { structure: "multiple_folders", locales, default_locale: defaultLocale },
-  collections: out,
-};
-
-const header = [
-  "# Generated by `node scripts/derive-cms.mjs` from content.toml, press/, settings.toml, messages/ and",
-  "# `[i18n]` in fiducial.toml. Do not edit — change the declaration and",
-  "# re-derive. `fid derive --check` fails if this file is stale.",
-  "",
-].join("\n");
-
-const dest = "tools/cms/config.yml";
-mkdirSync(dirname(at(dest).pathname), { recursive: true });
-writeFileSync(at(dest), `${header}${yaml(config)}\n`);
-console.log(`wrote ${dest} (${out.length} collection(s), ${locales.length} locale(s))`);
+const stamp = "Generated by `fid derive` (pipeline: cms). Do not edit — set [cms] editor in fiducial.toml.";
+function emit(dest, text) {
+  mkdirSync(dirname(at(dest).pathname), { recursive: true });
+  writeFileSync(at(dest), text);
+}
+emit("apps/cms/keystatic.config.ts", keystatic);
+emit("apps/cms/tina/config.ts", tina);
+emit("apps/cms/package.json", `${JSON.stringify({ ...pkg, "//": stamp }, null, 2)}\n`);
+console.log(`wrote apps/cms (${editor}; ${entries.length} editable item(s), ${locales.length} locale(s))`);

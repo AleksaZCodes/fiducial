@@ -673,7 +673,8 @@ the class-level gate changes) — `hardware` owns the board.
 ### A stack chosen per app — *multiplying* ⬜
 
 Today every web product is Next.js (or SvelteKit), its data is D1 or Supabase
-behind the `database` contract, and its content editor is Decap. That is the
+behind the `database` contract, and its content editor is Keystatic (Tina is the
+alternative, both shipped in 0.15.0). That is the
 right default and the wrong ceiling: a portfolio, a dashboard and a typed
 full-stack app do not want the same framework, and forcing them into one is how
 a product ends up fighting its scaffold. This item adds the options and, more
@@ -690,10 +691,13 @@ once, and never guessed.
 | ⬜ **Hono** | `api-hono` capability, `apps/api` | A backend for anything, mostly the Astro and SPA cases that have no route handlers of their own. Workers-native, tiny, built on Web standards, and its typed RPC client carries request and response types to the front end. The same app runs on Node for a self-hosted target |
 | ⬜ **Drizzle ORM** | `orm-drizzle` capability | An app that wants typed queries over D1, Postgres (Supabase) or self-hosted SQLite. It is a layer over the `database` contract, not a replacement: the contract and its `Migrator` stay, and the app opts in |
 | ⬜ **Pages CMS** | `cms` editor `pages` | Editors who are not technical and should not run anything locally: a hosted editor over the repository, any framework, no build coupling |
-| ⬜ **Keystatic** | `cms` editor `keystatic` | Code-first teams on Astro or Next.js: a TypeScript schema, local and GitHub modes, deep framework integration |
-| ⬜ **TinaCMS** | `cms` editor `tina` | Editors who need to edit on the page itself, with visual editing. Accepts a service dependency (Tina Cloud, or self-hosted) that the others avoid |
+| ✅ **Keystatic** | `cms` editor `keystatic` (default) | Writers who edit forms. Shipped in 0.15.0: derived from `content.toml`, one editable collection per locale, real image and relationship pickers. Still to come: its Astro integration (`@keystatic/astro`) and GitHub mode for hosted editing |
+| ✅ **TinaCMS** | `cms` editor `tina` | Editing on the page itself, visual editing. Shipped in 0.15.0 as the second deriver over the same model and the same files; visual editing and Tina Cloud hosting are not wired yet |
 
-Decap stays, and stays the default: it needs no service and no account.
+Decap is **removed** (0.15.0): Keystatic and Tina cover its job with a local
+editor that needs no service and no account, and a codebase with three editors
+is a codebase with a half-maintained one. The plan for the rest of this item
+is `docs/specs/2026-11-13-one-product-many-shapes.md`.
 
 **The rule for choosing is the deliverable.** It is declared per app, not per
 product, because one product legitimately has an Astro marketing site, a React
@@ -728,12 +732,12 @@ rather than generating something that half works.
   existing capabilities already carry (design tokens, `i18n`, `content`,
   `seo`, the adapters factory) must not be copied into each; where a template
   assumes Next.js, split it by framework the way `design/for/web-next/` does.
-- The editors: `capabilities/cms/scripts/derive-cms.mjs` derives Decap's config
-  from `content.toml`, `messages/` and `[i18n]`. Each new editor is another
-  deriver from the **same** declarations, selected by `[cms] editor`, so the
-  content model is still declared once and switching editor is a re-derive.
-  The `shared` collections and the interface-text file collection must reach
-  each editor, or the new editors cover less than Decap does.
+- The editors: `capabilities/cms/scripts/derive-cms.mjs` builds one neutral
+  model from `content.toml`, `press/`, `messages/`, `settings.json` and
+  `[i18n]`, and emits Keystatic's and Tina's configs from it, selected by
+  `[cms] editor`. The content model is declared once and switching editor is a
+  re-derive. Pages CMS is the next emitter, and hosted editing (GitHub mode,
+  Tina Cloud) waits on media no longer being a local staging directory.
 - Drizzle: the schema in TypeScript is the declaration, and the SQL it
   generates feeds the existing `Migrator`; do not keep a second, hand-written
   SQL copy of the same tables.

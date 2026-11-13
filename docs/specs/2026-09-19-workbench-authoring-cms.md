@@ -1,3 +1,7 @@
+> **Update, 0.15.0:** the editor is no longer Decap. Keystatic (default) and
+> Tina are derived from the same model; see `docs/specs/2026-11-13-one-product-many-shapes.md`.
+> The reasoning below about *why a derived, local editor* still holds.
+
 # Workbench authoring — the `cms` capability
 
 **Date:** 2026-09-19

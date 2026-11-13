@@ -1,29 +1,33 @@
 name     = "cms"
 executor = "shell"
 args     = ["node", "scripts/derive-cms.mjs"]
-outputs  = ["tools/cms/config.yml"]
+outputs  = ["apps/cms/keystatic.config.ts", "apps/cms/tina/config.ts", "apps/cms/package.json"]
 # What the script reads: an edit here, not re-derived, fails `fid derive --check`.
-inputs   = ["fiducial.toml#cms", "fiducial.toml#i18n", "content.toml?", "press/**", "messages/**", "settings.toml?"]
+inputs   = ["fiducial.toml#cms", "fiducial.toml#i18n", "fiducial.toml#product", "content.toml?", "press/**", "messages/**", "settings.json?"]
 
 # The content editor's config, derived from the content model.
 #
-# `tools/cms/` is a local tool: `pnpm cms` serves Decap CMS against this
-# working tree through `decap-server`, and every save is an ordinary file
-# change you review and commit. Nothing is deployed and there is no login,
-# because the way in is to have the repository checked out.
+# `apps/cms/` is a local tool: `pnpm dev` there serves the editor against this
+# working tree, and every save is an ordinary file change you review and
+# commit. Nothing is deployed and there is no login, because the way in is to
+# have the repository checked out.
 #
 # ## Why the config is derived rather than written
 #
-# Decap's config lists every collection, field and widget. `content.toml`
-# already declares exactly that, and `press/` already has a layout. A
-# hand-written config would be a second declaration of the content model — and
-# the copy that drifts silently, because nothing renders from it. An editor
-# offering a field the schema does not have writes an entry `fid derive` then
-# rejects; an editor missing a field leaves it empty on everything made through
-# it, which nobody notices until a page renders blank.
+# An editor's config lists every collection, field and widget. `content.toml`
+# already declares exactly that, and `press/`, `messages/` and `settings.json`
+# already hold the rest. A hand-written config would be a second declaration of
+# the content model — and the copy that drifts silently, because nothing
+# renders from it.
 #
 # So the editor follows the declarations, and `fid derive --check` fails when
 # it is stale. Change a schema and the editor changes on the next derive.
+#
+# ## Both editors, always
+#
+# Keystatic (default) and Tina are both derived from one model and both edit
+# the same plain files, so `[cms] editor` selects which one runs and nothing
+# else. `apps/cms/package.json` is derived so only that editor is installed.
 #
 # ## Ordering
 #

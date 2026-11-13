@@ -1,4 +1,4 @@
-description = "A local content editor over the repository's own files, with its config derived from the content model"
+description = "A local content editor (Keystatic by default, Tina optionally) over the repository's own files, with its config derived from the content model"
 
 # The editor is the authoring slice of the workbench (design §10, v2): the
 # repository stays the database and this is a view that writes back as ordinary
@@ -7,12 +7,15 @@ description = "A local content editor over the repository's own files, with its 
 # without them it would render an empty editor and look broken.
 requires_capabilities = ["content", "i18n"]
 
-# Where uploads are staged and how they are keyed.
+# Which editor runs, and where uploads are staged and how they are keyed.
+#
+# `editor` is `keystatic` or `tina`; both configs are always derived and both
+# edit the same files, so changing it never converts content.
 #
 # `media_dir` is the gitignored staging directory; `media_prefix` is the key
-# prefix new uploads get, so an image added while writing a post lands at
-# `<media_dir>/<media_prefix>/<file>` locally and `<media_prefix>/<file>` in
-# the bucket. Content stores that key, never a URL — see the `content` skill.
+# prefix new uploads get. An image added while writing a post lands at
+# `<media_dir>/<prefix>/<file>` locally and `<prefix>/<file>` in the bucket.
+# Content stores that key, never a URL — see the `content` skill.
 [[declarations.config]]
 block = "cms"
-seed = { media_dir = "media", media_prefix = "site/uploads" }
+seed = { editor = "keystatic", media_dir = "media", media_prefix = "site/uploads" }
