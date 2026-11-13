@@ -191,6 +191,14 @@ pub const RETIRED_TEMPLATES: &[(&str, &str)] = &[
         "apps/web/pnpm-workspace.yaml",
         "the workspace is rooted at the product root now — a second one in apps/web made pnpm start a separate install there, with its own lockfile",
     ),
+    (
+        "tools/cms/serve.mjs",
+        "the content editor is Keystatic or Tina now, run from apps/cms; Decap and its proxy are gone",
+    ),
+    (
+        "tools/cms/index.html",
+        "the content editor is Keystatic or Tina now, run from apps/cms; Decap and its proxy are gone",
+    ),
 ];
 
 // ── Lookup ────────────────────────────────────────────────────────────────────
