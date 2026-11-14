@@ -81,6 +81,35 @@ Honest limits, written down so they are not rediscovered:
    gitignored staging directory by design, which a hosted editor cannot see.
 5. Tina's visual editing is not wired; only its form editor is.
 
+### Review, 2026-11-14
+
+A review against `MISSION.md`, each finding confirmed against the real
+packages before it was fixed, each now held by a test in `cms_pipeline.rs`:
+
+- A frontmatter-only collection was written as `.yaml`, which nothing reads
+  (now Keystatic's `emptyContent`, so it stays `.md`).
+- The TOML reader skipped quoted keys, so no `[cms.selects]`, hints or
+  relations ever reached the editor, here or before. Also: `#` inside a string
+  was cut as a comment.
+- A select would overwrite an out-of-range value on save (now refused at
+  derive); a select on a list was single-valued (now a multi-select); a select
+  of numbers wrote text (now a number field).
+- An editor saving a JSON form deletes what the form cannot hold (dotted keys,
+  `null`, ragged record lists): now refused at derive, naming the key.
+- Tina saves a day as a timestamp (now read as the day; a real time of day is
+  refused), and nothing kept a date or number equal across locales once each
+  language became its own file (now a build failure, principle 1).
+- Body images would have been committed next to the entry, and Keystatic's
+  tables written in Markdoc syntax (now staged media and tables off).
+- `media:push --prune` would have deleted gallery images inside `object[]`
+  records (pre-existing).
+- The one breaking change, `settings.toml`, is now converted by `fid upgrade`
+  (a new `convert` kind of migration), not left to each product.
+
+Verified end to end on a copy of Outreach: upgrade, derive, `--check`, all 19
+entries read through Keystatic's reader, every form rendered, and two saves
+through the UI changed exactly one line each with all 125 message keys kept.
+
 ## The plan, in order
 
 Each step has a test that must exist before the step is called done, because

@@ -65,12 +65,24 @@ through it — which shows up as a blank page long after the editing session.
 | `string[]` | list of text |
 | `media` | image picker; stores a **key**, never a URL |
 | `object[]` | list of small records |
-| `body = "rich"` | Markdoc editor, written as `.md` |
+| `body = "rich"` | rich-text editor, written as plain Markdown `.md` |
+| `body = "none"` | no editor; the entry is still a frontmatter-only `.md` |
+
+Tables are off in the body editor: Keystatic writes them in Markdoc's own
+syntax, which a Markdown renderer prints as text. An image dropped into a body
+is staged under the collection's media prefix, like a picture field's.
 
 `[cms.selects]`, `[cms.hints]` and `[cms.relations]` refine a field: a fixed
 list of choices, help text, and a searchable pick from another collection (a
 field named `related<Collection>` points at that collection with no
-declaration).
+declaration). Keys are quoted, `"collection.field" = …`.
+
+- A select on a `string[]` field is a multi-select.
+- A select among numbers (`[1, 2, 3]`) is a number field that names the
+  choices, because a select stores text and the schema says number.
+- **A value already in the content that is not one of the choices fails the
+  derive.** The editor would show the default instead and write it over the
+  value on the next save.
 
 ## Localization
 
@@ -99,8 +111,12 @@ Two kinds of file are not collections of entries, so the editor offers them as a
   language.
 
 A new key appears in its form on the next derive and nothing lists a message by
-name. A key an editor cannot address (anything but letters, digits, `_`, `-`)
-is left out of the form and stays in the file.
+name.
+
+An editor saves a JSON file *from its form*, so whatever the form cannot hold is
+deleted on the first save. The derive therefore refuses, naming the file and
+key: a key that is not letters, digits, `_` and `-` (so `"nav.home"`, which
+should be nested), a `null`, and a list whose records differ in shape.
 
 What stays in code: `fiducial.toml` and `design-system.md`. They carry comments
 and structure a form would flatten, and they change how the product is built
@@ -109,7 +125,9 @@ rather than what it says.
 ## Media
 
 Images dropped into the editor are staged in `media/` and stored as **keys**
-(`site/blog/hello/cover.png`), never URLs and never files in git.
+(`<prefix>/<slug>/<file>`, e.g. `posts/hello/cover.png`), never files in git.
+Set `[cms] public_base = "/images"` only if the site stores URL paths instead
+of bare keys; the stored value is then `/images/posts/hello/cover.png`.
 
 - `pnpm media:push` uploads what changed, against a machine-local hash record;
   `--all` ignores it.
@@ -125,12 +143,23 @@ deletes them only when asked, because the bucket is the one place here where a
 mistake is not a `git revert`. Both directions read one definition of
 "referenced" (`scripts/media-keys.mjs`).
 
+A picture inside a list of records (a gallery) counts as referenced too.
+
 A collection declares its key prefix in `content.toml`:
 
 ```toml
 [collections.posts]
 media = "site/blog"    # defaults to the collection's own name
 ```
+
+## Upgrading from Decap (0.14 and earlier)
+
+`fid upgrade` converts `settings.toml` to `settings.json` (keeping the old file
+as `settings.toml.bak`, since JSON cannot hold its comments) and removes
+`tools/cms/`'s editor files. Delete the derived `tools/cms/config.yml` by hand,
+add `editor = "keystatic"` to `[cms]` if you like it stated, and run
+`pnpm install`. Decap-only keys (`media_prefix`, `[cms.images]` crops) are
+ignored.
 
 ## Not here yet
 

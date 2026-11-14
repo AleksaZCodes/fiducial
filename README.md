@@ -132,7 +132,7 @@ product actually needs.
 |---|---|---|
 | `adapters` | declares `adapters`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability adapters` |
 | `brand` | declares `brand`; 2 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability brand` |
-| `cms` | declares `cms`; 1 pipeline(s); 6 template file(s); seeds a `fiducial.toml` block | `fid add capability cms` |
+| `cms` | declares `cms`; 1 pipeline(s); 14 template file(s); seeds a `fiducial.toml` block | `fid add capability cms` |
 | `content` | declares `content.toml`, `content/posts/en/hello.md`; 1 pipeline(s); 2 template file(s) | `fid add capability content` |
 | `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
 | `design` | declares `design-system.md`; 1 pipeline(s); 4 template file(s) | `fid add capability design` |

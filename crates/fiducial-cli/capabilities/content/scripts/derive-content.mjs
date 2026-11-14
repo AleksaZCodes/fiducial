@@ -63,17 +63,24 @@ export function parseToml(src) {
       }
       continue;
     }
-    const kv = raw.match(/^\s*([A-Za-z_][\w-]*)\s*=\s*(.*)$/);
+    const kv = raw.match(KEY_VALUE);
     if (!kv) continue;
+    const key = unquoteKey(kv[1]);
     const v = kv[2].trim();
     if (!balanced(v)) {
-      pending = { key: kv[1], buf: v };
+      pending = { key, buf: v };
       continue;
     }
-    table[kv[1]] = parseValue(v);
+    table[key] = parseValue(v);
   }
   return root;
 }
+// A key is bare (`name`) or quoted (`"works.status"`): a quoted key is ONE key
+// with a dot in it, which is how `[cms.selects]` names "collection.field". The
+// reader used to match bare keys only and skipped the rest without a word, so a
+// product's selects, hints and relations were silently not there.
+const KEY_VALUE = /^\s*([A-Za-z_][\w-]*|"[^"]*"|'[^']*')\s*=\s*(.*)$/;
+const unquoteKey = (k) => (/^["']/.test(k) ? k.slice(1, -1) : k);
 const balanced = (s) => {
   let n = 0;
   for (const c of s) {
@@ -101,15 +108,36 @@ function splitTop(s) {
   if (cur.trim()) out.push(cur);
   return out.map((x) => x.trim()).filter(Boolean);
 }
+// A trailing `# comment`, but only outside a string: "a #2 pick" keeps its `#`.
+function stripComment(v) {
+  let q = null;
+  for (let i = 0; i < v.length; i++) {
+    const c = v[i];
+    if (q) {
+      if (c === "\\" && q === '"') i++;
+      else if (c === q) q = null;
+    } else if (c === '"' || c === "'") q = c;
+    else if (c === "#") return v.slice(0, i);
+  }
+  return v;
+}
 function parseValue(v) {
-  v = v.replace(/\s+#.*$/, "").trim();
-  if (v.startsWith('"') && v.endsWith('"')) return v.slice(1, -1);
+  v = stripComment(v).trim();
+  if (v.startsWith('"') && v.endsWith('"')) {
+    // TOML's basic-string escapes are JSON's, bar two rare ones (\e, \UXXXXXXXX).
+    try {
+      return JSON.parse(v);
+    } catch {
+      return v.slice(1, -1);
+    }
+  }
+  if (v.startsWith("'") && v.endsWith("'")) return v.slice(1, -1);
   if (v.startsWith("[")) return splitTop(v.slice(1, -1)).map(parseValue);
   if (v.startsWith("{")) {
     const o = {};
     for (const part of splitTop(v.slice(1, -1))) {
-      const m = part.match(/^([A-Za-z_][\w-]*)\s*=\s*([\s\S]+)$/);
-      if (m) o[m[1]] = parseValue(m[2]);
+      const m = part.match(/^([A-Za-z_][\w-]*|"[^"]*"|'[^']*')\s*=\s*([\s\S]+)$/);
+      if (m) o[unquoteKey(m[1])] = parseValue(m[2]);
     }
     return o;
   }
@@ -123,7 +151,6 @@ function frontmatter(md, where) {
   return fm(md, (msg) => fail(`${where}: ${msg}`));
 }
 
-
 // A date is a day that exists: `2026-13-01` has the shape and names no day,
 // and would sort, render and feed the sitemap as nonsense (the paper's
 // held-out set, N6). The time after the date, if any, is left to the reader.
@@ -134,6 +161,51 @@ function isCalendarDate(v) {
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
   const t = new Date(Date.UTC(y, mo - 1, d));
   return t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d;
+}
+
+// A date is a day. Some editors save a day as a timestamp (Tina writes
+// `2026-02-03T00:00:00.000Z`); midnight UTC is the same fact and is stored as the
+// day, so the data module has one shape whoever wrote the file. Any other time
+// is refused: cutting it off could move the date by one.
+function normalizeDates(meta, schema, where) {
+  for (const [field, type] of Object.entries(schema)) {
+    const v = meta[field];
+    if (type !== "date" || typeof v !== "string" || v.length === 10) continue;
+    if (!/^\d{4}-\d{2}-\d{2}[T ]00:00(:00(\.0+)?)?(Z|[+-]00:?00)?$/.test(v)) {
+      fail(
+        `${where}: \`${field}\` is a date, but "${v}" has a time of day. Write the day: ${v.slice(0, 10)}.`,
+      );
+    }
+    meta[field] = v.slice(0, 10);
+  }
+}
+
+// Facts that do not change with the language — a date, a number, a switch — are
+// one fact, so every locale's copy must agree. Editors keep each language in its
+// own file, which makes it easy to change a date in one and not the other, and
+// the site would then say two different things depending on who is reading.
+const LANGUAGE_FREE = new Set(["date", "partial-date", "number", "boolean"]);
+function sameInEveryLocale(name, schema, locales, byLocale) {
+  const fields = Object.entries(schema)
+    .filter(([, t]) => LANGUAGE_FREE.has(t))
+    .map(([f]) => f);
+  if (fields.length === 0 || locales.length < 2) return;
+  const [first, ...rest] = locales;
+  for (const entry of byLocale[first]) {
+    for (const loc of rest) {
+      const other = byLocale[loc].find((e) => e.slug === entry.slug);
+      if (!other) continue; // the entry-parity check reports this one
+      for (const f of fields) {
+        if (JSON.stringify(entry[f]) !== JSON.stringify(other[f])) {
+          fail(
+            `content/${name}/*/${entry.slug}.md: \`${f}\` differs between locales ` +
+              `(${first}: ${JSON.stringify(entry[f])}, ${loc}: ${JSON.stringify(other[f])}).\n` +
+              `  A ${schema[f]} is the same fact in every language; make them match.`,
+          );
+        }
+      }
+    }
+  }
 }
 
 // ── Schema check ─────────────────────────────────────────────────────────────
@@ -235,7 +307,7 @@ function main() {
   if (existsSync(at("settings.toml"))) {
     fail(
       "settings.toml is no longer read: settings are `settings.json`.\n" +
-        "  Convert it once (keys and nesting stay as they are), then delete the TOML file.",
+        "  `fid upgrade` converts it (keys and nesting stay; the old file is kept as .bak).",
     );
   }
   const settings = existsSync(at("settings.json")) ? JSON.parse(read("settings.json")) : {};
@@ -275,6 +347,7 @@ function main() {
           fail(`${where}: collection declares body = "none" but this entry has one`);
         if (!body && wantsBody)
           fail(`${where}: collection declares body = "rich" but this entry has none`);
+        normalizeDates(meta, schema, where);
         return { slug: f.replace(/\.md$/, ""), ...meta, ...(wantsBody ? { body } : {}) };
       });
     }
@@ -298,6 +371,7 @@ function main() {
       );
     }
 
+    sameInEveryLocale(name, schema, locales, byLocale);
     out.collections[name] = { kind, route: spec.route ?? "", byLocale };
   }
 

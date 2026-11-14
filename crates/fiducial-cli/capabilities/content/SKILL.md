@@ -64,6 +64,13 @@ route  = "/blog/{slug}"
   that silently disappears is how a paragraph goes missing with nobody able to
   find it.
 - **A body where `body = "none"`, or none where `body = "rich"`.**
+- **A language-free fact that differs between locales.** A `date`,
+  `partial-date`, `number` or `boolean` is one fact, so every locale's copy
+  must match. Editors keep each language in its own file, which makes changing
+  a date in one and not the other easy; the site would then say two things.
+- **A date with a time of day.** A date is a day. Midnight UTC written as a
+  timestamp (`2026-02-03T00:00:00.000Z`, which Tina saves) reads as that day;
+  any other time is refused, because cutting it off could move the date.
 - **A generated module that imports a framework.** See below.
 
 Types: `string`, `date`, `number`, `boolean`, `string[]`, and `media` — a

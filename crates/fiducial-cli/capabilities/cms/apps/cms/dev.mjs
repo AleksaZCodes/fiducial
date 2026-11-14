@@ -18,6 +18,10 @@ const repo = fileURLToPath(new URL("../..", import.meta.url));
 const [where, command, ...args] = process.argv.slice(2);
 const shell = process.platform === "win32";
 
+if (!command) {
+  console.error("usage: node dev.mjs <root|here> <command> [args…] (see apps/cms/package.json)");
+  process.exit(2);
+}
 const editor = spawn(command, args, {
   cwd: where === "root" ? repo : fileURLToPath(new URL(".", import.meta.url)),
   stdio: "inherit",
@@ -34,9 +38,14 @@ const derive = () => {
   timer = setTimeout(() => {
     if (running) return;
     running = true;
-    spawn("fid", ["derive"], { cwd: repo, stdio: "inherit", shell }).on("close", () => {
-      running = false;
-    });
+    spawn("fid", ["derive"], { cwd: repo, stdio: "inherit", shell })
+      .on("error", () => {
+        // Not fatal: the editor keeps working, the site just shows the old copy.
+        console.error("\n  `fid` is not on PATH, so saves are not re-derived. Run `fid derive`.\n");
+      })
+      .on("close", () => {
+        running = false;
+      });
   }, 600);
 };
 for (const path of ["content", "press", "messages", "settings.json"]) {

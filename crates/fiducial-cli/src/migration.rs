@@ -34,6 +34,9 @@ pub struct Migration {
     pub introduced_in: &'static str,
     /// Operations to apply, in order.
     pub ops: &'static [MigrationOp],
+    /// A change search-and-replace cannot express (a file converted to another
+    /// format). Returns how many files it changed; must be idempotent.
+    pub convert: Option<fn(&Path, bool) -> Result<usize>>,
 }
 
 /// One search-and-replace operation within a migration.
@@ -72,6 +75,7 @@ pub static BUILTIN_MIGRATIONS: &[Migration] = &[
                 replace: "geist.variable",
             },
         ],
+        convert: None,
     },
     Migration {
         id: "worker-cloudflare/0.2.0/wrangler-compatibility-date",
@@ -82,6 +86,7 @@ pub static BUILTIN_MIGRATIONS: &[Migration] = &[
             search: "compatibility_date = \"2024-01-01\"",
             replace: "compatibility_date = \"2025-01-01\"",
         }],
+        convert: None,
     },
     // The web-next template moved to Next 16. A major framework version is a
     // migration, said and recorded, not a line that rides in on a template
@@ -103,8 +108,53 @@ pub static BUILTIN_MIGRATIONS: &[Migration] = &[
                 replace: r#""next":  "^16.0.0""#,
             },
         ],
+        convert: None,
+    },
+    // Content editors read and write JSON; Keystatic cannot read TOML at all, so
+    // the settings every language shares moved from `settings.toml` to
+    // `settings.json`. The values and nesting carry over; the comments cannot,
+    // because JSON has none, which is why the TOML file is kept as `.bak`.
+    Migration {
+        id: "content/0.15.0/settings-json",
+        description: "Convert settings.toml to settings.json (the old file is kept as settings.toml.bak; move its comments to the README if they matter)",
+        introduced_in: "0.15.0",
+        ops: &[],
+        convert: Some(settings_toml_to_json),
     },
 ];
+
+fn settings_toml_to_json(root: &Path, dry_run: bool) -> Result<usize> {
+    let toml_path = root.join("settings.toml");
+    let json_path = root.join("settings.json");
+    if !toml_path.exists() || json_path.exists() {
+        return Ok(0);
+    }
+    let text = std::fs::read_to_string(&toml_path).context("reading settings.toml")?;
+    let value: toml::Value = toml::from_str(&text).context("settings.toml is not valid TOML")?;
+    if !dry_run {
+        let json = serde_json::to_string_pretty(&toml_to_json(value))?;
+        std::fs::write(&json_path, format!("{json}\n")).context("writing settings.json")?;
+        std::fs::rename(&toml_path, root.join("settings.toml.bak"))
+            .context("keeping settings.toml as settings.toml.bak")?;
+    }
+    Ok(1)
+}
+
+fn toml_to_json(value: toml::Value) -> serde_json::Value {
+    use serde_json::Value as J;
+    match value {
+        toml::Value::String(s) => J::String(s),
+        toml::Value::Integer(i) => J::from(i),
+        toml::Value::Float(f) => J::from(f),
+        toml::Value::Boolean(b) => J::Bool(b),
+        // A date is a day in every other content file: `YYYY-MM-DD` text.
+        toml::Value::Datetime(d) => J::String(d.to_string()),
+        toml::Value::Array(a) => J::Array(a.into_iter().map(toml_to_json).collect()),
+        toml::Value::Table(t) => {
+            J::Object(t.into_iter().map(|(k, v)| (k, toml_to_json(v))).collect())
+        }
+    }
+}
 
 // ── Apply logic ───────────────────────────────────────────────────────────────
 
@@ -195,6 +245,10 @@ pub(crate) fn apply_one(root: &Path, migration: &Migration, dry_run: bool) -> Re
         files_modified += 1;
     }
 
+    if let Some(convert) = migration.convert {
+        files_modified += convert(root, dry_run)?;
+    }
+
     Ok(ApplyResult {
         migration_id: migration.id.to_string(),
         description: migration.description.to_string(),
@@ -230,6 +284,31 @@ mod tests {
                 "{after}"
             );
         }
+    }
+
+    #[test]
+    fn settings_toml_becomes_settings_json_once() {
+        let migration = BUILTIN_MIGRATIONS
+            .iter()
+            .find(|m| m.id == "content/0.15.0/settings-json")
+            .expect("registered");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let root = tmp.path();
+        fs::write(
+            root.join("settings.toml"),
+            "# a comment\nsurvey_url = \"https://x.test/#a\"\nn = 3\n\n[maker]\nname = \"A\"\n",
+        )
+        .unwrap();
+        assert_eq!(apply_one(root, migration, false).unwrap().files_modified, 1);
+        let json: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(root.join("settings.json")).unwrap()).unwrap();
+        assert_eq!(json["survey_url"], "https://x.test/#a");
+        assert_eq!(json["n"], 3);
+        assert_eq!(json["maker"]["name"], "A");
+        assert!(!root.join("settings.toml").exists());
+        assert!(root.join("settings.toml.bak").exists());
+        // Idempotent: a second run, or a product with both, changes nothing.
+        assert_eq!(apply_one(root, migration, false).unwrap().files_modified, 0);
     }
 
     #[test]
