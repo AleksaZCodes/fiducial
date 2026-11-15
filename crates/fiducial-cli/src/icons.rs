@@ -336,42 +336,55 @@ fn parse_attrs(s: &str) -> anyhow::Result<(Vec<Attr>, usize)> {
 /// A line is inserted after `"dependencies": {` rather than the file being
 /// re-serialised: `package.json` is the product's, and rewriting its formatting
 /// to add one key would show up as an edit to every line of it.
-pub fn ensure_packages(root: &Path, lib: &Library) -> anyhow::Result<Vec<&'static str>> {
+pub fn ensure_packages(root: &Path, lib: &Library) -> anyhow::Result<Vec<String>> {
+    ensure_dependencies(root, lib.packages)
+}
+
+/// The same, for any list of `(package, range)`.
+pub fn ensure_dependencies(root: &Path, packages: &[(&str, &str)]) -> anyhow::Result<Vec<String>> {
+    ensure_entries(root, "dependencies", packages)
+}
+
+/// Add `(key, value)` pairs to one object of `apps/web/package.json` (its
+/// `dependencies`, its `scripts`) where the key is missing.
+pub fn ensure_entries(
+    root: &Path,
+    section: &str,
+    packages: &[(&str, &str)],
+) -> anyhow::Result<Vec<String>> {
     let path = root.join("apps/web/package.json");
     let Ok(text) = std::fs::read_to_string(&path) else {
         return Ok(Vec::new());
     };
     let parsed: serde_json::Value = serde_json::from_str(&text)?;
-    let deps = parsed.get("dependencies");
-    let missing: Vec<&(&str, &str)> = lib
-        .packages
+    let deps = parsed.get(section);
+    let missing: Vec<&(&str, &str)> = packages
         .iter()
         .filter(|(name, _)| deps.and_then(|d| d.get(*name)).is_none())
         .collect();
     if missing.is_empty() {
         return Ok(Vec::new());
     }
-    let anchor = "\"dependencies\": {";
-    let Some(at) = text.find(anchor) else {
+    let anchor = format!("\"{section}\": {{");
+    let Some(at) = text.find(&anchor) else {
         anyhow::bail!(
-            "apps/web/package.json has no \"dependencies\" object to add {} to",
+            "apps/web/package.json has no \"{section}\" object to add {} to",
             missing[0].0
         );
     };
     let insert_at = at + anchor.len();
     let lines: String = missing
         .iter()
-        .map(|(name, range)| format!("\n    \"{name}\": \"{range}\","))
+        .map(|(name, range)| format!("\n    \"{name}\": {},", serde_json::Value::from(*range)))
         .collect();
     let mut updated = text.clone();
     updated.insert_str(insert_at, &lines);
     // Inserting before an empty object leaves a trailing comma.
     let updated = updated.replace(",\n  }", "\n  }");
-    serde_json::from_str::<serde_json::Value>(&updated).map_err(|e| {
-        anyhow::anyhow!("adding icon packages would break apps/web/package.json: {e}")
-    })?;
+    serde_json::from_str::<serde_json::Value>(&updated)
+        .map_err(|e| anyhow::anyhow!("adding packages would break apps/web/package.json: {e}"))?;
     std::fs::write(&path, updated)?;
-    Ok(missing.iter().map(|(name, _)| *name).collect())
+    Ok(missing.iter().map(|(name, _)| name.to_string()).collect())
 }
 
 /// Set `iconLibrary` in `components.json`, keeping its formatting.

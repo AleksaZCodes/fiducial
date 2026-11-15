@@ -253,6 +253,11 @@ pub fn raw(rel_path: &str) -> Option<&'static str> {
 /// returns `None` rather than guessing, and the caller skips the file. A
 /// comparison against the wrong template is worse than no comparison.
 pub fn raw_for(rel_path: &str, enabled: &[String]) -> Option<&'static str> {
+    // A path an enabled capability replaces has no template to compare or merge.
+    if let Some(by) = crate::capability::superseded_by(rel_path, enabled) {
+        // Its replacement, when the superseding capability ships one; else none.
+        return crate::capability::find(by).and_then(|c| capability_file(c, rel_path, enabled));
+    }
     if let Some(t) = raw(rel_path) {
         return Some(t);
     }

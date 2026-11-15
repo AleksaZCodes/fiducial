@@ -23,8 +23,16 @@ pub fn run(
     default_locale: Option<&str>,
     full: bool,
     no_advise: bool,
+    shape: Option<&str>,
 ) -> Result<()> {
     validate_name(name)?;
+    // A shape is a set of `fid add` steps; check it before creating anything.
+    let shape_steps = match shape {
+        None => None,
+        Some("site") => Some(SITE_STEPS),
+        Some(other) => bail!("--shape `{other}` is not one of: site"),
+    };
+    let full = full || shape_steps.is_some();
     // Foundations are opt-in. `--locales` names them explicitly and implies
     // them; `--full` asks for the set a product used to be born with. See
     // `docs/specs/2026-09-21-foundations-are-additive.md`.
@@ -117,6 +125,10 @@ pub fn run(
         capability::install(cap, &dest, name)?;
         seed_locales(&dest, &locales, &default_locale)?;
         capability::reconcile_i18n_catalogs(&dest, &locales, &default_locale)?;
+
+        if let Some(steps) = shape_steps {
+            run_steps(&dest, steps)?;
+        }
 
         // Leave the scaffold derived. The CI `fid new` also scaffolds runs
         // `fid derive --check`, so a product whose generated messages have
@@ -226,6 +238,41 @@ fn resolve_default_locale(locales: &[String], declared: Option<&str>) -> Result<
     )
 }
 
+/// The `fid add` steps of `--shape site`, in dependency order.
+const SITE_STEPS: &[&[&str]] = &[
+    &["add", "app", "next"],
+    &["add", "brand"],
+    &["add", "legal"],
+    &["add", "capability", "content"],
+    &["add", "capability", "seo"],
+    &["add", "capability", "cms"],
+    &["add", "capability", "site"],
+    &["add", "deploy"],
+];
+
+/// Run each step as the `fid` the person would have typed, in the new product.
+/// The same binary and the same code path, so a shape cannot drift from what
+/// the individual commands produce.
+fn run_steps(dest: &Path, steps: &[&[&str]]) -> Result<()> {
+    let exe = std::env::current_exe().context("locating the fid binary")?;
+    for step in steps {
+        println!("\n✦ fid {}", step.join(" "));
+        let status = std::process::Command::new(&exe)
+            .args(*step)
+            .current_dir(dest)
+            .status()
+            .with_context(|| format!("running fid {}", step.join(" ")))?;
+        if !status.success() {
+            bail!(
+                "`fid {}` failed; the product is in {}",
+                step.join(" "),
+                dest.display()
+            );
+        }
+    }
+    Ok(())
+}
+
 /// Write the declared locale set into the product's `fiducial.toml`.
 ///
 /// Runs after `capability::install`, which seeds the capability's own locales
@@ -233,25 +280,32 @@ fn resolve_default_locale(locales: &[String], declared: Option<&str>) -> Result<
 /// teaching `install` about a locale set only `fid new` has.
 fn seed_locales(root: &Path, locales: &[String], default_locale: &str) -> Result<()> {
     let path = root.join(config::CONFIG_FILE);
-    let mut cfg = config::Config::load(&path)?;
-    cfg.i18n.locales = locales.to_vec();
-    cfg.i18n.default = Some(default_locale.to_string());
-
-    let raw = toml::to_string_pretty(&cfg).context("serialising fiducial.toml")?;
-    let header = format!(
-        "# fiducial.toml — created by `fid new {}` (fiducial {})\n\n",
-        root.file_name().unwrap_or_default().to_string_lossy(),
-        PLATFORM_VERSION
-    );
-    let content = format!("{header}{raw}");
+    let raw = std::fs::read_to_string(&path).context("reading fiducial.toml")?;
+    // Edited in place, not re-serialised: the template's comments are the
+    // explanation of every block, and a round trip through serde dropped all
+    // but two of them on every product created with `--locales`.
+    let mut doc: toml_edit::DocumentMut = raw.parse().context("parsing fiducial.toml")?;
+    let i18n = doc
+        .entry("i18n")
+        .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
+        .as_table_mut()
+        .context("[i18n] in fiducial.toml is not a table")?;
+    let mut list = toml_edit::Array::new();
+    for l in locales {
+        list.push(l.as_str());
+    }
+    i18n["locales"] = toml_edit::value(list);
+    i18n["default"] = toml_edit::value(default_locale);
+    let content = doc.to_string();
     std::fs::write(&path, &content).context("writing fiducial.toml")?;
 
-    // Re-record: the lock holds the hash of what was written, and this just
-    // rewrote it. Without this the product is born reporting its own config as
-    // hand-edited — `fid doctor` failing on a tree `fid new` produced.
+    // The lock holds the hash of what was written, and this just changed it.
+    // Without this the product is born reporting its own config as hand-edited;
+    // with a full `record` it is born reporting the template as changed
+    // upstream. The base stays the template; only the hash moves.
     let lock_path = root.join("fiducial.lock");
     let mut lock = Lock::load(&lock_path).unwrap_or_else(|_| Lock::new());
-    lock.record("fiducial.toml", content.as_bytes(), PLATFORM_VERSION);
+    lock.rehash("fiducial.toml", content.as_bytes(), PLATFORM_VERSION);
     lock.save(&lock_path).context("writing fiducial.lock")?;
     Ok(())
 }

@@ -1,6 +1,6 @@
 name     = "legal"
 executor = "fid-legal"
-outputs  = ["src/generated/legal.ts", "apps/web/src/generated/consent.ts"]
+outputs  = ["apps/web/src/generated/legal.ts", "apps/web/src/generated/consent.ts"]
 
 # `[legal]` in fiducial.toml is the declaration. The output is a TypeScript
 # file exporting typed legal page content for every locale declared in `[i18n]`.

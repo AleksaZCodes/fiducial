@@ -1,0 +1,75 @@
+description = "A working localized site on Next.js: locale routing, a home page, every declared content route, legal and press pages, with metadata from the route table"
+
+# The shape that turns the platform's parts into pages. Both products built on
+# Fiducial wrote this by hand, the same way: a `[locale]` root layout, the
+# default locale served without a prefix, a catch-all 404 in the reader's
+# language, and one route per declared page. Two products is the rule for
+# generalizing (MISSION.md, anti-goals), so it is here.
+#
+# Opt-in, not part of `i18n`: `fid upgrade` adds a capability's new templates to
+# every product that has it, and new route files would collide with a product's
+# own `[locale]` pages at build time.
+requires_capabilities = ["web-next", "i18n", "design", "content", "brand", "seo", "legal"]
+
+# The plain app's root layout and home page cannot sit beside a `[locale]` root
+# layout (two `<html>`s), and the plain URL rules are replaced by locale rules.
+supersedes = [
+  "apps/web/src/app/layout.tsx",
+  "apps/web/src/app/page.tsx",
+  "apps/web/src/routing.ts",
+]
+
+# Where the type faces come from. `google`: `next/font/google` downloads the
+# families `design-system.md` names at build time and the site serves them
+# itself (no font host at read time). `none`: the system stacks, or a product
+# loading its own faces, bound with `var` on a role in `fid:type`.
+[[declarations.config]]
+block = "site"
+seed = { fonts = "google" }
+
+[npm_dependencies]
+marked = "^18.2.0"
+# The site is the Worker (`[deploy] shape = "nextjs"`), built by OpenNext.
+"@opennextjs/cloudflare" = "^1.11.0"
+wrangler = "^4.45.0"
+
+[npm_scripts]
+preview = "opennextjs-cloudflare build && opennextjs-cloudflare preview"
+deploy = "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+
+# The words the pages print. Seeded into `messages/<locale>.json` where the
+# namespace is missing; the product's own words always win, and the editor
+# offers them like every other message.
+[seed_messages.en]
+site = { readMore = "Read more", notFound = "This page does not exist.", backHome = "Back to the home page", legal = "Legal", press = "Press", latest = "Latest" }
+
+[seed_messages.en.press]
+title = "Press"
+assets = "Logos"
+guidelines = "Use the logos as they are: do not recolor, stretch or crop them."
+facts = "Fast facts"
+boilerplate = "About us"
+short = "Short"
+medium = "Medium"
+long = "Long"
+stories = "Stories"
+contact = "Press contact"
+download = "Download"
+angle = { origin = "Origin", technical = "Technical", customer = "Customer", failure = "Lessons", milestone = "Milestone", people = "People", market = "Market" }
+
+[seed_messages.sr]
+site = { readMore = "Pročitaj više", notFound = "Ova stranica ne postoji.", backHome = "Nazad na početnu", legal = "Pravno", press = "Za medije", latest = "Najnovije" }
+
+[seed_messages.sr.press]
+title = "Za medije"
+assets = "Logotipi"
+guidelines = "Koristite logotipe onakve kakvi jesu: bez menjanja boja, razvlačenja i sečenja."
+facts = "Činjenice"
+boilerplate = "O nama"
+short = "Kratko"
+medium = "Srednje"
+long = "Dugo"
+stories = "Priče"
+contact = "Kontakt za medije"
+download = "Preuzmi"
+angle = { origin = "Početak", technical = "Tehnika", customer = "Korisnici", failure = "Pouke", milestone = "Prekretnica", people = "Ljudi", market = "Tržište" }

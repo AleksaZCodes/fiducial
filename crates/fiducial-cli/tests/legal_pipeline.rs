@@ -74,7 +74,7 @@ fn derive_writes_legal_ts() {
     let tmp = tempfile::tempdir().unwrap();
     let root = legal_product(tmp.path());
 
-    let ts = std::fs::read_to_string(root.join("src/generated/legal.ts")).unwrap();
+    let ts = std::fs::read_to_string(root.join("apps/web/src/generated/legal.ts")).unwrap();
     assert!(ts.contains("export type LegalPage ="), "{ts}");
     assert!(ts.contains("\"privacy\""), "{ts}");
     assert!(ts.contains("\"imprint\""), "{ts}"); // EU jurisdiction includes imprint
@@ -95,7 +95,7 @@ fn check_catches_a_hand_edited_legal_ts() {
     let tmp = tempfile::tempdir().unwrap();
     let root = legal_product(tmp.path());
 
-    let path = root.join("src/generated/legal.ts");
+    let path = root.join("apps/web/src/generated/legal.ts");
     std::fs::write(&path, "// hand-edited\n").unwrap();
     let out = run(&root, &["derive", "--check"]);
     assert!(!out.status.success(), "should fail after hand-edit");

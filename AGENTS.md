@@ -407,9 +407,10 @@ The capabilities this platform ships:
 | `realtime` | a skill | `fid add capability realtime` |
 | `research` | declares `paper`; seeds a `fiducial.toml` block | `fid add capability research` |
 | `seo` | declares `seo`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability seo` |
+| `site` | declares `site`; 1 pipeline(s); 15 template file(s); seeds a `fiducial.toml` block | `fid add capability site` |
 | `tauri` | 5 template file(s); guard rules | `fid add capability tauri` |
 | `topology` | declares `topology.toml`; 1 pipeline(s) | `fid add capability topology` |
-| `web-next` | 13 template file(s); guard rules | `fid add capability web-next` |
+| `web-next` | 14 template file(s); guard rules | `fid add capability web-next` |
 | `web-svelte` | 11 template file(s); guard rules | `fid add capability web-svelte` |
 | `worker-cloudflare` | 1 template file(s); guard rules | `fid add capability worker-cloudflare` |
 <!-- fid:end capabilities -->

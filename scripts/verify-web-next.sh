@@ -22,6 +22,7 @@
 #   cargo build -p fiducial-cli --bin fid
 #   scripts/verify-web-next.sh                     # lucide and hugeicons
 #   ICONS="lucide tabler hugeicons phosphor remixicon" scripts/verify-web-next.sh
+#   SITE=0 scripts/verify-web-next.sh              # skip the `--shape site` pass
 #
 # pnpm is pinned to 11 on purpose: it is the strictest about install scripts,
 # and the version a person who installs pnpm today gets.
@@ -78,3 +79,36 @@ for lib in $icons; do
   )
   echo "✓ $lib: installs, typechecks, builds"
 done
+
+# ── The `site` shape ──────────────────────────────────────────────────────────
+# `fid new --shape site` is the whole website in one command: every web
+# capability, the locale routes, the editor, and the Worker config. What the
+# Rust tests cannot do without a network is here: install it, compile it,
+# build it for Workers, and have wrangler accept the derived config.
+#
+# Skipped with SITE=0, because the OpenNext build is the slowest step here.
+if [ "${SITE:-1}" != "0" ]; then
+  echo "── web-next, --shape site ──────────────────────────────────────────────"
+  (
+    cd "$work"
+    "$fid" new site --shape site >/dev/null
+    cd site
+    if "$fid" doctor 2>&1 | grep -E "migration pending|upstream template updated"; then
+      echo "✗ a fresh site reports upgrades pending" >&2
+      exit 1
+    fi
+    "${pnpm[@]}" install --fetch-timeout 300000
+    cd apps/web
+    "${pnpm[@]}" run typecheck
+    "${pnpm[@]}" run lint
+    "${pnpm[@]}" exec opennextjs-cloudflare build
+    "${pnpm[@]}" exec wrangler deploy --dry-run
+    cd ../..
+    if ! "$fid" doctor 2>&1 | grep -q "no platform-owned file has been modified"; then
+      "$fid" doctor >&2 || true
+      echo "✗ install or build modified a platform-owned file" >&2
+      exit 1
+    fi
+  )
+  echo "✓ site: installs, typechecks, lints, builds for Workers, deploys (dry run)"
+fi
