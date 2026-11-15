@@ -68,6 +68,22 @@ work, and prose specs never get reread. So:
   architecture; diagrams-as-code renderers rather than drawn pictures.
 - Fits the core rule: a model is a declaration, a diagram is an artifact, and a
   route or screen the model lists but the app lacks fails the check.
+- **Models means real things to look at and edit**: graphs, actual UI,
+  canvases, with a good editor around them; extensible, like a design tool
+  built into the artifacts rather than a separate app.
+- **Open-source pieces to build on** (researched Nov 15, not yet tried), each
+  usable by a person and by an agent through MCP (Claude.ai included):
+  - *Penpot*: open-source design tool, open SVG-based format, an official MCP
+    server in its main repository. The closest to a design canvas both sides
+    can edit.
+  - *Excalidraw* and *tldraw*: canvases for flows and sketches; MCP servers
+    exist, and tldraw is an SDK for embedding a canvas in our own UI.
+  - *Onlook*: open-source visual editor that edits a real React, Tailwind and
+    shadcn codebase, so the prototype is the product's code, not a picture.
+  - *Puck*: an embeddable visual page editor for React that stores pages as
+    JSON, which is a declaration in this platform's sense.
+  - Diagrams as code: *Structurizr DSL* for C4, *Mermaid*, and the SysML v2
+    textual notation for whole systems.
 
 ## Fiducial's edge: System One advisory review for correctness · Spark
 
