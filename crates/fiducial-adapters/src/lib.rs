@@ -48,7 +48,13 @@
 //!    vendor.
 //! 2. Add the vendor key to `CONTRACTS` in `fiducial-cli/src/adapter.rs`
 //!    (move it from `candidates` to `implementations`).
-//! 3. Update the `fid-adapters` executor in `derive.rs` to emit the import.
+//! 3. Update the `fid-adapters` executor in `derive.rs` to emit the import — or,
+//!    for a vendor implemented in Rust only (`sqlite`, `native`, `ollama`), add
+//!    it to `RUST_ONLY` there, so the TypeScript factory says so when read.
+//!
+//! The Rust implementations of the self-hosted target are behind cargo features
+//! of the same name — `sqlite`, `native`, `ollama` — so a product that does not
+//! ship its own server compiles none of them.
 //!
 //! Nothing else changes — the contract is fixed; only the factory wiring grows.
 
@@ -65,6 +71,13 @@ pub mod newsletter;
 pub mod queue;
 pub mod storage;
 pub mod system_one;
+
+#[cfg(feature = "native")]
+pub mod native_auth;
+#[cfg(feature = "ollama")]
+pub mod ollama;
+#[cfg(feature = "sqlite")]
+pub mod sqlite;
 
 pub use ai::{
     Ai, AiError, ChatRequest, ChatResponse, Message as AiMessage, NoneAi, Role, StopReason,

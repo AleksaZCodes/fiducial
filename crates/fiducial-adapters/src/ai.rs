@@ -30,14 +30,15 @@
 //! would put a method on every implementation that no product can complete a
 //! task with. It lands when it has a consumer.
 //!
-//! # Rust has the contract; `openrouter` is TypeScript-only
+//! # Two halves: `openrouter` is TypeScript, `ollama` is Rust
 //!
-//! Same boundary as `turnstile` and `supabase` (auth): a plain HTTPS API that
-//! Rust could reach, with no Rust-side consumer that would use it. Every AI
-//! call in the product shapes this platform scaffolds happens in a Worker or
-//! a server route. The trait is defined here so the contract is one contract
-//! in both languages — see `packages/adapters/src/ai.ts` for the half that
-//! has a vendor behind it.
+//! `openrouter` is a plain HTTPS API that Rust could reach but nothing in Rust
+//! used: every AI call in the product shapes scaffolded for Cloudflare happens
+//! in a Worker or a server route. See `packages/adapters/src/ai.ts`.
+//!
+//! `ollama` is the self-hosted target's, and the first Rust consumer: the
+//! product's own server calls a model on the same host. It is behind the
+//! `ollama` cargo feature ([`crate::ollama`]) and has no TypeScript class.
 
 use thiserror::Error;
 

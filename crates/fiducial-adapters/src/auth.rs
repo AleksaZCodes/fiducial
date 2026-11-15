@@ -6,14 +6,14 @@
 //! extras (Supabase row-level security, Clerk's organizations, Auth.js
 //! adapters) stay on the vendor.
 //!
-//! **Only `none` ships a Rust implementation.** `supabase` is real, but only
-//! on the TypeScript side (`packages/adapters/src/auth.ts`) — auth in every
-//! product shape here happens from a Next.js/SvelteKit server action or a
-//! Worker, the same TypeScript-only reasoning `turnstile` has (see
-//! `bot_protection.rs`), and for the same non-structural cause: nothing
-//! about verifying a session is Worker-binding-only, there is simply no
-//! Rust-reachable consumer yet. See
-//! `docs/specs/2026-09-15-auth-contract.md`.
+//! **`none` and `native` ship a Rust implementation.** `supabase` is real, but
+//! only on the TypeScript side (`packages/adapters/src/auth.ts`) — auth in the
+//! Cloudflare product shapes happens from a Next.js/SvelteKit server action or
+//! a Worker. `native` is the self-hosted target's: accounts declared in server
+//! configuration with argon2 hashes and signed-token sessions, behind the
+//! `native` cargo feature ([`crate::native_auth`]), read by the product's own
+//! Rust server. See `docs/specs/2026-09-15-auth-contract.md` and
+//! `docs/specs/2026-11-01-a-self-hosted-target.md`.
 //!
 //! ## Why there is no session-store parameter here
 //!

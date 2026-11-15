@@ -67,7 +67,7 @@ pub static CONTRACTS: &[Contract] = &[
     Contract {
         name: "database",
         description: "Relational storage: queries, migrations, transactions",
-        implementations: &[NONE, "d1", "supabase"],
+        implementations: &[NONE, "d1", "supabase", "sqlite"],
         candidates: &["neon", "postgres"],
     },
     Contract {
@@ -115,13 +115,13 @@ pub static CONTRACTS: &[Contract] = &[
     Contract {
         name: "ai",
         description: "Language-model calls: chat, streaming, tool use",
-        implementations: &[NONE, "openrouter"],
+        implementations: &[NONE, "openrouter", "ollama"],
         candidates: &["workers-ai", "anthropic", "openai"],
     },
     Contract {
         name: "auth",
         description: "Users and authentication: sign-up, sign-in, sessions",
-        implementations: &[NONE, "supabase"],
+        implementations: &[NONE, "supabase", "native"],
         candidates: &["clerk", "auth.js"],
     },
     Contract {

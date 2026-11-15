@@ -198,6 +198,12 @@ commit. A name under *Planned* cannot be selected and fails with a message
 saying so: a selectable name with nothing behind it is a promise the platform
 does not keep.
 
+A vendor may be implemented on one side only. `d1` has no Rust class, because a
+Workers binding exists only inside a Worker; `sqlite`, `native` and `ollama` have
+no TypeScript class, because the self-hosted Rust server is what reads them. The
+generated TypeScript factory throws a message saying so when one of those is
+read, rather than quietly building `none`.
+
 Three of those `none`s **fail rather than succeed silently**: `auth`, `ai` and
 `systemOne`. The difference is whether the caller reads a result. A no-op send
 or enqueue is indistinguishable from the real thing at the call site — the
@@ -213,7 +219,7 @@ until something actually asks.
 <!-- fid:begin adapters -->
 | Contract | For | Selectable today | Planned |
 |---|---|---|---|
-| `database` | Relational storage: queries, migrations, transactions | `none`, `d1`, `supabase` | `neon`, `postgres` |
+| `database` | Relational storage: queries, migrations, transactions | `none`, `d1`, `supabase`, `sqlite` | `neon`, `postgres` |
 | `storage` | Object storage: put, get, signed URLs | `none`, `r2`, `supabase-storage` | `s3` |
 | `deploy` | Where the product ships and how a release is promoted | `none`, `cloudflare`, `compose` | `vercel`, `fly` |
 | `email` | Transactional email: send, template, verify a domain | `none`, `resend` | `ses`, `cloudflare-email` |
@@ -221,8 +227,8 @@ until something actually asks.
 | `errors` | Error tracking and diagnostics | `none` | `sentry`, `workers-analytics` |
 | `botProtection` | Bot / abuse challenge verification | `none`, `turnstile` | `recaptcha`, `hcaptcha` |
 | `queue` | Asynchronous job/message queue (producer side) | `none`, `cloudflare-queues` | `sqs` |
-| `ai` | Language-model calls: chat, streaming, tool use | `none`, `openrouter` | `workers-ai`, `anthropic`, `openai` |
-| `auth` | Users and authentication: sign-up, sign-in, sessions | `none`, `supabase` | `clerk`, `auth.js` |
+| `ai` | Language-model calls: chat, streaming, tool use | `none`, `openrouter`, `ollama` | `workers-ai`, `anthropic`, `openai` |
+| `auth` | Users and authentication: sign-up, sign-in, sessions | `none`, `supabase`, `native` | `clerk`, `auth.js` |
 | `systemOne` | Typed probabilistic decisions: yes/no, one-of-N, ordered levels | `none`, `openrouter`, `typesafe` | — |
 <!-- fid:end adapters -->
 

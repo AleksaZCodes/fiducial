@@ -73,6 +73,26 @@ topology declares the controllers (`mcu`), the Pi (`host`, `target =
 
 The integration test `tests/compose_pipeline.rs` is this product.
 
+## The Rust vendors that go with it
+
+Three `[adapters]` selections are implemented on the Rust side only, for the
+product's own server (`fiducial-adapters`, each behind the cargo feature of the
+same name):
+
+| Selection | What it is |
+|---|---|
+| `database = "sqlite"` | one SQLite file in WAL mode, through `sqlx`; the same dialect as `d1`, so a migration runs on both. Sets `DATABASE_PATH` for the server |
+| `auth = "native"` | accounts declared in server configuration with argon2id hashes, sessions as HMAC-signed tokens; no sign-up and no reset email. The key is the secret `SESSION_SECRET`, at least 32 bytes |
+| `ai = "ollama"` | the OpenAI-compatible endpoint of the `ollama` service; `[ai] model` is required and `[ai] base_url` defaults to `http://ollama:11434/v1`. Sets `AI_BASE_URL` and `AI_MODEL`. Plain http only |
+
+They have **no TypeScript class**: the generated `adapters.generated.ts` throws a
+message saying so if it is read, rather than falling back to `none`. In the server:
+
+```toml
+# Cargo.toml
+fiducial-adapters = { version = "…", features = ["sqlite", "native", "ollama"] }
+```
+
 ## What it does not derive
 
 - **Passwords and certificates.** Per-device credentials are provisioned at first
