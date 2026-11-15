@@ -11,13 +11,13 @@ what is not needed, fix the bugs — so the thesis is *true*.
 ## The premise
 
 <!-- fid:describes thesis.toml -->
-**"Build any robust multidisciplinary product with AI agents"** is
-Fiducial's thesis: the platform's standing claim, declared in `thesis.toml`
-(`fid thesis`), not this plan's or one paper's. This spec is one audit of
-the platform against it, on 2026-10-02, and the plan that closed what the
-audit found. The table below is the standing test: every later change is
-measured against the same five words, and `thesis.toml`'s `evidence` says
-what may be claimed today.
+**"Build any robust multidisciplinary product with AI agents"** was
+Fiducial's thesis from 2026-10-02 until 2026-11-15, when entry 3 of
+`thesis.toml` superseded it to cover the whole path from idea to running
+product (`fid thesis log`). This spec is one audit of the platform against
+the earlier claim, on 2026-10-02, and the plan that closed what the audit
+found. Its table still holds as a test of the product half: the newer claim
+keeps every one of these five commitments and adds where the work happens.
 <!-- fid:end-describes -->
 
 The paper argues the same claim and cites a release (`v0.9.x`, version DOI
