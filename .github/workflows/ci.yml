@@ -882,6 +882,12 @@ jobs:
       - name: Scaffold, install, typecheck, build, serve — React Router
         run: scripts/verify-web-router.sh
 
+      # TanStack Start on Workers, the same checks: a custom server entry sets the
+      # headers, and the built app is served in workerd. See
+      # scripts/verify-web-start.sh.
+      - name: Scaffold, install, typecheck, build, serve — TanStack Start
+        run: scripts/verify-web-start.sh
+
       # A Hono API with Drizzle over it: tests, a Worker dry run, and a schema
       # change carried through to a migration. See scripts/verify-api-hono.sh.
       - name: Scaffold, install, typecheck, test, deploy dry run — Hono and Drizzle

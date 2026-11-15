@@ -157,6 +157,13 @@ pub static WEB_APP_SHAPES: &[WebAppShape] = &[
         also: &[],
     },
     WebAppShape {
+        name: "TanStack Start",
+        // The server entry sets the headers from this module.
+        config: "apps/web/src/security.ts",
+        marker: "apps/web/tsr.config.json",
+        also: &[],
+    },
+    WebAppShape {
         name: "Cloudflare Worker",
         config: "src/index.ts",
         marker: "wrangler.jsonc",

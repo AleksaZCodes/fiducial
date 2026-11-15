@@ -426,6 +426,7 @@ The capabilities this platform ships:
 | `web-astro` | 10 template file(s); guard rules | `fid add capability web-astro` |
 | `web-next` | 14 template file(s); guard rules | `fid add capability web-next` |
 | `web-router` | 15 template file(s); guard rules | `fid add capability web-router` |
+| `web-start` | 13 template file(s); guard rules | `fid add capability web-start` |
 | `web-svelte` | 12 template file(s); guard rules | `fid add capability web-svelte` |
 | `worker-cloudflare` | 1 template file(s); guard rules | `fid add capability worker-cloudflare` |
 <!-- fid:end capabilities -->

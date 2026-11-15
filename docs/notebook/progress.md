@@ -2,6 +2,11 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.24.0 · 2026-11-15
+
+- `fid add app start`: TanStack Start on Workers, with its headers set by a custom
+  server entry. Every framework in the "stack chosen per app" list now has a template.
+
 ## 0.23.0 · 2026-11-15
 
 - `fid add app router`: React Router 8 on Workers through the Cloudflare Vite plugin,

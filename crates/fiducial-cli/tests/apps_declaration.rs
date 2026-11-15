@@ -32,18 +32,18 @@ fn product(tmp: &Path, apps: &str) -> PathBuf {
 }
 
 #[test]
-fn an_intended_framework_fails_doctor_with_what_is_selectable() {
+fn an_intended_choice_fails_doctor_with_what_is_selectable() {
     let tmp = tempfile::tempdir().unwrap();
-    let root = product(tmp.path(), "[apps.web]\nframework = \"tanstack-start\"\n");
+    let root = product(
+        tmp.path(),
+        "[apps.web]\nframework = \"next\"\neditor = \"pages\"\n",
+    );
     let out = text(&run(&root, &["doctor"]));
     assert!(
         out.contains("names an intended choice that nothing builds yet"),
         "{out}"
     );
-    assert!(
-        out.contains("Selectable today: next, sveltekit, astro, hono, react-router"),
-        "{out}"
-    );
+    assert!(out.contains("Selectable today: keystatic, tina"), "{out}");
 }
 
 #[test]
@@ -106,6 +106,27 @@ fn a_react_router_app_without_its_headers_module_fails_doctor() {
     .unwrap();
     let out = text(&run(&root, &["doctor"]));
     assert!(out.contains("React Router app is missing"), "{out}");
+}
+
+#[test]
+fn a_tanstack_start_app_without_its_headers_module_fails_doctor() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product(tmp.path(), "[apps.web]\nframework = \"tanstack-start\"\n");
+    assert!(run(&root, &["add", "design"]).status.success());
+    assert!(run(&root, &["add", "app", "start"]).status.success());
+    let out = text(&run(&root, &["doctor"]));
+    assert!(
+        !out.contains("TanStack Start app"),
+        "a fresh product was reported unsafe: {out}"
+    );
+
+    std::fs::write(
+        root.join("apps/web/src/security.ts"),
+        "export const responseHeaders = [];\n",
+    )
+    .unwrap();
+    let out = text(&run(&root, &["doctor"]));
+    assert!(out.contains("TanStack Start app is missing"), "{out}");
 }
 
 #[test]

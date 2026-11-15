@@ -1,0 +1,8 @@
+/node_modules/
+/dist/
+/.output/
+.mf
+.wrangler
+.dev.vars*
+worker-configuration.d.ts
+!.dev.vars.example

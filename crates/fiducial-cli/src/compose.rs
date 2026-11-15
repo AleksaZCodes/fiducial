@@ -795,14 +795,24 @@ depends_on = ["db"]
             );
         }
 
-        // And the React Router template's `app/security.ts`, the fourth: the same
-        // names and the same values, written as `["Name", "value"]` pairs.
-        let router = include_str!("../capabilities/web-router/apps/web/app/security.ts");
-        for (k, v) in STATIC_HEADERS.iter().chain(std::iter::once(&HSTS)) {
-            assert!(
-                router.contains(&format!("\"{k}\"")) && router.contains(&format!("\"{v}\"")),
-                "web-router app/security.ts lacks `{k}: {v}`"
-            );
+        // And the React Router and TanStack Start templates' `security.ts`, the
+        // fourth and fifth: the same names and values, as `["Name", "value"]` pairs.
+        for (name, src) in [
+            (
+                "web-router app/security.ts",
+                include_str!("../capabilities/web-router/apps/web/app/security.ts"),
+            ),
+            (
+                "web-start src/security.ts",
+                include_str!("../capabilities/web-start/apps/web/src/security.ts"),
+            ),
+        ] {
+            for (k, v) in STATIC_HEADERS.iter().chain(std::iter::once(&HSTS)) {
+                assert!(
+                    src.contains(&format!("\"{k}\"")) && src.contains(&format!("\"{v}\"")),
+                    "{name} lacks `{k}: {v}`"
+                );
+            }
         }
     }
 
