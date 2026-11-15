@@ -1,0 +1,11 @@
+name     = "deploy-compose"
+executor = "fid-compose"
+# Always these two. When topology.toml declares an MQTT broker, derive also owes
+# its config and ACL, and names them here if they are missing:
+#
+#   "deploy/mosquitto/mosquitto.conf",
+#   "deploy/mosquitto/acl",
+outputs  = [
+  "deploy/compose.yaml",
+  "deploy/Caddyfile",
+]

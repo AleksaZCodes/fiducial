@@ -638,7 +638,7 @@ and what it measured are fixed at the release it cites; changes after it go in
 the platform and its specs, not in `docs/paper/`, except for a reviewer's
 camera-ready edits.
 
-### Distributed, self-hosted products — *multiplying* ⬜
+### Distributed, self-hosted products — *multiplying* 🟡
 
 Several controllers, a Linux host and one web app, declared once in
 `topology.toml` (`docs/specs/2026-11-01-topology-is-a-declaration.md`). The
@@ -653,7 +653,7 @@ cost of delay:
 | 2 | `topology.toml` and `fid-topology` (nodes, buses, settings, topics, in any firmware language) and the optional `monitoring` capability (points, rules, schedules, web cards, readings schema) | multiplying | ✅ |
 | 3 | Hardware built from modules, with variants and derived wiring; products extend the module library | multiplying | ✅ |
 | 4 | `firmware-esp32c6` capability: an optional template; any firmware already reads the derived tables | terminal | ✅ |
-| 5 | Self-hosted server stack: `sqlite`, `native` auth, `ollama`, `compose`, broker ACL from `can()` | terminal | ⬜ |
+| 5 | Self-hosted server stack: `compose` and the broker ACL (done, 0.18.0); `sqlite`, `native` auth and `ollama` (to do) | terminal | 🟡 |
 | 6 | The web app as a static export served by the server | terminal | ⬜ |
 | 7 | Derived documentation: topology, wiring, rules, sequence and storage diagrams (`topology.md` from `fid-topology`, `rules.md` from `fid-monitoring`; wiring per variant) | multiplying | ✅ |
 | 8 | CAN / CAN-FD with ISO-TP, and a Linux RT runtime — gated on a product | terminal | ⬜ |

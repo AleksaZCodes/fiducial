@@ -1,0 +1,2 @@
+description = "ESP32-C6 firmware on ESP-IDF (std Rust, FreeRTOS, Wi-Fi and MQTT in the SDK) with espflash"
+guard_rules = ["no-unpinned-cli-fetch"]

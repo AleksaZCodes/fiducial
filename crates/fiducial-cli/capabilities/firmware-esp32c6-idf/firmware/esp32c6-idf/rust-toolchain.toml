@@ -1,0 +1,8 @@
+[toolchain]
+# `riscv32imac-esp-espidf` is a tier-3 target, so std is built from source.
+#
+# Pinned, not "nightly": on 2026-11-13 the nightly's std for ESP-IDF did not
+# compile against its own libc (`st_atime` missing from `stat`). This one builds
+# std and every crate up to the SDK. Move it on purpose, and rebuild.
+channel    = "nightly-2026-10-15"
+components = ["rust-src"]

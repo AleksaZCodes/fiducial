@@ -17,6 +17,11 @@
 #   cargo build -p fiducial-cli --bin fid
 #   scripts/verify-firmware.sh                       # every target
 #   TARGETS="esp32c6" scripts/verify-firmware.sh
+#   TARGETS="esp32c6-idf" scripts/verify-firmware.sh   # not in the default set
+#
+# `esp32c6-idf` is std Rust on ESP-IDF: nightly with build-std, and the first
+# build downloads the SDK and its toolchain (gigabytes, minutes), so it is not
+# in the default set. It needs `ldproxy` (cargo install ldproxy).
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,6 +35,7 @@ triple() {
     rp2040) echo thumbv6m-none-eabi ;;
     stm32) echo thumbv7em-none-eabihf ;;
     esp32c6) echo riscv32imac-unknown-none-elf ;;
+    esp32c6-idf) echo riscv32imac-esp-espidf ;;
     *) echo "unknown target $1" >&2; exit 1 ;;
   esac
 }
@@ -47,15 +53,20 @@ for t in $targets; do
     cd product
     "$fid" add firmware "$t" >/dev/null
     cd firmware
+    # The ESP-IDF target is its own workspace, so its manifest is its own.
+    manifest=Cargo.toml
+    [ "$t" = esp32c6-idf ] && manifest="$t/Cargo.toml"
     # Resolve the platform crates from this checkout, not crates.io.
-    cat >> Cargo.toml <<PATCH
+    cat >> "$manifest" <<PATCH
 
 [patch.crates-io]
 fiducial-core     = { path = "$repo/crates/fiducial-core" }
 fiducial-protocol = { path = "$repo/crates/fiducial-protocol" }
 PATCH
     (cd "$t" && cargo build --release)
-    cargo check --release -p firmware-shared --target "$(triple "$t")"
+    if [ "$t" != esp32c6-idf ]; then
+      cargo check --release -p firmware-shared --target "$(triple "$t")"
+    fi
   )
 done
 echo "✓ every firmware target compiles"

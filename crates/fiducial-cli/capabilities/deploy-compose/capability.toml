@@ -1,0 +1,8 @@
+description = "Self-hosted deploy: Docker Compose and Caddy on one Linux host, derived from the topology, [adapters] and [deploy]; with a Mosquitto broker and topic ACL when the topology declares one"
+
+# `[deploy]` holds only what the host knows: its name, where the images live,
+# how Caddy gets a certificate, which service it proxies, and any service
+# nothing else declares. Apps, the broker and Ollama are derived.
+[[declarations.config]]
+block = "deploy"
+seed = { tls = "internal" }

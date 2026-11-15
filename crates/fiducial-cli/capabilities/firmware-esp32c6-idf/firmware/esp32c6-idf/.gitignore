@@ -1,0 +1,4 @@
+# Cargo's build output, and the SDK and tools embuild downloads into it.
+target/
+.embuild/
+sdkconfig

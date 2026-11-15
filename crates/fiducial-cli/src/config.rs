@@ -526,6 +526,36 @@ pub struct Deploy {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub shape: String,
 
+    /// The hostname a self-hosted product answers on (`deploy = "compose"`):
+    /// a LAN name such as `building.local`, or a public domain. Read only by
+    /// `fid-compose`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub host: String,
+
+    /// Where the server image is pushed and pulled (`deploy = "compose"`).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub registry: String,
+
+    /// How Caddy gets its certificate (`deploy = "compose"`): `internal` (its
+    /// own CA, for a LAN name, the default) or `acme` (a public domain).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tls: String,
+
+    /// Which service Caddy proxies to (`deploy = "compose"`). Defaults to the
+    /// first app of the first host node, or `server` with no topology.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub proxy: String,
+
+    /// The port that service listens on. Defaults to 8080.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub proxy_port: u16,
+
+    /// Services this product runs that nothing else declares: a database, a
+    /// cache, a worker (`deploy = "compose"`). Apps, the broker and Ollama are
+    /// derived and are not listed here.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub services: Vec<ComposeService>,
+
     /// Where the adapter writes the static assets it wants served.
     ///
     /// Only read for `shape = "sveltekit"` and `"nextjs"`, and defaulted to the adapter's own
@@ -565,6 +595,35 @@ pub struct Deploy {
     /// into a file in the repository.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub vars: std::collections::BTreeMap<String, String>,
+}
+
+fn is_zero(n: &u16) -> bool {
+    *n == 0
+}
+
+/// One extra service in a self-hosted product's Compose file.
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ComposeService {
+    pub name: String,
+    pub image: String,
+    /// `host:container`, published on the host.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ports: Vec<String>,
+    /// Plain values only. A secret is named in `secrets` and set in `.env`.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub environment: std::collections::BTreeMap<String, String>,
+    /// Names of secrets, written as `${NAME}`, never as a value.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub secrets: Vec<String>,
+    /// `name:/path` is a named volume; `./dir:/path` is a bind mount.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub volumes: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub depends_on: Vec<String>,
+    /// A shell command; exit 0 is healthy.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub healthcheck: String,
 }
 
 /// One KV namespace binding: the name the Worker reads, and the account's id.

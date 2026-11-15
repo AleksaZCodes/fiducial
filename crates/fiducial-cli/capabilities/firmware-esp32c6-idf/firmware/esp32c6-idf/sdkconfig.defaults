@@ -1,0 +1,5 @@
+# The main task runs Rust's std runtime, which wants more than the default stack.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8000
+
+# One tick per millisecond, so FreeRtos::delay_ms(1) is 1 ms.
+CONFIG_FREERTOS_HZ=1000

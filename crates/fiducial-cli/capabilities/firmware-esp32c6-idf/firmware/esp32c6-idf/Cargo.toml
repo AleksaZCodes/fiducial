@@ -1,0 +1,30 @@
+[package]
+name        = "firmware-esp32c6-idf"
+description = "ESP32-C6 ESP-IDF firmware for {{name}}."
+version     = "0.1.0"
+edition     = "2021"
+license     = "MIT"
+
+# Its own workspace, on purpose. ESP-IDF Rust is std on a nightly toolchain
+# with build-std; the bare-metal `esp32c6` target is no_std on stable. One
+# workspace would force one toolchain and one lockfile on both.
+[workspace]
+
+[[bin]]
+name = "firmware-esp32c6-idf"
+path = "src/main.rs"
+
+[dependencies]
+fiducial-core = "{{version}}"
+esp-idf-svc   = "0.53"
+log           = "0.4"
+
+[build-dependencies]
+embuild = "0.33"
+
+[profile.dev]
+debug     = true
+opt-level = "z"
+
+[profile.release]
+opt-level = "s"

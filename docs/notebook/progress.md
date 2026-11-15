@@ -2,6 +2,16 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.18.0 · 2026-11-15
+
+- `deploy = "compose"`: the self-hosted target is derived: compose services,
+  Caddy, and the Mosquitto broker with a per-device topic ACL, from the topology.
+  The `sqlite`, `native` auth and `ollama` implementations are still to build.
+
+- `fid add firmware esp32c6-idf`: ESP32-C6 on ESP-IDF (std Rust) beside the Embassy
+  one. Its full build is not yet verified: the SDK installer needs a host the
+  authoring sandbox blocks.
+
 ## 0.17.0 · 2026-11-15
 
 - `fid add firmware esp32c6`: the ESP32-C6 template (esp-hal, `esp-rtos`, Embassy).
