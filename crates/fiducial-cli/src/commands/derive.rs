@@ -2840,10 +2840,11 @@ fn run_fid_topology(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             }
             _ if !role.is_empty() && stem == "params" => topo::render_params(&t, role, decl, ext)?,
             _ if stem == "topics" => topo::render_topics(&t, decl, ext)?,
+            _ if file == "topology.md" => topo::render_diagrams(&t, decl),
             _ => bail!(
                 "fid-topology: unknown output `{out}` (supported: firmware/<role>/…/params and \
                  board as .rs, .h or .json; topics as .rs, .h or .json; per hardware variant \
-                 wiring.csv, wiring.svg, bom.csv; hardware/<node>/variants.md)"
+                 wiring.csv, wiring.svg, bom.csv; hardware/<node>/variants.md; topology.md)"
             ),
         };
         if !role.is_empty() && t.first_node_of(role).is_none() {
@@ -2914,10 +2915,11 @@ fn run_fid_monitoring(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             ("cards", "ts") => mon::render_cards_ts(&m, &t, decl),
             ("points", _) if !role.is_empty() => mon::render_points(&m, &t, &role, decl, ext)?,
             ("schedules", _) if !role.is_empty() => mon::render_schedules(&m, &role, decl, ext)?,
+            ("rules", "md") => mon::render_rules_md(&m, decl),
             (_, "sql") => mon::render_migration(&m, &t, decl, &dialect)?,
             _ => bail!(
                 "fid-monitoring: unknown output `{out}` (supported: firmware/<role>/…/points and \
-                 schedules as .rs, .h or .json; points.ts; cards.ts; migrations/*.sql)"
+                 schedules as .rs, .h or .json; points.ts; cards.ts; rules.md; migrations/*.sql)"
             ),
         };
         if !role.is_empty() && t.first_node_of(&role).is_none() {

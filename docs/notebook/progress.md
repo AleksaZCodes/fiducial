@@ -2,6 +2,13 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.16.0 · 2026-11-15
+
+- Derived documentation: `topology.md` (nodes by system, buses, topics as a
+  sequence) from `fid-topology`, `rules.md` (rules and storage) from
+  `fid-monitoring`. Distributed products phase 7 is done.
+- The paper was submitted; the roadmap, `SHIPPED.md` and the paper notes say so.
+
 ## 0.15.0 · 2026-11-15 ([#123](https://github.com/AleksaZCodes/fiducial/pull/123))
 
 - `fid new <name> --shape site`: a localized Next.js site in one command

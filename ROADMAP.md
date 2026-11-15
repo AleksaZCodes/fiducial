@@ -605,7 +605,7 @@ especially, since the **Open-source bootstrap** item below is explicitly
 waiting on "the command that produces these for any repository," and Fiducial
 now has the files to generalize from.
 
-### Paper readiness — *debt-accruing* ⬜
+### Paper readiness — *debt-accruing* ✅
 
 The IEEESTEC paper's evidence is derived from `SHIPPED.md` and the specs, so a
 claim there that overstates what shipped becomes a claim in the paper. Three
@@ -630,7 +630,15 @@ session, which starts from the owner's `.docx` template and prior paper
 (`docs/paper/README.md`) — so item 5 targets that template (Pandoc's
 `--reference-doc`), not an IEEE LaTeX one.
 
-### Distributed, self-hosted products — *multiplying* 🟡
+**Done, 2026-11-15: the paper was submitted** (IEEESTEC 2026, *Fiducial: Keeping
+AI-Built Products Consistent*). Items 4–6 were carried out in the paper's own
+session (`docs/paper/README.md`): the injected-mistake sets, the measurements and
+the build script. The submitted files are now a record. What the paper claims
+and what it measured are fixed at the release it cites; changes after it go in
+the platform and its specs, not in `docs/paper/`, except for a reviewer's
+camera-ready edits.
+
+### Distributed, self-hosted products — *multiplying* ⬜
 
 Several controllers, a Linux host and one web app, declared once in
 `topology.toml` (`docs/specs/2026-11-01-topology-is-a-declaration.md`). The
@@ -647,7 +655,7 @@ cost of delay:
 | 4 | `firmware-esp32c6` capability: an optional template; any firmware already reads the derived tables | terminal | ⬜ |
 | 5 | Self-hosted server stack: `sqlite`, `native` auth, `ollama`, `compose`, broker ACL from `can()` | terminal | ⬜ |
 | 6 | The web app as a static export served by the server | terminal | ⬜ |
-| 7 | Derived documentation: topology, wiring, rules, sequence and storage diagrams (wiring per variant done) | multiplying | 🟡 |
+| 7 | Derived documentation: topology, wiring, rules, sequence and storage diagrams (`topology.md` from `fid-topology`, `rules.md` from `fid-monitoring`; wiring per variant) | multiplying | ✅ |
 | 8 | CAN / CAN-FD with ISO-TP, and a Linux RT runtime — gated on a product | terminal | ⬜ |
 
 ### Physical products — outline, region, part, cost ✅

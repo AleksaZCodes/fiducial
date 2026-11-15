@@ -631,6 +631,41 @@ pub fn render_migration(m: &Monitoring, t: &Topology, decl: &str, dialect: &str)
     Ok(s)
 }
 
+/// `rules.md`: what each rule reads and drives, then the tables readings and
+/// settings are stored in.
+pub fn render_rules_md(m: &Monitoring, decl: &str) -> String {
+    use topology::mid;
+    let mut s = format!(
+        "<!-- Derived by fid-monitoring from {decl} — do not edit. -->\n\n# Rules\n\n```mermaid\nflowchart LR\n"
+    );
+    let mut seen = BTreeSet::new();
+    for r in &m.rule {
+        let rid = format!("rule_{}_{}", mid(&r.scope), mid(&r.id));
+        s.push_str(&format!("  {rid}{{{{\"{} ({})\"}}}}\n", r.id, r.scope));
+        for x in r.reads.iter().chain(r.drives.iter()) {
+            if seen.insert(x.clone()) {
+                s.push_str(&format!("  p_{}([\"{x}\"])\n", mid(x)));
+            }
+        }
+        for x in &r.parameters {
+            if seen.insert(format!("param:{x}")) {
+                s.push_str(&format!("  q_{}[/\"{x}\"/]\n", mid(x)));
+            }
+            s.push_str(&format!("  q_{} -.-> {rid}\n", mid(x)));
+        }
+        for x in &r.reads {
+            s.push_str(&format!("  p_{} --> {rid}\n", mid(x)));
+        }
+        for x in &r.drives {
+            s.push_str(&format!("  {rid} --> p_{}\n", mid(x)));
+        }
+    }
+    s.push_str(
+        "```\n\n# Storage\n\n```mermaid\nerDiagram\n  reading { text node PK\n integer point PK\n integer at PK\n real value }\n  reading_hourly { text node PK\n integer point PK\n integer hour PK\n real mean\n real min\n real max\n integer samples }\n  parameter_value { text scope_node PK\n integer parameter PK\n real value\n integer changed_at }\n  schedule_slot { text node PK\n text schedule PK\n integer weekday PK\n integer from_min PK\n integer to_min }\n  reading ||--o{ reading_hourly : \"rolled up into\"\n```\n",
+    );
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -758,5 +793,15 @@ parameters = ["co2_on"]
             cards.contains("{ point: \"co2\", unit: \"ppm\", limits: [\"co2_on\"] }"),
             "{cards}"
         );
+    }
+
+    #[test]
+    fn the_rules_diagram_joins_points_to_rules() {
+        let t: Topology = toml::from_str(TOPO).unwrap();
+        let m: Monitoring = toml::from_str(MON).unwrap();
+        assert!(validate(&m, &t).is_empty());
+        let d = render_rules_md(&m, "monitoring.toml");
+        assert!(d.contains("flowchart LR") && d.contains("erDiagram"));
+        assert!(d.contains("reading_hourly"));
     }
 }
