@@ -125,7 +125,6 @@ function frontmatter(md) {
   return { meta, body: decomment(body) };
 }
 
-
 /**
  * The locales, read from `[i18n]`.
  *
@@ -154,11 +153,7 @@ function loadLocale(loc) {
     // English boilerplate to a Serbian journalist, who quotes it, and nobody
     // finds out.
     throw new Error(
-      `derive-press: locale \`${loc}\` is declared in [i18n] but its press room ` +
-        `is incomplete.\n\n  missing:\n` +
-        absent.map((f) => `    ${f}`).join("\n") +
-        `\n\n  A missing translation is a missing artifact, not a fallback ` +
-        `(MISSION.md 1c).\n  Write them, or remove \`${loc}\` from [i18n] locales.`,
+      `derive-press: locale \`${loc}\` is declared in [i18n] but its press room is incomplete.\n\n  missing:\n${absent.map((f) => `    ${f}`).join("\n")}\n\n  A missing translation is a missing artifact, not a fallback (MISSION.md 1c).\n  Write them, or remove \`${loc}\` from [i18n] locales.`,
     );
   }
   const storyDir = at(`press/stories/${loc}`);
@@ -224,8 +219,7 @@ if (new Set(slugSets).size > 1) {
     .map((l) => `    ${l}: ${byLocale[l].stories.map((s) => s.slug).join(", ") || "(none)"}`)
     .join("\n");
   throw new Error(
-    `derive-press: the locales do not carry the same stories.\n\n${detail}\n\n` +
-      `  Every story exists in every locale, or it exists in none.`,
+    `derive-press: the locales do not carry the same stories.\n\n${detail}\n\n  Every story exists in every locale, or it exists in none.`,
   );
 }
 

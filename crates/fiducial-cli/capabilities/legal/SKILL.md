@@ -10,7 +10,7 @@ over the entity declared in `[brand]`.
 ```
 [legal] in fiducial.toml      ← you edit this
   ↓  fid derive                (pipeline: legal — executor fid-legal)
-src/generated/legal.ts         ← generated: never hand-edit this
+apps/web/src/generated/legal.ts       ← generated: never hand-edit this
   ↓
 fid derive --check            ← fails if it is missing or stale
 ```
@@ -46,9 +46,9 @@ Valid cookie categories: `necessary` (always included), `analytics`, `marketing`
 
 | File | Is |
 |---|---|
-| `src/generated/legal.ts` | TypeScript file exporting `LegalPage` type and a typed `Record<LegalPage, { title: string; body: string }>` for each declared locale. Placeholder text has `{legal_name}`, `{domain}`, `{jurisdiction}`, and `{email}` substituted from the declarations. |
+| `apps/web/src/generated/legal.ts` | TypeScript file exporting `LegalPage` type and a typed `Record<LegalPage, { title: string; body: string }>` for each declared locale. Placeholder text has `{legal_name}`, `{domain}`, `{jurisdiction}`, and `{email}` substituted from the declarations. |
 
-**Never hand-edit `src/generated/legal.ts`.** It is rewritten on every
+**Never hand-edit `apps/web/src/generated/legal.ts`.** It is rewritten on every
 `fid derive`. Change `[legal]` or `[brand]`, run `fid derive`.
 
 ## GDPR compliance is a legal state, not a code state

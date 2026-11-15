@@ -195,8 +195,15 @@ pub fn install_with(
             _ => None,
         })
         .collect();
+    let mut enabled_after: Vec<String> = already_installed.clone();
+    enabled_after.push(cap.id.clone());
+    remove_superseded(root, cap, &mut lock)?;
     let mut uses_icons = false;
     for FileEntry { path: rel, content } in files {
+        if let Some(by) = superseded_by(rel, &enabled_after).filter(|by| *by != cap.id) {
+            println!("  · skipped {rel} (replaced by `{by}`)");
+            continue;
+        }
         // A declaration is the product's, not the capability's: the seed is
         // there so a fresh install derives, and nothing more. When the product
         // already declared it — written before the capability was added, or
@@ -248,6 +255,26 @@ pub fn install_with(
     if uses_icons {
         add_icon_packages(root)?;
     }
+    if !cap.npm_dependencies.is_empty() {
+        let wanted: Vec<(&str, &str)> = cap
+            .npm_dependencies
+            .iter()
+            .map(|(n, r)| (n.as_str(), r.as_str()))
+            .collect();
+        for name in crate::icons::ensure_dependencies(root, &wanted)? {
+            println!("  added  {name} to apps/web/package.json");
+        }
+    }
+    if !cap.npm_scripts.is_empty() {
+        let wanted: Vec<(&str, &str)> = cap
+            .npm_scripts
+            .iter()
+            .map(|(n, r)| (n.as_str(), r.as_str()))
+            .collect();
+        for name in crate::icons::ensure_entries(root, "scripts", &wanted)? {
+            println!("  added  script `{name}` to apps/web/package.json");
+        }
+    }
 
     // 2. SKILL.md → a vendor-neutral path, plus a pointer for Claude Code.
     //
@@ -274,9 +301,9 @@ pub fn install_with(
     // `enabled` over the product's capabilities (`templates::merge_base`).
     let new_config_content = std::fs::read(root.join(crate::config::CONFIG_FILE))
         .context("reading updated fiducial.toml")?;
-    match lock.templates.get_mut("fiducial.toml") {
-        Some(record) => record.hash = crate::lock::sha256_hex(&new_config_content),
-        None => lock.record("fiducial.toml", &new_config_content, PLATFORM_VERSION),
+    lock.rehash("fiducial.toml", &new_config_content, PLATFORM_VERSION);
+    if cap.id == "deploy" {
+        infer_deploy_shape(root, &already_installed, &mut lock)?;
     }
 
     // Record what was installed, and from where. Without this a capability
@@ -315,8 +342,11 @@ pub fn install_with(
     lock.save(&root.join("fiducial.lock"))
         .context("writing fiducial.lock")?;
 
-    if cap.id == "content" {
-        reconcile_content_locales(root)?;
+    if !cap.seed_messages.is_empty() {
+        seed_capability_messages(root, cap)?;
+    }
+    if cap.id == "content" || cap.id == "press" {
+        reconcile_sample_locales(root, &cap.id)?;
     }
     if cap.id == "seo" {
         seed_page_metadata(root, product_name)?;
@@ -364,6 +394,11 @@ fn backfill_conditional_templates(
             entries.len()
         );
         for FileEntry { path: rel, content } in entries {
+            let mut enabled = already_installed.to_vec();
+            enabled.push(new_id.to_string());
+            if superseded_by(rel, &enabled).is_some_and(|by| by != installed_id) {
+                continue;
+            }
             uses_icons |= crate::icons::uses_placeholders(content);
             let expanded = crate::templates::for_product(root, content)?
                 .replace("{{name}}", product_name)
@@ -384,6 +419,136 @@ fn backfill_conditional_templates(
         );
     }
     Ok(uses_icons)
+}
+
+/// Insert a capability's message namespaces into each locale's catalog.
+///
+/// Text insertion after the opening brace, not a parse-and-reserialise: the
+/// catalog is the product's, and rewriting its key order and spacing to add one
+/// namespace would show as an edit to every line of it.
+fn seed_capability_messages(root: &Path, cap: &Capability) -> Result<()> {
+    let Ok(config) = Config::load(&root.join(CONFIG_FILE)) else {
+        return Ok(());
+    };
+    let Ok(default) = config.i18n.default_locale() else {
+        return Ok(());
+    };
+    let fallback = cap
+        .seed_messages
+        .get(default)
+        .or_else(|| cap.seed_messages.get("en"))
+        .or_else(|| cap.seed_messages.values().next());
+    let mut lock = load_or_new_lock(root)?;
+    for locale in &config.i18n.locales {
+        let Some(seed) = cap.seed_messages.get(locale).or(fallback) else {
+            continue;
+        };
+        let rel = format!("messages/{locale}.json");
+        let Ok(raw) = std::fs::read_to_string(root.join(&rel)) else {
+            continue;
+        };
+        let json: serde_json::Value =
+            serde_json::from_str(&raw).with_context(|| format!("{rel} does not parse"))?;
+        let mut blocks = String::new();
+        for (namespace, value) in seed {
+            if json.get(namespace).is_some() {
+                continue; // the product's words win
+            }
+            let value = serde_json::to_value(value)?;
+            let pretty = serde_json::to_string_pretty(&value)?.replace('\n', "\n  ");
+            blocks.push_str(&format!(
+                "\n  {}: {pretty},",
+                serde_json::Value::from(namespace.as_str())
+            ));
+        }
+        if blocks.is_empty() {
+            continue;
+        }
+        let Some(open) = raw.find('{') else { continue };
+        let body = format!("{}{}{}", &raw[..=open], blocks, &raw[open + 1..]);
+        // An empty catalog (`{}`) would now end in `,}`.
+        let body = body.replace(",\n}", "\n}");
+        serde_json::from_str::<serde_json::Value>(&body)
+            .with_context(|| format!("seeding {rel} would break it"))?;
+        write_file(root, &rel, &body)?;
+        lock.rehash(rel.clone(), body.as_bytes(), PLATFORM_VERSION);
+        println!("  seeded {rel} ({})", cap.id);
+    }
+    lock.save(&root.join("fiducial.lock"))
+        .context("writing fiducial.lock")?;
+    Ok(())
+}
+
+/// `[deploy] shape` follows the app that is there: a Next.js or SvelteKit app
+/// IS the Worker, and the standalone `apps/worker/` default is wrong for it. It
+/// was left for the product to set by hand, so `fid add deploy` on a website
+/// derived a config for a Worker that does not exist.
+fn infer_deploy_shape(root: &Path, installed: &[String], lock: &mut Lock) -> Result<()> {
+    let shape = if installed.iter().any(|c| c == "web-next") {
+        "nextjs"
+    } else if installed.iter().any(|c| c == "web-svelte") {
+        "sveltekit"
+    } else {
+        return Ok(());
+    };
+    let path = root.join(CONFIG_FILE);
+    let raw = std::fs::read_to_string(&path).context("reading fiducial.toml")?;
+    let mut doc: toml_edit::DocumentMut = raw.parse().context("parsing fiducial.toml")?;
+    let Some(deploy) = doc.get_mut("deploy").and_then(|d| d.as_table_mut()) else {
+        return Ok(());
+    };
+    if deploy
+        .get("shape")
+        .and_then(|v| v.as_str())
+        .is_some_and(|s| !s.is_empty())
+    {
+        return Ok(()); // declared: the product's decision
+    }
+    deploy["shape"] = toml_edit::value(shape);
+    let content = doc.to_string();
+    std::fs::write(&path, &content).context("writing fiducial.toml")?;
+    lock.rehash("fiducial.toml", content.as_bytes(), PLATFORM_VERSION);
+    println!("  ✓ [deploy] shape = \"{shape}\" (apps/web is the Worker)");
+    Ok(())
+}
+
+/// The enabled capability that replaces `rel`, if any (see `supersedes`). A
+/// capability may supersede a path and ship its own file there (`site` replaces
+/// `web-next`'s `src/routing.ts` with one of its own); callers compare.
+pub(crate) fn superseded_by(rel: &str, enabled: &[String]) -> Option<&'static str> {
+    enabled
+        .iter()
+        .filter_map(|id| find(id))
+        .find(|c| c.supersedes.iter().any(|p| p == rel))
+        .map(|c| c.id.as_str())
+}
+
+/// On installing a capability that supersedes other templates: remove each
+/// one the platform wrote and nobody edited, and say what to do about the rest.
+fn remove_superseded(root: &Path, cap: &Capability, lock: &mut Lock) -> Result<()> {
+    for rel in &cap.supersedes {
+        let path = root.join(rel);
+        let Some(record) = lock.templates.get(rel) else {
+            continue; // never the platform's here
+        };
+        let unmodified = std::fs::read(&path)
+            .map(|b| crate::lock::sha256_hex(&b) == record.hash)
+            .unwrap_or(true);
+        if unmodified {
+            if path.exists() {
+                std::fs::remove_file(&path).with_context(|| format!("removing {rel}"))?;
+            }
+            lock.templates.remove(rel);
+            println!("  removed {rel} (replaced by `{}`)", cap.id);
+        } else {
+            println!(
+                "  ⚠ {rel}: replaced by `{}`, but edited here, so kept. Move what you \
+                 changed into its replacement and delete it, or the build has two of it.",
+                cap.id
+            );
+        }
+    }
+    Ok(())
 }
 
 /// A template written with `<IconPlaceholder>` now imports from the product's
@@ -527,11 +692,12 @@ pub fn reconcile_i18n_catalogs(root: &Path, locales: &[String], default: &str) -
 
 /// Give every declared locale the sample entries the default locale has.
 ///
-/// The `content` capability ships its sample post in one language. A product
-/// in two failed its first `fid derive`, correctly — an entry exists in every
-/// locale or in none — but on a file the platform itself wrote. Like a seeded
+/// `content` and `press` ship their samples in one language, both laid out as
+/// `<top>/<group>/<locale>/<file>`. A product in two failed its first
+/// `fid derive`, correctly — an entry exists in every locale or in none — but
+/// on files the platform itself wrote (`press` did until 0.15.0). Like a seeded
 /// catalog, the copy starts in the default's words, for a person to translate.
-pub fn reconcile_content_locales(root: &Path) -> Result<()> {
+pub fn reconcile_sample_locales(root: &Path, top: &str) -> Result<()> {
     let Ok(config) = Config::load(&root.join(CONFIG_FILE)) else {
         return Ok(());
     };
@@ -539,8 +705,7 @@ pub fn reconcile_content_locales(root: &Path) -> Result<()> {
         return Ok(());
     };
     let default = default.to_string();
-    let content = root.join("content");
-    let Ok(collections) = std::fs::read_dir(&content) else {
+    let Ok(collections) = std::fs::read_dir(root.join(top)) else {
         return Ok(());
     };
     let mut lock = load_or_new_lock(root)?;
@@ -566,10 +731,7 @@ pub fn reconcile_content_locales(root: &Path) -> Result<()> {
             }
             for f in &files {
                 let body = std::fs::read_to_string(f.path())?;
-                let rel = format!(
-                    "content/{name}/{locale}/{}",
-                    f.file_name().to_string_lossy()
-                );
+                let rel = format!("{top}/{name}/{locale}/{}", f.file_name().to_string_lossy());
                 write_file(root, &rel, &body)?;
                 lock.record(rel, body.as_bytes(), PLATFORM_VERSION);
             }
@@ -624,7 +786,7 @@ pub fn seed_page_metadata(root: &Path, product_name: &str) -> Result<()> {
         let body = format!("{}{}{}", &raw[..=open], block, &raw[open + 1..]);
         let rel = format!("messages/{locale}.json");
         write_file(root, &rel, &body)?;
-        lock.record(rel, body.as_bytes(), PLATFORM_VERSION);
+        lock.rehash(rel, body.as_bytes(), PLATFORM_VERSION);
         seeded = true;
     }
     lock.save(&root.join("fiducial.lock"))
@@ -720,7 +882,9 @@ pub(crate) fn install_added(
     let mut added = Vec::new();
     for FileEntry { path: rel, content } in files {
         let key = rel.replace('\\', "/");
-        if lock.templates.contains_key(&key) {
+        if lock.templates.contains_key(&key)
+            || superseded_by(rel, enabled).is_some_and(|by| by != cap.id)
+        {
             continue;
         }
         if root.join(rel).exists() {

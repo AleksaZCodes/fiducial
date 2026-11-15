@@ -186,6 +186,23 @@ command and produces exactly the same tree."
         )]
         locales: Option<String>,
 
+        /// What the product is: `site` creates a working localized website
+        #[arg(
+            long,
+            value_name = "SHAPE",
+            long_help = "\
+What the product is, installing what that shape needs in one command.
+
+  site   A localized website on Next.js, ready to edit and deploy: design,
+         the app, locales (en, sr unless --locales says otherwise), brand,
+         legal pages, content with its editor, seo, and the `site` pages
+         that wire them. `pnpm install`, then `pnpm dev`.
+
+Every step is the same `fid add` you could run yourself, so the result is the
+tree those commands produce, and nothing about it is special afterwards."
+        )]
+        shape: Option<String>,
+
         /// Scaffold the full set of foundations: design system and locales
         #[arg(
             long,
@@ -874,12 +891,14 @@ fn main() -> Result<()> {
             default_locale,
             full,
             no_advise,
+            shape,
         } => commands::new::run(
             &name,
             locales.as_deref(),
             default_locale.as_deref(),
             full,
             no_advise,
+            shape.as_deref(),
         ),
         Commands::Add { target } => commands::add::run(target),
         Commands::Capability { action } => commands::capability::run(action),

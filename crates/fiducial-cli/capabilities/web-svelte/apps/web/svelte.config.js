@@ -1,4 +1,8 @@
-import adapter from "@sveltejs/adapter-auto";
+// Cloudflare is the platform's default target, and the `deploy` capability's
+// `sveltekit` shape serves what this adapter writes (`.svelte-kit/cloudflare`).
+// `adapter-auto` only detects Cloudflare inside Cloudflare's own build, so a
+// local `vite build` produced nothing a deploy could ship.
+import adapter from "@sveltejs/adapter-cloudflare";
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {

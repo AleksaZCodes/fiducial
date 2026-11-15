@@ -1,79 +1,79 @@
 <script lang="ts">
+import { type PressLocale, press, pressFor } from "../../generated/press";
+import { mediaUrl } from "../media";
+/**
+ * The press room.
+ *
+ * Its React twin is `press/for/web-next/.../press-kit.tsx`, and the two are
+ * the same decisions in two frameworks. Change one, change both.
+ *
+ * ## The order is the order a journalist needs things in
+ *
+ *   1. **Assets** — the logo and the gallery. Usually the reason they came:
+ *      they already have a story and need a picture for it.
+ *   2. **Fast facts** — the table they check their copy against.
+ *   3. **Boilerplate** — the paragraph they paste at the bottom.
+ *   4. **Stories** — for the ones who have not got an angle yet.
+ *   5. **Contact** — last, because by now they know what to ask.
+ *
+ * It was ordered the other way round in both of the apps this was
+ * generalized from, prose first, which puts the one thing most visitors
+ * want below three screens of text.
+ *
+ * ## What the product supplies
+ *
+ * Labels (from its catalog), the logo list, the gallery, and three
+ * functions: where a story lives, how an angle reads, and how a date reads.
+ * The room's *content* comes from `generated/press.ts`, which is plain data
+ * — so this component never reaches for a declaration itself.
+ */
+import MediaFigure from "./MediaFigure.svelte";
+
+type LabelKey =
+  | "title"
+  | "assets"
+  | "guidelines"
+  | "facts"
+  | "boilerplate"
+  | "short"
+  | "medium"
+  | "long"
+  | "stories"
+  | "contact"
+  | "download";
+
+let {
+  locale,
+  labels,
+  logos,
+  gallery = [],
+  storyHref,
+  angleLabel = (a: string) => a,
+  formatDate,
+}: {
+  locale: PressLocale;
+  labels: Record<LabelKey, string>;
   /**
-   * The press room.
+   * The brand primitives, previewed and downloadable. Served from the repo
+   * rather than the media bucket — they are source files, not content.
    *
-   * Its React twin is `press/for/web-next/.../press-kit.tsx`, and the two are
-   * the same decisions in two frameworks. Change one, change both.
-   *
-   * ## The order is the order a journalist needs things in
-   *
-   *   1. **Assets** — the logo and the gallery. Usually the reason they came:
-   *      they already have a story and need a picture for it.
-   *   2. **Fast facts** — the table they check their copy against.
-   *   3. **Boilerplate** — the paragraph they paste at the bottom.
-   *   4. **Stories** — for the ones who have not got an angle yet.
-   *   5. **Contact** — last, because by now they know what to ask.
-   *
-   * It was ordered the other way round in both of the apps this was
-   * generalized from, prose first, which puts the one thing most visitors
-   * want below three screens of text.
-   *
-   * ## What the product supplies
-   *
-   * Labels (from its catalog), the logo list, the gallery, and three
-   * functions: where a story lives, how an angle reads, and how a date reads.
-   * The room's *content* comes from `generated/press.ts`, which is plain data
-   * — so this component never reaches for a declaration itself.
+   * `background` is not decoration. A mark drawn in light colours on the
+   * ambient page background is invisible, and that shipped: every mark was
+   * put on the one surface it could not be read against. A file name
+   * usually names the surface a mark is drawn *for*, not the mark's own
+   * colour, so check the fills rather than the name.
    */
-  import MediaFigure from "./MediaFigure.svelte";
-  import { mediaUrl } from "../media";
-  import { press, pressFor, type PressLocale } from "../../generated/press";
+  logos: readonly { label: string; href: string; background?: string }[];
+  /** Pictures from the media bucket, with their localized captions. */
+  gallery?: readonly { key: string; alt: string; caption: string }[];
+  storyHref: (slug: string) => string;
+  angleLabel?: (angle: string) => string;
+  formatDate: (iso: string) => string;
+} = $props();
 
-  type LabelKey =
-    | "title"
-    | "assets"
-    | "guidelines"
-    | "facts"
-    | "boilerplate"
-    | "short"
-    | "medium"
-    | "long"
-    | "stories"
-    | "contact"
-    | "download";
-
-  let {
-    locale,
-    labels,
-    logos,
-    gallery = [],
-    storyHref,
-    angleLabel = (a: string) => a,
-    formatDate,
-  }: {
-    locale: PressLocale;
-    labels: Record<LabelKey, string>;
-    /**
-     * The brand primitives, previewed and downloadable. Served from the repo
-     * rather than the media bucket — they are source files, not content.
-     *
-     * `background` is not decoration. A mark drawn in light colours on the
-     * ambient page background is invisible, and that shipped: every mark was
-     * put on the one surface it could not be read against. A file name
-     * usually names the surface a mark is drawn *for*, not the mark's own
-     * colour, so check the fills rather than the name.
-     */
-    logos: readonly { label: string; href: string; background?: string }[];
-    /** Pictures from the media bucket, with their localized captions. */
-    gallery?: readonly { key: string; alt: string; caption: string }[];
-    storyHref: (slug: string) => string;
-    angleLabel?: (angle: string) => string;
-    formatDate: (iso: string) => string;
-  } = $props();
-
-  const room = $derived(pressFor(locale));
-  const boilerplateKeys = ["short", "medium", "long"] as const;
-  const rowsFor = (k: string) => (k === "long" ? 9 : k === "medium" ? 5 : 3);
+const room = $derived(pressFor(locale));
+const boilerplateKeys = ["short", "medium", "long"] as const;
+const rowsFor = (k: string) => (k === "long" ? 9 : k === "medium" ? 5 : 3);
 </script>
 
 <div class="kit">

@@ -790,7 +790,7 @@ export function recordConsent(granted: readonly CookieCategory[]): void {{
     )
 }
 
-/// Generate `src/generated/legal.ts` from the declarations.
+/// Generate `apps/web/src/generated/legal.ts` from the declarations.
 ///
 /// `locales` is the full list from `[i18n]`; `default_locale` is the fallback.
 /// The generated file exports a `LegalPage` union type and, for each locale,

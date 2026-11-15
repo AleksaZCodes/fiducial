@@ -2,7 +2,7 @@
  * Renders one generated legal page.
  *
  * Installed by the `legal` capability. The content comes from
- * `src/generated/legal.ts`, which `fid derive` writes from `[legal]`,
+ * `apps/web/src/generated/legal.ts`, which `fid derive` writes from `[legal]`,
  * `[brand]` and `[i18n]` in `fiducial.toml`. Nothing here supplies copy: this
  * is the presentation half, and a sentence typed into this file is a sentence
  * that exists in one language and is invisible to `fid derive --check`.

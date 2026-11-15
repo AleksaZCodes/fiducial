@@ -38,6 +38,10 @@ pub fn run(check: bool, pipeline_filter: Option<String>) -> Result<()> {
 /// --check` its own scaffolded CI runs, on the first commit, before anyone has
 /// changed anything.
 pub fn run_in(root: &Path, check: bool, pipeline_filter: Option<String>) -> Result<()> {
+    // Absolute, always: the script sandbox grants paths, and a relative root
+    // (`fid new site` derives `site/`) granted paths node then resolved against
+    // its own working directory and refused every read.
+    let root = &std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
     let config_path = root.join(CONFIG_FILE);
     let lock_path = root.join(LOCK_FILE);
 
@@ -347,6 +351,19 @@ fn segment_match(pat: &str, s: &str) -> bool {
 pub(crate) fn outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<String> {
     match pipeline.executor.as_str() {
         "fid-identity" => identity_outputs_not_applicable(pipeline, root),
+        // Both wrangler configs are declared; the shape writes one of them.
+        "fid-deploy" => Config::load(&root.join(CONFIG_FILE))
+            .ok()
+            .and_then(|c| deploy_target(pipeline, &c).ok().cloned())
+            .map(|t| {
+                pipeline
+                    .outputs
+                    .iter()
+                    .filter(|o| **o != t)
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default(),
         // `seo` knows the routes, so it owns the sitemap; brand's one-line
         // sitemap is for a product without it. Both writing one was a race
         // a fresh product with every capability lost on its first derive.
@@ -1398,10 +1415,7 @@ fn run_fid_deploy(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     }
     config.deploy.validate(&config.adapters)?;
 
-    let target = pipeline
-        .outputs
-        .first()
-        .ok_or_else(|| anyhow::anyhow!("fid-deploy: pipeline declares no outputs"))?;
+    let target = deploy_target(pipeline, &config)?;
 
     let plan = deploy_plan(&config)?;
 
@@ -1424,6 +1438,24 @@ fn run_fid_deploy(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     }
     std::fs::write(&abs, out).with_context(|| format!("writing {target}"))?;
     Ok(())
+}
+
+/// Which declared output this product's deploy shape writes.
+///
+/// The pipeline lists both: `apps/worker/wrangler.toml` for a standalone
+/// Worker, `apps/web/wrangler.jsonc` for an app that is the Worker. A product
+/// that declares only one (an older pipeline, or one it edited) gets that one.
+fn deploy_target<'p>(pipeline: &'p Pipeline, config: &Config) -> Result<&'p String> {
+    let first = pipeline
+        .outputs
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("fid-deploy: pipeline declares no outputs"))?;
+    let worker = matches!(config.deploy.resolve_shape()?, DeployShape::Worker);
+    Ok(pipeline
+        .outputs
+        .iter()
+        .find(|o| o.starts_with(if worker { "apps/worker/" } else { "apps/web/" }))
+        .unwrap_or(first))
 }
 
 /// Everything a `wrangler` config states, derived once.
@@ -1795,7 +1827,9 @@ fn render_wrangler_jsonc(p: &DeployPlan) -> String {
         .iter()
         .map(|(k, v)| format!("{}: {}", q(k), q(v)))
         .collect();
-    fields.push(format!("  \"vars\": {{ {} }}", vars.join(", ")));
+    if !vars.is_empty() {
+        fields.push(format!("  \"vars\": {{ {} }}", vars.join(", ")));
+    }
 
     if let Some((db_name, db_id)) = &p.d1 {
         fields.push(format!(
@@ -2955,7 +2989,7 @@ fn run_fid_design(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
 /// categories. `[brand]` provides the entity name and domain. `[i18n]` provides
 /// the locale list. All three must be configured before this pipeline can run.
 ///
-/// Output: a single TypeScript file `src/generated/legal.ts` (or wherever
+/// Output: a single TypeScript file `apps/web/src/generated/legal.ts` (or wherever
 /// `pipelines/legal.toml` points) with:
 /// - `LegalPage` type union
 /// - `LegalCatalog` type (`Record<LegalPage, { title, body }>`)

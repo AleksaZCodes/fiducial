@@ -56,12 +56,16 @@ a list anyone maintains.
 Deriving the facts is half of it — the pages have to render them:
 
 ```tsx
-export const metadata = metadataForPath("en", "/press");            // a page
+import { metadataForPath } from "@/lib/metadata";   // installed for web-next
+
+export const metadata = metadataForPath("/press");                  // a page
 export async function generateMetadata({ params }) {                 // an entry
-  const { slug } = await params;
-  return metadataForPath("en", `/en/blog/${slug}`);
+  const { locale, slug } = await params;
+  return metadataForPath(localePath(locale, `/blog/${slug}`));       // `/sr/blog/…`
 }
 ```
+
+The path is the URL a reader sees, so the default locale's has no prefix.
 
 `metadataForPath` sets the page's own title, description, canonical, hreflang
 alternates, Open Graph and Twitter card, and `publishedTime` for an article.
@@ -78,6 +82,15 @@ on the file name, so it catches the collision whatever directory the two
 pipelines spell.
 
 ## Social images
+
+**Off until you turn them on**: `[seo] og = true`. Until then no route names an
+image, so no page points a crawler at a file that does not exist; that is what
+every product shipped with before, because nothing renders them by default.
+
+To turn them on, the product needs what the renderer reads: `satori` and
+`@resvg/resvg-js` as dev dependencies, the two fonts below, and
+`apps/web/src/generated/logo.json` (the wordmark's geometry). Then add
+`"prebuild": "node ../../scripts/render-og.mjs"` to `apps/web/package.json`.
 
 `scripts/render-og.mjs` renders one 1200×630 PNG per route into `public/og/`
 before every web build (`"prebuild"`), from the page's own title and

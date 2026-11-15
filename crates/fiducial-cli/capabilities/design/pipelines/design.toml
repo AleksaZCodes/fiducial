@@ -22,5 +22,6 @@ outputs  = ["apps/web/src/app/tokens.css"]
 # `fiducial.lock`, the same as every other pipeline's outputs — which is what
 # finally makes the declaration and the stylesheet unable to disagree.
 #
-# A SvelteKit product points `outputs` at `apps/web/src/tokens.css` instead.
-# The declaration does not move, only where the derivation lands.
+# The same path in a SvelteKit product: `src/app/` is this capability's
+# directory on every framework, and the SvelteKit app's `app.css` imports
+# `./app/tokens.css` from there.

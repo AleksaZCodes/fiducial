@@ -28,6 +28,7 @@
 // one canonical to a crawler and another to a reader.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { frontmatter } from "./frontmatter.mjs";
 // `toml-lite.mjs`, not `derive-content.mjs`, for `parseToml`.
 //
 // `derive-content.mjs` is a pipeline executor with no main-module guard: its
@@ -43,7 +44,6 @@ import { dirname } from "node:path";
 // `toml-lite.mjs` is a parser and nothing else, and it already handles the
 // arrays-across-several-lines that an `outputs` list is always written as.
 import { parseToml } from "./toml-lite.mjs";
-import { frontmatter } from "./frontmatter.mjs";
 
 const at = (p) => new URL(`../${p}`, import.meta.url);
 // A missing file is named, never a stack trace: a locale added to [i18n]
@@ -106,18 +106,13 @@ const staticPages = (seo.pages ?? ["/"]).map((entry) => {
     const keys = CONVENTIONAL_KEYS[entry];
     if (!keys) {
       fail(
-        `[seo] pages lists ${entry}, and this script has no conventional title key for it.\n` +
-          "  Declare the keys with the path instead of listing the path alone:\n" +
-          `    { path = "${entry}", title = "<key>", description = "<key>" }\n` +
-          "  They are message keys, resolved in each locale's catalogue.",
+        `[seo] pages lists ${entry}, and this script has no conventional title key for it.\n  Declare the keys with the path instead of listing the path alone:\n    { path = "${entry}", title = "<key>", description = "<key>" }\n  They are message keys, resolved in each locale's catalogue.`,
       );
     }
     return { path: entry, title: keys[0], description: keys[1] };
   }
   if (!entry.path || !entry.title || !entry.description) {
-    fail(
-      `[seo] pages has an entry missing path, title or description: ${JSON.stringify(entry)}`,
-    );
+    fail(`[seo] pages has an entry missing path, title or description: ${JSON.stringify(entry)}`);
   }
   return entry;
 });
@@ -155,10 +150,7 @@ const declaredOutputs = pipeline.outputs ?? [];
 const output = (name) =>
   declaredOutputs.find((o) => o.endsWith(`/${name}`) || o === name) ??
   fail(
-    `pipelines/seo.toml declares no output ending in \`${name}\`.\n` +
-      `  Its outputs are ${JSON.stringify(declaredOutputs)}.\n` +
-      "  This script derives seo.ts, seo.json and sitemap.xml; each one needs a\n" +
-      "  declared path, because that path is what `fid derive --check` guards.",
+    `pipelines/seo.toml declares no output ending in \`${name}\`.\n  Its outputs are ${JSON.stringify(declaredOutputs)}.\n  This script derives seo.ts, seo.json and sitemap.xml; each one needs a\n  declared path, because that path is what \`fid derive --check\` guards.`,
   );
 
 const tsOut = output("seo.ts");
@@ -185,6 +177,9 @@ const localized = (locale, path) => `${prefix(locale)}${path === "/" ? "" : path
 const messages = Object.fromEntries(locales.map((l) => [l, readJson(`messages/${l}.json`)]));
 const msg = (locale, path) =>
   path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), messages[locale]);
+// For a page a capability adds whose title key the product may not have yet
+// (`press.title` arrives with the `site` capability, not with `press`).
+const msgOr = (locale, path, fallback) => msg(locale, path) ?? fallback;
 
 // ── The routes ───────────────────────────────────────────────────────────────
 /** @type {{path: string, locale: string, key: string, title: string, description: string, kind: string, date?: string}[]} */
@@ -218,9 +213,10 @@ const legalTs = existsSync(at("apps/web/src/generated/legal.ts"))
   ? read("apps/web/src/generated/legal.ts")
   : "";
 const legalPages =
-  legalTs.match(/export type LegalPage = ([^;]+);/)?.[1].match(/"([^"]+)"/g)?.map((s) =>
-    s.slice(1, -1),
-  ) ?? [];
+  legalTs
+    .match(/export type LegalPage = ([^;]+);/)?.[1]
+    .match(/"([^"]+)"/g)
+    ?.map((s) => s.slice(1, -1)) ?? [];
 for (const locale of locales) {
   for (const page of legalPages) {
     // An authored override owns the title when it exists; otherwise the
@@ -266,6 +262,22 @@ for (const [name, spec] of Object.entries(collections)) {
   }
 }
 
+// The press room's own page, when there is a press room: it lists the stories
+// below, so a sitemap with the stories and not the room left the one page a
+// journalist is sent to out.
+if (existsSync(at("press/docs"))) {
+  for (const locale of locales) {
+    add({
+      path: localized(locale, "/press"),
+      locale,
+      key: "page/press",
+      title: msgOr(locale, "press.title", "Press"),
+      description: msg(locale, "meta.description"),
+      kind: "page",
+    });
+  }
+}
+
 // Press stories.
 for (const locale of locales) {
   const dir = `press/stories/${locale}`;
@@ -291,7 +303,13 @@ routes.sort((a, b) => a.path.localeCompare(b.path));
 // The social image lives at a path per route, rendered at build time by
 // `scripts/render-og.mjs`. It is not committed: it is a picture of facts the
 // repository already holds, so it is rebuilt rather than stored.
-const ogPath = (r) => `/og/${r.locale}/${r.key.replace(/^page\//, "").replace(/\//g, "-") || "home"}.png`;
+//
+// Only with `[seo] og = true`. The renderer needs the product's fonts and its
+// wordmark geometry, which a product does not have until it sets them up; a
+// route table that named an image anyway sent every crawler to a 404.
+const withOg = seo.og === true;
+const ogPath = (r) =>
+  `/og/${r.locale}/${r.key.replace(/^page\//, "").replace(/\//g, "-") || "home"}.png`;
 
 const byKey = new Map();
 for (const r of routes) {
@@ -306,7 +324,7 @@ const entries = routes.map((r) => ({
   kind: r.kind,
   title: r.title,
   description: r.description,
-  og: ogPath(r),
+  ...(withOg ? { og: ogPath(r) } : {}),
   ...(r.date ? { date: r.date } : {}),
   alternates: Object.fromEntries(byKey.get(r.key).map((o) => [o.locale, o.path])),
 }));
@@ -318,7 +336,7 @@ const ts = `// Generated by \`node scripts/derive-seo.mjs\`. Do not edit.
 // needs and what the language picker uses to stay on the page.
 //
 // \`og\` is where the page's social image is, rendered at build time from these
-// same fields by scripts/render-og.mjs.
+// same fields by scripts/render-og.mjs — present only with [seo] og = true.
 
 export interface SeoRoute {
   readonly path: string;
@@ -328,7 +346,7 @@ export interface SeoRoute {
   readonly kind: "home" | "page" | "article";
   readonly title: string;
   readonly description: string;
-  readonly og: string;
+  readonly og?: string;
   readonly date?: string;
   readonly alternates: Readonly<Record<string, string>>;
 }
@@ -348,7 +366,10 @@ console.log(`wrote ${tsOut} (${entries.length} route(s), ${locales.length} local
 // The same routes as JSON, for the node scripts that also need them — the
 // social-image renderer runs before the app is built, so it cannot import a
 // TypeScript module. Same rule as the logo pipeline: two readers, one source.
-writeFileSync(at(jsonOut), `${JSON.stringify({ origin, defaultLocale, routes: entries }, null, 2)}\n`);
+writeFileSync(
+  at(jsonOut),
+  `${JSON.stringify({ origin, defaultLocale, routes: entries }, null, 2)}\n`,
+);
 console.log(`wrote ${jsonOut}`);
 
 // ── sitemap.xml ──────────────────────────────────────────────────────────────

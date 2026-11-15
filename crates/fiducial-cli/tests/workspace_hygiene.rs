@@ -1030,3 +1030,24 @@ fn changesets_name_packages_that_exist() {
         known.join(", ")
     );
 }
+
+/// No NUL bytes in a text file the platform ships. Two skills carried 2 KB of
+/// them for weeks: every product received them as its instructions, and `grep`
+/// treated the files as binary and stopped searching them.
+#[test]
+fn shipped_text_has_no_nul_bytes() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("capabilities");
+    let mut bad = Vec::new();
+    let mut stack = vec![root];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if std::fs::read(&path).unwrap().contains(&0) {
+                bad.push(path.display().to_string());
+            }
+        }
+    }
+    assert!(bad.is_empty(), "NUL bytes in: {bad:?}");
+}

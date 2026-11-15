@@ -71,7 +71,8 @@ Every row carries a status, and the statuses are honest:
 | Mobile | **Tauri** — same shell as desktop. Native Rust on the phone, no webview-WASM | Decided |
 | Mobile + desktop BLE | **`tauri-plugin-blec`** (btleplug-based). iOS is the least-proven path | Decided |
 | Mobile until Tauri mobile ships | **Responsive web app installed as a PWA** — one site on every screen size | Decided |
-| Capacitor | **Dropped from the platform.** Available as an optional capability if a product needs a specific plugin | Decided |
+| Capacitor | **Optional shell**, chosen per app when a product wants a thin native wrapper around its web app and a specific plugin (BLE, geolocation, background tasks). Proven on a product; a `shell` capability is planned. Tauri stays the default | Decided |
+| Electron | **Optional shell**, only where Tauri's webview differences or a Node-only dependency make it the cheaper choice. Planned with the other shells | Candidate |
 | Browser | The one place the WASM boundary is unavoidable | Decided |
 
 ## 5 · Backend, edge & data
@@ -84,7 +85,7 @@ Every row carries a status, and the statuses are honest:
 | Analytics | **DuckDB over R2** | Decided |
 | Transactional email | **Resend**, via `@fiducial/email` | Decided |
 | CMS | **Payload** | Candidate — ROP-proven, not yet platform-generalized |
-| Content editor (git-based) | **Decap** (default, derived from `content.toml`), plus **Pages CMS**, **Keystatic**, **TinaCMS** chosen per app | Decap decided; others candidates |
+| Content editor (git-based) | **Keystatic** (default) and **TinaCMS**, both derived from `content.toml`, `messages/` and `settings.json`; **Pages CMS** next. Decap was removed in 0.15.0 | Decided |
 | Backend framework | **Hono** (Workers-native; Node for a self-hosted target) | Candidate — roadmap: *A stack chosen per app* |
 | ORM | **Drizzle** over the `database` contract (D1, Postgres, SQLite) | Candidate — roadmap: *A stack chosen per app* |
 | Docs site | **VitePress** | Decided |

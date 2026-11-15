@@ -74,7 +74,7 @@ fn derive_writes_legal_ts() {
     let tmp = tempfile::tempdir().unwrap();
     let root = legal_product(tmp.path());
 
-    let ts = std::fs::read_to_string(root.join("src/generated/legal.ts")).unwrap();
+    let ts = std::fs::read_to_string(root.join("apps/web/src/generated/legal.ts")).unwrap();
     assert!(ts.contains("export type LegalPage ="), "{ts}");
     assert!(ts.contains("\"privacy\""), "{ts}");
     assert!(ts.contains("\"imprint\""), "{ts}"); // EU jurisdiction includes imprint
@@ -95,7 +95,7 @@ fn check_catches_a_hand_edited_legal_ts() {
     let tmp = tempfile::tempdir().unwrap();
     let root = legal_product(tmp.path());
 
-    let path = root.join("src/generated/legal.ts");
+    let path = root.join("apps/web/src/generated/legal.ts");
     std::fs::write(&path, "// hand-edited\n").unwrap();
     let out = run(&root, &["derive", "--check"]);
     assert!(!out.status.success(), "should fail after hand-edit");
@@ -156,6 +156,13 @@ fn the_consent_rules_are_derived_and_a_hand_edit_fails_check() {
         ts.contains("return cookieConsent()?.granted.includes(category) ?? false;"),
         "{ts}"
     );
+    // The banner is a React component, so it arrives with a Next.js app — added
+    // after `legal` here, which also proves the scoped template back-fills.
+    assert!(!root
+        .join("apps/web/src/components/cookie-consent.tsx")
+        .exists());
+    assert!(run(&root, &["add", "design"]).status.success());
+    assert!(run(&root, &["add", "app", "next"]).status.success());
     let banner =
         std::fs::read_to_string(root.join("apps/web/src/components/cookie-consent.tsx")).unwrap();
     assert!(banner.contains("from \"../generated/consent\""), "{banner}");

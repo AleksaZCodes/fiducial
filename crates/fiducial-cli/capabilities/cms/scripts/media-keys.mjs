@@ -34,9 +34,15 @@ function markdown(dir) {
 export function referencedKeys() {
   const collections = parseToml(read("content.toml")).collections ?? {};
   const fields = new Set(["cover", "key"]);
+  // A picture inside a list of records (a gallery) is referenced too. Missing it
+  // here made `media:push --prune` treat every gallery image as an orphan.
+  const recordFields = new Set();
   for (const spec of Object.values(collections)) {
     for (const [field, type] of Object.entries(spec.schema ?? {})) {
       if (type === "media") fields.add(field);
+    }
+    for (const shape of Object.values(spec.objects ?? {})) {
+      for (const [k, type] of Object.entries(shape)) if (type === "media") recordFields.add(k);
     }
   }
 
@@ -45,6 +51,13 @@ export function referencedKeys() {
     const { meta, body } = frontmatter(read(file), () => {});
     for (const [field, value] of Object.entries(meta)) {
       if (fields.has(field) && typeof value === "string" && value) keys.add(value);
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (!item || typeof item !== "object") continue;
+          for (const k of recordFields)
+            if (typeof item[k] === "string" && item[k]) keys.add(item[k]);
+        }
+      }
     }
     // Inline images in a body: `![alt](key "caption")`.
     for (const m of body.matchAll(/!\[[^\]]*\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g)) {

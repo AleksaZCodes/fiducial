@@ -1,60 +1,60 @@
 <script lang="ts">
+/**
+ * One image with its caption and a download button.
+ *
+ * Its React twin is `press/for/web-next/.../media-figure.tsx`. Change one,
+ * change both.
+ *
+ * Every image on a document page goes through this: press gallery items,
+ * story and post covers, and images inside a post's body. One component,
+ * because a press asset is used by someone else, and a journalist lifting an
+ * image needs the same three things wherever they find it — the picture,
+ * what it shows, and a way to save the original rather than a screenshot of
+ * it.
+ *
+ * The download goes through `?download`, which makes the media route send
+ * `Content-Disposition: attachment`. A bare `download` attribute is ignored
+ * by some browsers for anything they can display, which opens the image in a
+ * tab instead of saving it — the one thing the button exists to prevent.
+ */
+import { mediaUrl } from "../media";
+
+let {
+  mediaKey,
+  alt,
+  caption,
+  downloadLabel,
+  aspect = "3 / 2",
+  fit = "cover",
+  priority = false,
   /**
-   * One image with its caption and a download button.
+   * The surface to put behind the image.
    *
-   * Its React twin is `press/for/web-next/.../media-figure.tsx`. Change one,
-   * change both.
-   *
-   * Every image on a document page goes through this: press gallery items,
-   * story and post covers, and images inside a post's body. One component,
-   * because a press asset is used by someone else, and a journalist lifting an
-   * image needs the same three things wherever they find it — the picture,
-   * what it shows, and a way to save the original rather than a screenshot of
-   * it.
-   *
-   * The download goes through `?download`, which makes the media route send
-   * `Content-Disposition: attachment`. A bare `download` attribute is ignored
-   * by some browsers for anything they can display, which opens the image in a
-   * tab instead of saving it — the one thing the button exists to prevent.
+   * It matters for anything with transparency, and it is the fix for a bug
+   * that shipped: a logo drawn in light colours, dropped on the ambient page
+   * background, is invisible. A mark's file name usually names the surface
+   * it is drawn *for*, not its own colour, so read the fills before deciding
+   * — `mark-ink.svg` being drawn in pale aqua is not a contradiction, it is
+   * the mark for an ink-coloured field.
    */
-  import { mediaUrl } from "../media";
+  background,
+}: {
+  mediaKey: string;
+  alt: string;
+  caption?: string;
+  /** Omit to show the image with no download button (e.g. a card thumbnail). */
+  downloadLabel?: string;
+  aspect?: string;
+  /**
+   * `contain` for an asset whose whole frame matters — a logo, an icon, a
+   * diagram — where cropping would misrepresent the file being downloaded.
+   */
+  fit?: "cover" | "contain";
+  priority?: boolean;
+  background?: string;
+} = $props();
 
-  let {
-    mediaKey,
-    alt,
-    caption,
-    downloadLabel,
-    aspect = "3 / 2",
-    fit = "cover",
-    priority = false,
-    /**
-     * The surface to put behind the image.
-     *
-     * It matters for anything with transparency, and it is the fix for a bug
-     * that shipped: a logo drawn in light colours, dropped on the ambient page
-     * background, is invisible. A mark's file name usually names the surface
-     * it is drawn *for*, not its own colour, so read the fills before deciding
-     * — `mark-ink.svg` being drawn in pale aqua is not a contradiction, it is
-     * the mark for an ink-coloured field.
-     */
-    background,
-  }: {
-    mediaKey: string;
-    alt: string;
-    caption?: string;
-    /** Omit to show the image with no download button (e.g. a card thumbnail). */
-    downloadLabel?: string;
-    aspect?: string;
-    /**
-     * `contain` for an asset whose whole frame matters — a logo, an icon, a
-     * diagram — where cropping would misrepresent the file being downloaded.
-     */
-    fit?: "cover" | "contain";
-    priority?: boolean;
-    background?: string;
-  } = $props();
-
-  const src = $derived(mediaUrl(mediaKey));
+const src = $derived(mediaUrl(mediaKey));
 </script>
 
 <figure class="fig">

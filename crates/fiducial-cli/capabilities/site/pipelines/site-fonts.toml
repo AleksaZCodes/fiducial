@@ -1,0 +1,15 @@
+name     = "site-fonts"
+executor = "shell"
+args     = ["node", "scripts/derive-fonts.mjs"]
+outputs  = ["apps/web/src/generated/fonts.ts"]
+# What the script reads: an edit here, not re-derived, fails `fid derive --check`.
+inputs   = ["design-system.md", "fiducial.toml#site"]
+
+# The faces `design-system.md` declares, loaded.
+#
+# The design pipeline names the families and writes each role's stack as
+# `var(--face-<role>, "<family>")`; nothing loaded them, so every product drew
+# its type in the reader's system fallbacks. This derives one `next/font`
+# call per role, which downloads the files at build time and serves them from
+# the site itself: no request to a font host when someone reads a page, and
+# nothing for the content security policy to allow.

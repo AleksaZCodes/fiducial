@@ -38,9 +38,7 @@ function assertWellFormed(name, svg) {
   for (const m of svg.matchAll(/<!--([\s\S]*?)-->/g)) {
     if (m[1].includes("--")) {
       throw new Error(
-        `${name}: an XML comment contains "--", which is not legal and makes ` +
-          `the file unrenderable. Rewrite the comment (a CLI flag like ` +
-          `\`--check\` is the usual culprit).`,
+        `${name}: an XML comment contains "--", which is not legal and makes the file unrenderable. Rewrite the comment (a CLI flag like \`--check\` is the usual culprit).`,
       );
     }
   }
@@ -97,12 +95,7 @@ export function logoGeometry() {
 
 /** The accent, as SVG elements in one colour. */
 export function accentSvg(accent, fill) {
-  return (
-    `<g fill="${fill}">` +
-    accent.paths.map((d) => `<path d="${d}"/>`).join("") +
-    accent.polygons.map((pts) => `<polygon points="${pts}"/>`).join("") +
-    "</g>"
-  );
+  return `<g fill="${fill}">${accent.paths.map((d) => `<path d="${d}"/>`).join("")}${accent.polygons.map((pts) => `<polygon points="${pts}"/>`).join("")}</g>`;
 }
 
 const g = logoGeometry();

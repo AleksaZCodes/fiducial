@@ -152,6 +152,19 @@ impl Lock {
         );
     }
 
+    /// The file changed after the platform wrote it, by a step that is the
+    /// product's (a seeded key, a patched block): keep the merge base as the
+    /// template shipped, and record only the new hash. Recording the edited
+    /// file as the base makes the template look changed upstream, and `fid
+    /// doctor` tells a product a second old to run `fid upgrade`.
+    pub fn rehash(&mut self, path: impl Into<String>, content: &[u8], source_version: &str) {
+        let path = path.into();
+        match self.templates.get_mut(&path) {
+            Some(record) => record.hash = sha256_hex(content),
+            None => self.record(path, content, source_version),
+        }
+    }
+
     /// Load from a path.
     pub fn load(path: &Path) -> Result<Self> {
         let raw =

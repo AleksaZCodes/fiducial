@@ -123,7 +123,10 @@ console.log(`\n${pushed} uploaded, ${skipped} unchanged → ${bucket}`);
 // Reported by default, deleted only with `--prune`. The bucket is the one
 // place in this system where a mistake is not a `git revert`.
 const referenced = referencedKeys();
-const known = new Set([...Object.keys(record), ...files.map((f) => relative(MEDIA, f).split("\\").join("/"))]);
+const known = new Set([
+  ...Object.keys(record),
+  ...files.map((f) => relative(MEDIA, f).split("\\").join("/")),
+]);
 const orphans = [...known].filter((k) => !referenced.has(k)).sort();
 
 if (!orphans.length) {
@@ -131,7 +134,9 @@ if (!orphans.length) {
 } else if (!prune) {
   console.log(`\n${orphans.length} object(s) no entry refers to any more:`);
   for (const k of orphans) console.log(`  ·  ${k}`);
-  console.log("\n`pnpm media:push --prune` deletes them from the bucket and the staging directory.");
+  console.log(
+    "\n`pnpm media:push --prune` deletes them from the bucket and the staging directory.",
+  );
 } else {
   console.log(`\npruning ${orphans.length} unreferenced object(s):`);
   for (const key of orphans) {
@@ -139,10 +144,14 @@ if (!orphans.length) {
       console.log(`  →  would delete ${key}`);
       continue;
     }
-    const r = spawnSync("npx", ["wrangler", "r2", "object", "delete", `${bucket}/${key}`, "--remote"], {
-      cwd: join(repo, "apps/web"),
-      stdio: ["ignore", "ignore", "inherit"],
-    });
+    const r = spawnSync(
+      "npx",
+      ["wrangler", "r2", "object", "delete", `${bucket}/${key}`, "--remote"],
+      {
+        cwd: join(repo, "apps/web"),
+        stdio: ["ignore", "ignore", "inherit"],
+      },
+    );
     if (r.status !== 0) {
       console.error(`  ×  ${key} — delete failed`);
       continue;

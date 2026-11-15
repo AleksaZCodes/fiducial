@@ -180,6 +180,25 @@ pub struct Capability {
     /// it is caught at install instead.
     pub requires_capabilities: Vec<String>,
     pub guard_rules: Vec<String>,
+    /// npm packages the capability's templates import, added to
+    /// `apps/web/package.json` on install where they are missing. A template
+    /// importing a package nobody installed fails at the first build, after
+    /// the install said it worked.
+    pub npm_dependencies: BTreeMap<String, String>,
+    /// `apps/web/package.json` scripts the capability's workflow runs
+    /// (`deploy`), added where the product has none of that name.
+    pub npm_scripts: BTreeMap<String, String>,
+    /// Paths another capability installs that this one replaces: the plain
+    /// root layout a localized site cannot have beside its `[locale]` one.
+    /// Not written while this capability is enabled, removed on install when
+    /// unmodified, and ignored by `doctor` and `upgrade`.
+    pub supersedes: Vec<String>,
+    /// Message namespaces the capability's templates read, per locale:
+    /// `[seed_messages.en] site = { readMore = "Read more" }`. Inserted into
+    /// `messages/<locale>.json` on install where the namespace is missing; a
+    /// declared locale with no seed gets the default locale's words, which
+    /// `fid derive` then reports as untranslated rather than missing.
+    pub seed_messages: BTreeMap<String, toml::Table>,
     pub templates: Vec<FileEntry>,
     /// Templates that install only alongside another capability.
     ///
@@ -203,6 +222,14 @@ struct Manifest {
     deprecated: Option<String>,
     #[serde(default)]
     guard_rules: Vec<String>,
+    #[serde(default)]
+    npm_dependencies: BTreeMap<String, String>,
+    #[serde(default)]
+    npm_scripts: BTreeMap<String, String>,
+    #[serde(default)]
+    supersedes: Vec<String>,
+    #[serde(default)]
+    seed_messages: BTreeMap<String, toml::Table>,
     #[serde(default)]
     requires_adapters: Vec<String>,
     #[serde(default)]
@@ -349,6 +376,10 @@ pub fn derive(id: &str, files: &BTreeMap<String, String>, source: Source) -> Res
         requires_tools: manifest.requires_tools,
         requires_capabilities: manifest.requires_capabilities,
         guard_rules: manifest.guard_rules,
+        npm_dependencies: manifest.npm_dependencies,
+        npm_scripts: manifest.npm_scripts,
+        supersedes: manifest.supersedes,
+        seed_messages: manifest.seed_messages,
         templates,
         conditional_templates,
         skill_md,

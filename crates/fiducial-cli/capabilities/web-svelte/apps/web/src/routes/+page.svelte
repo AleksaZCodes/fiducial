@@ -1,8 +1,10 @@
 <script lang="ts">
-  import type { Result } from "@fiducial/headless";
+import type { Result } from "@fiducial/headless";
 
-  // Typed product state using headless Result — same pattern as web-next.
-  const status: Result<string, string> = { ok: true, value: "{{name}}" };
+// Typed product state using headless Result — same pattern as web-next.
+// `as`, not an annotation: annotated, TypeScript narrows the union on
+// assignment and `status.error` below no longer type-checks.
+const status = { ok: true, value: "{{name}}" } as Result<string, string>;
 </script>
 
 <main>

@@ -27,7 +27,7 @@ Installs the corresponding platform capability and writes all template files
 into the product. After installation, run `fid capability check` to verify.",
         after_long_help = "\
 TARGETS
-  next      Next.js 15 (App Router) web app     → apps/web/
+  next      Next.js 16 (App Router) web app     → apps/web/
   svelte    SvelteKit web app                    → apps/web/
   tauri     Tauri 2 desktop + mobile             → apps/desktop/
   worker    Cloudflare Worker / Durable Object   → apps/worker/
@@ -324,7 +324,7 @@ checklist comment naming every decision a human must still make.",
 EXAMPLE:
     fid add legal
     # edit [legal] in fiducial.toml — replace data_protection_email
-    fid derive          # writes src/generated/legal.ts
+    fid derive          # writes apps/web/src/generated/legal.ts
     fid derive --check  # fails if it is missing or stale"
     )]
     Legal,

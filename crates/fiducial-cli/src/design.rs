@@ -763,15 +763,24 @@ impl DesignSystem {
     /// The font stack for one role.
     ///
     /// A family name is quoted; keyword fallbacks (`ui-serif`, `sans-serif`)
-    /// must stay unquoted or they stop being keywords. The loader variable,
-    /// when declared, comes first.
+    /// must stay unquoted or they stop being keywords. A loader variable comes
+    /// first: the declared `var`, or else `--face-<role>` with the family name
+    /// as its own fallback.
     fn stack(&self, role: &str) -> String {
         let r = &self.roles[role];
         let mut parts = Vec::new();
-        if let Some(v) = &r.var {
-            parts.push(format!("var({v})"));
+        match &r.var {
+            Some(v) => {
+                parts.push(format!("var({v})"));
+                parts.push(format!("\"{}\"", r.family));
+            }
+            // `--face-<role>` is where a font loader binds the self-hosted face
+            // (the `site` capability derives `next/font` for every role). With a
+            // fallback inside `var()`, an unset variable resolves to the family
+            // name, so a product without a loader renders exactly as before; a
+            // bare `var(--x)` left unset would void the whole declaration.
+            None => parts.push(format!("var(--face-{role}, \"{}\")", r.family)),
         }
-        parts.push(format!("\"{}\"", r.family));
         parts.extend(r.fallback.iter().cloned());
         parts.join(", ")
     }
@@ -1502,9 +1511,10 @@ small = "eyebrow"
             css.contains(r#"--type-display: var(--font-cp), "Chakra Petch", sans-serif;"#),
             "{css}"
         );
-        // A role with no `var` is just the family and its fallbacks.
+        // A role with no `var` gets the conventional `--face-<role>`, with the
+        // family as its fallback: unset, it is exactly the family and its stack.
         assert!(
-            css.contains(r#"--type-body: "Source Serif 4", serif;"#),
+            css.contains(r#"--type-body: var(--face-body, "Source Serif 4"), serif;"#),
             "{css}"
         );
     }

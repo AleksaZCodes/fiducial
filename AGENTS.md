@@ -357,6 +357,13 @@ Seven kinds, and the difference is not cosmetic — see
 | **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
 | **Scoped template** | a template under `for/<capability>/`, installed only alongside that capability | `for/web-svelte/…/LocalePicker.svelte` |
 
+`capability.toml` can also say what an install does to files the product
+already has: `supersedes` (another capability's templates this one replaces,
+as `site` replaces the plain app's root layout), `npm_dependencies` and
+`npm_scripts` (added to `apps/web/package.json` where missing), and
+`seed_messages` (message namespaces inserted into each locale's catalog where
+missing). Each only adds what is absent: the product's own edits win.
+
 <!-- fid:end-describes -->
 
 The test for a declaration: *could two different pipelines read this and both be
@@ -389,7 +396,7 @@ The capabilities this platform ships:
 |---|---|---|
 | `adapters` | declares `adapters`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability adapters` |
 | `brand` | declares `brand`; 2 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability brand` |
-| `cms` | declares `cms`; 1 pipeline(s); 6 template file(s); seeds a `fiducial.toml` block | `fid add capability cms` |
+| `cms` | declares `cms`; 1 pipeline(s); 14 template file(s); seeds a `fiducial.toml` block | `fid add capability cms` |
 | `content` | declares `content.toml`, `content/posts/en/hello.md`; 1 pipeline(s); 2 template file(s) | `fid add capability content` |
 | `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
 | `design` | declares `design-system.md`; 1 pipeline(s); 4 template file(s) | `fid add capability design` |
@@ -397,9 +404,9 @@ The capabilities this platform ships:
 | `firmware-rp2040` | 11 template file(s); guard rules | `fid add capability firmware-rp2040` |
 | `firmware-stm32` | 10 template file(s); guard rules | `fid add capability firmware-stm32` |
 | `hardware` | declares `hardware/outline.svg`, `hardware/product.toml`; 1 pipeline(s); 12 template file(s) | `fid add capability hardware` |
-| `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
+| `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 2 pipeline(s); 3 template file(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
-| `legal` | declares `legal`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability legal` |
+| `legal` | declares `legal`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability legal` |
 | `migrations` | declares `migrations`; 1 pipeline(s) | `fid add capability migrations` |
 | `monitoring` | declares `monitoring.toml`; 1 pipeline(s) | `fid add capability monitoring` |
 | `press` | declares `press`, `press/docs/en/boilerplate.md`, `press/docs/en/facts.md`, `press/stories/en/0001-why-this-exists.md`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability press` |
@@ -407,10 +414,11 @@ The capabilities this platform ships:
 | `realtime` | a skill | `fid add capability realtime` |
 | `research` | declares `paper`; seeds a `fiducial.toml` block | `fid add capability research` |
 | `seo` | declares `seo`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability seo` |
+| `site` | declares `site`; 1 pipeline(s); 15 template file(s); seeds a `fiducial.toml` block | `fid add capability site` |
 | `tauri` | 5 template file(s); guard rules | `fid add capability tauri` |
 | `topology` | declares `topology.toml`; 1 pipeline(s) | `fid add capability topology` |
-| `web-next` | 13 template file(s); guard rules | `fid add capability web-next` |
-| `web-svelte` | 11 template file(s); guard rules | `fid add capability web-svelte` |
+| `web-next` | 14 template file(s); guard rules | `fid add capability web-next` |
+| `web-svelte` | 12 template file(s); guard rules | `fid add capability web-svelte` |
 | `worker-cloudflare` | 1 template file(s); guard rules | `fid add capability worker-cloudflare` |
 <!-- fid:end capabilities -->
 

@@ -1,6 +1,8 @@
 name     = "deploy"
 executor = "fid-deploy"
-outputs  = ["apps/worker/wrangler.toml"]
+# One of these, by `[deploy] shape`: a standalone Worker's `wrangler.toml`, or
+# the `wrangler.jsonc` of a Next.js or SvelteKit app that is the Worker.
+outputs  = ["apps/worker/wrangler.toml", "apps/web/wrangler.jsonc"]
 
 # `wrangler.toml` is a derivation, not a template.
 #

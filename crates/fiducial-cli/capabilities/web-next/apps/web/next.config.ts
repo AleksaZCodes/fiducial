@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { redirects, rewrites } from "./src/routing";
 
 /**
  * Response headers every page carries.
@@ -143,6 +144,16 @@ const config: NextConfig = {
 
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
+  },
+
+  // Empty unless a capability routes URLs (see `src/routing.ts`).
+  async redirects() {
+    return redirects;
+  },
+
+  // After the filesystem, so `/_next/*`, `/api/*` and files in `public/` win.
+  async rewrites() {
+    return { beforeFiles: [], afterFiles: rewrites, fallback: [] };
   },
 };
 

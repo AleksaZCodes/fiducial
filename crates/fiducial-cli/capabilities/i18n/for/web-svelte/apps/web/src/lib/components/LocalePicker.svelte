@@ -1,81 +1,76 @@
 <script lang="ts">
-  /**
-   * The language picker — the Svelte half of the platform's locale switcher.
-   *
-   * Its React twin is `for/web-next/apps/web/src/components/locale-picker.tsx`
-   * and every decision below is that file's, restated in another framework.
-   * Read this list before changing either: each item is a bug that shipped.
-   *
-   * **A list, not a toggle.** It used to be a single link to "the other
-   * locale". That works for exactly two languages and is silently wrong at
-   * three.
-   *
-   * **Every locale names itself.** A language is listed under its endonym —
-   * `Srpski`, not `Serbian` — read from that locale's own catalog
-   * (`locale.name`). A picker exists for someone who cannot read the page
-   * they are looking at, so translating the list into the language they are
-   * trying to leave is the one arrangement guaranteed to be useless. There is
-   * no table of languages here and no branch on a locale code: dropping in
-   * `messages/de.json` with a `locale` block adds German and nothing else has
-   * to be touched, which is the whole test of whether an i18n layer is real.
-   *
-   * **The flag is decoration and is marked as such.** A flag is a country and
-   * a locale is a language; Serbian is not confined to Serbia. The flag is
-   * `aria-hidden`, the endonym is the label, so a screen reader announces the
-   * language and never a nation. A region with no flag in the set renders as
-   * no flag rather than as a broken image — the name was always what carried
-   * the meaning.
-   *
-   * **Real links.** Each row is an `<a href>`, so it is middle-clickable,
-   * copyable and crawlable, with `hreflang` stating the relationship. A
-   * switcher built from click handlers is invisible to a search engine and to
-   * anyone opening it in a new tab.
-   *
-   * **bits-ui, not a hand-rolled dropdown.** The version this replaces was
-   * `let open = $state(false)` plus `<svelte:window onclick={close}>`, which
-   * has no focus trap, no roving tabindex, no Escape handling, no
-   * `aria-activedescendant`, and closes on any click anywhere including the
-   * one opening it. bits-ui is what shadcn-svelte is built on; using it
-   * directly is the same components without the copy-in step.
-   */
-  import RS from "country-flag-icons/string/3x2/RS";
-  import GB from "country-flag-icons/string/3x2/GB";
-  import { DropdownMenu } from "bits-ui";
-  import { type Locale, locales, messages } from "../../generated/messages";
-  import { queryLocaleHref } from "../locale-href";
+import { DropdownMenu } from "bits-ui";
+/**
+ * The language picker — the Svelte half of the platform's locale switcher.
+ *
+ * Its React twin is `for/web-next/apps/web/src/components/locale-picker.tsx`
+ * and every decision below is that file's, restated in another framework.
+ * Read this list before changing either: each item is a bug that shipped.
+ *
+ * **A list, not a toggle.** It used to be a single link to "the other
+ * locale". That works for exactly two languages and is silently wrong at
+ * three.
+ *
+ * **Every locale names itself.** A language is listed under its endonym —
+ * `Srpski`, not `Serbian` — read from that locale's own catalog
+ * (`locale.name`). A picker exists for someone who cannot read the page
+ * they are looking at, so translating the list into the language they are
+ * trying to leave is the one arrangement guaranteed to be useless. There is
+ * no table of languages here and no branch on a locale code: dropping in
+ * `messages/de.json` with a `locale` block adds German and nothing else has
+ * to be touched, which is the whole test of whether an i18n layer is real.
+ *
+ * **The flag is decoration and is marked as such.** A flag is a country and
+ * a locale is a language; Serbian is not confined to Serbia. The flag is
+ * `aria-hidden`, the endonym is the label, so a screen reader announces the
+ * language and never a nation. A region with no flag in the set renders as
+ * no flag rather than as a broken image — the name was always what carried
+ * the meaning.
+ *
+ * **Real links.** Each row is an `<a href>`, so it is middle-clickable,
+ * copyable and crawlable, with `hreflang` stating the relationship. A
+ * switcher built from click handlers is invisible to a search engine and to
+ * anyone opening it in a new tab.
+ *
+ * **bits-ui, not a hand-rolled dropdown.** The version this replaces was
+ * `let open = $state(false)` plus `<svelte:window onclick={close}>`, which
+ * has no focus trap, no roving tabindex, no Escape handling, no
+ * `aria-activedescendant`, and closes on any click anywhere including the
+ * one opening it. bits-ui is what shadcn-svelte is built on; using it
+ * directly is the same components without the copy-in step.
+ */
+import { flags } from "../../generated/flags";
+import { type Locale, locales, messages } from "../../generated/messages";
+import { queryLocaleHref } from "../locale-href";
 
-  let {
-    locale,
-    variant = "full",
-    /**
-     * The page the picker is on. Passed in rather than read from `$app/state`
-     * so this component has no route dependency and can be rendered in a test
-     * or a story.
-     */
-    url,
-    /**
-     * Where a language leads. Defaults to `?lang=`, which needs no routing.
-     * A product with locale-prefixed routes passes `prefixLocaleHref`.
-     */
-    href = (target: Locale) => queryLocaleHref(url, target),
-  }: {
-    locale: Locale;
-    variant?: "full" | "icon";
-    url: URL | string;
-    href?: (target: Locale) => string;
-  } = $props();
-
+let {
+  locale,
+  variant = "full",
   /**
-   * Flags as plain SVG strings (`country-flag-icons/string/3x2/<REGION>`)
-   * rather than the package's React components — this is Svelte, and a flag
-   * is a fixed 3:2 mark, not something that needs per-framework logic.
-   *
-   * Extend this map when a product declares a locale whose region is not
-   * here; an absent region renders no flag, which is a deliberate
-   * non-failure.
+   * The page the picker is on. Passed in rather than read from `$app/state`
+   * so this component has no route dependency and can be rendered in a test
+   * or a story.
    */
-  const flags: Record<string, string> = { RS, GB };
-  const flagFor = (l: Locale) => flags[messages[l]["locale.region"]];
+  url,
+  /**
+   * Where a language leads. Defaults to `?lang=`, which needs no routing.
+   * A product with locale-prefixed routes passes `prefixLocaleHref`.
+   */
+  href = (target: Locale) => queryLocaleHref(url, target),
+}: {
+  locale: Locale;
+  variant?: "full" | "icon";
+  url: URL | string;
+  href?: (target: Locale) => string;
+} = $props();
+
+/**
+ * Flags as plain SVG strings, one per declared region: `generated/flags.ts`
+ * is derived from the catalogs' `locale.region`, so a new locale's flag
+ * needs no edit here and only the declared ones are bundled. An absent
+ * region renders no flag, which is a deliberate non-failure.
+ */
+const flagFor = (l: Locale) => flags[messages[l]["locale.region"]];
 </script>
 
 <DropdownMenu.Root>

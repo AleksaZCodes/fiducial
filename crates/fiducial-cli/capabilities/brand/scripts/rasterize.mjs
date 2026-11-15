@@ -93,7 +93,7 @@ const sourceDir =
   raster.source_dir ??
   fail(
     "pipelines/raster.toml declares outputs, but [raster] source_dir is not in\n" +
-      "       fiducial.toml — there is no way to know which SVGs they come from."
+      "       fiducial.toml — there is no way to know which SVGs they come from.",
   );
 const marks = raster.marks ?? {};
 
@@ -112,8 +112,7 @@ function parseOutput(out) {
   const m = file.match(/^(.+)-(\d+)(?:x(\d+))?\.png$/);
   if (!m) {
     fail(
-      `output "${out}" is not named <mark>-<size>.png or <mark>-<w>x<h>.png.\n` +
-        `       The name is the declaration: it says which SVG and at what size.`
+      `output "${out}" is not named <mark>-<size>.png or <mark>-<w>x<h>.png.\n       The name is the declaration: it says which SVG and at what size.`,
     );
   }
   const [, name, w, h] = m;
@@ -129,17 +128,30 @@ function parseSvg(src, where) {
   if (!root) fail(`${where} has no <svg> element`);
   const viewBox = attr(root[1], "viewBox");
   if (!viewBox) fail(`${where} has no viewBox — there is no way to know its coordinate space`);
-  const [vx, vy, vw, vh] = viewBox.trim().split(/[\s,]+/).map(Number);
+  const [vx, vy, vw, vh] = viewBox
+    .trim()
+    .split(/[\s,]+/)
+    .map(Number);
 
-  for (const el of ["text", "image", "use", "linearGradient", "radialGradient", "filter", "mask", "clipPath"]) {
+  for (const el of [
+    "text",
+    "image",
+    "use",
+    "linearGradient",
+    "radialGradient",
+    "filter",
+    "mask",
+    "clipPath",
+  ]) {
     if (new RegExp(`<${el}\\b`, "i").test(src)) {
       fail(
-        `${where} contains <${el}>, which this renderer will not approximate.\n` +
-          (el === "text"
+        `${where} contains <${el}>, which this renderer will not approximate.\n${
+          el === "text"
             ? "       Text needs a font, and two machines with different versions of the\n" +
               "       same family produce different pixels — so the artifact would not be\n" +
               "       reproducible. Convert the text to paths in the source SVG."
-            : `       Supported: <g>, <path>, flat fills, and affine transforms.`)
+            : "       Supported: <g>, <path>, flat fills, and affine transforms."
+        }`,
       );
     }
   }
@@ -150,8 +162,7 @@ function parseSvg(src, where) {
   const shapes = [];
   const stack = [{ fill: "#000000", matrix: [1, 0, 0, 1, 0, 0] }];
   const tag = /<(\/?)(g|path|svg)\b([^>]*?)(\/?)>/gi;
-  let m;
-  while ((m = tag.exec(src)) !== null) {
+  for (const m of src.matchAll(tag)) {
     const [, closing, name, attrs, selfClosing] = m;
     const lower = name.toLowerCase();
     if (lower === "svg") continue;
@@ -184,9 +195,11 @@ function parseTransform(value) {
   if (!value) return [1, 0, 0, 1, 0, 0];
   let out = [1, 0, 0, 1, 0, 0];
   const fn = /([a-zA-Z]+)\s*\(([^)]*)\)/g;
-  let m;
-  while ((m = fn.exec(value)) !== null) {
-    const n = m[2].trim().split(/[\s,]+/).map(Number);
+  for (const m of value.matchAll(fn)) {
+    const n = m[2]
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number);
     let t;
     switch (m[1]) {
       case "translate":
@@ -238,9 +251,7 @@ function parseColor(value, where) {
     ];
   }
   fail(
-    `${where} uses fill "${value}". Only #rgb and #rrggbb are accepted.\n` +
-      `       A named colour or a gradient is a colour this renderer would have to\n` +
-      `       guess at, and a guess that renders is worse than an error that does not.`
+    `${where} uses fill "${value}". Only #rgb and #rrggbb are accepted.\n       A named colour or a gradient is a colour this renderer would have to\n       guess at, and a guess that renders is worse than an error that does not.`,
   );
 }
 
@@ -322,7 +333,14 @@ function flatten(d, matrix, where) {
         const [ex, ey] = [ox + num(), oy + num()];
         // A quadratic is a cubic with both control points a third of the way
         // in — exactly, not approximately.
-        curve(x + (2 / 3) * (qx - x), y + (2 / 3) * (qy - y), ex + (2 / 3) * (qx - ex), ey + (2 / 3) * (qy - ey), ex, ey);
+        curve(
+          x + (2 / 3) * (qx - x),
+          y + (2 / 3) * (qy - y),
+          ex + (2 / 3) * (qx - ex),
+          ey + (2 / 3) * (qy - ey),
+          ex,
+          ey,
+        );
         break;
       }
       case "Z":
@@ -335,8 +353,7 @@ function flatten(d, matrix, where) {
         break;
       case "A":
         fail(
-          `${where} uses an arc (A) command, which this renderer does not implement.\n` +
-            `       Most vector editors can export arcs as cubic curves.`
+          `${where} uses an arc (A) command, which this renderer does not implement.\n       Most vector editors can export arcs as cubic curves.`,
         );
         break;
       case "T":
@@ -365,8 +382,8 @@ const SS = 4;
 function coverage(subpaths, width, height) {
   const cov = new Float32Array(width * height);
   const edges = [];
-  let minY = Infinity;
-  let maxY = -Infinity;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
   for (const pts of subpaths) {
     for (let k = 0; k < pts.length - 1; k++) {
       const [x0, y0] = pts[k];
@@ -540,7 +557,10 @@ function render(svg, spec, options) {
   // what to centre. Declaring the cap box instead centres what a reader reads
   // as the mark, and lets the rest hang outside it.
   const box = options.artbox
-    ? String(options.artbox).trim().split(/[\s,]+/).map(Number)
+    ? String(options.artbox)
+        .trim()
+        .split(/[\s,]+/)
+        .map(Number)
     : [svg.vx, svg.vy, svg.vw, svg.vh];
   if (box.length !== 4 || box.some(Number.isNaN)) {
     fail(`[raster.marks.${spec.name}] artbox must be four numbers: "x y width height"`);
@@ -589,8 +609,7 @@ for (const out of outputs) {
   const svgPath = join(ROOT, sourceDir, `${spec.name}.svg`);
   if (!existsSync(svgPath)) {
     fail(
-      `output "${out}" needs ${sourceDir}/${spec.name}.svg, which does not exist.\n` +
-        `       The output's name is what names its source.`
+      `output "${out}" needs ${sourceDir}/${spec.name}.svg, which does not exist.\n       The output's name is what names its source.`,
     );
   }
   const svg = parseSvg(readFileSync(svgPath, "utf8"), `${sourceDir}/${spec.name}.svg`);
@@ -624,5 +643,5 @@ for (const out of outputs) {
 }
 
 console.log(
-  `rasterize: ${written} written, ${unchanged} already correct (${outputs.length} declared)`
+  `rasterize: ${written} written, ${unchanged} already correct (${outputs.length} declared)`,
 );
