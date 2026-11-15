@@ -1,7 +1,7 @@
 # Fiducial
 
 <!-- fid:describes thesis.toml -->
-> **Build any robust multidisciplinary product with AI agents.**
+> **Take any idea to a robust, running product with AI agents, in one place where nothing drifts.**
 
 That is the platform's thesis ([`thesis.toml`](thesis.toml), `fid thesis`). How:
 **declare each fact once, derive every artifact from it**, and gate the result.
@@ -13,6 +13,13 @@ that normally needs a team, by one person working with agents.
 
 Not by working harder at each domain. By deleting the work that exists only
 because the domains don't talk to each other.
+
+Where it is going: one place where every project built with code lives and is
+seen whole — the running app beside its files, its content, configuration,
+deploy, pull requests and the agents' work, with the notes and decisions about
+it kept in the same repository (`docs/notebook/`). Today that is the CLI, the
+shapes (`fid new <name> --shape site`) and the gates; the studio that shows it
+all is the next layer (`docs/notebook/ideas.md`).
 
 ---
 

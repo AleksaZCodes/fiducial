@@ -21,24 +21,52 @@ person working with agents.
 Not by working harder at each domain. By removing the work that exists only because the domains
 don't talk to each other.
 
+And to be the **one place** that work happens in: every project built with code, a product,
+a client's website, a research question, lives in its repository and is seen whole. The running
+app beside its files, its content, its configuration, its deploy, its pull requests, the agents'
+sessions and the notes and decisions around it, laid out so a person can follow, change or
+redirect any of it without holding the map in their head. Structured and finite rather than
+infinitely flexible: it exists to advance the product, and to take the cognitive load of
+keeping everything in step off the person building it.
+
+**Agree on it before building it, and keep the agreement alive.** People and agents disagree
+most about how a thing should look and behave, and prose specs are where that disagreement
+hides: they are written once and never read again. So the core is not text. It is a working
+prototype, built from the product's real design system and components, that people and agents
+can click through and agree on before the real work starts, and that becomes the product rather
+than being thrown away. Behind it sit living models (the structure, the flows, the screens) declared as
+data in the standardized way systems engineering already uses (model-based systems engineering:
+SysML v2 for systems, the C4 model for software), derived into the diagrams and wireframes people
+look at, and checked against what the product actually does, so they stay current and are used
+in the smallest places. Specs and decision records stay, as history and reasons; the models and
+the prototype are what is current.
+
+Not by adding another tool to keep in sync. By removing the reasons there were several.
+
 ---
 
 ## The thesis
 
 <!-- fid:describes thesis.toml -->
-> **Build any robust multidisciplinary product with AI agents.**
+> **Take any idea to a robust, running product with AI agents, in one place where nothing drifts.**
 
 That is Fiducial's thesis: the one claim the whole platform is built to test, declared in
 [`thesis.toml`](thesis.toml) and shown by `fid thesis`. It is not one session's goal or one
 paper's title. Every change to the platform is measured against it, word by word:
 
-- **Build** — the output is something a manufacturer can make: real parts, fab files.
-- **any** — the method is general: rules are declared as data, not written per product.
+- **any idea** — the method is general: rules are declared as data, not written per product,
+  and a product, its research and a client's site all start the same way.
 - **robust** — drift cannot ship: every artifact is gated, contradictions are named.
-- **multidisciplinary** — one fact feeds every discipline it touches.
+- **running** — the output is real: something a manufacturer can make, a site that is
+  deployed, an app someone uses. Not a mock-up.
 - **with AI agents** — agents do the work inside the gates, and the record shows it.
+- **in one place where nothing drifts** — the facts, the artifacts, and the knowledge around
+  them (the idea, the decisions, the open questions, the deploy, the agents' sessions) live
+  together and are visible together, so no copy goes stale in another tool.
 
-What may honestly be claimed today, and what not yet, is in `thesis.toml` under `evidence`.
+The previous claim (2026-10-02, "Build any robust multidisciplinary product with AI agents")
+is kept in `fid thesis log`; it is the claim the IEEESTEC paper argues. What may honestly be
+claimed today, and what not yet, is in `thesis.toml` under `evidence`.
 <!-- fid:end-describes -->
 
 ### How: declare each fact once, derive every artifact from it

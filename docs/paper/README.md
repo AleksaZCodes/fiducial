@@ -6,10 +6,13 @@ AI agents*
 **Author:** Aleksa Zdravković (ORCID 0009-0004-1535-1839)
 
 <!-- fid:describes thesis.toml -->
-The title is Fiducial's thesis — the platform's standing claim, declared in
-`thesis.toml`, which the paper argues; it is not the paper's own. What must
-be true for it, and the plan that made it true, is
-`docs/specs/2026-10-02-making-the-thesis-true.md`.
+The title is Fiducial's thesis as it stood when the paper was written:
+entry 2 of `thesis.toml`, declared 2026-10-02. The paper argues that claim;
+it is not the paper's own. What had to be true for it, and the plan that
+made it true, is `docs/specs/2026-10-02-making-the-thesis-true.md`. The
+platform's standing claim moved on 2026-11-15 (`fid thesis log`) to cover the
+whole path from idea to running product; the paper does not argue the newer
+claim, and its title stays as submitted.
 <!-- fid:end-describes -->
 
 ## Mechanism

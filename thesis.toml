@@ -18,15 +18,21 @@ claim      = "Build any robust multidisciplinary product with AI agents."
 supersedes = 1
 because    = "\"Declare each fact once\" is how, not what for: it says nothing of who builds the product, what comes out, or how it can be judged. The claim is the product — whole, every discipline, made by one person with agents, buildable and checked. Declaring once and deriving the rest is the mechanism, and stays the first principle in MISSION.md."
 
+[[thesis]]
+date       = "2026-11-15"
+claim      = "Take any idea to a robust, running product with AI agents, in one place where nothing drifts."
+supersedes = 2
+because    = "The previous claim named what comes out and left out where the work happens. A product is more than its artifacts: the idea it started from, the decisions, the open questions, the deploy, the agents' sessions. Kept in separate tools they drift from the repository exactly as one discipline's copy of a fact drifts from another's, so the claim now covers the whole path from idea to running product and the place it happens in. Declaring each fact once stays the mechanism; multidisciplinary stays inside 'any'."
+
 [thesis.arc]
-what     = "A platform in which a product — case, board, firmware, web, content — is one repository of typed declarations, every artifact derived from them and gated."
-for_whom = "One person, or a small team, building a physical and digital product with AI agents."
-problem  = "Agents are fast inside one codebase and blind across them: each discipline's copy of a fact drifts, and the drift is found when a board comes back or a case does not close."
+what     = "A platform in which a product — case, board, firmware, web, content, and the research, decisions and notes around it — is one repository of typed declarations, every artifact derived from them and gated, and one place to see it all running: the app beside its files, its content, its configuration, its deploy and the agents' work."
+for_whom = "One person, or a small team, taking ideas to physical and digital products with AI agents: their own, their clients', and the research behind them."
+problem  = "Agents are fast inside one codebase and blind across them: each discipline's copy of a fact drifts, and the drift is found when a board comes back or a case does not close. The same happens one level up: the idea, the plan, the decisions and the running system live in different tools, and the person holding them together carries the load."
 why_now  = "Agents now write most of each discipline's work; what they lack is one shared, checked context across all of them."
-how      = "Declare each fact once; derive every artifact from it; gate the result, so drift cannot ship. Hard problems go to proven engines (CP-SAT, OpenCascade, KiCad) behind contracts the platform owns."
+how      = "Declare each fact once; derive every artifact from it; gate the result, so drift cannot ship. Hard problems go to proven engines (CP-SAT, OpenCascade, KiCad) behind contracts the platform owns. Shapes take an idea to a running product in one command; the notes about a product live in its repository; a lightweight studio shows the whole of it in one place."
 
 [thesis.test]
-falsified_by = "A product built on Fiducial that ships drift between disciplines its gates passed, or a class of product whose rules cannot be declared as data and need per-product code."
+falsified_by = "A product built on Fiducial that ships drift between disciplines its gates passed; a class of product whose rules cannot be declared as data and need per-product code; or a product whose knowledge (decisions, ideas, plans) drifts from its repository anyway."
 disagrees    = "A discipline expert who holds that each domain needs its own tool and its own specialist, and that one declaration across all of them flattens the judgment each one needs."
 
 [thesis.evidence]
@@ -34,8 +40,12 @@ proven = [
   "examples/sensor-stick: a USB-C sensor stick — real, verified parts, a routed DRC-clean board, a checked case, firmware and a web page — derived from one declaration and built end to end in CI.",
   "One pin change reaches the board, the schematic, the firmware's pin map and the web types in one derive; code using a renamed net stops compiling.",
   "Every placement rule is an instance of eight generic constraint kinds; contradictions fail naming the declarations that conflict.",
+  "fid new <name> --shape site: an idea to a localized website in one command, verified through install, typecheck, lint, a Workers build and a deploy dry run (0.15.0).",
 ]
 not_yet = [
+  "The studio, the one place to see a product running beside its files, configuration, deploy and agents, is not built; this is the aspiration the claim now carries.",
+  "The notes about Fiducial live in its repository (docs/notebook) but are synced from Notion by hand.",
+  "No research project, as opposed to a product, has been run on it.",
   "Nothing built on it has been manufactured and tested on a bench.",
   "Two products end to end, one public; \"any\" is a claim about the method, not a measurement over many.",
   "Autorouting is not deterministic (made visible, and hand routing is gated).",

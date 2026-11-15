@@ -1,0 +1,32 @@
+# Progress
+
+*What each release moved, against the open Fiducial tasks. Newest first.*
+
+## 0.15.0 · 2026-11-15 ([#123](https://github.com/AleksaZCodes/fiducial/pull/123))
+
+- `fid new <name> --shape site`: a localized Next.js site in one command
+  (pages, editor, fonts, the app as its own Worker), verified through an
+  OpenNext build and `wrangler deploy --dry-run`.
+- Keystatic (default) and Tina replace Decap, derived from one content model.
+- Fresh Next.js and SvelteKit products install, typecheck, lint, build and
+  deploy; `scripts/verify-web-next.sh`, `scripts/verify-web-svelte.sh`.
+- Downstream: Outreach and aleksa.works upgraded; Outreach live.
+
+Moves these open tasks (none closed; each needs its own evidence):
+
+| Task | What moved |
+|---|---|
+| Build and validate one portable minimal web template | The site shape is that template inside the monorepo; still to do: copy it outside and build with two agents |
+| Audit Fiducial against the new vision | A build-it-for-real review found and fixed a dozen gaps; the gap table itself is not written |
+| Clarify source, generated and escape-hatch ownership | `supersedes`, `media_field = "text"`, `[site] fonts = "none"` are scoped escape hatches |
+| Trace how i18n connects to a running app | The site shape is the trace: catalog → `generated/messages.ts` → `t()` → `[locale]` routes |
+
+## 0.12.0–0.14.0 · 2026-11-11 to 13
+
+Prebuilt `fid` and lean CI; Durable Objects in `[deploy]`; aleksa-works' CMS
+work generalized; the language picker above sticky chrome.
+
+## Next
+
+- `fid notebook`: sync this folder with the planning tool it mirrors (the
+  Notion API first), so the copy cannot drift. Until then, by hand.
