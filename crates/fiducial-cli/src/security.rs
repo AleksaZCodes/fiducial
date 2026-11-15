@@ -150,6 +150,13 @@ pub static WEB_APP_SHAPES: &[WebAppShape] = &[
         also: &[],
     },
     WebAppShape {
+        name: "React Router",
+        // The Worker sets the headers (`workers/app.ts`) from this module.
+        config: "apps/web/app/security.ts",
+        marker: "apps/web/react-router.config.ts",
+        also: &[],
+    },
+    WebAppShape {
         name: "Cloudflare Worker",
         config: "src/index.ts",
         marker: "wrangler.jsonc",

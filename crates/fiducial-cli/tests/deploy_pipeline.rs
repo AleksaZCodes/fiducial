@@ -685,6 +685,40 @@ fn workers_dev_is_written_only_when_declared() {
     assert!(cfg.contains("\"workers_dev\": true"), "{cfg}");
 }
 
+// ── The React Router shape: the Vite plugin builds the Worker ──────────────────
+
+/// The entry is a source file the Cloudflare Vite plugin bundles, and the plugin
+/// adds the client assets to the config it deploys. Stating `assets` here as well
+/// would be a second, competing declaration of the same directory.
+#[test]
+fn the_react_router_shape_names_its_source_entry_and_no_assets() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    assert!(run(tmp.path(), &["new", "p"]).status.success());
+    let root = tmp.path().join("p");
+    assert!(run(&root, &["add", "deploy"]).status.success());
+    let config_path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&config_path)
+        .unwrap()
+        .replace("[deploy]\n", "[deploy]\nshape = \"reactrouter\"\n")
+        .replace("REPLACE_WITH_DATABASE_ID", "db-id-1")
+        .replace("REPLACE_WITH_BUCKET_NAME", "p-assets")
+        .replace("REPLACE_WITH_QUEUE_NAME", "p-jobs");
+    std::fs::write(&config_path, config).unwrap();
+    std::fs::write(
+        root.join("pipelines/deploy.toml"),
+        "name     = \"deploy\"\nexecutor = \"fid-deploy\"\noutputs  = [\"apps/web/wrangler.jsonc\"]\n",
+    )
+    .unwrap();
+
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "fid derive: {}", text(&out));
+    let cfg = std::fs::read_to_string(root.join("apps/web/wrangler.jsonc")).unwrap();
+    assert!(cfg.contains("\"main\": \"workers/app.ts\""), "{cfg}");
+    assert!(!cfg.contains("\"assets\""), "{cfg}");
+    assert!(!cfg.contains("FIDUCIAL_PRODUCT"), "{cfg}");
+    assert!(run(&root, &["derive", "--check"]).status.success());
+}
+
 // ── The Astro shape: static files, no Worker ──────────────────────────────────
 
 /// A static site has no Worker entry and no binding: `main` and `binding` are

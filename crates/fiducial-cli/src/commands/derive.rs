@@ -1512,7 +1512,10 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
         match shape {
             // A SvelteKit product's Worker *is* the product, so `-worker`
             // would be noise in the one place a name is load-bearing.
-            DeployShape::SvelteKit | DeployShape::NextJs | DeployShape::Astro => product.clone(),
+            DeployShape::SvelteKit
+            | DeployShape::NextJs
+            | DeployShape::Astro
+            | DeployShape::ReactRouter => product.clone(),
             DeployShape::Worker => format!("{product}-worker"),
         }
     } else {
@@ -1529,6 +1532,8 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
             DeployShape::NextJs => ".open-next/worker.js".to_string(),
             // A static site has no Worker: assets are all there is.
             DeployShape::Astro => String::new(),
+            // The entry is a source file; the Vite plugin bundles it.
+            DeployShape::ReactRouter => "workers/app.ts".to_string(),
             DeployShape::Worker => "src/index.ts".to_string(),
         }
     } else {
@@ -1548,6 +1553,9 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
             d.resolved_assets_directory(shape).to_string(),
             String::new(),
         )),
+        // The Cloudflare Vite plugin adds the client assets to the deployed
+        // config, so stating them here would be a second, competing declaration.
+        DeployShape::ReactRouter => None,
         DeployShape::Worker => None,
     };
 
@@ -1561,7 +1569,10 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
     // capability at all.
     let mut vars: Vec<(String, String)> = match shape {
         DeployShape::Worker => vec![("FIDUCIAL_PRODUCT".into(), product.clone())],
-        DeployShape::SvelteKit | DeployShape::NextJs | DeployShape::Astro => Vec::new(),
+        DeployShape::SvelteKit
+        | DeployShape::NextJs
+        | DeployShape::Astro
+        | DeployShape::ReactRouter => Vec::new(),
     };
     for (k, v) in &d.vars {
         // A product's own var wins over the derived one rather than appearing
