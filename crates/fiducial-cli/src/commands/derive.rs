@@ -1512,7 +1512,7 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
         match shape {
             // A SvelteKit product's Worker *is* the product, so `-worker`
             // would be noise in the one place a name is load-bearing.
-            DeployShape::SvelteKit | DeployShape::NextJs => product.clone(),
+            DeployShape::SvelteKit | DeployShape::NextJs | DeployShape::Astro => product.clone(),
             DeployShape::Worker => format!("{product}-worker"),
         }
     } else {
@@ -1527,6 +1527,8 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
             DeployShape::SvelteKit => ".svelte-kit/cloudflare/_worker.js".to_string(),
             // `opennextjs-cloudflare build` writes the Worker here.
             DeployShape::NextJs => ".open-next/worker.js".to_string(),
+            // A static site has no Worker: assets are all there is.
+            DeployShape::Astro => String::new(),
             DeployShape::Worker => "src/index.ts".to_string(),
         }
     } else {
@@ -1541,6 +1543,11 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
             d.resolved_assets_directory(shape).to_string(),
             d.resolved_assets_binding().to_string(),
         )),
+        // No Worker reads the assets, so there is no binding to name.
+        DeployShape::Astro => Some((
+            d.resolved_assets_directory(shape).to_string(),
+            String::new(),
+        )),
         DeployShape::Worker => None,
     };
 
@@ -1554,7 +1561,7 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
     // capability at all.
     let mut vars: Vec<(String, String)> = match shape {
         DeployShape::Worker => vec![("FIDUCIAL_PRODUCT".into(), product.clone())],
-        DeployShape::SvelteKit | DeployShape::NextJs => Vec::new(),
+        DeployShape::SvelteKit | DeployShape::NextJs | DeployShape::Astro => Vec::new(),
     };
     for (k, v) in &d.vars {
         // A product's own var wins over the derived one rather than appearing
@@ -1677,7 +1684,9 @@ fn render_wrangler_toml(p: &DeployPlan) -> String {
     }
     out.push_str("# Editing this file by hand fails `fid derive --check`.\n\n");
     out.push_str(&format!("name = \"{}\"\n", p.name));
-    out.push_str(&format!("main = \"{}\"\n", p.main));
+    if !p.main.is_empty() {
+        out.push_str(&format!("main = \"{}\"\n", p.main));
+    }
     out.push_str(&format!(
         "compatibility_date = \"{}\"\n",
         p.compatibility_date
@@ -1715,7 +1724,9 @@ fn render_wrangler_toml(p: &DeployPlan) -> String {
         out.push_str("\n# The adapter's build output, served through a binding.\n");
         out.push_str("[assets]\n");
         out.push_str(&format!("directory = \"{directory}\"\n"));
-        out.push_str(&format!("binding = \"{binding}\"\n"));
+        if !binding.is_empty() {
+            out.push_str(&format!("binding = \"{binding}\"\n"));
+        }
     }
 
     out.push_str("\n[vars]\n");
@@ -1796,7 +1807,9 @@ fn render_wrangler_jsonc(p: &DeployPlan) -> String {
 
     let mut fields: Vec<String> = Vec::new();
     fields.push(format!("  \"name\": {}", q(&p.name)));
-    fields.push(format!("  \"main\": {}", q(&p.main)));
+    if !p.main.is_empty() {
+        fields.push(format!("  \"main\": {}", q(&p.main)));
+    }
     fields.push(format!(
         "  \"compatibility_date\": {}",
         q(&p.compatibility_date)
@@ -1824,11 +1837,18 @@ fn render_wrangler_jsonc(p: &DeployPlan) -> String {
         fields.push("  \"observability\": { \"enabled\": true }".to_string());
     }
     if let Some((directory, binding)) = &p.assets {
-        fields.push(format!(
-            "  // The adapter's build output, served through a binding.\n  \"assets\": {{ \"directory\": {}, \"binding\": {} }}",
-            q(directory),
-            q(binding)
-        ));
+        if binding.is_empty() {
+            fields.push(format!(
+                "  // The static build output, served as files; no Worker reads it.\n  \"assets\": {{ \"directory\": {} }}",
+                q(directory)
+            ));
+        } else {
+            fields.push(format!(
+                "  // The adapter's build output, served through a binding.\n  \"assets\": {{ \"directory\": {}, \"binding\": {} }}",
+                q(directory),
+                q(binding)
+            ));
+        }
     }
     let vars: Vec<String> = p
         .vars

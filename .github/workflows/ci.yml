@@ -871,6 +871,11 @@ jobs:
         env:
           ICONS: lucide tabler hugeicons phosphor remixicon
 
+      # The same for the Astro shape: a static site, no Worker, headers in a
+      # file. See scripts/verify-web-astro.sh.
+      - name: Scaffold, install, typecheck, build, deploy dry run — Astro
+        run: scripts/verify-web-astro.sh
+
   # ── portfolio: workbench v1 ───────────────────────────────────────────────
   #
   # Phase 17. `fid dash --portfolio` aggregates multiple product repos from a

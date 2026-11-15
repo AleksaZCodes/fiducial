@@ -1,0 +1,27 @@
+{
+  "name": "@{{name}}/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check",
+    "lint": "biome check .",
+    "test": "echo 'no tests yet'"
+  },
+  "dependencies": {
+    "astro": "^7.4.0",
+    "@fiducial/tokens": "*",
+    "@fiducial/i18n": "^0.2.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@biomejs/biome": "^1.9.0",
+    "@tailwindcss/vite": "^4.3.0",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^5.9.0",
+    "wrangler": "^4.118.0"
+  }
+}
