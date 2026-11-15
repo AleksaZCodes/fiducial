@@ -156,6 +156,13 @@ fn the_consent_rules_are_derived_and_a_hand_edit_fails_check() {
         ts.contains("return cookieConsent()?.granted.includes(category) ?? false;"),
         "{ts}"
     );
+    // The banner is a React component, so it arrives with a Next.js app — added
+    // after `legal` here, which also proves the scoped template back-fills.
+    assert!(!root
+        .join("apps/web/src/components/cookie-consent.tsx")
+        .exists());
+    assert!(run(&root, &["add", "design"]).status.success());
+    assert!(run(&root, &["add", "app", "next"]).status.success());
     let banner =
         std::fs::read_to_string(root.join("apps/web/src/components/cookie-consent.tsx")).unwrap();
     assert!(banner.contains("from \"../generated/consent\""), "{banner}");
