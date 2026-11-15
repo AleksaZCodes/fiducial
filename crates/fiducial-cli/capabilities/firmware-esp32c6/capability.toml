@@ -1,0 +1,2 @@
+description = "ESP32-C6 Embassy firmware on esp-hal with defmt logging and espflash"
+guard_rules = ["no-unpinned-cli-fetch"]

@@ -2,6 +2,13 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.17.0 · 2026-11-15
+
+- `fid add firmware esp32c6`: the ESP32-C6 template (esp-hal, `esp-rtos`, Embassy).
+- The RP2040 and STM32 templates did not compile in a fresh product (a re-export
+  of two names that do not exist, a linker path, a missing critical section).
+  Fixed, and `scripts/verify-firmware.sh` now builds every target in CI.
+
 ## 0.16.0 · 2026-11-15
 
 - Derived documentation: `topology.md` (nodes by system, buses, topics as a

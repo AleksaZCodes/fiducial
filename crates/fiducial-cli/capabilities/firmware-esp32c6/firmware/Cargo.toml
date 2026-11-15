@@ -1,0 +1,45 @@
+# Firmware Cargo workspace for {{name}}.
+# Intentionally separate from the host workspace — different target triple + toolchain.
+# Design spec §5: "Firmware workspaces are separate on purpose."
+
+[workspace]
+resolver = "2"
+members  = [
+    "shared",
+    "esp32c6",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+fiducial-core     = "{{version}}"
+fiducial-protocol = "{{version}}"
+
+# esp-hal and the crates that must move with it are pinned together: they
+# share generated chip metadata, so a mismatch fails at link time, not here.
+esp-hal                = { version = "1.2", features = ["esp32c6", "defmt", "unstable"] }
+esp-rtos               = { version = "0.4", features = ["esp32c6", "embassy", "defmt"] }
+esp-bootloader-esp-idf = { version = "0.6", features = ["esp32c6"] }
+esp-backtrace          = { version = "0.20", features = ["esp32c6", "panic-handler", "defmt"] }
+esp-println            = { version = "0.18", features = ["esp32c6", "defmt-espflash"] }
+
+embassy-executor = { version = "0.10", default-features = false }
+embassy-time     = { version = "0.5", default-features = false }
+
+defmt = "1"
+
+# Profiles apply only at the workspace root; in a member they are ignored.
+[profile.dev]
+debug           = 2
+opt-level       = "s"
+overflow-checks = true
+
+[profile.release]
+debug           = 2
+opt-level       = "s"
+lto             = true
+codegen-units   = 1
+overflow-checks = false

@@ -144,6 +144,7 @@ product actually needs.
 | `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
 | `design` | declares `design-system.md`; 1 pipeline(s); 4 template file(s) | `fid add capability design` |
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
+| `firmware-esp32c6` | 9 template file(s); guard rules | `fid add capability firmware-esp32c6` |
 | `firmware-rp2040` | 11 template file(s); guard rules | `fid add capability firmware-rp2040` |
 | `firmware-stm32` | 10 template file(s); guard rules | `fid add capability firmware-stm32` |
 | `hardware` | declares `hardware/outline.svg`, `hardware/product.toml`; 1 pipeline(s); 12 template file(s) | `fid add capability hardware` |

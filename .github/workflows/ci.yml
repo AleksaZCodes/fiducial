@@ -287,7 +287,7 @@ jobs:
       - name: Install Rust stable + embedded targets
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: thumbv6m-none-eabi,thumbv7em-none-eabihf
+          targets: thumbv6m-none-eabi,thumbv7em-none-eabihf,riscv32imac-unknown-none-elf
 
       - name: Install libudev (required by serialport / probe-rs build deps)
         run: sudo apt-get install -y libudev-dev
@@ -304,6 +304,15 @@ jobs:
       - name: Check firmware workspace (STM32 — thumbv7em-none-eabihf)
         working-directory: firmware
         run: cargo check --target thumbv7em-none-eabihf -p fiducial-firmware-shared -p fiducial-stm32
+
+      # The templates a product is scaffolded from are never built by the two
+      # steps above, which check this repository's own firmware workspace.
+      # See scripts/verify-firmware.sh.
+      - name: Build the fid binary
+        run: cargo build -p fiducial-cli --bin fid
+
+      - name: Scaffold each firmware target and compile it
+        run: scripts/verify-firmware.sh
 
   # ── The worked example: a whole product, end to end ───────────────────────
   #
