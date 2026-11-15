@@ -64,7 +64,11 @@ jobs:
   spine:
     name: spine (${{ matrix.target.triple }})
     needs: changes
-    if: needs.changes.outputs.spine == 'true'
+    # No job-level `if`: a skipped matrix job never expands, so it reports one
+    # check literally named `spine (${{ matrix.target.triple }})` and the four
+    # required `spine (<triple>)` checks never arrive, which blocked every PR
+    # that did not touch the spine. The condition is on each step instead, so
+    # an untouched spine reports four quick passes.
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -85,13 +89,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        if: needs.changes.outputs.spine == 'true'
 
       - name: Install Rust stable
+        if: needs.changes.outputs.spine == 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target.triple }}
 
       - name: Cache cargo
+        if: needs.changes.outputs.spine == 'true'
         uses: Swatinem/rust-cache@v2
 
       # The spine crate list is DERIVED, not typed.
@@ -107,6 +114,7 @@ jobs:
       #
       # Adding a `no_std` crate now enters this matrix automatically.
       - name: Check the no_std spine (${{ matrix.target.triple }})
+        if: needs.changes.outputs.spine == 'true'
         run: |
           set -euo pipefail
           spine=$(grep -l '^#!\[no_std\]' crates/*/src/lib.rs \
@@ -127,7 +135,7 @@ jobs:
           done
 
       - name: Check fiducial-wasm (${{ matrix.target.triple }})
-        if: matrix.target.check_wasm
+        if: needs.changes.outputs.spine == 'true' && matrix.target.check_wasm
         run: >
           cargo check
           --package fiducial-wasm
@@ -136,7 +144,7 @@ jobs:
       # fiducial-sim is not `no_std`, so it is not on the embedded matrix — but
       # it does have to keep building for the browser.
       - name: Check fiducial-sim (${{ matrix.target.triple }})
-        if: matrix.target.check_wasm
+        if: needs.changes.outputs.spine == 'true' && matrix.target.check_wasm
         run: >
           cargo check
           --package fiducial-sim
