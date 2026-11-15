@@ -775,6 +775,26 @@ fn check_security_headers(root: &Path, issues: &mut Vec<String>, ok: &mut Vec<St
 /// or scaffolding the platform rewrites, so an unrecorded edit is a change to
 /// how artifacts are derived that no declaration states (the paper's fourth
 /// set, F14 and F15, edited two generator scripts).
+/// Whether a file differs from the platform's record only in its `FID_VERSION`.
+fn only_the_ci_pin_differs(path: &Path, record: Option<&crate::lock::TemplateRecord>) -> bool {
+    let (Ok(now), Some(base)) = (
+        std::fs::read_to_string(path),
+        record.and_then(|r| r.base_content.as_deref()),
+    ) else {
+        return false;
+    };
+    let unpinned = |text: &str| -> String {
+        text.lines()
+            .map(|l| match l.trim_start().strip_prefix("FID_VERSION:") {
+                Some(_) => "FID_VERSION:",
+                None => l,
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    unpinned(&now) == unpinned(base)
+}
+
 pub(crate) fn platform_drift(root: &Path, lock: &Lock, enabled: &[String]) -> (Vec<String>, usize) {
     let mut drifted: Vec<String> = Vec::new();
     let mut owned_edits = 0usize;
@@ -801,6 +821,15 @@ pub(crate) fn platform_drift(root: &Path, lock: &Lock, enabled: &[String]) -> (V
             owned_edits += 1;
             continue;
         }
+        // Moving the CI pin is the product's call (`fid upgrade` leaves it, and
+        // `check_ci_pin` asks for it), so a `ci.yml` that differs from what the
+        // platform wrote only in `FID_VERSION` is not drift. Reporting it was
+        // the one warning every upgraded product had to rebaseline away.
+        if key == ".github/workflows/ci.yml"
+            && only_the_ci_pin_differs(&path, lock.templates.get(&key))
+        {
+            continue;
+        }
         if let Some((_, why)) = crate::templates::RETIRED_TEMPLATES
             .iter()
             .find(|(p, _)| *p == key)
@@ -823,6 +852,22 @@ pub(crate) fn platform_drift(root: &Path, lock: &Lock, enabled: &[String]) -> (V
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_moved_ci_pin_is_not_drift_and_anything_else_is() {
+        let base = "env:\n      FID_VERSION: \"0.14.0\"\nsteps: []\n";
+        let record = crate::lock::TemplateRecord {
+            source_version: "0.14.0".into(),
+            hash: String::new(),
+            base_content: Some(base.into()),
+        };
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("ci.yml");
+        std::fs::write(&path, base.replace("0.14.0", "0.15.0")).unwrap();
+        assert!(super::only_the_ci_pin_differs(&path, Some(&record)));
+        std::fs::write(&path, base.replace("steps: []", "steps: [x]")).unwrap();
+        assert!(!super::only_the_ci_pin_differs(&path, Some(&record)));
+    }
     use super::pinned_cli_version;
 
     #[test]
