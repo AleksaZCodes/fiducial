@@ -61,8 +61,8 @@ pub struct Choices {
 
 pub const FRAMEWORK: Choices = Choices {
     field: "framework",
-    implemented: &["next", "sveltekit", "astro"],
-    intended: &["react-router", "tanstack-start", "hono"],
+    implemented: &["next", "sveltekit", "astro", "hono"],
+    intended: &["react-router", "tanstack-start"],
 };
 pub const EDITOR: Choices = Choices {
     field: "editor",
@@ -76,13 +76,13 @@ pub const SHELL: Choices = Choices {
 };
 pub const API: Choices = Choices {
     field: "api",
-    implemented: &[],
-    intended: &["hono"],
+    implemented: &["hono"],
+    intended: &[],
 };
 pub const ORM: Choices = Choices {
     field: "orm",
-    implemented: &[],
-    intended: &["drizzle"],
+    implemented: &["drizzle"],
+    intended: &[],
 };
 
 impl Choices {
@@ -268,11 +268,11 @@ mod tests {
     }
 
     #[test]
-    fn an_orm_over_a_selected_database_is_only_unbuilt() {
-        let p = check("[adapters]\ndatabase = \"sqlite\"\n[apps.web]\nframework = \"next\"\norm = \"drizzle\"\n")
-            .join("\n");
-        assert!(!p.contains("layer over"), "{p}");
-        assert!(p.contains("nothing builds yet"), "{p}");
+    fn an_orm_over_a_selected_database_is_fine() {
+        let p = check(
+            "[adapters]\ndatabase = \"d1\"\n[apps.api]\nframework = \"hono\"\norm = \"drizzle\"\n",
+        );
+        assert!(p.is_empty(), "{p:?}");
     }
 
     #[test]

@@ -86,3 +86,61 @@ fn a_product_with_no_apps_block_is_read_as_before() {
     let out = text(&run(&tmp.path().join("p"), &["doctor"]));
     assert!(!out.contains("[apps"), "{out}");
 }
+
+#[test]
+fn an_api_with_an_orm_over_a_database_passes_doctor() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product(
+        tmp.path(),
+        "[adapters]\ndatabase = \"d1\"\n[apps.api]\nframework = \"hono\"\norm = \"drizzle\"\n",
+    );
+    let out = text(&run(&root, &["doctor"]));
+    assert!(
+        out.contains("[apps]: 1 app(s), every choice buildable"),
+        "{out}"
+    );
+}
+
+#[test]
+fn an_orm_over_no_database_fails_doctor_naming_the_contract() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product(
+        tmp.path(),
+        "[apps.api]\nframework = \"hono\"\norm = \"drizzle\"\n",
+    );
+    let out = text(&run(&root, &["doctor"]));
+    assert!(
+        out.contains("a layer over the `database` contract"),
+        "{out}"
+    );
+}
+
+#[test]
+fn a_capability_can_add_dependencies_to_another_apps_manifest() {
+    let tmp = tempfile::tempdir().unwrap();
+    assert!(run(tmp.path(), &["new", "p"]).status.success());
+    let root = tmp.path().join("p");
+    for args in [
+        &["add", "app", "api"][..],
+        &["add", "capability", "migrations"],
+        &["add", "capability", "orm-drizzle"],
+    ] {
+        let out = run(&root, args);
+        assert!(out.status.success(), "{args:?}: {}", text(&out));
+    }
+    let api = std::fs::read_to_string(root.join("apps/api/package.json")).unwrap();
+    assert!(api.contains("\"drizzle-orm\""), "{api}");
+    assert!(api.contains("\"drizzle-kit\""), "{api}");
+    assert!(
+        api.contains("\"db:generate\": \"drizzle-kit generate\""),
+        "{api}"
+    );
+    // Parses, with the dependency in its own section.
+    let v: serde_json::Value = serde_json::from_str(&api).unwrap();
+    assert!(v["dependencies"]["drizzle-orm"].is_string(), "{api}");
+    assert!(v["devDependencies"]["drizzle-kit"].is_string(), "{api}");
+    assert!(
+        !root.join("apps/web/package.json").exists(),
+        "the web app's manifest must not appear or change"
+    );
+}

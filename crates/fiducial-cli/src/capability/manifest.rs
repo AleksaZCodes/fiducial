@@ -185,9 +185,18 @@ pub struct Capability {
     /// importing a package nobody installed fails at the first build, after
     /// the install said it worked.
     pub npm_dependencies: BTreeMap<String, String>,
+    /// The same for `devDependencies`: tools the build runs and the shipped code
+    /// never imports (a schema generator, a type package).
+    pub npm_dev_dependencies: BTreeMap<String, String>,
     /// `apps/web/package.json` scripts the capability's workflow runs
     /// (`deploy`), added where the product has none of that name.
     pub npm_scripts: BTreeMap<String, String>,
+    /// The `package.json` those two go into, relative to the product root.
+    /// Empty means `apps/web/package.json`, which is where every web capability
+    /// has always put them; a capability for another app (`apps/api`) names its
+    /// own, because adding a Hono dependency to the web app's manifest would be
+    /// the wrong app quietly getting heavier.
+    pub npm_package: String,
     /// Paths another capability installs that this one replaces: the plain
     /// root layout a localized site cannot have beside its `[locale]` one.
     /// Not written while this capability is enabled, removed on install when
@@ -225,7 +234,11 @@ struct Manifest {
     #[serde(default)]
     npm_dependencies: BTreeMap<String, String>,
     #[serde(default)]
+    npm_dev_dependencies: BTreeMap<String, String>,
+    #[serde(default)]
     npm_scripts: BTreeMap<String, String>,
+    #[serde(default)]
+    npm_package: String,
     #[serde(default)]
     supersedes: Vec<String>,
     #[serde(default)]
@@ -377,7 +390,9 @@ pub fn derive(id: &str, files: &BTreeMap<String, String>, source: Source) -> Res
         requires_capabilities: manifest.requires_capabilities,
         guard_rules: manifest.guard_rules,
         npm_dependencies: manifest.npm_dependencies,
+        npm_dev_dependencies: manifest.npm_dev_dependencies,
         npm_scripts: manifest.npm_scripts,
+        npm_package: manifest.npm_package,
         supersedes: manifest.supersedes,
         seed_messages: manifest.seed_messages,
         templates,

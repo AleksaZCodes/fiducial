@@ -1,0 +1,21 @@
+description = "Drizzle ORM over the database contract: the TypeScript schema is the declaration, and the SQL it generates feeds the migration runner"
+guard_rules = ["no-unpinned-cli-fetch"]
+
+# The schema lives in the API app (`apps/api/src/db/schema.ts`), so the API app
+# has to exist; the SQL Drizzle writes goes to `migrations/`, so the migration
+# runner has to be there to read it.
+requires_capabilities = ["api-hono", "migrations"]
+
+# Into the API app's manifest, not the web app's.
+npm_package = "apps/api/package.json"
+
+[npm_dependencies]
+drizzle-orm = "^0.45.0"
+
+[npm_dev_dependencies]
+drizzle-kit = "^0.31.0"
+
+[npm_scripts]
+# Writes `migrations/NNNN_slug.sql` from a changed schema; with no change it
+# writes nothing. `fid derive` then rebuilds `src/migrations.generated.ts`.
+"db:generate" = "drizzle-kit generate"

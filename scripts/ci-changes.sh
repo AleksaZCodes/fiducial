@@ -67,7 +67,8 @@ touched "$cap/(hardware|eda)/" '^crates/fiducial-(mesh|eda|geometry)/' '^package
 touched '^packages/' '^pnpm-lock\.yaml$' '^pnpm-workspace\.yaml$' '^package\.json$' '^turbo\.json$' && on[js]=true
 touched '^packages/identity/' '^crates/fiducial-identity/' "$cap/identity/" '^crates/fiducial-cli/src/' && on[identity]=true
 touched '^packages/adapters/' '^crates/fiducial-adapters/' "$cap/(adapters|migrations|deploy)/" '^crates/fiducial-cli/src/' && on[adapters]=true
-touched "$cap/(web-next|design|i18n|content|cms|seo|brand|legal)/" '^crates/fiducial-cli/src/' '^scripts/verify-web-next\.sh$' && on[web]=true
+touched "$cap/(web-next|web-astro|api-hono|orm-drizzle|design|i18n|content|cms|seo|brand|legal)/" '^crates/fiducial-cli/src/' \
+  '^scripts/verify-web-(next|astro)\.sh$' '^scripts/verify-api-hono\.sh$' && on[web]=true
 touched '\.md$' '^docs/' '^crates/fiducial-cli/' && on[docs]=true
 
 for g in "${groups[@]}"; do
