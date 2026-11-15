@@ -1,9 +1,8 @@
-description = "Self-hosted deploy: Docker Compose, Caddy and a Mosquitto broker with its topic ACL, derived from the topology and [adapters]"
-requires_capabilities = ["topology"]
+description = "Self-hosted deploy: Docker Compose and Caddy on one Linux host, derived from the topology, [adapters] and [deploy]; with a Mosquitto broker and topic ACL when the topology declares one"
 
-# `[deploy]` holds only what the host knows: its name, where the image lives and
-# how Caddy gets a certificate. The services, volumes, healthchecks and the
-# broker's ACL are derived from topology.toml and [adapters].
+# `[deploy]` holds only what the host knows: its name, where the images live,
+# how Caddy gets a certificate, which service it proxies, and any service
+# nothing else declares. Apps, the broker and Ollama are derived.
 [[declarations.config]]
 block = "deploy"
 seed = { tls = "internal" }

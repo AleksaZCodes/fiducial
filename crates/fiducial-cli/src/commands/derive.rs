@@ -220,7 +220,10 @@ fn executor_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
         "fid-identity" => cfg(&["identity", "adapters"]),
         "fid-compose" => {
             let mut v = cfg(&["deploy", "adapters", "product.name"]);
-            v.push(arg(crate::topology::DECLARATION));
+            v.extend(expand_inputs(
+                root,
+                &[format!("{}?", crate::topology::DECLARATION)],
+            ));
             v
         }
         "fid-adapters" => cfg(&["adapters"]),
@@ -2870,7 +2873,27 @@ fn run_fid_compose(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         .first()
         .map(String::as_str)
         .unwrap_or(crate::topology::DECLARATION);
-    let plan = crate::compose::load(working_dir, &config, decl)?;
+    let topology = crate::compose::topology_if_any(working_dir, decl)?;
+    let plan = crate::compose::plan(&config, topology.as_ref())?;
+    // The broker's files are derivable only with a broker, and are owed
+    // whenever there is one: a product that declares a broker and does not list
+    // its config would deploy a broker nobody configured.
+    let mut owed: Vec<&str> = crate::compose::ALWAYS.to_vec();
+    if plan.broker.is_some() {
+        owed.extend(["deploy/mosquitto/mosquitto.conf", "deploy/mosquitto/acl"]);
+    }
+    let missing: Vec<&str> = owed
+        .into_iter()
+        .filter(|o| !pipeline.outputs.iter().any(|x| x == o))
+        .collect();
+    if !missing.is_empty() {
+        bail!(
+            "fid-compose: this product derives files that pipelines/{}.toml does not list \
+             — add to `outputs`:\n  {}",
+            pipeline.name,
+            missing.join("\n  ")
+        );
+    }
     for out in &pipeline.outputs {
         let content = crate::compose::render(&plan, out)?;
         write_output(working_dir, out, &content)?;

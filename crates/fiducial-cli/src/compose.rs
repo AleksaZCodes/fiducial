@@ -2,19 +2,28 @@
 //!
 //! `[adapters] deploy = "compose"` ships a product to one Linux host running
 //! Docker Compose, with no vendor account and no required internet. What runs
-//! is already declared: the host nodes and the MQTT bus in `topology.toml`, the
-//! vendors in `[adapters]`, the hostname in `[deploy]`. So the services, their
-//! volumes and healthchecks, the reverse proxy and the broker's topic ACL are
-//! derived from them rather than written a second time
-//! (`docs/specs/2026-11-01-a-self-hosted-target.md`).
+//! is already declared, so the file is derived rather than written a second
+//! time (`docs/specs/2026-11-01-a-self-hosted-target.md`).
+//!
+//! **A list of services, from several sources.** Nothing here is specific to one
+//! kind of product:
+//!
+//! - **apps** — each app of each host node in `topology.toml`, when there is one
+//!   (without a topology, one service named `server`);
+//! - **the broker** — Mosquitto, only when the topology declares a bus with a
+//!   `broker`; this is the building-controller use case, and what makes the
+//!   broker's config and topic ACL derivable;
+//! - **the model server** — Ollama, when `[adapters] ai = "ollama"`;
+//! - **declared services** — `[[deploy.services]]`: a database, a cache, a
+//!   worker, anything with an image.
+//!
+//! Caddy proxies one of them (`[deploy] proxy`, default the first app).
 //!
 //! Outputs, all derived and gated by `fid derive --check`:
 //!
-//! - `deploy/compose.yaml` — `server`, `mosquitto`, `caddy`, and `ollama` when
-//!   `[adapters] ai = "ollama"`;
-//! - `deploy/Caddyfile` — TLS and the reverse proxy to the server;
-//! - `deploy/mosquitto/mosquitto.conf` and `deploy/mosquitto/acl` — the broker
-//!   and which principal may publish or subscribe to which topic.
+//! - `deploy/compose.yaml` and `deploy/Caddyfile`, always;
+//! - `deploy/mosquitto/mosquitto.conf` and `deploy/mosquitto/acl`, when there is
+//!   a broker.
 //!
 //! **What the ACL is derived from.** Each topic in the topology has a direction
 //! (`up`: a device publishes; `down`: the server publishes and the device
@@ -24,15 +33,16 @@
 //! every device's `up` topics and write its `down` topics. Grants a product
 //! stores beyond that are runtime data and are not enumerated here.
 
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use anyhow::{bail, Result};
 
-use crate::config::Config;
+use crate::config::{ComposeService, Config};
 use crate::topology::{Direction, NodeKind, Topology};
 
-/// The port the product's server listens on, behind the proxy.
-pub const SERVER_PORT: u16 = 8080;
+/// The port the proxied service listens on unless `[deploy] proxy_port` says so.
+pub const DEFAULT_PORT: u16 = 8080;
 
 /// Files this pipeline can derive, relative to the product root.
 pub const OUTPUTS: [&str; 4] = [
@@ -42,19 +52,35 @@ pub const OUTPUTS: [&str; 4] = [
     "deploy/mosquitto/acl",
 ];
 
+/// The outputs every product gets; the broker's are added when there is one.
+pub const ALWAYS: [&str; 2] = ["deploy/compose.yaml", "deploy/Caddyfile"];
+
+/// One service in the Compose file.
+pub struct Service {
+    pub name: String,
+    pub image: String,
+    pub platform: Option<&'static str>,
+    pub ports: Vec<String>,
+    pub environment: Vec<(String, String)>,
+    pub volumes: Vec<String>,
+    pub depends_on: Vec<(String, &'static str)>,
+    pub healthcheck: Option<String>,
+    /// Extra lines, already indented, for what the generic fields cannot say.
+    pub extra: String,
+}
+
 /// The facts the derivation reads, gathered once.
 pub struct Plan {
     pub product: String,
     pub host: String,
-    pub registry: String,
     pub acme: bool,
-    pub platform: Option<&'static str>,
-    pub ollama: bool,
+    pub services: Vec<Service>,
+    pub proxy: String,
+    pub proxy_port: u16,
     /// The MQTT broker, when the topology declares one.
     pub broker: Option<Broker>,
     pub devices: Vec<String>,
     pub topics: Vec<(String, Direction)>,
-    pub secrets: Vec<String>,
 }
 
 pub struct Broker {
@@ -73,7 +99,15 @@ fn platform(target: &str) -> Option<&'static str> {
     }
 }
 
-pub fn plan(config: &Config, t: &Topology) -> Result<Plan> {
+fn image_of(registry: &str, product: &str, app: &str) -> String {
+    if registry.is_empty() {
+        format!("{product}-{app}:latest")
+    } else {
+        format!("{}/{product}-{app}:latest", registry.trim_end_matches('/'))
+    }
+}
+
+pub fn plan(config: &Config, t: Option<&Topology>) -> Result<Plan> {
     let vendor = config.adapters.get("deploy").unwrap_or("");
     if vendor != "compose" {
         bail!(
@@ -106,117 +140,283 @@ pub fn plan(config: &Config, t: &Topology) -> Result<Plan> {
              or use tls = \"internal\"."
         );
     }
-    let hosts: Vec<_> = t.node.iter().filter(|n| n.kind == NodeKind::Host).collect();
-    let Some(server) = hosts.first() else {
-        bail!("fid-compose: topology.toml declares no host node for the server to run on");
-    };
-    let broker = t
-        .bus
-        .iter()
-        .find(|b| b.broker.is_some())
-        .map(|b| Broker { tls: b.tls });
-    let devices: Vec<String> = t
-        .node
-        .iter()
-        .filter(|n| n.kind == NodeKind::Mcu)
-        .map(|n| n.id.clone())
-        .collect();
-    let topics = t
-        .topics()
-        .into_iter()
-        .map(|x| (x.id, x.direction))
-        .collect();
 
-    let mut secrets = Vec::new();
+    let mut secrets: Vec<String> = Vec::new();
     if config.adapters.get("auth") == Some("native") {
         secrets.push("SESSION_SECRET".to_string());
     }
     if config.adapters.get("ai") == Some("openrouter") {
         secrets.push("OPENROUTER_API_KEY".to_string());
     }
+    let broker = t
+        .and_then(|t| t.bus.iter().find(|b| b.broker.is_some()))
+        .map(|b| Broker { tls: b.tls });
+    let ollama = config.adapters.get("ai") == Some("ollama");
+    let sqlite = config.adapters.get("database") == Some("sqlite");
+
+    // Apps: from the topology's host nodes, or one `server`.
+    let mut apps: Vec<(String, Option<&'static str>)> = Vec::new();
+    if let Some(t) = t {
+        for n in t.node.iter().filter(|n| n.kind == NodeKind::Host) {
+            let pf = n.target.as_deref().and_then(platform);
+            for a in &n.apps {
+                apps.push((a.clone(), pf));
+            }
+        }
+    }
+    if apps.is_empty() {
+        apps.push(("server".to_string(), None));
+    }
+    let proxy = if d.proxy.is_empty() {
+        apps[0].0.clone()
+    } else {
+        d.proxy.clone()
+    };
+    let proxy_port = if d.proxy_port == 0 {
+        DEFAULT_PORT
+    } else {
+        d.proxy_port
+    };
+
+    let mut services: Vec<Service> = Vec::new();
+    for (app, pf) in &apps {
+        let mut env: Vec<(String, String)> = Vec::new();
+        if sqlite {
+            env.push(("DATABASE_PATH".into(), format!("/data/{app}.db")));
+        }
+        if broker.is_some() {
+            env.push(("MQTT_URL".into(), "mqtts://mosquitto:8883".into()));
+        }
+        if ollama {
+            env.push(("AI_BASE_URL".into(), "http://ollama:11434/v1".into()));
+        }
+        let mut depends = Vec::new();
+        if broker.is_some() {
+            depends.push(("mosquitto".to_string(), "service_started"));
+        }
+        if ollama {
+            depends.push(("ollama".to_string(), "service_started"));
+        }
+        let health = (*app == proxy)
+            .then(|| format!("wget -q --spider http://127.0.0.1:{proxy_port}/healthz || exit 1"));
+        let mut extra = String::new();
+        if !secrets.is_empty() {
+            extra.push_str("      # Secrets, never written here — set them in deploy/.env:\n");
+            for name in &secrets {
+                extra.push_str(&format!("      {name}: ${{{name}}}\n"));
+            }
+        }
+        services.push(Service {
+            name: app.clone(),
+            image: image_of(&d.registry, &product, app),
+            platform: *pf,
+            ports: Vec::new(),
+            environment: env,
+            volumes: vec![format!("{app}-data:/data")],
+            depends_on: depends,
+            healthcheck: health,
+            extra,
+        });
+    }
+
+    if broker.is_some() {
+        services.push(Service {
+            name: "mosquitto".into(),
+            image: "eclipse-mosquitto:2".into(),
+            platform: None,
+            ports: vec!["8883:8883".into()],
+            environment: Vec::new(),
+            volumes: vec![
+                "./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro".into(),
+                "./mosquitto/acl:/mosquitto/config/acl:ro".into(),
+                // Provisioned per device at first flash; never in the repository.
+                "./mosquitto/passwd:/mosquitto/config/passwd:ro".into(),
+                "./certs:/mosquitto/certs:ro".into(),
+                "mosquitto-data:/mosquitto/data".into(),
+            ],
+            depends_on: Vec::new(),
+            healthcheck: Some(
+                "mosquitto_sub -h localhost -p 1883 -t '$$SYS/broker/uptime' -C 1 -W 3 || exit 1"
+                    .into(),
+            ),
+            extra: String::new(),
+        });
+    }
+    if ollama {
+        services.push(Service {
+            name: "ollama".into(),
+            image: "ollama/ollama:latest".into(),
+            platform: None,
+            ports: Vec::new(),
+            environment: Vec::new(),
+            volumes: vec!["ollama-models:/root/.ollama".into()],
+            depends_on: Vec::new(),
+            healthcheck: Some("ollama list || exit 1".into()),
+            extra: String::new(),
+        });
+    }
+    for x in &d.services {
+        services.push(declared(x));
+    }
+    let mut seen = BTreeSet::new();
+    for sv in &services {
+        if !seen.insert(sv.name.clone()) {
+            bail!(
+                "fid-compose: service `{}` is declared twice — an app, the broker or Ollama \
+                 already derives it, and [[deploy.services]] lists it again. Rename one.",
+                sv.name
+            );
+        }
+    }
+    if !services.iter().any(|sv| sv.name == proxy) {
+        bail!(
+            "fid-compose: [deploy] proxy = \"{proxy}\" names no service. Services: {}.",
+            services
+                .iter()
+                .map(|s| s.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+    for sv in &services {
+        for (dep, _) in &sv.depends_on {
+            if !services.iter().any(|o| &o.name == dep) {
+                bail!(
+                    "fid-compose: service `{}` depends_on `{dep}`, which is not a service.",
+                    sv.name
+                );
+            }
+        }
+    }
+
+    let devices = t
+        .map(|t| {
+            t.node
+                .iter()
+                .filter(|n| n.kind == NodeKind::Mcu)
+                .map(|n| n.id.clone())
+                .collect()
+        })
+        .unwrap_or_default();
+    let topics = t
+        .map(|t| {
+            t.topics()
+                .into_iter()
+                .map(|x| (x.id, x.direction))
+                .collect()
+        })
+        .unwrap_or_default();
     Ok(Plan {
         product,
         host,
-        registry: d.registry.clone(),
         acme: tls,
-        platform: server.target.as_deref().and_then(platform),
-        ollama: config.adapters.get("ai") == Some("ollama"),
+        services,
+        proxy,
+        proxy_port,
         broker,
         devices,
         topics,
-        secrets,
     })
+}
+
+fn declared(x: &ComposeService) -> Service {
+    let mut extra = String::new();
+    if !x.secrets.is_empty() {
+        extra.push_str("      # Secrets, never written here — set them in deploy/.env:\n");
+        for name in &x.secrets {
+            extra.push_str(&format!("      {name}: ${{{name}}}\n"));
+        }
+    }
+    Service {
+        name: x.name.clone(),
+        image: x.image.clone(),
+        platform: None,
+        ports: x.ports.clone(),
+        environment: x
+            .environment
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect(),
+        volumes: x.volumes.clone(),
+        depends_on: x
+            .depends_on
+            .iter()
+            .map(|d| (d.clone(), "service_started"))
+            .collect(),
+        healthcheck: (!x.healthcheck.is_empty()).then(|| x.healthcheck.clone()),
+        extra,
+    }
 }
 
 const HEADER: &str =
     "Derived by fid-compose from topology.toml, [adapters] and [deploy] — do not edit.";
 
+/// A value that must stay one YAML scalar.
+fn q(v: &str) -> String {
+    format!("\"{}\"", v.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
 pub fn render_compose(p: &Plan) -> String {
-    let image = if p.registry.is_empty() {
-        format!("{}-server:latest", p.product)
-    } else {
-        format!(
-            "{}/{}-server:latest",
-            p.registry.trim_end_matches('/'),
-            p.product
-        )
-    };
     let mut s = format!("# {HEADER}\nname: {}\n\nservices:\n", p.product);
-    s.push_str(&format!("  server:\n    image: {image}\n"));
-    if let Some(pl) = p.platform {
-        s.push_str(&format!("    platform: {pl}\n"));
-    }
-    s.push_str(
-        "    restart: unless-stopped\n    environment:\n      DATABASE_PATH: /data/app.db\n",
-    );
-    if p.broker.is_some() {
-        s.push_str("      MQTT_URL: mqtts://mosquitto:8883\n");
-    }
-    if p.ollama {
-        s.push_str("      AI_BASE_URL: http://ollama:11434/v1\n");
-    }
-    if !p.secrets.is_empty() {
-        s.push_str("      # Secrets, never written here — set them in deploy/.env:\n");
-        for name in &p.secrets {
-            s.push_str(&format!("      {name}: ${{{name}}}\n"));
+    let mut named: BTreeSet<String> = BTreeSet::new();
+    for (i, sv) in p.services.iter().enumerate() {
+        if i > 0 {
+            s.push('\n');
+        }
+        s.push_str(&format!("  {}:\n    image: {}\n", sv.name, sv.image));
+        if let Some(pl) = sv.platform {
+            s.push_str(&format!("    platform: {pl}\n"));
+        }
+        s.push_str("    restart: unless-stopped\n");
+        if !sv.ports.is_empty() {
+            s.push_str("    ports:\n");
+            for port in &sv.ports {
+                s.push_str(&format!("      - {}\n", q(port)));
+            }
+        }
+        if !sv.environment.is_empty() || !sv.extra.is_empty() {
+            s.push_str("    environment:\n");
+            for (k, v) in &sv.environment {
+                s.push_str(&format!("      {k}: {}\n", q(v)));
+            }
+            s.push_str(&sv.extra);
+        }
+        if !sv.volumes.is_empty() {
+            s.push_str("    volumes:\n");
+            for v in &sv.volumes {
+                if let Some((left, _)) = v.split_once(':') {
+                    if !left.starts_with('.') && !left.starts_with('/') {
+                        named.insert(left.to_string());
+                    }
+                }
+                s.push_str(&format!("      - {v}\n"));
+            }
+        }
+        if let Some(h) = &sv.healthcheck {
+            s.push_str(&format!(
+                "    healthcheck:\n      test: [\"CMD-SHELL\", {}]\n      interval: 30s\n      timeout: 5s\n      retries: 3\n",
+                q(h)
+            ));
+        }
+        if !sv.depends_on.is_empty() {
+            s.push_str("    depends_on:\n");
+            for (d, cond) in &sv.depends_on {
+                s.push_str(&format!("      {d}:\n        condition: {cond}\n"));
+            }
         }
     }
-    s.push_str("    volumes:\n      - server-data:/data\n");
+    s.push_str(
+        "\n  caddy:\n    image: caddy:2\n    restart: unless-stopped\n    ports:\n      - \"80:80\"\n      - \"443:443\"\n    volumes:\n      - ./Caddyfile:/etc/caddy/Caddyfile:ro\n      - caddy-data:/data\n      - caddy-config:/config\n",
+    );
     s.push_str(&format!(
-        "    healthcheck:\n      test: [\"CMD-SHELL\", \"wget -q --spider http://127.0.0.1:{SERVER_PORT}/healthz || exit 1\"]\n      interval: 30s\n      timeout: 5s\n      retries: 3\n"
+        "    depends_on:\n      {}:\n        condition: service_healthy\n",
+        p.proxy
     ));
-    let mut deps = Vec::new();
-    if p.broker.is_some() {
-        deps.push("mosquitto");
-    }
-    if p.ollama {
-        deps.push("ollama");
-    }
-    if !deps.is_empty() {
-        s.push_str("    depends_on:\n");
-        for d in deps {
-            s.push_str(&format!("      {d}:\n        condition: service_started\n"));
-        }
-    }
-    if p.broker.is_some() {
-        s.push_str(
-            "\n  mosquitto:\n    image: eclipse-mosquitto:2\n    restart: unless-stopped\n    ports:\n      - \"8883:8883\"\n    volumes:\n      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro\n      - ./mosquitto/acl:/mosquitto/config/acl:ro\n      # Provisioned per device at first flash; never in the repository.\n      - ./mosquitto/passwd:/mosquitto/config/passwd:ro\n      - ./certs:/mosquitto/certs:ro\n      - mosquitto-data:/mosquitto/data\n    healthcheck:\n      test: [\"CMD-SHELL\", \"mosquitto_sub -h localhost -p 1883 -t '$$SYS/broker/uptime' -C 1 -W 3 || exit 1\"]\n      interval: 30s\n      timeout: 5s\n      retries: 3\n",
-        );
-    }
-    if p.ollama {
-        s.push_str(
-            "\n  ollama:\n    image: ollama/ollama:latest\n    restart: unless-stopped\n    volumes:\n      - ollama-models:/root/.ollama\n    healthcheck:\n      test: [\"CMD\", \"ollama\", \"list\"]\n      interval: 30s\n      timeout: 10s\n      retries: 3\n",
-        );
-    }
-    s.push_str(
-        "\n  caddy:\n    image: caddy:2\n    restart: unless-stopped\n    ports:\n      - \"80:80\"\n      - \"443:443\"\n    volumes:\n      - ./Caddyfile:/etc/caddy/Caddyfile:ro\n      - caddy-data:/data\n      - caddy-config:/config\n    depends_on:\n      server:\n        condition: service_healthy\n",
-    );
-    s.push_str("\nvolumes:\n  server-data:\n  caddy-data:\n  caddy-config:\n");
-    if p.broker.is_some() {
-        s.push_str("  mosquitto-data:\n");
-    }
-    if p.ollama {
-        s.push_str("  ollama-models:\n");
+    named.insert("caddy-data".into());
+    named.insert("caddy-config".into());
+    s.push_str("\nvolumes:\n");
+    for v in &named {
+        s.push_str(&format!("  {v}:\n"));
     }
     s
 }
@@ -228,8 +428,8 @@ pub fn render_caddyfile(p: &Plan) -> String {
         "    tls internal\n"
     };
     format!(
-        "# {HEADER}\n{} {{\n{tls}    encode zstd gzip\n    reverse_proxy server:{SERVER_PORT}\n}}\n",
-        p.host
+        "# {HEADER}\n{} {{\n{tls}    encode zstd gzip\n    reverse_proxy {}:{}\n}}\n",
+        p.host, p.proxy, p.proxy_port
     )
 }
 
@@ -300,9 +500,14 @@ pub fn render(p: &Plan, out: &str) -> Result<String> {
     })
 }
 
-pub fn load(root: &Path, config: &Config, decl: &str) -> Result<Plan> {
-    let t = crate::topology::load(root, decl)?;
-    plan(config, &t)
+/// The topology, when the product has one. A product that is only an app and a
+/// database declares none.
+pub fn topology_if_any(root: &Path, decl: &str) -> Result<Option<Topology>> {
+    if root.join(decl).exists() {
+        Ok(Some(crate::topology::load(root, decl)?))
+    } else {
+        Ok(None)
+    }
 }
 
 #[cfg(test)]
@@ -334,30 +539,31 @@ broker = "server"
 connect = ["room_1.wifi", "server.eth0"]
 "#;
 
-    fn plan_for(ai: &str) -> Plan {
-        let t: Topology = toml::from_str(SITE).unwrap();
-        let config: Config = toml::from_str(&format!(
-            "[product]\nname = \"building\"\nversion = \"0.1.0\"\n\n[adapters]\ndeploy = \"compose\"\nai = \"{ai}\"\nauth = \"native\"\n"
+    fn config(extra: &str) -> Config {
+        toml::from_str(&format!(
+            "[product]\nname = \"building\"\nversion = \"0.1.0\"\n\n[adapters]\ndeploy = \"compose\"\n{extra}"
         ))
-        .unwrap();
-        plan(&config, &t).unwrap()
+        .unwrap()
+    }
+
+    fn site() -> Topology {
+        toml::from_str(SITE).unwrap()
     }
 
     #[test]
-    fn the_services_follow_the_declarations() {
-        let c = render_compose(&plan_for("ollama"));
+    fn the_building_use_case_gets_its_broker_and_acl() {
+        let p = plan(
+            &config("ai = \"ollama\"\nauth = \"native\"\n"),
+            Some(&site()),
+        )
+        .unwrap();
+        let c = render_compose(&p);
         for s in ["server:", "mosquitto:", "caddy:", "ollama:"] {
             assert!(c.contains(&format!("  {s}")), "{s}\n{c}");
         }
         assert!(c.contains("platform: linux/arm64"));
         assert!(c.contains("SESSION_SECRET: ${SESSION_SECRET}"));
-        let c = render_compose(&plan_for("none"));
-        assert!(!c.contains("ollama"));
-    }
-
-    #[test]
-    fn a_device_touches_only_its_own_subtree() {
-        let a = render_acl(&plan_for("none"));
+        let a = render_acl(&p);
         assert!(a.contains("pattern write building/%u/state"));
         assert!(a.contains("pattern read building/%u/command"));
         assert!(a.contains("topic write building/+/command"));
@@ -365,13 +571,75 @@ connect = ["room_1.wifi", "server.eth0"]
     }
 
     #[test]
+    fn without_a_topology_it_is_one_app_and_a_proxy() {
+        let p = plan(&config(""), None).unwrap();
+        let c = render_compose(&p);
+        assert!(c.contains("  server:") && c.contains("  caddy:"), "{c}");
+        assert!(!c.contains("mosquitto") && !c.contains("ollama"), "{c}");
+        assert!(render_caddyfile(&p).contains("reverse_proxy server:8080"));
+        assert!(p.broker.is_none());
+    }
+
+    #[test]
+    fn declared_services_sit_beside_the_derived_ones() {
+        let cfg: Config = toml::from_str(
+            r#"
+[product]
+name = "shop"
+version = "0.1.0"
+
+[adapters]
+deploy = "compose"
+
+[deploy]
+proxy = "web"
+proxy_port = 3000
+
+[[deploy.services]]
+name = "db"
+image = "postgres:17"
+volumes = ["db-data:/var/lib/postgresql/data"]
+secrets = ["POSTGRES_PASSWORD"]
+healthcheck = "pg_isready -U postgres"
+
+[[deploy.services]]
+name = "web"
+image = "ghcr.io/me/shop-web:latest"
+depends_on = ["db"]
+"#,
+        )
+        .unwrap();
+        let p = plan(&cfg, None).unwrap();
+        let c = render_compose(&p);
+        assert!(c.contains("  db:\n    image: postgres:17"), "{c}");
+        assert!(c.contains("POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}"), "{c}");
+        assert!(c.contains("  db-data:"), "named volume declared: {c}");
+        assert!(render_caddyfile(&p).contains("reverse_proxy web:3000"));
+    }
+
+    #[test]
+    fn a_duplicate_or_unknown_service_is_named() {
+        let cfg: Config = toml::from_str(
+            "[product]\nname = \"p\"\nversion = \"0.1.0\"\n\n[adapters]\ndeploy = \"compose\"\n\n[[deploy.services]]\nname = \"server\"\nimage = \"x\"\n",
+        )
+        .unwrap();
+        let e = plan(&cfg, None).err().unwrap().to_string();
+        assert!(e.contains("`server` is declared twice"), "{e}");
+        let cfg: Config = toml::from_str(
+            "[product]\nname = \"p\"\nversion = \"0.1.0\"\n\n[adapters]\ndeploy = \"compose\"\n\n[deploy]\nproxy = \"nope\"\n",
+        )
+        .unwrap();
+        let e = plan(&cfg, None).err().unwrap().to_string();
+        assert!(e.contains("names no service"), "{e}");
+    }
+
+    #[test]
     fn a_lan_name_cannot_ask_for_a_public_certificate() {
-        let t: Topology = toml::from_str(SITE).unwrap();
-        let config: Config = toml::from_str(
+        let cfg: Config = toml::from_str(
             "[product]\nname = \"b\"\nversion = \"0.1.0\"\n\n[adapters]\ndeploy = \"compose\"\n\n[deploy]\ntls = \"acme\"\n",
         )
         .unwrap();
-        let e = plan(&config, &t).err().unwrap().to_string();
+        let e = plan(&cfg, Some(&site())).err().unwrap().to_string();
         assert!(e.contains("cannot get a public certificate"), "{e}");
     }
 }

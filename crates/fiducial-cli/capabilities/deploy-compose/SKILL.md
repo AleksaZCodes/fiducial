@@ -12,50 +12,78 @@ running Docker Compose, with no vendor account and no required internet. Set
 
 | File | Holds |
 |---|---|
-| `deploy/compose.yaml` | `server`, `mosquitto`, `caddy`, and `ollama` when `[adapters] ai = "ollama"` — with volumes, healthchecks, restart policy and the image platform from the host node's `target` |
-| `deploy/Caddyfile` | TLS and the reverse proxy to the server on port 8080 |
-| `deploy/mosquitto/mosquitto.conf` | the MQTT listener on 8883 with TLS, no anonymous clients |
-| `deploy/mosquitto/acl` | which principal may publish or subscribe to which topic |
+| `deploy/compose.yaml` | every service, with volumes, healthchecks, restart policy and the image platform |
+| `deploy/Caddyfile` | TLS and the reverse proxy to one service |
+| `deploy/mosquitto/mosquitto.conf`, `deploy/mosquitto/acl` | only when `topology.toml` declares an MQTT broker: the listener with TLS and the topic ACL |
 
-All four are derived: edit `topology.toml`, `[adapters]` or `[deploy]`, never the
-files. `fid derive --check` fails on a stale or hand-edited one.
+All are derived: edit the declarations, never the files. `fid derive --check`
+fails on a stale or hand-edited one. A product with a broker lists the two
+Mosquitto files in `pipelines/deploy-compose.toml`; derive names them if they are
+missing.
 
-## What you declare
+## It is a list of services, from four sources
+
+Nothing here assumes one kind of product.
+
+| Source | Services |
+|---|---|
+| **Apps** | each `apps` entry of each `host` node in `topology.toml` (an app named `server` with no topology) |
+| **The broker** | `mosquitto`, when a `[[bus]]` has `broker = "<host>"` |
+| **The model server** | `ollama`, when `[adapters] ai = "ollama"` |
+| **Declared** | `[[deploy.services]]`: a database, a cache, a worker, anything with an image |
 
 ```toml
 [adapters]
 deploy = "compose"
 
 [deploy]
-host     = "building.local"      # a LAN name or a public domain; default <product>.local
-registry = "ghcr.io/you"         # where the server image is pulled from
-tls      = "internal"            # Caddy's own CA; "acme" for a public domain
+host       = "shop.example.com"   # a LAN name or a public domain; default <product>.local
+registry   = "ghcr.io/you"         # where the app images are pulled from
+tls        = "acme"                # Caddy's own CA is "internal" (the default)
+proxy      = "web"                 # which service Caddy proxies; default the first app
+proxy_port = 3000                  # default 8080
+
+[[deploy.services]]
+name        = "db"
+image       = "postgres:17"
+volumes     = ["db-data:/var/lib/postgresql/data"]   # a name before the colon is a named volume
+secrets     = ["POSTGRES_PASSWORD"]                  # written as ${POSTGRES_PASSWORD}, set in deploy/.env
+healthcheck = "pg_isready -U postgres"
 ```
 
 `tls = "acme"` with a `.local` host is refused: nothing can issue a public
-certificate for it.
+certificate for it. A service declared twice, a `proxy` that names no service and
+a `depends_on` that names none are each refused by name.
 
-## The broker ACL
+## The use case that exercises all of it: a building
 
-A device's MQTT username is its node id. It may touch only
-`<product>/<device>/<topic>`: write the topics the topology marks `up` or `will`,
-read the ones marked `down`. The `server` user reads every device's `up` topics and
-writes every device's `down` topics. That is the same rule `can()` states for a
-device acting on itself. Grants a product stores beyond it are runtime data and are
-not enumerated into the ACL.
+Controllers in each room, a Raspberry Pi in the cabinet, one web app. The
+topology declares the controllers (`mcu`), the Pi (`host`, `target =
+"aarch64-unknown-linux-gnu"`, `apps = ["server"]`) and a `lan` bus with
+`broker = "server"`. From that alone:
+
+- `server` (`platform: linux/arm64`), `mosquitto` and `caddy`, plus `ollama` if
+  chosen, in `compose.yaml`;
+- the broker's ACL: a device's MQTT username is its node id, and it may touch only
+  `<product>/<device>/<topic>`, writing the topics the topology marks `up` or
+  `will` and reading the ones marked `down`. The `server` user reads every device's
+  `up` topics and writes every device's `down` topics. That is the rule `can()`
+  states for a device acting on itself. Grants a product stores beyond it are
+  runtime data and are not enumerated into the ACL.
+
+The integration test `tests/compose_pipeline.rs` is this product.
 
 ## What it does not derive
 
 - **Passwords and certificates.** Per-device credentials are provisioned at first
   flash into `deploy/mosquitto/passwd`, and the broker's certificates go in
   `deploy/certs/`. Neither is committed.
-- **Secrets.** Their names are in `compose.yaml` as `${NAME}`; the values go in
+- **Secrets.** Their names appear in `compose.yaml` as `${NAME}`; the values go in
   `deploy/.env`.
-- **The server image.** `/healthz` on port 8080 is the contract the healthcheck
-  reads; building the image is the product's.
+- **The app images.** `/healthz` on the proxy port is the contract the healthcheck
+  reads; building the images is the product's.
 - **Backups.** A disk filling and a certificate expiring are this target's failure
-  modes; back up the `server-data` volume nightly (`docker run --rm -v
-  <product>_server-data:/data -v $PWD:/backup alpine tar czf /backup/data.tgz /data`).
+  modes; back up the named volumes nightly.
 
 ## Guard rules activated
 
