@@ -694,6 +694,11 @@ once, and never guessed.
 | ✅ **Keystatic** | `cms` editor `keystatic` (default) | Writers who edit forms. Shipped in 0.15.0: derived from `content.toml`, one editable collection per locale, real image and relationship pickers. Still to come: its Astro integration (`@keystatic/astro`) and GitHub mode for hosted editing |
 | ✅ **TinaCMS** | `cms` editor `tina` | Editing on the page itself, visual editing. Shipped in 0.15.0 as the second deriver over the same model and the same files; visual editing and Tina Cloud hosting are not wired yet |
 
+**Shipped in 0.15.0 toward this item:** `fid new <name> --shape site` (a
+localized Next.js site in one command, through the new `site` capability), a
+SvelteKit shape that builds and deploys (it had never been compiled), and the
+deploy shape set from the app instead of by hand.
+
 Decap is **removed** (0.15.0): Keystatic and Tina cover its job with a local
 editor that needs no service and no account, and a codebase with three editors
 is a codebase with a half-maintained one. The plan for the rest of this item

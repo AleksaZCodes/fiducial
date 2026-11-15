@@ -10,7 +10,7 @@ isn't. Three speeds, one platform:
 
 | Speed | What you want | What you get today |
 |---|---|---|
-| **A ten-minute site** | A website with a design system, shadcn components and an editor, deployed | `fid new` + `design` + `i18n` + `content` + `cms` + `deploy`: works, but is five commands and Next.js only |
+| **A ten-minute site** | A website with a design system, shadcn components and an editor, deployed | `fid new <name> --shape site` (0.15.0): one command, a localized Next.js site with every page wired, its editor, its fonts and its Worker config; `pnpm install`, `pnpm dev`, `pnpm deploy` |
 | **A full-stack app** | Typed server, database, auth, realtime | Next.js on Workers, D1/Supabase, Durable Objects, `realtime`, `auth`: works |
 | **On every device** | The same app as a phone, desktop or installed app | Tauri capability exists; Capacitor proven by hand in one product, not a capability; Electron absent |
 
@@ -120,10 +120,12 @@ Each step has a test that must exist before the step is called done, because
    `doctor` check that a combination fits (an editor that needs a framework the
    app is not on fails with the reason). *Test:* a table of valid and invalid
    combinations.
-2. **`fid new --shape site`**: the ten-minute path as one command (design,
-   i18n, content, cms, seo, deploy), with shadcn components installed and a
-   deploy to Workers. *Test:* from empty directory to a served page with an
-   editable collection, timed, in CI nightly.
+2. ✅ **`fid new --shape site`** (0.15.0): the ten-minute path as one command,
+   through a new `site` capability that wires the parts into pages. Verified:
+   install, typecheck, lint, `next build`, OpenNext build, `wrangler deploy
+   --dry-run`, and every sitemap URL answering in `workerd`
+   (`scripts/verify-web-next.sh`, `tests/site_shape.rs`). Still to do: a
+   SvelteKit version of the pages (the data side is framework-free already).
 3. **`web-astro`.** The content-first default. Keystatic's own Astro
    integration replaces the separate `apps/cms` workspace there (the editor
    runs inside the dev server). Reuse tokens, i18n, content, seo: only the
