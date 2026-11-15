@@ -5,7 +5,7 @@
 #![no_std]
 
 pub use fiducial_core::{version, DeviceId, VERSION};
-pub use fiducial_protocol::{Frame, FrameDecoder, FrameEncoder};
+pub use fiducial_protocol::{encode, encoded_len, CrcError, EncodeError, FrameDecoder};
 
 /// Blink timing constants — the baseline all LED indicators follow.
 pub mod blink {

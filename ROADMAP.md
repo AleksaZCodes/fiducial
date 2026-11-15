@@ -652,7 +652,7 @@ cost of delay:
 | 1 | One message declaration, two encodings (postcard on device links, JSON typed by `ts-rs` at the web): a product-side pattern, proved and documented; no platform code needed | debt-accruing | ✅ |
 | 2 | `topology.toml` and `fid-topology` (nodes, buses, settings, topics, in any firmware language) and the optional `monitoring` capability (points, rules, schedules, web cards, readings schema) | multiplying | ✅ |
 | 3 | Hardware built from modules, with variants and derived wiring; products extend the module library | multiplying | ✅ |
-| 4 | `firmware-esp32c6` capability: an optional template; any firmware already reads the derived tables | terminal | ⬜ |
+| 4 | `firmware-esp32c6` capability: an optional template; any firmware already reads the derived tables | terminal | ✅ |
 | 5 | Self-hosted server stack: `sqlite`, `native` auth, `ollama`, `compose`, broker ACL from `can()` | terminal | ⬜ |
 | 6 | The web app as a static export served by the server | terminal | ⬜ |
 | 7 | Derived documentation: topology, wiring, rules, sequence and storage diagrams (`topology.md` from `fid-topology`, `rules.md` from `fid-monitoring`; wiring per variant) | multiplying | ✅ |

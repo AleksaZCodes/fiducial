@@ -1,0 +1,24 @@
+[package]
+name        = "firmware-esp32c6"
+description = "ESP32-C6 firmware for {{name}}."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "firmware-esp32c6"
+path = "src/main.rs"
+
+[dependencies]
+firmware-shared = { path = "../shared" }
+
+esp-hal                = { workspace = true }
+esp-rtos               = { workspace = true }
+esp-bootloader-esp-idf = { workspace = true }
+esp-backtrace          = { workspace = true }
+esp-println            = { workspace = true }
+
+embassy-executor = { workspace = true }
+embassy-time     = { workspace = true }
+
+defmt = { workspace = true }
