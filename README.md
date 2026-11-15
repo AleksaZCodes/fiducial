@@ -269,6 +269,13 @@ its description from the first line of prose in its own skill.
 | **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
 | **Scoped template** | a template under `for/<capability>/`, installed only alongside that capability | `for/web-svelte/…/LocalePicker.svelte` |
 
+`capability.toml` can also say what an install does to files the product
+already has: `supersedes` (another capability's templates this one replaces,
+as `site` replaces the plain app's root layout), `npm_dependencies` and
+`npm_scripts` (added to `apps/web/package.json` where missing), and
+`seed_messages` (message namespaces inserted into each locale's catalog where
+missing). Each only adds what is absent: the product's own edits win.
+
 <!-- fid:end-describes -->
 
 The test for a declaration: *could two different pipelines read this and both be
