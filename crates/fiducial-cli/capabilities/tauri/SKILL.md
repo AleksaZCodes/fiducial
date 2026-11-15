@@ -33,7 +33,25 @@ pnpm tauri build                # release build (all platforms via CI)
 fiducial-core = { path = "../../../crates/fiducial-core", features = ["std"] }
 ```
 
+## What the shell wraps
+
+`apps/desktop` is a shell around the web app in `apps/web`: in development it
+loads `http://localhost:3000` (`pnpm dev` there), and a release bundles
+`apps/web/out`, a static export. A Next.js app produces one with
+`output: "export"`, which means no server routes and no rewrites; a SvelteKit
+app uses `adapter-static` and writes `build/` (change `frontendDist`).
+
+Before the first `tauri build`, generate the icons the bundle names from the
+brand mark: `pnpm tauri icon apps/web/public/favicon.svg`. The CSP is the web
+app's, plus Tauri's IPC origin; `null` (off), which this template used to ship,
+is not a default worth having.
+
 ## OTA updates
+
+Off until set up, because it cannot work with placeholders. Add
+`tauri-plugin-updater` to `src-tauri/Cargo.toml`, `"createUpdaterArtifacts":
+true` under `bundle`, and `plugins.updater` with your public key and endpoint
+in `tauri.conf.json`.
 
 Tauri compiles web assets into the binary — there is no web-only OTA. The full
 signed binary is the update unit. `tauri-plugin-updater` handles download,
