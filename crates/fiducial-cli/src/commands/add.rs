@@ -368,6 +368,7 @@ TARGETS
   rp2350     Raspberry Pi RP2350 — Embassy + probe-rs      → firmware/rp2350/
   stm32      STM32 family — Embassy HAL                    → firmware/stm32/
   esp32c6    Espressif ESP32-C6 — esp-hal + Embassy        → firmware/esp32c6/
+  esp32c6-idf  ESP32-C6 on ESP-IDF — std Rust, FreeRTOS    → firmware/esp32c6-idf/
   nrf52      nRF52 family — Embassy HAL                    → firmware/nrf52/  (not available yet)
 
 EXAMPLES
@@ -375,7 +376,7 @@ EXAMPLES
   fid add firmware rp2350"
     )]
     Firmware {
-        /// Board target: rp2040 | rp2350 | stm32 | esp32c6 | nrf52
+        /// Board target: rp2040 | rp2350 | stm32 | esp32c6 | esp32c6-idf | nrf52
         #[arg(value_name = "TARGET")]
         target: String,
     },
@@ -515,6 +516,7 @@ fn add_firmware(target: &str) -> Result<()> {
         "rp2040" => "firmware-rp2040",
         "stm32" => "firmware-stm32",
         "esp32c6" => "firmware-esp32c6",
+        "esp32c6-idf" => "firmware-esp32c6-idf",
         "rp2350" => {
             println!(
                 "✦ fid add firmware rp2350\n\n\
@@ -534,7 +536,7 @@ fn add_firmware(target: &str) -> Result<()> {
         }
         other => bail!(
             "unknown firmware target `{other}`.\n\
-             Supported: rp2040, rp2350, stm32, esp32c6, nrf52.\n\
+             Supported: rp2040, rp2350, stm32, esp32c6, esp32c6-idf, nrf52.\n\
              Run `fid add firmware --help` for details."
         ),
     };

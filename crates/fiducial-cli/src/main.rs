@@ -264,6 +264,7 @@ EXAMPLES
   fid add firmware rp2040     add RP2040 Embassy firmware
   fid add firmware rp2350     add RP2350 Embassy firmware
   fid add firmware esp32c6    add ESP32-C6 firmware (esp-hal + Embassy)
+  fid add firmware esp32c6-idf  add ESP32-C6 firmware on ESP-IDF (std)
   fid add module payments     add a bounded-context Rust + TS module
   fid add web-next            install the web-next capability (alias for `fid add app next`)
   fid add firmware-rp2040     install the firmware-rp2040 capability directly"
