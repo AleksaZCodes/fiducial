@@ -1,0 +1,7 @@
+description = "Astro static site: zero JavaScript by default, the design tokens, headers in public/_headers, deployed as Workers static assets"
+guard_rules = ["no-unpinned-cli-fetch"]
+
+# The stylesheet imports `tokens.css` (derived by the design pipeline) and
+# `marks.css` (installed by `design`). Without `design` the first build fails on
+# a missing import — the same dependency `web-next` declares.
+requires_capabilities = ["design"]

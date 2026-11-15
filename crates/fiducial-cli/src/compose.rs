@@ -774,6 +774,26 @@ depends_on = ["db"]
             in_next, here,
             "next.config.ts securityHeaders vs fid-compose STATIC_HEADERS"
         );
+
+        // The Astro template's `_headers` is the third copy: the same names and,
+        // for every header the platform shares, the same value.
+        let astro = include_str!("../capabilities/web-astro/apps/web/public/_headers");
+        let mut in_astro: Vec<&str> = astro
+            .lines()
+            .filter(|l| l.starts_with("  "))
+            .filter_map(|l| l.trim().split(':').next())
+            .collect();
+        in_astro.sort_unstable();
+        assert_eq!(
+            in_astro, here,
+            "web-astro _headers vs fid-compose STATIC_HEADERS"
+        );
+        for (k, v) in STATIC_HEADERS.iter().chain(std::iter::once(&HSTS)) {
+            assert!(
+                astro.contains(&format!("{k}: {v}")),
+                "web-astro _headers lacks `{k}: {v}`"
+            );
+        }
     }
 
     #[test]

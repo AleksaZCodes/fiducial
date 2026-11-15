@@ -115,7 +115,7 @@ through the UI changed exactly one line each with all 125 message keys kept.
 Each step has a test that must exist before the step is called done, because
 "it generated" is not "it works". Order is by what unblocks the most products.
 
-1. **`[apps.<name>]` and the rule for choosing** (`config.rs`, `doctor`). No new
+1. ✅ **`[apps.<name>]` and the rule for choosing** (0.21.0) (`config.rs`, `doctor`). No new
    framework yet: just the declaration, defaults recorded in comments, and a
    `doctor` check that a combination fits (an editor that needs a framework the
    app is not on fails with the reason). *Test:* a table of valid and invalid
@@ -126,7 +126,7 @@ Each step has a test that must exist before the step is called done, because
    --dry-run`, and every sitemap URL answering in `workerd`
    (`scripts/verify-web-next.sh`, `tests/site_shape.rs`). Still to do: a
    SvelteKit version of the pages (the data side is framework-free already).
-3. **`web-astro`.** The content-first default. Keystatic's own Astro
+3. 🟡 **`web-astro`** (0.21.0: the static site, deploy shape and headers; islands, the Keystatic integration and the i18n, SEO and content forms are still to do). The content-first default. Keystatic's own Astro
    integration replaces the separate `apps/cms` workspace there (the editor
    runs inside the dev server). Reuse tokens, i18n, content, seo: only the
    `for/web-astro/` templates are new. *Test:* the `cms_pipeline` end-to-end

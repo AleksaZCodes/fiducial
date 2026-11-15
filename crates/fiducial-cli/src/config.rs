@@ -60,6 +60,9 @@ pub struct Config {
     /// `[advise]` — whether advisory review is part of this product's procedure.
     #[serde(default, skip_serializing_if = "Advise::is_empty")]
     pub advise: Advise,
+    /// `[apps.<name>]` — what each app is built with (`crate::apps`).
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub apps: std::collections::BTreeMap<String, crate::apps::App>,
 
     /// Every other top-level block, kept verbatim.
     ///
@@ -689,6 +692,9 @@ pub enum DeployShape {
     SvelteKit,
     /// A Next.js app deployed through `@opennextjs/cloudflare`.
     NextJs,
+    /// An Astro site built to static files and served by Workers Static
+    /// Assets: no Worker entry and no binding, only the build directory.
+    Astro,
 }
 
 impl Deploy {
@@ -718,11 +724,13 @@ impl Deploy {
             "" | "worker" => Ok(DeployShape::Worker),
             "sveltekit" => Ok(DeployShape::SvelteKit),
             "nextjs" => Ok(DeployShape::NextJs),
+            "astro" => Ok(DeployShape::Astro),
             other => bail!(
                 "[deploy] shape = \"{other}\" is not a shape this executor knows. \
                  Use \"worker\" (a standalone Worker at apps/worker/), \
                  \"sveltekit\" (apps/web IS the Worker, via adapter-cloudflare) or \
-                 \"nextjs\" (apps/web IS the Worker, via @opennextjs/cloudflare)."
+                 \"nextjs\" (apps/web IS the Worker, via @opennextjs/cloudflare) or \
+                 \"astro\" (a static site: apps/web/dist served as assets, no Worker entry)."
             ),
         }
     }
@@ -733,6 +741,7 @@ impl Deploy {
         if self.assets_directory.is_empty() {
             match shape {
                 DeployShape::NextJs => ".open-next/assets",
+                DeployShape::Astro => "dist",
                 DeployShape::SvelteKit | DeployShape::Worker => ".svelte-kit/cloudflare",
             }
         } else {

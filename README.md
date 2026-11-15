@@ -163,6 +163,7 @@ product actually needs.
 | `site` | declares `site`; 1 pipeline(s); 15 template file(s); seeds a `fiducial.toml` block | `fid add capability site` |
 | `tauri` | 5 template file(s); guard rules | `fid add capability tauri` |
 | `topology` | declares `topology.toml`; 1 pipeline(s) | `fid add capability topology` |
+| `web-astro` | 10 template file(s); guard rules | `fid add capability web-astro` |
 | `web-next` | 14 template file(s); guard rules | `fid add capability web-next` |
 | `web-svelte` | 12 template file(s); guard rules | `fid add capability web-svelte` |
 | `worker-cloudflare` | 1 template file(s); guard rules | `fid add capability worker-cloudflare` |

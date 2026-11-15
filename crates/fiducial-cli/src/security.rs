@@ -142,6 +142,14 @@ pub static WEB_APP_SHAPES: &[WebAppShape] = &[
         also: &["apps/web/svelte.config.js"],
     },
     WebAppShape {
+        name: "Astro",
+        // A static site has no server to set headers, so they are a file the
+        // static-assets host reads from the build output.
+        config: "apps/web/public/_headers",
+        marker: "apps/web/astro.config.mjs",
+        also: &[],
+    },
+    WebAppShape {
         name: "Cloudflare Worker",
         config: "src/index.ts",
         marker: "wrangler.jsonc",

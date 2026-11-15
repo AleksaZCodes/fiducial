@@ -684,3 +684,40 @@ fn workers_dev_is_written_only_when_declared() {
     let cfg = std::fs::read_to_string(root.join("wrangler.jsonc")).unwrap();
     assert!(cfg.contains("\"workers_dev\": true"), "{cfg}");
 }
+
+// ── The Astro shape: static files, no Worker ──────────────────────────────────
+
+/// A static site has no Worker entry and no binding: `main` and `binding` are
+/// absent, not empty, and the build directory is Astro's `dist`. A `main` that
+/// names a file that does not exist makes `wrangler deploy` fail, and a binding
+/// nothing reads is a lie about the product.
+#[test]
+fn the_astro_shape_serves_the_build_directory_and_names_no_worker() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    assert!(run(tmp.path(), &["new", "p"]).status.success());
+    let root = tmp.path().join("p");
+    assert!(run(&root, &["add", "deploy"]).status.success());
+    let config_path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&config_path)
+        .unwrap()
+        .replace("[deploy]\n", "[deploy]\nshape = \"astro\"\n")
+        .replace("REPLACE_WITH_DATABASE_ID", "db-id-1")
+        .replace("REPLACE_WITH_BUCKET_NAME", "p-assets")
+        .replace("REPLACE_WITH_QUEUE_NAME", "p-jobs");
+    std::fs::write(&config_path, config).unwrap();
+    std::fs::write(
+        root.join("pipelines/deploy.toml"),
+        "name     = \"deploy\"\nexecutor = \"fid-deploy\"\noutputs  = [\"apps/web/wrangler.jsonc\"]\n",
+    )
+    .unwrap();
+
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "fid derive: {}", text(&out));
+    let cfg = std::fs::read_to_string(root.join("apps/web/wrangler.jsonc")).unwrap();
+
+    assert!(cfg.contains("\"directory\": \"dist\""), "{cfg}");
+    assert!(!cfg.contains("\"main\""), "{cfg}");
+    assert!(!cfg.contains("\"binding\""), "{cfg}");
+    assert!(!cfg.contains("FIDUCIAL_PRODUCT"), "{cfg}");
+    assert!(run(&root, &["derive", "--check"]).status.success());
+}

@@ -53,6 +53,7 @@ pub fn run() -> Result<()> {
     // ── 7. Adapter selections ─────────────────────────────────────────────
     if let Some(cfg) = &cfg {
         check_adapters(cfg, lock.as_ref(), &mut issues, &mut ok);
+        check_apps(cfg, &mut issues, &mut ok);
     }
 
     // ── 8. Hardcoded user-visible strings ─────────────────────────────────
@@ -134,6 +135,27 @@ pub fn run() -> Result<()> {
 }
 
 // ── Check helpers ─────────────────────────────────────────────────────────────
+
+/// Every `[apps.<name>]` choice is one that can be built, and fits the others.
+///
+/// An **issue**: a framework nothing builds, or an editor on a backend, is a
+/// declaration that cannot be honoured, and saying so here is cheaper than the
+/// scaffold that half works.
+fn check_apps(cfg: &Config, issues: &mut Vec<String>, ok: &mut Vec<String>) {
+    if cfg.apps.is_empty() {
+        return;
+    }
+    let found = crate::apps::problems(cfg, &cfg.apps);
+    if found.is_empty() {
+        ok.push(format!(
+            "[apps]: {} app(s), every choice buildable and consistent",
+            cfg.apps.len()
+        ));
+    }
+    for p in found {
+        issues.push(format!("fiducial.toml {p}"));
+    }
+}
 
 /// Every `[adapters]` selection resolves, and every required contract is filled.
 ///

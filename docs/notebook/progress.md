@@ -2,6 +2,13 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.21.0 · 2026-11-15
+
+- `[apps.<name>]`: each app declares framework, editor, shell, api and orm, and
+  `fid doctor` checks the choice can be built and fits the others.
+- `fid add app astro`: a static Astro site, deployed as static assets. Verified on
+  a fresh product through install, typecheck, lint, build and a wrangler dry run.
+
 ## 0.20.0 · 2026-11-15
 
 - The web app as a static export served by Caddy (`[deploy] static_dir`), built
