@@ -699,6 +699,9 @@ pub enum DeployShape {
     /// the entry is a source file, and the plugin produces the deployed config
     /// and the assets, so neither is named here.
     ReactRouter,
+    /// A TanStack Start app built the same way: `@cloudflare/vite-plugin`
+    /// produces the deployed config, and the entry is Start's own server entry.
+    TanStackStart,
 }
 
 impl Deploy {
@@ -730,13 +733,15 @@ impl Deploy {
             "nextjs" => Ok(DeployShape::NextJs),
             "astro" => Ok(DeployShape::Astro),
             "reactrouter" => Ok(DeployShape::ReactRouter),
+            "tanstackstart" => Ok(DeployShape::TanStackStart),
             other => bail!(
                 "[deploy] shape = \"{other}\" is not a shape this executor knows. \
                  Use \"worker\" (a standalone Worker at apps/worker/), \
                  \"sveltekit\" (apps/web IS the Worker, via adapter-cloudflare) or \
                  \"nextjs\" (apps/web IS the Worker, via @opennextjs/cloudflare) or \
                  \"astro\" (a static site: apps/web/dist served as assets, no Worker entry) or \
-                 \"reactrouter\" (apps/web IS the Worker, built by @cloudflare/vite-plugin)."
+                 \"reactrouter\" or \"tanstackstart\" (apps/web IS the Worker, built by \
+                 @cloudflare/vite-plugin)."
             ),
         }
     }
@@ -750,6 +755,7 @@ impl Deploy {
                 DeployShape::Astro => "dist",
                 // The Vite plugin serves the client build itself.
                 DeployShape::ReactRouter => "build/client",
+                DeployShape::TanStackStart => "dist/client",
                 DeployShape::SvelteKit | DeployShape::Worker => ".svelte-kit/cloudflare",
             }
         } else {

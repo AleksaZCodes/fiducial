@@ -1515,7 +1515,8 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
             DeployShape::SvelteKit
             | DeployShape::NextJs
             | DeployShape::Astro
-            | DeployShape::ReactRouter => product.clone(),
+            | DeployShape::ReactRouter
+            | DeployShape::TanStackStart => product.clone(),
             DeployShape::Worker => format!("{product}-worker"),
         }
     } else {
@@ -1534,6 +1535,9 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
             DeployShape::Astro => String::new(),
             // The entry is a source file; the Vite plugin bundles it.
             DeployShape::ReactRouter => "workers/app.ts".to_string(),
+            // Start's own entry; the plugin swaps in `src/server.ts` when the
+            // product has one.
+            DeployShape::TanStackStart => "@tanstack/react-start/server-entry".to_string(),
             DeployShape::Worker => "src/index.ts".to_string(),
         }
     } else {
@@ -1555,7 +1559,7 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
         )),
         // The Cloudflare Vite plugin adds the client assets to the deployed
         // config, so stating them here would be a second, competing declaration.
-        DeployShape::ReactRouter => None,
+        DeployShape::ReactRouter | DeployShape::TanStackStart => None,
         DeployShape::Worker => None,
     };
 
@@ -1572,7 +1576,8 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
         DeployShape::SvelteKit
         | DeployShape::NextJs
         | DeployShape::Astro
-        | DeployShape::ReactRouter => Vec::new(),
+        | DeployShape::ReactRouter
+        | DeployShape::TanStackStart => Vec::new(),
     };
     for (k, v) in &d.vars {
         // A product's own var wins over the derived one rather than appearing

@@ -719,6 +719,43 @@ fn the_react_router_shape_names_its_source_entry_and_no_assets() {
     assert!(run(&root, &["derive", "--check"]).status.success());
 }
 
+// ── The TanStack Start shape: Start's own server entry ────────────────────────
+
+/// `main` is the package's server entry, which the Cloudflare Vite plugin
+/// resolves, and `nodejs_compat` (seeded by `deploy`) is kept because Start
+/// needs it. Neither the assets nor a binding is stated: the plugin adds them.
+#[test]
+fn the_tanstack_start_shape_names_starts_entry_and_keeps_nodejs_compat() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    assert!(run(tmp.path(), &["new", "p"]).status.success());
+    let root = tmp.path().join("p");
+    assert!(run(&root, &["add", "deploy"]).status.success());
+    let config_path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&config_path)
+        .unwrap()
+        .replace("[deploy]\n", "[deploy]\nshape = \"tanstackstart\"\n")
+        .replace("REPLACE_WITH_DATABASE_ID", "db-id-1")
+        .replace("REPLACE_WITH_BUCKET_NAME", "p-assets")
+        .replace("REPLACE_WITH_QUEUE_NAME", "p-jobs");
+    std::fs::write(&config_path, config).unwrap();
+    std::fs::write(
+        root.join("pipelines/deploy.toml"),
+        "name     = \"deploy\"\nexecutor = \"fid-deploy\"\noutputs  = [\"apps/web/wrangler.jsonc\"]\n",
+    )
+    .unwrap();
+
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "fid derive: {}", text(&out));
+    let cfg = std::fs::read_to_string(root.join("apps/web/wrangler.jsonc")).unwrap();
+    assert!(
+        cfg.contains("\"main\": \"@tanstack/react-start/server-entry\""),
+        "{cfg}"
+    );
+    assert!(cfg.contains("nodejs_compat"), "{cfg}");
+    assert!(!cfg.contains("\"assets\""), "{cfg}");
+    assert!(run(&root, &["derive", "--check"]).status.success());
+}
+
 // ── The Astro shape: static files, no Worker ──────────────────────────────────
 
 /// A static site has no Worker entry and no binding: `main` and `binding` are

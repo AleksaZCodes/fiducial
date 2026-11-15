@@ -31,6 +31,7 @@ TARGETS
   svelte    SvelteKit web app                    → apps/web/
   astro     Astro static site (zero JS default)  → apps/web/
   router    React Router 8 on Workers (SSR)      → apps/web/
+  start     TanStack Start on Workers (SSR)      → apps/web/
   api       Hono API (Worker and Node)           → apps/api/
   tauri     Tauri 2 desktop + mobile             → apps/desktop/
   worker    Cloudflare Worker / Durable Object   → apps/worker/
@@ -42,7 +43,7 @@ EXAMPLES
   fid add app worker"
     )]
     App {
-        /// Target: next | svelte | astro | router | api | tauri | worker | mobile
+        /// Target: next | svelte | astro | router | start | api | tauri | worker | mobile
         #[arg(
             value_name = "TARGET",
             long_help = "Application type to scaffold. Run `fid add app --help` for the full list."
@@ -497,6 +498,7 @@ fn add_app(target: &str, icons: Option<&str>) -> Result<()> {
         "svelte" => "web-svelte",
         "astro" => "web-astro",
         "router" => "web-router",
+        "start" => "web-start",
         "api" => "api-hono",
         "tauri" => "tauri",
         "worker" => "worker-cloudflare",
@@ -510,7 +512,7 @@ fn add_app(target: &str, icons: Option<&str>) -> Result<()> {
         }
         other => bail!(
             "unknown app target `{other}`.\n\
-             Supported: next, svelte, astro, router, api, tauri, worker, mobile.\n\
+             Supported: next, svelte, astro, router, start, api, tauri, worker, mobile.\n\
              Run `fid add app --help` for details."
         ),
     };

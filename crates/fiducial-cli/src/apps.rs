@@ -61,8 +61,15 @@ pub struct Choices {
 
 pub const FRAMEWORK: Choices = Choices {
     field: "framework",
-    implemented: &["next", "sveltekit", "astro", "hono", "react-router"],
-    intended: &["tanstack-start"],
+    implemented: &[
+        "next",
+        "sveltekit",
+        "astro",
+        "hono",
+        "react-router",
+        "tanstack-start",
+    ],
+    intended: &[],
 };
 pub const EDITOR: Choices = Choices {
     field: "editor",
@@ -179,6 +186,7 @@ pub fn problems(cfg: &Config, apps: &BTreeMap<String, App>) -> Vec<String> {
                 "sveltekit" => Some("sveltekit"),
                 "astro" => Some("astro"),
                 "react-router" => Some("reactrouter"),
+                "tanstack-start" => Some("tanstackstart"),
                 _ => None,
             };
             if let Some(want) = want {
@@ -227,19 +235,16 @@ mod tests {
 
     #[test]
     fn an_intended_choice_says_nothing_builds_it() {
-        let p = check("[apps.web]\nframework = \"tanstack-start\"\n").join("\n");
+        let p = check("[apps.web]\nframework = \"next\"\neditor = \"pages\"\n").join("\n");
         assert!(p.contains("intended choice that nothing builds yet"), "{p}");
-        assert!(
-            p.contains("Selectable today: next, sveltekit, astro, hono, react-router"),
-            "{p}"
-        );
+        assert!(p.contains("Selectable today: keystatic, tina"), "{p}");
     }
 
     #[test]
     fn an_unknown_choice_lists_what_is_known() {
         let p = check("[apps.web]\nframework = \"rails\"\n").join("\n");
         assert!(p.contains("not a known choice"), "{p}");
-        assert!(p.contains("planned: tanstack-start"), "{p}");
+        assert!(p.contains("planned: none"), "{p}");
     }
 
     #[test]

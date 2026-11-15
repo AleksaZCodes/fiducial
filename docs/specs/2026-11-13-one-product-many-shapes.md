@@ -134,7 +134,7 @@ Each step has a test that must exist before the step is called done, because
 4. ✅ **`api-hono` and `orm-drizzle`** (0.22.0; Drizzle on SQLite only). Hono as the Worker backend for anything
    without route handlers; Drizzle schema as the declaration whose generated
    SQL feeds the existing `Migrator` (no second hand-written SQL).
-5. 🟡 **`web-router`** (0.23.0) **and `web-start`** (not yet). Verify each framework's current major and
+5. ✅ **`web-router`** (0.23.0) **and `web-start`** (0.24.0). Verify each framework's current major and
    its Workers story first (React Router v8, TanStack Start); do not copy a
    version from this document.
 6. **Shells as one family.** `shell-tauri` (exists), `shell-capacitor` (harvest
