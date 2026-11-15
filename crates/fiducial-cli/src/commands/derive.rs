@@ -218,6 +218,11 @@ fn executor_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
         "fid-legal" => cfg(&["legal", "brand", "i18n"]),
         "fid-deploy" => cfg(&["deploy", "adapters", "product.name"]),
         "fid-identity" => cfg(&["identity", "adapters"]),
+        "fid-compose" => {
+            let mut v = cfg(&["deploy", "adapters", "product.name"]);
+            v.push(arg(crate::topology::DECLARATION));
+            v
+        }
         "fid-adapters" => cfg(&["adapters"]),
         "fid-thesis" => {
             let mut v = expand_inputs(root, &[format!("{}?", crate::thesis::THESIS_FILE)]);
@@ -2855,6 +2860,24 @@ fn run_fid_topology(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// `deploy = "compose"`: the services, the proxy and the broker, derived from
+/// the topology and `[adapters]`. See `crate::compose`.
+fn run_fid_compose(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    let config = Config::load(&working_dir.join(crate::config::CONFIG_FILE))
+        .context("fid-compose needs fiducial.toml")?;
+    let decl = pipeline
+        .args
+        .first()
+        .map(String::as_str)
+        .unwrap_or(crate::topology::DECLARATION);
+    let plan = crate::compose::load(working_dir, &config, decl)?;
+    for out in &pipeline.outputs {
+        let content = crate::compose::render(&plan, out)?;
+        write_output(working_dir, out, &content)?;
+    }
+    Ok(())
+}
+
 fn run_fid_monitoring(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     use crate::{monitoring as mon, topology as topo};
     let decl = pipeline
@@ -3086,6 +3109,7 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             "fid-brand" => return run_fid_brand(pipeline, working_dir),
             "fid-thesis" => return run_fid_thesis(pipeline, working_dir),
             "fid-deploy" => return run_fid_deploy(pipeline, working_dir),
+            "fid-compose" => return run_fid_compose(pipeline, working_dir),
             "fid-identity" => return run_fid_identity(pipeline, working_dir),
             "fid-adapters" => return run_fid_adapters(pipeline, working_dir),
             "fid-schema" => return run_fid_schema(pipeline, working_dir),
@@ -3098,7 +3122,7 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             other => bail!(
                 "unknown executor `{other}` \
                  (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n, fid-brand, \
-                 fid-adapters, fid-deploy, fid-identity, fid-schema, fid-legal, fid-design, \
+                 fid-adapters, fid-deploy, fid-compose, fid-identity, fid-schema, fid-legal, fid-design, \
                  fid-protocol, fid-topology, fid-monitoring, fid-hardware)"
             ),
         };

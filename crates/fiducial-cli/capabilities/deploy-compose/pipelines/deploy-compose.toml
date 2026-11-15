@@ -1,0 +1,8 @@
+name     = "deploy-compose"
+executor = "fid-compose"
+outputs  = [
+  "deploy/compose.yaml",
+  "deploy/Caddyfile",
+  "deploy/mosquitto/mosquitto.conf",
+  "deploy/mosquitto/acl",
+]

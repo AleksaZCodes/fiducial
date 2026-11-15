@@ -1,0 +1,9 @@
+description = "Self-hosted deploy: Docker Compose, Caddy and a Mosquitto broker with its topic ACL, derived from the topology and [adapters]"
+requires_capabilities = ["topology"]
+
+# `[deploy]` holds only what the host knows: its name, where the image lives and
+# how Caddy gets a certificate. The services, volumes, healthchecks and the
+# broker's ACL are derived from topology.toml and [adapters].
+[[declarations.config]]
+block = "deploy"
+seed = { tls = "internal" }

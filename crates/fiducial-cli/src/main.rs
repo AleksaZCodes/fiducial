@@ -6,6 +6,7 @@ mod brand;
 mod capability;
 mod circuit;
 mod commands;
+mod compose;
 mod config;
 mod context;
 mod design;

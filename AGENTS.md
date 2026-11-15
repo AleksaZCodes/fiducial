@@ -399,6 +399,7 @@ The capabilities this platform ships:
 | `cms` | declares `cms`; 1 pipeline(s); 14 template file(s); seeds a `fiducial.toml` block | `fid add capability cms` |
 | `content` | declares `content.toml`, `content/posts/en/hello.md`; 1 pipeline(s); 2 template file(s) | `fid add capability content` |
 | `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |
+| `deploy-compose` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy-compose` |
 | `design` | declares `design-system.md`; 1 pipeline(s); 4 template file(s) | `fid add capability design` |
 | `eda` | declares `board/board.interface.json`; 2 pipeline(s); 1 template file(s) | `fid add capability eda` |
 | `firmware-esp32c6` | 9 template file(s); guard rules | `fid add capability firmware-esp32c6` |
@@ -443,7 +444,7 @@ not keep. This table is generated from the registry that enforces that rule:
 |---|---|---|---|
 | `database` | Relational storage: queries, migrations, transactions | `none`, `d1`, `supabase` | `neon`, `postgres` |
 | `storage` | Object storage: put, get, signed URLs | `none`, `r2`, `supabase-storage` | `s3` |
-| `deploy` | Where the product ships and how a release is promoted | `none`, `cloudflare` | `vercel`, `fly` |
+| `deploy` | Where the product ships and how a release is promoted | `none`, `cloudflare`, `compose` | `vercel`, `fly` |
 | `email` | Transactional email: send, template, verify a domain | `none`, `resend` | `ses`, `cloudflare-email` |
 | `newsletter` | Subscriber list management: subscribe, unsubscribe, status | `none`, `resend` | — |
 | `errors` | Error tracking and diagnostics | `none` | `sentry`, `workers-analytics` |

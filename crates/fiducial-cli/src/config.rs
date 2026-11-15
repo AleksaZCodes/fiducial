@@ -526,6 +526,21 @@ pub struct Deploy {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub shape: String,
 
+    /// The hostname a self-hosted product answers on (`deploy = "compose"`):
+    /// a LAN name such as `building.local`, or a public domain. Read only by
+    /// `fid-compose`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub host: String,
+
+    /// Where the server image is pushed and pulled (`deploy = "compose"`).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub registry: String,
+
+    /// How Caddy gets its certificate (`deploy = "compose"`): `internal` (its
+    /// own CA, for a LAN name, the default) or `acme` (a public domain).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tls: String,
+
     /// Where the adapter writes the static assets it wants served.
     ///
     /// Only read for `shape = "sveltekit"` and `"nextjs"`, and defaulted to the adapter's own

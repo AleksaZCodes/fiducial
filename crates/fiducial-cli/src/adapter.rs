@@ -79,7 +79,7 @@ pub static CONTRACTS: &[Contract] = &[
     Contract {
         name: "deploy",
         description: "Where the product ships and how a release is promoted",
-        implementations: &[NONE, "cloudflare"],
+        implementations: &[NONE, "cloudflare", "compose"],
         candidates: &["vercel", "fly"],
     },
     Contract {
