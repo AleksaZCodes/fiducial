@@ -764,6 +764,90 @@ pub fn render_topics(t: &Topology, decl: &str, ext: &str) -> Result<String> {
     )
 }
 
+/// A Mermaid id: letters, digits and underscores only.
+pub(crate) fn mid(s: &str) -> String {
+    s.chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect()
+}
+
+/// `topology.md`: the nodes grouped by system and the buses between them,
+/// then the topics as a sequence between each node and the broker. Derived,
+/// so a change to the declaration changes the picture in the same derive.
+pub fn render_diagrams(t: &Topology, decl: &str) -> String {
+    let mut s = format!(
+        "<!-- Derived by fid-topology from {decl} — do not edit. -->\n\n# Topology\n\n```mermaid\nflowchart LR\n"
+    );
+    for sys in &t.system {
+        s.push_str(&format!("  subgraph {}[\"{}\"]\n", mid(&sys.id), sys.id));
+        for id in &sys.nodes {
+            if let Some(n) = t.node.iter().find(|n| &n.id == id) {
+                let kind = match n.kind {
+                    NodeKind::Mcu => "mcu",
+                    NodeKind::Host => "host",
+                };
+                s.push_str(&format!("    {}[\"{} ({kind})\"]\n", mid(id), id));
+            }
+        }
+        s.push_str("  end\n");
+    }
+    for n in t.node.iter().filter(|n| t.system_of(&n.id).is_none()) {
+        s.push_str(&format!("  {}[\"{}\"]\n", mid(&n.id), n.id));
+    }
+    for b in &t.bus {
+        let label = match &b.protocol {
+            Some(p) => format!("{} · {p}{}", b.kind, if b.tls { " · tls" } else { "" }),
+            None => b.kind.clone(),
+        };
+        let ends: Vec<String> = b
+            .connect
+            .iter()
+            .map(|c| mid(c.split('.').next().unwrap_or(c)))
+            .collect();
+        let hub = match &b.broker {
+            Some(h) => mid(h),
+            None => ends.first().cloned().unwrap_or_default(),
+        };
+        for e in ends.iter().filter(|e| **e != hub) {
+            s.push_str(&format!("  {e} ---|\"{} · {label}\"| {hub}\n", b.id));
+        }
+    }
+    s.push_str("```\n");
+    let brokers: Vec<&Bus> = t.bus.iter().filter(|b| b.broker.is_some()).collect();
+    if let Some(b) = brokers.first() {
+        let hub = b.broker.clone().unwrap_or_default();
+        let nodes: Vec<&String> = b
+            .connect
+            .iter()
+            .map(|c| c.split('.').next().unwrap_or(c))
+            .filter_map(|c| t.node.iter().find(|n| n.id == c).map(|n| &n.id))
+            .filter(|id| **id != hub)
+            .collect();
+        s.push_str("\n# Topics\n\n```mermaid\nsequenceDiagram\n");
+        for n in &nodes {
+            s.push_str(&format!("  participant {} as {n}\n", mid(n)));
+        }
+        s.push_str(&format!("  participant {} as {hub}\n", mid(&hub)));
+        if let Some(n) = nodes.first() {
+            for tp in t.topics() {
+                let (from, to, arrow) = match tp.direction {
+                    Direction::Up => (mid(n), mid(&hub), "->>"),
+                    Direction::Down => (mid(&hub), mid(n), "->>"),
+                    Direction::Will => (mid(&hub), mid(&hub), "-->>"),
+                };
+                let ret = if tp.retained { " (retained)" } else { "" };
+                let what = match tp.direction {
+                    Direction::Will => format!("{}{ret}: the will, sent if {n} drops", tp.id),
+                    _ => format!("{}{ret}", tp.id),
+                };
+                s.push_str(&format!("  {from}{arrow}{to}: {what}\n"));
+            }
+        }
+        s.push_str("```\n");
+    }
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -883,5 +967,13 @@ default = 1000
             topics.contains("#define NODE_ROOM_1_RUNTIME \"zephyr\""),
             "{topics}"
         );
+    }
+
+    #[test]
+    fn the_diagrams_draw_every_node_and_topic() {
+        let d = render_diagrams(&parse(SITE), "topology.toml");
+        assert!(d.contains("flowchart LR") && d.contains("sequenceDiagram"));
+        assert!(d.contains("room_1") && d.contains("server"));
+        assert!(d.contains("parameters (retained)"));
     }
 }
