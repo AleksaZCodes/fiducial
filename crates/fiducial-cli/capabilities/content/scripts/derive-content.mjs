@@ -121,8 +121,8 @@ function stripComment(v) {
   }
   return v;
 }
-function parseValue(v) {
-  v = stripComment(v).trim();
+function parseValue(raw) {
+  const v = stripComment(raw).trim();
   if (v.startsWith('"') && v.endsWith('"')) {
     // TOML's basic-string escapes are JSON's, bar two rare ones (\e, \UXXXXXXXX).
     try {
@@ -268,10 +268,7 @@ function checkSchema(meta, schema, where, objects = {}) {
   for (const field of Object.keys(meta)) {
     if (!(field in schema)) {
       fail(
-        `${where}: field \`${field}\` is not in the collection's schema.\n` +
-          `  Add it to content.toml, or fix the spelling. A field that is not ` +
-          `declared is dropped silently otherwise, which is how a typo becomes ` +
-          `a missing paragraph nobody can find.`,
+        `${where}: field \`${field}\` is not in the collection's schema.\n  Add it to content.toml, or fix the spelling. A field that is not declared is dropped silently otherwise, which is how a typo becomes a missing paragraph nobody can find.`,
       );
     }
   }
@@ -327,10 +324,7 @@ function main() {
         // behaviour and the wrong one — the reader is never told, and a
         // journalist or customer quotes text in the wrong language.
         fail(
-          `collection \`${name}\` has nothing for locale \`${loc}\`.\n` +
-            `  expected: ${dir}/\n` +
-            `  A missing translation is a missing artifact, not a fallback ` +
-            `(MISSION.md 1c).\n  Write it, or remove \`${loc}\` from [i18n] locales.`,
+          `collection \`${name}\` has nothing for locale \`${loc}\`.\n  expected: ${dir}/\n  A missing translation is a missing artifact, not a fallback (MISSION.md 1c).\n  Write it, or remove \`${loc}\` from [i18n] locales.`,
         );
       }
       const files = readdirSync(at(dir))
@@ -366,8 +360,7 @@ function main() {
         .map((l) => `    ${l}: ${byLocale[l].map((e) => e.slug).join(", ") || "(none)"}`)
         .join("\n");
       fail(
-        `collection \`${name}\` does not carry the same entries in every locale.\n\n${detail}\n\n` +
-          `  An entry exists in every locale, or it exists in none.`,
+        `collection \`${name}\` does not carry the same entries in every locale.\n\n${detail}\n\n  An entry exists in every locale, or it exists in none.`,
       );
     }
 

@@ -1,3 +1,6 @@
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 // The brand SVGs → PNGs, staged for the bucket.
 //
 // `pnpm brand:render`, then `pnpm media:push`.
@@ -17,9 +20,6 @@
 // is a check that fails for the wrong reason. The SVGs — which ARE derived,
 // and are text — stay in the `logo` pipeline where the check works.
 import { Resvg } from "@resvg/resvg-js";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 const repo = fileURLToPath(new URL("..", import.meta.url));
 const read = (p) => readFileSync(join(repo, p), "utf8");
@@ -44,4 +44,6 @@ for (const { name, width } of ASSETS) {
   console.log(`  ✓  press/gallery/${name}.png  (${width}px, transparent)`);
 }
 
-console.log(`\n${ASSETS.length} asset(s) staged in media/press/gallery — \`pnpm media:push\` uploads them.`);
+console.log(
+  `\n${ASSETS.length} asset(s) staged in media/press/gallery — \`pnpm media:push\` uploads them.`,
+);

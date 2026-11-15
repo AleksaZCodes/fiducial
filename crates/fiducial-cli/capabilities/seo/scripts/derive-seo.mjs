@@ -28,6 +28,7 @@
 // one canonical to a crawler and another to a reader.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { frontmatter } from "./frontmatter.mjs";
 // `toml-lite.mjs`, not `derive-content.mjs`, for `parseToml`.
 //
 // `derive-content.mjs` is a pipeline executor with no main-module guard: its
@@ -43,7 +44,6 @@ import { dirname } from "node:path";
 // `toml-lite.mjs` is a parser and nothing else, and it already handles the
 // arrays-across-several-lines that an `outputs` list is always written as.
 import { parseToml } from "./toml-lite.mjs";
-import { frontmatter } from "./frontmatter.mjs";
 
 const at = (p) => new URL(`../${p}`, import.meta.url);
 // A missing file is named, never a stack trace: a locale added to [i18n]
@@ -106,18 +106,13 @@ const staticPages = (seo.pages ?? ["/"]).map((entry) => {
     const keys = CONVENTIONAL_KEYS[entry];
     if (!keys) {
       fail(
-        `[seo] pages lists ${entry}, and this script has no conventional title key for it.\n` +
-          "  Declare the keys with the path instead of listing the path alone:\n" +
-          `    { path = "${entry}", title = "<key>", description = "<key>" }\n` +
-          "  They are message keys, resolved in each locale's catalogue.",
+        `[seo] pages lists ${entry}, and this script has no conventional title key for it.\n  Declare the keys with the path instead of listing the path alone:\n    { path = "${entry}", title = "<key>", description = "<key>" }\n  They are message keys, resolved in each locale's catalogue.`,
       );
     }
     return { path: entry, title: keys[0], description: keys[1] };
   }
   if (!entry.path || !entry.title || !entry.description) {
-    fail(
-      `[seo] pages has an entry missing path, title or description: ${JSON.stringify(entry)}`,
-    );
+    fail(`[seo] pages has an entry missing path, title or description: ${JSON.stringify(entry)}`);
   }
   return entry;
 });
@@ -155,10 +150,7 @@ const declaredOutputs = pipeline.outputs ?? [];
 const output = (name) =>
   declaredOutputs.find((o) => o.endsWith(`/${name}`) || o === name) ??
   fail(
-    `pipelines/seo.toml declares no output ending in \`${name}\`.\n` +
-      `  Its outputs are ${JSON.stringify(declaredOutputs)}.\n` +
-      "  This script derives seo.ts, seo.json and sitemap.xml; each one needs a\n" +
-      "  declared path, because that path is what `fid derive --check` guards.",
+    `pipelines/seo.toml declares no output ending in \`${name}\`.\n  Its outputs are ${JSON.stringify(declaredOutputs)}.\n  This script derives seo.ts, seo.json and sitemap.xml; each one needs a\n  declared path, because that path is what \`fid derive --check\` guards.`,
   );
 
 const tsOut = output("seo.ts");
@@ -221,9 +213,10 @@ const legalTs = existsSync(at("apps/web/src/generated/legal.ts"))
   ? read("apps/web/src/generated/legal.ts")
   : "";
 const legalPages =
-  legalTs.match(/export type LegalPage = ([^;]+);/)?.[1].match(/"([^"]+)"/g)?.map((s) =>
-    s.slice(1, -1),
-  ) ?? [];
+  legalTs
+    .match(/export type LegalPage = ([^;]+);/)?.[1]
+    .match(/"([^"]+)"/g)
+    ?.map((s) => s.slice(1, -1)) ?? [];
 for (const locale of locales) {
   for (const page of legalPages) {
     // An authored override owns the title when it exists; otherwise the
@@ -315,7 +308,8 @@ routes.sort((a, b) => a.path.localeCompare(b.path));
 // wordmark geometry, which a product does not have until it sets them up; a
 // route table that named an image anyway sent every crawler to a 404.
 const withOg = seo.og === true;
-const ogPath = (r) => `/og/${r.locale}/${r.key.replace(/^page\//, "").replace(/\//g, "-") || "home"}.png`;
+const ogPath = (r) =>
+  `/og/${r.locale}/${r.key.replace(/^page\//, "").replace(/\//g, "-") || "home"}.png`;
 
 const byKey = new Map();
 for (const r of routes) {
@@ -372,7 +366,10 @@ console.log(`wrote ${tsOut} (${entries.length} route(s), ${locales.length} local
 // The same routes as JSON, for the node scripts that also need them — the
 // social-image renderer runs before the app is built, so it cannot import a
 // TypeScript module. Same rule as the logo pipeline: two readers, one source.
-writeFileSync(at(jsonOut), `${JSON.stringify({ origin, defaultLocale, routes: entries }, null, 2)}\n`);
+writeFileSync(
+  at(jsonOut),
+  `${JSON.stringify({ origin, defaultLocale, routes: entries }, null, 2)}\n`,
+);
 console.log(`wrote ${jsonOut}`);
 
 // ── sitemap.xml ──────────────────────────────────────────────────────────────

@@ -1,3 +1,5 @@
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 // generated/seo.json + the logo primitives  →  apps/web/public/og/**.png
 //
 // The social image of every route, rendered from the facts the repository
@@ -25,8 +27,6 @@
 // under their SIL Open Font Licence. Fetching them at build time would put a
 // network call — and Google — in the critical path of a deploy.
 import { Resvg } from "@resvg/resvg-js";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
 import satori from "satori";
 
 const at = (p) => new URL(`../${p}`, import.meta.url);
@@ -36,10 +36,7 @@ const { routes } = JSON.parse(read("apps/web/src/generated/seo.json"));
 const logo = JSON.parse(read("apps/web/src/generated/logo.json"));
 /** The wordmark's accent (paths and polygons, possibly none) in one colour. */
 const accentSvg = (accent, fill) =>
-  `<g fill="${fill}">` +
-  (accent?.paths ?? []).map((d) => `<path d="${d}"/>`).join("") +
-  (accent?.polygons ?? []).map((pts) => `<polygon points="${pts}"/>`).join("") +
-  "</g>";
+  `<g fill="${fill}">${(accent?.paths ?? []).map((d) => `<path d="${d}"/>`).join("")}${(accent?.polygons ?? []).map((pts) => `<polygon points="${pts}"/>`).join("")}</g>`;
 
 const display = readFileSync(at("assets/fonts/ChakraPetch.ttf"));
 const body = readFileSync(at("assets/fonts/SourceSerif4.ttf"));

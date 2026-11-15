@@ -776,23 +776,51 @@ fn check_security_headers(root: &Path, issues: &mut Vec<String>, ok: &mut Vec<St
 /// how artifacts are derived that no declaration states (the paper's fourth
 /// set, F14 and F15, edited two generator scripts).
 /// Whether a file differs from the platform's record only in its `FID_VERSION`.
+///
+/// The record is a hash of the file as last accepted (scaffolded, merged or
+/// rebaselined), so the question is whether putting an earlier pin back makes
+/// the file hash to it. A product with its own CI edits, rebaselined, keeps
+/// them and is still only "pin moved".
 fn only_the_ci_pin_differs(path: &Path, record: Option<&crate::lock::TemplateRecord>) -> bool {
-    let (Ok(now), Some(base)) = (
-        std::fs::read_to_string(path),
-        record.and_then(|r| r.base_content.as_deref()),
-    ) else {
+    let (Ok(now), Some(record)) = (std::fs::read_to_string(path), record) else {
         return false;
     };
-    let unpinned = |text: &str| -> String {
+    let pin_of = |text: &str| -> Option<String> {
         text.lines()
-            .map(|l| match l.trim_start().strip_prefix("FID_VERSION:") {
-                Some(_) => "FID_VERSION:",
-                None => l,
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
+            .find_map(|l| l.trim_start().strip_prefix("FID_VERSION:"))
+            .map(|v| v.trim().trim_matches('"').to_string())
     };
-    unpinned(&now) == unpinned(base)
+    let Some(current) = pin_of(&now) else {
+        return false;
+    };
+    let mut candidates: Vec<String> = record
+        .base_content
+        .as_deref()
+        .and_then(pin_of)
+        .into_iter()
+        .collect();
+    candidates.push(record.source_version.clone());
+    // The pin the record was accepted with is not stored, only its hash, and
+    // it is often neither the merge base's nor the record's version (a pin
+    // moved by hand and then rebaselined). Every release up to this one is a
+    // candidate: a few hundred hashes of one small file.
+    let mut this = PLATFORM_VERSION
+        .split('.')
+        .map(|n| n.parse::<u32>().unwrap_or(0));
+    let (major, minor) = (this.next().unwrap_or(0), this.next().unwrap_or(0));
+    for m in 0..=minor {
+        for patch in 0..=30 {
+            candidates.push(format!("{major}.{m}.{patch}"));
+        }
+    }
+    candidates.iter().any(|old| {
+        let restored = now.replacen(
+            &format!("FID_VERSION: \"{current}\""),
+            &format!("FID_VERSION: \"{old}\""),
+            1,
+        );
+        crate::lock::sha256_hex(restored.as_bytes()) == record.hash
+    })
 }
 
 pub(crate) fn platform_drift(root: &Path, lock: &Lock, enabled: &[String]) -> (Vec<String>, usize) {
@@ -856,17 +884,31 @@ mod tests {
     #[test]
     fn a_moved_ci_pin_is_not_drift_and_anything_else_is() {
         let base = "env:\n      FID_VERSION: \"0.14.0\"\nsteps: []\n";
+        // The product's own CI edit, accepted (rebaselined) at 0.14.0.
+        let accepted = base.replace("steps: []", "steps: [lint]");
         let record = crate::lock::TemplateRecord {
             source_version: "0.14.0".into(),
-            hash: String::new(),
+            hash: crate::lock::sha256_hex(accepted.as_bytes()),
             base_content: Some(base.into()),
         };
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("ci.yml");
-        std::fs::write(&path, base.replace("0.14.0", "0.15.0")).unwrap();
+        std::fs::write(&path, accepted.replace("0.14.0", "0.15.0")).unwrap();
         assert!(super::only_the_ci_pin_differs(&path, Some(&record)));
-        std::fs::write(&path, base.replace("steps: []", "steps: [x]")).unwrap();
+        std::fs::write(&path, accepted.replace("steps: [lint]", "steps: [x]")).unwrap();
         assert!(!super::only_the_ci_pin_differs(&path, Some(&record)));
+
+        // Scaffolded at 0.12.0, pin moved to 0.14.0 and rebaselined, now 0.15.0:
+        // the accepted pin is in neither the base nor the record's version.
+        let base = "env:\n      FID_VERSION: \"0.12.0\"\nsteps: []\n";
+        let accepted = base.replace("0.12.0", "0.14.0");
+        let record = crate::lock::TemplateRecord {
+            source_version: "0.12.0".into(),
+            hash: crate::lock::sha256_hex(accepted.as_bytes()),
+            base_content: Some(base.into()),
+        };
+        std::fs::write(&path, accepted.replace("0.14.0", "0.15.0")).unwrap();
+        assert!(super::only_the_ci_pin_differs(&path, Some(&record)));
     }
     use super::pinned_cli_version;
 

@@ -2,11 +2,13 @@
 //
 // Named imports of only the declared regions' flags, as SVG strings: the one
 // form both pickers (React and Svelte) can draw, and one a bundler tree-shakes.
-import { readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 
 const at = (p) => new URL(`../${p}`, import.meta.url);
 const regions = new Set();
-for (const file of readdirSync(at("messages")).filter((f) => f.endsWith(".json")).sort()) {
+for (const file of readdirSync(at("messages"))
+  .filter((f) => f.endsWith(".json"))
+  .sort()) {
   const catalog = JSON.parse(readFileSync(at(`messages/${file}`), "utf8"));
   const region = catalog?.locale?.region;
   // A flag export is a two-letter region code; anything else draws no flag,

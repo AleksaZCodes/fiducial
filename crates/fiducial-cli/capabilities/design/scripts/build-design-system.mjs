@@ -134,7 +134,8 @@ const step = (cls, spec, sample) => `
 
 const pages = {
   "foundations/color.html": page(
-    "Colour", "Foundations",
+    "Colour",
+    "Foundations",
     "Every value is a token. Nothing here is written at a call site, and a colour that is not on this page does not exist in the product.",
     `<div class="grid">
       ${swatch("Primary", "--primary", "primary actions and links")}
@@ -153,10 +154,12 @@ const pages = {
         <div style="width:44px;height:44px;background:var(--doodle-accent)"></div>
         <p class="type-small" style="color:var(--muted-foreground);max-width:52ch">Marks stroke in <code>--doodle-ink</code>, deliberately quieter than body text. <code>--doodle-accent</code> is the one that gets to shout — at most one mark per viewport.</p>
       </div>
-    </div>`),
+    </div>`,
+  ),
 
   "foundations/type.html": page(
-    "Typography", "Foundations",
+    "Typography",
+    "Foundations",
     "Four roles, ten steps, nothing outside them. The display face is not the body face at a larger size — that difference is most of what separates a designed page from a generated one.",
     `<div class="stack">
       ${step("type-display", "display · 3.75rem / 1.04 / 600", "The display face")}
@@ -169,10 +172,12 @@ const pages = {
       ${step("type-eyebrow", "display · 0.75rem / 600 / 0.18em", "Section label")}
       ${step("doodle-note", "script · 1.25rem / 1.25 / 500", "…and the hand in the margin")}
       ${step("type-mono", "mono · 0.8125rem / 1.5 / 400", "01 · 02 · 03 · 04 — tabular figures on by default")}
-    </div>`),
+    </div>`,
+  ),
 
   "foundations/shape-space.html": page(
-    "Shape and space", "Foundations",
+    "Shape and space",
+    "Foundations",
     "Corners are a strategy, not a number. One scalar can say how much; it can never say what kind, which is why every product built on a single --radius has the same silhouette.",
     `<div class="grid">
       <figure><div class="cham" style="height:80px"></div><figcaption class="type-small" style="margin-top:.5rem">--corner-panel · cards and panels</figcaption></figure>
@@ -185,10 +190,12 @@ const pages = {
       <p class="label">Why three sizes and not one scalar</p>
       <p class="type-small" style="color:var(--muted-foreground);margin-top:.6rem;max-width:68ch">A chamfer must stay under half the element's height, or the two cuts on one edge meet and the box degenerates into a lozenge. A chip given the panel corner is not slightly wrong — it is a different shape. That constraint is the reason the scale is tied to element classes rather than to a size ramp.</p>
       <p class="type-small" style="color:var(--muted-foreground);margin-top:.8rem;max-width:68ch">The border is not a <code>border</code>: <code>clip-path</code> cuts a stroke off along the diagonal and leaves the corners bare. So the element's own background paints the edge and an inset pseudo-element paints the fill. Callers set <code>--edge</code> and <code>--fill</code>.</p>
-    </div>`),
+    </div>`,
+  ),
 
   "components/actions.html": page(
-    "Buttons and status", "Components",
+    "Buttons and status",
+    "Components",
     "One primary action per view. The status pill is the honest one — it says what is actually true about a thing, and the design system exists partly to keep it that way.",
     `<div class="stack">
       <div><p class="label">Buttons</p><div class="row" style="margin-top:.6rem">
@@ -204,10 +211,12 @@ const pages = {
           <span style="width:6px;height:6px;border-radius:999px;background:var(--accent);display:inline-block"></span>In development
         </span>
       </div></div>
-    </div>`),
+    </div>`,
+  ),
 
   "components/marks.html": page(
-    "Annotation marks", "Components",
+    "Annotation marks",
+    "Components",
     "The one device here a layout algorithm cannot imitate: a mark says someone looked at this and pointed. Which is exactly why it is rationed — at most two per viewport, at most one of them in the accent ink.",
     `<div class="grid">
       <figure>
@@ -251,18 +260,22 @@ const pages = {
       <p class="label">The rules</p>
       <p class="type-small" style="color:var(--muted-foreground);margin-top:.6rem;max-width:68ch">Marks are <code>aria-hidden</code>: one that points at text is emphasis, not information, and the text has to carry the meaning alone. They stroke in <code>--doodle-ink</code>, never <code>--foreground</code> — an annotation at full text contrast is a second headline. The script face appears in <code>doodle-note</code> and nowhere else.</p>
       <p style="margin-top:1rem"><span class="doodle-note" style="transform:rotate(-3deg);color:var(--doodle-ink)">…like this, and only like this</span></p>
-    </div>`),
+    </div>`,
+  ),
 
   "components/cards.html": page(
-    "Cards", "Components",
+    "Cards",
+    "Components",
     "Flat, 2px edge, no shadow and no hover lift. Under the chamfer strategy a clip-path element cannot cast an outer shadow anyway — so elevation is carried by the edge, which is the more honest cue.",
     `<div class="grid">
       <div class="cham card"><div class="row" style="justify-content:space-between;align-items:flex-start"><h3 class="type-h3">Card title</h3><span class="cham-xs chip">Status</span></div><p class="type-small" style="color:var(--muted-foreground);margin-top:.7rem">A status label is load-bearing: it says what is actually true about the thing, and it is the first place a design system starts telling comfortable lies.</p></div>
       <div class="cham card"><div class="row" style="justify-content:space-between;align-items:flex-start"><h3 class="type-h3">Second card</h3><span class="cham-xs chip">Status</span></div><p class="type-small" style="color:var(--muted-foreground);margin-top:.7rem">Cards sit in a grid with a 1rem gutter and do not move when pointed at.</p></div>
-    </div>`),
+    </div>`,
+  ),
 
   "components/navigation.html": page(
-    "Navigation", "Components",
+    "Navigation",
+    "Components",
     "Text links, no icons. Sticky, frosted, and chamfered along the bottom edge only — so the bar reads as hanging from the top of the viewport rather than floating near it.",
     `<div style="border:1px solid var(--border);overflow:hidden">
       <div style="position:relative;height:210px;background:var(--muted)">
@@ -275,7 +288,8 @@ const pages = {
         </div>
         <p class="type-small" style="padding:1.5rem 1.25rem;color:var(--muted-foreground)">A clip-path element cannot cast an outer shadow, so the scroll cue is the 2px edge itself — transparent at rest, drawn once there is page behind the bar.</p>
       </div>
-    </div>`),
+    </div>`,
+  ),
 };
 
 for (const [path, html] of Object.entries(pages)) {

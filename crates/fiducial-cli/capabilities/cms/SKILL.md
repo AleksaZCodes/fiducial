@@ -145,6 +145,11 @@ mistake is not a `git revert`. Both directions read one definition of
 
 A picture inside a list of records (a gallery) counts as referenced too.
 
+`[cms] media_field = "text"` edits a picture as its stored text instead of
+through the picker. Use it when a value carries more than a key (a focus point
+as `?focus=30,40`, a URL): the picker re-homes an image under the entry's own
+folder when it saves and keeps no query, so it would rewrite every such value.
+
 A collection declares its key prefix in `content.toml`:
 
 ```toml
