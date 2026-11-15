@@ -188,7 +188,13 @@ pub fn plan(config: &Config, t: Option<&Topology>) -> Result<Plan> {
             env.push(("MQTT_URL".into(), "mqtts://mosquitto:8883".into()));
         }
         if ollama {
-            env.push(("AI_BASE_URL".into(), "http://ollama:11434/v1".into()));
+            let url = if config.ai.base_url.is_empty() {
+                "http://ollama:11434/v1"
+            } else {
+                config.ai.base_url.as_str()
+            };
+            env.push(("AI_BASE_URL".into(), url.into()));
+            env.push(("AI_MODEL".into(), config.ai.model.clone()));
         }
         let mut depends = Vec::new();
         if broker.is_some() {
@@ -553,7 +559,9 @@ connect = ["room_1.wifi", "server.eth0"]
     #[test]
     fn the_building_use_case_gets_its_broker_and_acl() {
         let p = plan(
-            &config("ai = \"ollama\"\nauth = \"native\"\n"),
+            &config(
+                "ai = \"ollama\"\nauth = \"native\"\ndatabase = \"sqlite\"\n\n[ai]\nmodel = \"llama3.2\"\n",
+            ),
             Some(&site()),
         )
         .unwrap();
@@ -563,6 +571,9 @@ connect = ["room_1.wifi", "server.eth0"]
         }
         assert!(c.contains("platform: linux/arm64"));
         assert!(c.contains("SESSION_SECRET: ${SESSION_SECRET}"));
+        assert!(c.contains("DATABASE_PATH: \"/data/server.db\""), "{c}");
+        assert!(c.contains("AI_MODEL: \"llama3.2\""), "{c}");
+        assert!(c.contains("AI_BASE_URL: \"http://ollama:11434/v1\""), "{c}");
         let a = render_acl(&p);
         assert!(a.contains("pattern write building/%u/state"));
         assert!(a.contains("pattern read building/%u/command"));

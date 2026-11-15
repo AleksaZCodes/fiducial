@@ -2,6 +2,12 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.19.0 · 2026-11-15
+
+- The self-hosted server stack is complete: `sqlite`, `native` auth and `ollama`
+  are implemented in Rust (`fiducial-adapters` features) and selectable, with no
+  TypeScript class. Phase 5 of distributed products is done.
+
 ## 0.18.0 · 2026-11-15
 
 - `deploy = "compose"`: the self-hosted target is derived: compose services,

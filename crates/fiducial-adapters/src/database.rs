@@ -4,6 +4,10 @@
 //! Postgres. Any method that leaks a vendor's model (Supabase row-level
 //! security policies, D1's batch API shape, Postgres advisory locks) belongs
 //! on the vendor type, not on this trait.
+//!
+//! `none` and `sqlite` (cargo feature `sqlite`, [`crate::sqlite`]) are the
+//! Rust implementations; `d1` and `supabase` are TypeScript-side, because a
+//! Workers binding exists only inside a Worker.
 
 use std::collections::BTreeMap;
 use thiserror::Error;

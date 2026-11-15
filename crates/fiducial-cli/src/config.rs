@@ -142,6 +142,12 @@ pub struct Ai {
     /// unknown model at the first call rather than at deploy.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub model: String,
+
+    /// The OpenAI-compatible endpoint, for `ai = "ollama"`: a plain-http URL
+    /// ending in `/v1`. Empty means the Compose service,
+    /// `http://ollama:11434/v1`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub base_url: String,
 }
 
 /// `[systemOne]` — facts for the typed-decision contract.
@@ -173,7 +179,7 @@ impl SystemOne {
 impl Ai {
     /// True when the product declares no AI facts at all.
     pub fn is_empty(&self) -> bool {
-        self.model.is_empty()
+        self.model.is_empty() && self.base_url.is_empty()
     }
 
     /// The facts the selected vendor needs, named when missing.
@@ -188,6 +194,20 @@ impl Ai {
                 "[ai] model is missing, and `[adapters] ai = \"openrouter\"` \
                  needs one — a gateway routes by model id. Declare one (e.g. \
                  model = \"anthropic/claude-opus-5\")."
+            );
+        }
+        if adapters.get("ai") == Some("ollama") && self.model.is_empty() {
+            bail!(
+                "[ai] model is missing, and `[adapters] ai = \"ollama\"` needs one — a \
+                 name `ollama list` shows on the host (e.g. model = \"llama3.2\"). Pull it \
+                 first with `ollama pull`."
+            );
+        }
+        if !self.base_url.is_empty() && !self.base_url.starts_with("http://") {
+            bail!(
+                "[ai] base_url = \"{}\" is not plain http://. Ollama runs beside the \
+                 product server, and the Rust adapter carries no TLS.",
+                self.base_url
             );
         }
         Ok(())

@@ -410,3 +410,73 @@ fn the_factory_builds_each_adapter_only_when_it_is_read() {
         "an adapter is constructed eagerly: {factory}"
     );
 }
+
+// ── The self-hosted vendors: Rust-side only ────────────────────────────────────
+
+#[test]
+fn a_rust_only_vendor_is_selectable_and_its_typescript_slot_says_so() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "database", "sqlite");
+    set_adapter(&root, "auth", "native");
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "derive: {}", text(&out));
+
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    // No class is imported for them, and reading one is a clear error — not a
+    // quiet `none`.
+    assert!(
+        !factory.contains("D1Database") && !factory.contains("NoneDatabase"),
+        "{factory}"
+    );
+    assert!(factory.contains("get database(): never"), "{factory}");
+    assert!(factory.contains("implemented in Rust only"), "{factory}");
+    assert!(
+        factory.contains("[adapters] auth = \\\"native\\\""),
+        "{factory}"
+    );
+    assert!(
+        factory.contains("createAuth(_env: any, _ctx: AuthSessionContext)"),
+        "{factory}"
+    );
+    // The vendors that are not Rust-only are unaffected.
+    assert!(factory.contains("NoneStorage"), "{factory}");
+
+    let doctor = run(&root, &["doctor"]);
+    assert!(
+        !text(&doctor).contains("not a known implementation"),
+        "doctor rejected a selectable vendor: {}",
+        text(&doctor)
+    );
+}
+
+#[test]
+fn ollama_needs_a_model_and_a_plain_http_url() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_adapters(tmp.path());
+    set_adapter(&root, "ai", "ollama");
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success(), "ollama with no model passed");
+    assert!(
+        text(&out).contains("[ai] model is missing"),
+        "{}",
+        text(&out)
+    );
+
+    let toml = root.join("fiducial.toml");
+    let mut s = std::fs::read_to_string(&toml).unwrap();
+    s.push_str("\n[ai]\nmodel = \"llama3.2\"\nbase_url = \"https://ollama.example.com/v1\"\n");
+    std::fs::write(&toml, s).unwrap();
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success(), "a TLS base_url passed");
+    assert!(text(&out).contains("not plain http://"), "{}", text(&out));
+
+    let s = std::fs::read_to_string(&toml)
+        .unwrap()
+        .replace("base_url = \"https://ollama.example.com/v1\"\n", "");
+    std::fs::write(&toml, s).unwrap();
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "derive: {}", text(&out));
+    let factory = std::fs::read_to_string(root.join("src/adapters.generated.ts")).unwrap();
+    assert!(factory.contains("get ai(): never"), "{factory}");
+}
