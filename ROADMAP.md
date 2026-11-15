@@ -605,7 +605,7 @@ especially, since the **Open-source bootstrap** item below is explicitly
 waiting on "the command that produces these for any repository," and Fiducial
 now has the files to generalize from.
 
-### Paper readiness — *debt-accruing* ⬜
+### Paper readiness — *debt-accruing* ✅
 
 The IEEESTEC paper's evidence is derived from `SHIPPED.md` and the specs, so a
 claim there that overstates what shipped becomes a claim in the paper. Three
@@ -629,6 +629,14 @@ in part: the engines spec's P7 numbers. Items 4–6 belong to the paper's own
 session, which starts from the owner's `.docx` template and prior paper
 (`docs/paper/README.md`) — so item 5 targets that template (Pandoc's
 `--reference-doc`), not an IEEE LaTeX one.
+
+**Done, 2026-11-15: the paper was submitted** (IEEESTEC 2026, *Fiducial: Keeping
+AI-Built Products Consistent*). Items 4–6 were carried out in the paper's own
+session (`docs/paper/README.md`): the injected-mistake sets, the measurements and
+the build script. The submitted files are now a record. What the paper claims
+and what it measured are fixed at the release it cites; changes after it go in
+the platform and its specs, not in `docs/paper/`, except for a reviewer's
+camera-ready edits.
 
 ### Distributed, self-hosted products — *multiplying* ⬜
 

@@ -87,6 +87,9 @@ solvers, set-point checks, prices and the cut board are in `v0.9.1`, and
 
 ## The paper
 
+**Status: submitted 2026-11-15.** The files below are what was sent. Edit them only
+for a reviewer's requested changes; the platform has moved on (see `thesis.toml`).
+
 For IEEESTEC 2026, on the conference template, in the voice of the author's
 IEEESTEC 2025 paper (Outreach). It cites the release in `Cargo.toml`. After review, its
 title is *Fiducial: Keeping AI-Built Products Consistent*: the reviewer found "Build Any Robust …" (the platform's thesis,
