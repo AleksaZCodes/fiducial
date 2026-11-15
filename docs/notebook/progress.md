@@ -2,6 +2,12 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.20.0 · 2026-11-15
+
+- The web app as a static export served by Caddy (`[deploy] static_dir`), built
+  from the Next.js template with `pnpm build:static`. Phase 6 is done, so the
+  distributed, self-hosted group is complete except CAN, which waits for a product.
+
 ## 0.19.0 · 2026-11-15
 
 - The self-hosted server stack is complete: `sqlite`, `native` auth and `ollama`

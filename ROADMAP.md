@@ -654,7 +654,7 @@ cost of delay:
 | 3 | Hardware built from modules, with variants and derived wiring; products extend the module library | multiplying | ✅ |
 | 4 | `firmware-esp32c6` capability: an optional template; any firmware already reads the derived tables | terminal | ✅ |
 | 5 | Self-hosted server stack: `sqlite`, `native` auth, `ollama`, `compose`; the broker ACL follows the topology's topic directions, not stored grants | terminal | ✅ |
-| 6 | The web app as a static export served by the server | terminal | ⬜ |
+| 6 | The web app as a static export served by the server (Next.js; SvelteKit is not wired) | terminal | ✅ |
 | 7 | Derived documentation: topology, wiring, rules, sequence and storage diagrams (`topology.md` from `fid-topology`, `rules.md` from `fid-monitoring`; wiring per variant) | multiplying | ✅ |
 | 8 | CAN / CAN-FD with ISO-TP, and a Linux RT runtime — gated on a product | terminal | ⬜ |
 

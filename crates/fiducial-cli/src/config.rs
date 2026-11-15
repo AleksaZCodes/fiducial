@@ -570,6 +570,18 @@ pub struct Deploy {
     #[serde(default, skip_serializing_if = "is_zero")]
     pub proxy_port: u16,
 
+    /// A static export Caddy serves (`deploy = "compose"`): the web app's build
+    /// directory, relative to the product root, e.g. `apps/web/out`. Built with
+    /// `STATIC_EXPORT=1` (`pnpm build:static`). With it, `proxy` receives only
+    /// `api_prefix/*`; without it, `proxy` receives everything.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub static_dir: String,
+
+    /// The path prefix Caddy proxies to the server when `static_dir` is set.
+    /// Defaults to `/api`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub api_prefix: String,
+
     /// Services this product runs that nothing else declares: a database, a
     /// cache, a worker (`deploy = "compose"`). Apps, the broker and Ollama are
     /// derived and are not listed here.

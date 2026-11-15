@@ -118,6 +118,32 @@ fn a_product_with_no_topology_is_an_app_a_database_and_a_proxy() {
 }
 
 #[test]
+fn a_static_export_is_served_and_only_the_api_is_proxied() {
+    let tmp = tempfile::tempdir().unwrap();
+    assert!(run(tmp.path(), &["new", "site"]).status.success());
+    let root = tmp.path().join("site");
+    let out = run(&root, &["add", "capability", "deploy-compose"]);
+    assert!(out.status.success(), "{}", text(&out));
+    select_compose(&root);
+    let toml = root.join("fiducial.toml");
+    let s = std::fs::read_to_string(&toml).unwrap().replace(
+        "tls = \"internal\"",
+        "tls = \"internal\"\nstatic_dir = \"apps/web/out\"",
+    );
+    std::fs::write(&toml, s).unwrap();
+
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "derive: {}", text(&out));
+    let caddy = std::fs::read_to_string(root.join("deploy/Caddyfile")).unwrap();
+    assert!(caddy.contains("handle /api/* {"), "{caddy}");
+    assert!(caddy.contains("root * /srv/web"), "{caddy}");
+    assert!(caddy.contains("X-Content-Type-Options"), "{caddy}");
+    let compose = std::fs::read_to_string(root.join("deploy/compose.yaml")).unwrap();
+    assert!(compose.contains("../apps/web/out:/srv/web:ro"), "{compose}");
+    assert!(run(&root, &["derive", "--check"]).status.success());
+}
+
+#[test]
 fn a_public_certificate_for_a_lan_name_is_refused() {
     let tmp = tempfile::tempdir().unwrap();
     let root = product(tmp.path());
