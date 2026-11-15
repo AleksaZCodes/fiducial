@@ -131,7 +131,7 @@ Each step has a test that must exist before the step is called done, because
    runs inside the dev server). Reuse tokens, i18n, content, seo: only the
    `for/web-astro/` templates are new. *Test:* the `cms_pipeline` end-to-end
    for Astro, plus a `derive --check` over a built site.
-4. **`api-hono` and `orm-drizzle`.** Hono as the Worker backend for anything
+4. ✅ **`api-hono` and `orm-drizzle`** (0.22.0; Drizzle on SQLite only). Hono as the Worker backend for anything
    without route handlers; Drizzle schema as the declaration whose generated
    SQL feeds the existing `Migrator` (no second hand-written SQL).
 5. **`web-router` and `web-start`.** Verify each framework's current major and

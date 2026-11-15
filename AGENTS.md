@@ -359,9 +359,10 @@ Seven kinds, and the difference is not cosmetic — see
 
 `capability.toml` can also say what an install does to files the product
 already has: `supersedes` (another capability's templates this one replaces,
-as `site` replaces the plain app's root layout), `npm_dependencies` and
-`npm_scripts` (added to `apps/web/package.json` where missing), and
-`seed_messages` (message namespaces inserted into each locale's catalog where
+as `site` replaces the plain app's root layout), `npm_dependencies`,
+`npm_dev_dependencies` and `npm_scripts` (added where missing, to
+`apps/web/package.json` or to the `package.json` `npm_package` names, as
+`orm-drizzle` names `apps/api/package.json`), and `seed_messages` (message namespaces inserted into each locale's catalog where
 missing). Each only adds what is absent: the product's own edits win.
 
 <!-- fid:end-describes -->
@@ -395,6 +396,7 @@ The capabilities this platform ships:
 | Capability | Contributes | Install |
 |---|---|---|
 | `adapters` | declares `adapters`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability adapters` |
+| `api-hono` | 9 template file(s); guard rules | `fid add capability api-hono` |
 | `brand` | declares `brand`; 2 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability brand` |
 | `cms` | declares `cms`; 1 pipeline(s); 14 template file(s); seeds a `fiducial.toml` block | `fid add capability cms` |
 | `content` | declares `content.toml`, `content/posts/en/hello.md`; 1 pipeline(s); 2 template file(s) | `fid add capability content` |
@@ -412,6 +414,7 @@ The capabilities this platform ships:
 | `legal` | declares `legal`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability legal` |
 | `migrations` | declares `migrations`; 1 pipeline(s) | `fid add capability migrations` |
 | `monitoring` | declares `monitoring.toml`; 1 pipeline(s) | `fid add capability monitoring` |
+| `orm-drizzle` | 3 template file(s); guard rules | `fid add capability orm-drizzle` |
 | `press` | declares `press`, `press/docs/en/boilerplate.md`, `press/docs/en/facts.md`, `press/stories/en/0001-why-this-exists.md`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability press` |
 | `protocol` | declares `protocol.toml`; 1 pipeline(s) | `fid add capability protocol` |
 | `realtime` | a skill | `fid add capability realtime` |

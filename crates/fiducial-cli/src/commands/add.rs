@@ -30,6 +30,7 @@ TARGETS
   next      Next.js 16 (App Router) web app     → apps/web/
   svelte    SvelteKit web app                    → apps/web/
   astro     Astro static site (zero JS default)  → apps/web/
+  api       Hono API (Worker and Node)           → apps/api/
   tauri     Tauri 2 desktop + mobile             → apps/desktop/
   worker    Cloudflare Worker / Durable Object   → apps/worker/
   mobile    Tauri mobile standalone              → apps/mobile/ (not available yet)
@@ -40,7 +41,7 @@ EXAMPLES
   fid add app worker"
     )]
     App {
-        /// Target: next | svelte | astro | tauri | worker | mobile
+        /// Target: next | svelte | astro | api | tauri | worker | mobile
         #[arg(
             value_name = "TARGET",
             long_help = "Application type to scaffold. Run `fid add app --help` for the full list."
@@ -494,6 +495,7 @@ fn add_app(target: &str, icons: Option<&str>) -> Result<()> {
         "next" => "web-next",
         "svelte" => "web-svelte",
         "astro" => "web-astro",
+        "api" => "api-hono",
         "tauri" => "tauri",
         "worker" => "worker-cloudflare",
         "mobile" => {
@@ -506,7 +508,7 @@ fn add_app(target: &str, icons: Option<&str>) -> Result<()> {
         }
         other => bail!(
             "unknown app target `{other}`.\n\
-             Supported: next, svelte, astro, tauri, worker, mobile.\n\
+             Supported: next, svelte, astro, api, tauri, worker, mobile.\n\
              Run `fid add app --help` for details."
         ),
     };

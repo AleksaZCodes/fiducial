@@ -2,6 +2,12 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.22.0 · 2026-11-15
+
+- `fid add app api`: a Hono API for a Worker and for Node, with a typed client.
+- `orm-drizzle`: the TypeScript schema is the declaration, and its SQL feeds the
+  existing migration runner. Capabilities can target another app's `package.json`.
+
 ## 0.21.0 · 2026-11-15
 
 - `[apps.<name>]`: each app declares framework, editor, shell, api and orm, and

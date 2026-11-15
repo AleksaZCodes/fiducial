@@ -46,6 +46,15 @@ mod builtin_files {
     include!(concat!(env!("OUT_DIR"), "/capabilities.rs"));
 }
 
+/// The `package.json` a capability's npm entries went into, for the message.
+fn package_label(npm_package: &str) -> &str {
+    if npm_package.is_empty() {
+        crate::icons::DEFAULT_PACKAGE
+    } else {
+        npm_package
+    }
+}
+
 /// The built-in capabilities, derived once on first use.
 ///
 /// `OnceLock` rather than a `static` literal because a `Capability` owns its
@@ -261,8 +270,23 @@ pub fn install_with(
             .iter()
             .map(|(n, r)| (n.as_str(), r.as_str()))
             .collect();
-        for name in crate::icons::ensure_dependencies(root, &wanted)? {
-            println!("  added  {name} to apps/web/package.json");
+        for name in crate::icons::ensure_dependencies(root, &cap.npm_package, &wanted)? {
+            println!("  added  {name} to {}", package_label(&cap.npm_package));
+        }
+    }
+    if !cap.npm_dev_dependencies.is_empty() {
+        let wanted: Vec<(&str, &str)> = cap
+            .npm_dev_dependencies
+            .iter()
+            .map(|(n, r)| (n.as_str(), r.as_str()))
+            .collect();
+        for name in
+            crate::icons::ensure_entries(root, &cap.npm_package, "devDependencies", &wanted)?
+        {
+            println!(
+                "  added  {name} (dev) to {}",
+                package_label(&cap.npm_package)
+            );
         }
     }
     if !cap.npm_scripts.is_empty() {
@@ -271,8 +295,11 @@ pub fn install_with(
             .iter()
             .map(|(n, r)| (n.as_str(), r.as_str()))
             .collect();
-        for name in crate::icons::ensure_entries(root, "scripts", &wanted)? {
-            println!("  added  script `{name}` to apps/web/package.json");
+        for name in crate::icons::ensure_entries(root, &cap.npm_package, "scripts", &wanted)? {
+            println!(
+                "  added  script `{name}` to {}",
+                package_label(&cap.npm_package)
+            );
         }
     }
 

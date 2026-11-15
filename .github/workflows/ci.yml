@@ -876,6 +876,11 @@ jobs:
       - name: Scaffold, install, typecheck, build, deploy dry run — Astro
         run: scripts/verify-web-astro.sh
 
+      # A Hono API with Drizzle over it: tests, a Worker dry run, and a schema
+      # change carried through to a migration. See scripts/verify-api-hono.sh.
+      - name: Scaffold, install, typecheck, test, deploy dry run — Hono and Drizzle
+        run: scripts/verify-api-hono.sh
+
   # ── portfolio: workbench v1 ───────────────────────────────────────────────
   #
   # Phase 17. `fid dash --portfolio` aggregates multiple product repos from a

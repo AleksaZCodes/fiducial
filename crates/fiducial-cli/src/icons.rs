@@ -337,22 +337,36 @@ fn parse_attrs(s: &str) -> anyhow::Result<(Vec<Attr>, usize)> {
 /// re-serialised: `package.json` is the product's, and rewriting its formatting
 /// to add one key would show up as an edit to every line of it.
 pub fn ensure_packages(root: &Path, lib: &Library) -> anyhow::Result<Vec<String>> {
-    ensure_dependencies(root, lib.packages)
+    ensure_dependencies(root, DEFAULT_PACKAGE, lib.packages)
 }
 
 /// The same, for any list of `(package, range)`.
-pub fn ensure_dependencies(root: &Path, packages: &[(&str, &str)]) -> anyhow::Result<Vec<String>> {
-    ensure_entries(root, "dependencies", packages)
+pub fn ensure_dependencies(
+    root: &Path,
+    package: &str,
+    packages: &[(&str, &str)],
+) -> anyhow::Result<Vec<String>> {
+    ensure_entries(root, package, "dependencies", packages)
 }
 
-/// Add `(key, value)` pairs to one object of `apps/web/package.json` (its
-/// `dependencies`, its `scripts`) where the key is missing.
+/// The `package.json` a capability's dependencies go into when it names none.
+pub const DEFAULT_PACKAGE: &str = "apps/web/package.json";
+
+/// Add `(key, value)` pairs to one object of a `package.json` (its
+/// `dependencies`, its `scripts`) where the key is missing. `package` is relative
+/// to the product root; empty means [`DEFAULT_PACKAGE`].
 pub fn ensure_entries(
     root: &Path,
+    package: &str,
     section: &str,
     packages: &[(&str, &str)],
 ) -> anyhow::Result<Vec<String>> {
-    let path = root.join("apps/web/package.json");
+    let package = if package.is_empty() {
+        DEFAULT_PACKAGE
+    } else {
+        package
+    };
+    let path = root.join(package);
     let Ok(text) = std::fs::read_to_string(&path) else {
         return Ok(Vec::new());
     };
@@ -368,7 +382,7 @@ pub fn ensure_entries(
     let anchor = format!("\"{section}\": {{");
     let Some(at) = text.find(&anchor) else {
         anyhow::bail!(
-            "apps/web/package.json has no \"{section}\" object to add {} to",
+            "{package} has no \"{section}\" object to add {} to",
             missing[0].0
         );
     };
@@ -382,7 +396,7 @@ pub fn ensure_entries(
     // Inserting before an empty object leaves a trailing comma.
     let updated = updated.replace(",\n  }", "\n  }");
     serde_json::from_str::<serde_json::Value>(&updated)
-        .map_err(|e| anyhow::anyhow!("adding packages would break apps/web/package.json: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("adding packages would break {package}: {e}"))?;
     std::fs::write(&path, updated)?;
     Ok(missing.iter().map(|(name, _)| name.to_string()).collect())
 }

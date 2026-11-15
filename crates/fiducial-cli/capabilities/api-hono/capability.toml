@@ -1,0 +1,2 @@
+description = "Hono API: runs on a Cloudflare Worker and on Node for the self-hosted target, with a typed RPC client"
+guard_rules = ["no-unpinned-cli-fetch"]
