@@ -34,14 +34,14 @@ fn product(tmp: &Path, apps: &str) -> PathBuf {
 #[test]
 fn an_intended_framework_fails_doctor_with_what_is_selectable() {
     let tmp = tempfile::tempdir().unwrap();
-    let root = product(tmp.path(), "[apps.web]\nframework = \"react-router\"\n");
+    let root = product(tmp.path(), "[apps.web]\nframework = \"tanstack-start\"\n");
     let out = text(&run(&root, &["doctor"]));
     assert!(
         out.contains("names an intended choice that nothing builds yet"),
         "{out}"
     );
     assert!(
-        out.contains("Selectable today: next, sveltekit, astro"),
+        out.contains("Selectable today: next, sveltekit, astro, hono, react-router"),
         "{out}"
     );
 }
@@ -85,6 +85,27 @@ fn a_product_with_no_apps_block_is_read_as_before() {
     assert!(run(tmp.path(), &["new", "p"]).status.success());
     let out = text(&run(&tmp.path().join("p"), &["doctor"]));
     assert!(!out.contains("[apps"), "{out}");
+}
+
+#[test]
+fn a_react_router_app_without_its_headers_module_fails_doctor() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product(tmp.path(), "[apps.web]\nframework = \"react-router\"\n");
+    assert!(run(&root, &["add", "design"]).status.success());
+    assert!(run(&root, &["add", "app", "router"]).status.success());
+    let out = text(&run(&root, &["doctor"]));
+    assert!(
+        !out.contains("React Router app"),
+        "a fresh product was reported unsafe: {out}"
+    );
+
+    std::fs::write(
+        root.join("apps/web/app/security.ts"),
+        "export const responseHeaders = [];\n",
+    )
+    .unwrap();
+    let out = text(&run(&root, &["doctor"]));
+    assert!(out.contains("React Router app is missing"), "{out}");
 }
 
 #[test]

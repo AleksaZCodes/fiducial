@@ -261,6 +261,7 @@ EXAMPLES
   fid add app next            add a Next.js web app
   fid add app svelte          add a SvelteKit web app
   fid add app astro           add an Astro static site
+  fid add app router          add a React Router app on Workers
   fid add app tauri           add a Tauri desktop + mobile app
   fid add app worker          add a Cloudflare Worker
   fid add firmware rp2040     add RP2040 Embassy firmware

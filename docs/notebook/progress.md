@@ -2,6 +2,11 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.23.0 · 2026-11-15
+
+- `fid add app router`: React Router 8 on Workers through the Cloudflare Vite plugin,
+  with its security headers set by the Worker and checked by `fid doctor`.
+
 ## 0.22.0 · 2026-11-15
 
 - `fid add app api`: a Hono API for a Worker and for Node, with a typed client.

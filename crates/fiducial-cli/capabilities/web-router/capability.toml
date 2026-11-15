@@ -1,0 +1,7 @@
+description = "React Router 8 (framework mode) on Cloudflare Workers: routes and loaders, server-rendered, the design tokens, security headers set in the Worker"
+guard_rules = ["no-unpinned-cli-fetch"]
+
+# The stylesheet imports `tokens.css` (derived by the design pipeline) and
+# `marks.css` (installed by `design`). Without `design` the first build fails on
+# a missing import, as it would for `web-next`.
+requires_capabilities = ["design"]

@@ -876,6 +876,12 @@ jobs:
       - name: Scaffold, install, typecheck, build, deploy dry run — Astro
         run: scripts/verify-web-astro.sh
 
+      # React Router 8 on Workers: build, a Worker dry run, and the built app
+      # served in workerd with every security header on a real response. See
+      # scripts/verify-web-router.sh.
+      - name: Scaffold, install, typecheck, build, serve — React Router
+        run: scripts/verify-web-router.sh
+
       # A Hono API with Drizzle over it: tests, a Worker dry run, and a schema
       # change carried through to a migration. See scripts/verify-api-hono.sh.
       - name: Scaffold, install, typecheck, test, deploy dry run — Hono and Drizzle

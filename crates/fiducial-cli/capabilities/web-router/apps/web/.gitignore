@@ -1,0 +1,8 @@
+/node_modules/
+/.react-router/
+/build/
+.mf
+.wrangler
+.dev.vars*
+worker-configuration.d.ts
+!.dev.vars.example
