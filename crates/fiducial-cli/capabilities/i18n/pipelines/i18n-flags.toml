@@ -1,0 +1,14 @@
+name     = "i18n-flags"
+executor = "shell"
+args     = ["node", "scripts/derive-flags.mjs"]
+outputs  = ["apps/web/src/generated/flags.ts"]
+# What the script reads: an edit here, not re-derived, fails `fid derive --check`.
+inputs   = ["messages/*.json"]
+
+# The flags the language picker draws: one per declared locale's region.
+#
+# The picker used to import the whole flag set and pick one by region at run
+# time, which no bundler can tree-shake: a two-language site shipped every
+# country's flag to every page (99 KB gzipped on the first product measured).
+# The regions are declared in the catalogs (`locale.region`), so the import
+# list is derived from them and only those flags are bundled.

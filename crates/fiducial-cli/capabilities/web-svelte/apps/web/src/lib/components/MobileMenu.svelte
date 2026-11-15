@@ -1,47 +1,47 @@
 <script lang="ts">
-  /**
-   * The nav links on a narrow screen, in a sheet that slides in from the right.
-   *
-   * ## Why a dialog and not a disclosure
-   *
-   * A row that pushes the header down is simpler and wrong: focus stays behind
-   * it, Escape does nothing, the page underneath keeps scrolling, and nothing
-   * returns focus to the button when it closes. This is a modal dialog, so all
-   * four are handled by the primitive rather than by four listeners somebody
-   * has to remember. bits-ui is what shadcn-svelte builds its Sheet from;
-   * using it directly is the same behaviour without the copy-in step.
-   *
-   * The version this replaces was `let open = $state(false)` with a
-   * `<svelte:window onkeydown>` for Escape and an overlay `<div onclick>`. It
-   * looked equivalent and had none of the focus behaviour.
-   *
-   * ## What is the product's, and what is not
-   *
-   * This component owns the sheet: how it opens, how it closes, what a screen
-   * reader hears, and where focus goes. It owns no words and no routes —
-   * `links` and both labels come in, because which pages a product has is the
-   * product's fact and translating them is the catalog's job. That line is
-   * deliberate: a menu that hard-codes four `href`s is a menu every product
-   * has to fork, and one that takes twenty props to avoid it is worse.
-   *
-   * Composition also stays out here. There is no `SiteNav` in the platform on
-   * purpose: arranging a wordmark, links, a language picker and a call to
-   * action is exactly the decision each product makes differently, and the
-   * pieces being separate is what lets it.
-   */
-  import { Dialog } from "bits-ui";
+/**
+ * The nav links on a narrow screen, in a sheet that slides in from the right.
+ *
+ * ## Why a dialog and not a disclosure
+ *
+ * A row that pushes the header down is simpler and wrong: focus stays behind
+ * it, Escape does nothing, the page underneath keeps scrolling, and nothing
+ * returns focus to the button when it closes. This is a modal dialog, so all
+ * four are handled by the primitive rather than by four listeners somebody
+ * has to remember. bits-ui is what shadcn-svelte builds its Sheet from;
+ * using it directly is the same behaviour without the copy-in step.
+ *
+ * The version this replaces was `let open = $state(false)` with a
+ * `<svelte:window onkeydown>` for Escape and an overlay `<div onclick>`. It
+ * looked equivalent and had none of the focus behaviour.
+ *
+ * ## What is the product's, and what is not
+ *
+ * This component owns the sheet: how it opens, how it closes, what a screen
+ * reader hears, and where focus goes. It owns no words and no routes —
+ * `links` and both labels come in, because which pages a product has is the
+ * product's fact and translating them is the catalog's job. That line is
+ * deliberate: a menu that hard-codes four `href`s is a menu every product
+ * has to fork, and one that takes twenty props to avoid it is worse.
+ *
+ * Composition also stays out here. There is no `SiteNav` in the platform on
+ * purpose: arranging a wordmark, links, a language picker and a call to
+ * action is exactly the decision each product makes differently, and the
+ * pieces being separate is what lets it.
+ */
+import { Dialog } from "bits-ui";
 
-  let {
-    links,
-    openLabel,
-    closeLabel,
-  }: {
-    links: readonly { href: string; label: string }[];
-    openLabel: string;
-    closeLabel: string;
-  } = $props();
+let {
+  links,
+  openLabel,
+  closeLabel,
+}: {
+  links: readonly { href: string; label: string }[];
+  openLabel: string;
+  closeLabel: string;
+} = $props();
 
-  let open = $state(false);
+let open = $state(false);
 </script>
 
 <!-- `display: contents`, so this wrapper adds no box to the parent's flex or

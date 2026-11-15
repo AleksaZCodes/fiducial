@@ -1,62 +1,62 @@
 <script lang="ts">
-  /**
-   * A collection's entries: one cover story, then a grid of the rest.
-   *
-   * ## Why a cover story
-   *
-   * A list of identical cards says every entry is equally worth reading,
-   * which is never true and is least true of a blog's front page. The most
-   * recent (or pinned) entry gets a card with room for its summary; the rest
-   * get a grid below. That is the whole of the hierarchy, and it is one
-   * decision rather than a design system.
-   *
-   * With a single entry there is no grid and no rule under the cover — a
-   * section divider with nothing under it reads as a loading failure.
-   *
-   * ## The whole card is one link
-   *
-   * Not the title with the card inert around it. A card that only responds on
-   * one line is a card people click on the wrong part of, and they do not
-   * conclude the site has a small hit target — they conclude it is broken.
-   * `<a>` wrapping block content is valid HTML5 as long as nothing inside is
-   * itself interactive, which is why the "read more" line is a `<span>` and
-   * not a second link.
-   *
-   * ## What is the product's
-   *
-   * `entries` and `href` come in. Which collection this is, where it lives,
-   * and what the section is called are product facts; the shape of a card is
-   * not. The date is formatted through the shared Intl binding, so it reads
-   * `24. septembar 2026.` or `24 September 2026` without this component
-   * knowing either language.
-   */
-  import { formatContentDate } from "../intl";
-  import type { Locale } from "../../generated/messages";
+import type { Locale } from "../../generated/messages";
+/**
+ * A collection's entries: one cover story, then a grid of the rest.
+ *
+ * ## Why a cover story
+ *
+ * A list of identical cards says every entry is equally worth reading,
+ * which is never true and is least true of a blog's front page. The most
+ * recent (or pinned) entry gets a card with room for its summary; the rest
+ * get a grid below. That is the whole of the hierarchy, and it is one
+ * decision rather than a design system.
+ *
+ * With a single entry there is no grid and no rule under the cover — a
+ * section divider with nothing under it reads as a loading failure.
+ *
+ * ## The whole card is one link
+ *
+ * Not the title with the card inert around it. A card that only responds on
+ * one line is a card people click on the wrong part of, and they do not
+ * conclude the site has a small hit target — they conclude it is broken.
+ * `<a>` wrapping block content is valid HTML5 as long as nothing inside is
+ * itself interactive, which is why the "read more" line is a `<span>` and
+ * not a second link.
+ *
+ * ## What is the product's
+ *
+ * `entries` and `href` come in. Which collection this is, where it lives,
+ * and what the section is called are product facts; the shape of a card is
+ * not. The date is formatted through the shared Intl binding, so it reads
+ * `24. septembar 2026.` or `24 September 2026` without this component
+ * knowing either language.
+ */
+import { formatContentDate } from "../intl";
 
-  type Entry = {
-    slug: string;
-    title: string;
-    /** `YYYY-MM-DD`, as every entry's frontmatter stores it. */
-    date?: string;
-    summary?: string;
-    tags?: readonly string[];
-  };
+type Entry = {
+  slug: string;
+  title: string;
+  /** `YYYY-MM-DD`, as every entry's frontmatter stores it. */
+  date?: string;
+  summary?: string;
+  tags?: readonly string[];
+};
 
-  let {
-    entries,
-    locale,
-    href,
-    readMoreLabel,
-  }: {
-    entries: readonly Entry[];
-    locale: Locale;
-    href: (entry: Entry) => string;
-    /** e.g. `t(locale, "blog.readMore")`. Omit to leave the line off. */
-    readMoreLabel?: string;
-  } = $props();
+let {
+  entries,
+  locale,
+  href,
+  readMoreLabel,
+}: {
+  entries: readonly Entry[];
+  locale: Locale;
+  href: (entry: Entry) => string;
+  /** e.g. `t(locale, "blog.readMore")`. Omit to leave the line off. */
+  readMoreLabel?: string;
+} = $props();
 
-  const cover = $derived(entries[0]);
-  const rest = $derived(entries.slice(1));
+const cover = $derived(entries[0]);
+const rest = $derived(entries.slice(1));
 </script>
 
 {#if cover}

@@ -404,9 +404,9 @@ The capabilities this platform ships:
 | `firmware-rp2040` | 11 template file(s); guard rules | `fid add capability firmware-rp2040` |
 | `firmware-stm32` | 10 template file(s); guard rules | `fid add capability firmware-stm32` |
 | `hardware` | declares `hardware/outline.svg`, `hardware/product.toml`; 1 pipeline(s); 12 template file(s) | `fid add capability hardware` |
-| `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
+| `i18n` | declares `i18n`, `messages/en.json`, `messages/sr.json`; 2 pipeline(s); 3 template file(s); seeds a `fiducial.toml` block | `fid add capability i18n` |
 | `identity` | declares `identity`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability identity` |
-| `legal` | declares `legal`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability legal` |
+| `legal` | declares `legal`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability legal` |
 | `migrations` | declares `migrations`; 1 pipeline(s) | `fid add capability migrations` |
 | `monitoring` | declares `monitoring.toml`; 1 pipeline(s) | `fid add capability monitoring` |
 | `press` | declares `press`, `press/docs/en/boilerplate.md`, `press/docs/en/facts.md`, `press/stories/en/0001-why-this-exists.md`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability press` |
@@ -418,7 +418,7 @@ The capabilities this platform ships:
 | `tauri` | 5 template file(s); guard rules | `fid add capability tauri` |
 | `topology` | declares `topology.toml`; 1 pipeline(s) | `fid add capability topology` |
 | `web-next` | 14 template file(s); guard rules | `fid add capability web-next` |
-| `web-svelte` | 11 template file(s); guard rules | `fid add capability web-svelte` |
+| `web-svelte` | 12 template file(s); guard rules | `fid add capability web-svelte` |
 | `worker-cloudflare` | 1 template file(s); guard rules | `fid add capability worker-cloudflare` |
 <!-- fid:end capabilities -->
 

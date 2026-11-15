@@ -1,9 +1,9 @@
 "use client";
 
+import { flags } from "@/generated/flags";
 import { type Locale, locales, messages } from "@/generated/messages";
 import { queryLocaleHref } from "@/lib/locale-href";
 import { Menu } from "@base-ui/react/menu";
-import * as Flags from "country-flag-icons/react/3x2";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
@@ -207,22 +207,16 @@ function PickerMenu({
  * square. The span owns the box; the svg just fills it.
  */
 function FlagFrame({ l }: { l: Locale }) {
-  const Flag = flagFor(l);
-  if (!Flag) return null;
+  const svg = flags[messages[l]["locale.region"]];
+  if (!svg) return null;
   return (
-    <span aria-hidden="true" className={styles.flag}>
-      <Flag />
-    </span>
+    <span
+      aria-hidden="true"
+      className={styles.flag}
+      // A flag from the package, chosen by `generated/flags.ts`: static SVG,
+      // not content anyone writes.
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: a bundled flag SVG
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
   );
-}
-
-/**
- * The flag component for a locale's declared region, or undefined.
- *
- * The lookup is on the catalog's own `locale.region`, so this function knows
- * nothing about any particular language and never needs editing.
- */
-function flagFor(l: Locale) {
-  const region = messages[l]["locale.region"];
-  return (Flags as Record<string, React.ComponentType | undefined>)[region];
 }
