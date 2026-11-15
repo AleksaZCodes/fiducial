@@ -55,6 +55,34 @@ healthcheck = "pg_isready -U postgres"
 certificate for it. A service declared twice, a `proxy` that names no service and
 a `depends_on` that names none are each refused by name.
 
+## Serving the web app as a static export
+
+With `[deploy] static_dir = "apps/web/out"`, the web app is plain files and Caddy
+serves them: there is no Next.js server at runtime.
+
+```toml
+[deploy]
+static_dir = "apps/web/out"   # relative to the product root; mounted read-only at /srv/web
+api_prefix = "/api"           # what Caddy still proxies to the server; the default
+```
+
+Build the files with `pnpm build:static` (`STATIC_EXPORT=1 next build`). The Next.js
+template's `next.config.ts` then writes `output: "export"` with `trailingSlash`,
+so each page is `<path>/index.html` and Caddy finds it without a rewrite.
+
+What a static export cannot do, so you should know before choosing it:
+
+- **No `headers`, `redirects` or `rewrites`.** Next applies them in its server.
+  The security headers move to the Caddyfile (derived; a test fails if the two
+  lists drift), and HSTS is sent only over a public certificate, without
+  `preload`. The redirects in `src/routing` are not served.
+- **No route handlers, middleware or server actions**, and no image optimiser
+  (`images.unoptimized`). Everything dynamic goes through `api_prefix` to the
+  Rust server.
+- **SvelteKit is not wired yet.** `web-svelte` builds for Workers only.
+
+Without `static_dir`, Caddy proxies every path to the `proxy` service as before.
+
 ## The use case that exercises all of it: a building
 
 Controllers in each room, a Raspberry Pi in the cabinet, one web app. The

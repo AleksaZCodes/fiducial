@@ -67,6 +67,13 @@ for lib in $icons; do
     "${pnpm[@]}" run lint
     "${pnpm[@]}" run build
 
+    # The self-hosted target serves a static export (`[deploy] static_dir`).
+    # `STATIC_EXPORT=1` swaps next.config.ts's server-side headers, redirects and
+    # rewrites for `output: "export"`, which only a real build can prove still
+    # compiles: an export refuses what needs a server.
+    "${pnpm[@]}" run build:static
+    [ -f out/index.html ] || { echo "✗ build:static wrote no out/index.html" >&2; exit 1; }
+
     # Installing and building must not have rewritten a file the platform
     # owns. pnpm 11 does exactly that to `pnpm-workspace.yaml` when a declared
     # range admits no release older than its `minimumReleaseAge`.

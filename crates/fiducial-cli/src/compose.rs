@@ -74,6 +74,10 @@ pub struct Plan {
     pub product: String,
     pub host: String,
     pub acme: bool,
+    /// The web app's static export, served by Caddy, and the prefix still
+    /// proxied to the server.
+    pub static_dir: Option<String>,
+    pub api_prefix: String,
     pub services: Vec<Service>,
     pub proxy: String,
     pub proxy_port: u16,
@@ -312,10 +316,36 @@ pub fn plan(config: &Config, t: Option<&Topology>) -> Result<Plan> {
                 .collect()
         })
         .unwrap_or_default();
+    let static_dir = if d.static_dir.is_empty() {
+        None
+    } else {
+        let dir = d.static_dir.trim_end_matches('/');
+        if dir.starts_with('/') || dir.split('/').any(|c| c == "..") {
+            bail!(
+                "fid-compose: [deploy] static_dir = \"{}\" must be a path inside the product, \
+                 relative to its root (e.g. apps/web/out).",
+                d.static_dir
+            );
+        }
+        Some(dir.to_string())
+    };
+    let api_prefix = if d.api_prefix.is_empty() {
+        "/api".to_string()
+    } else {
+        d.api_prefix.trim_end_matches('/').to_string()
+    };
+    if !api_prefix.starts_with('/') {
+        bail!(
+            "fid-compose: [deploy] api_prefix = \"{}\" must start with `/`.",
+            d.api_prefix
+        );
+    }
     Ok(Plan {
         product,
         host,
         acme: tls,
+        static_dir,
+        api_prefix,
         services,
         proxy,
         proxy_port,
@@ -414,6 +444,10 @@ pub fn render_compose(p: &Plan) -> String {
     s.push_str(
         "\n  caddy:\n    image: caddy:2\n    restart: unless-stopped\n    ports:\n      - \"80:80\"\n      - \"443:443\"\n    volumes:\n      - ./Caddyfile:/etc/caddy/Caddyfile:ro\n      - caddy-data:/data\n      - caddy-config:/config\n",
     );
+    if let Some(dir) = &p.static_dir {
+        // Relative to deploy/, where this file lives.
+        s.push_str(&format!("      - ../{dir}:/srv/web:ro\n"));
+    }
     s.push_str(&format!(
         "    depends_on:\n      {}:\n        condition: service_healthy\n",
         p.proxy
@@ -427,16 +461,62 @@ pub fn render_compose(p: &Plan) -> String {
     s
 }
 
+/// The response headers a static export cannot set for itself.
+///
+/// A Next.js static export has no server, so the `headers()` in its config do
+/// not exist, and Caddy sends them instead. They are the same names as
+/// `securityHeaders` in the web template's `next.config.ts`, and a test fails if
+/// the two lists drift. Two values differ on purpose: HSTS is sent only over a
+/// public certificate (a LAN name on Caddy's own CA has nothing to pin) and
+/// without `preload`, which is a deliberate, slow-to-undo step.
+pub const STATIC_HEADERS: [(&str, &str); 6] = [
+    ("X-Content-Type-Options", "nosniff"),
+    ("Referrer-Policy", "strict-origin-when-cross-origin"),
+    ("X-Frame-Options", "DENY"),
+    (
+        "Permissions-Policy",
+        "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
+    ),
+    ("Cross-Origin-Opener-Policy", "same-origin"),
+    (
+        "Content-Security-Policy",
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; media-src 'self' https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
+    ),
+];
+
+pub const HSTS: (&str, &str) = (
+    "Strict-Transport-Security",
+    "max-age=63072000; includeSubDomains",
+);
+
 pub fn render_caddyfile(p: &Plan) -> String {
     let tls = if p.acme {
         "    # A public domain: Caddy gets and renews a certificate itself.\n"
     } else {
         "    tls internal\n"
     };
-    format!(
-        "# {HEADER}\n{} {{\n{tls}    encode zstd gzip\n    reverse_proxy {}:{}\n}}\n",
-        p.host, p.proxy, p.proxy_port
-    )
+    let mut s = format!("# {HEADER}\n{} {{\n{tls}    encode zstd gzip\n", p.host);
+    if p.static_dir.is_none() {
+        s.push_str(&format!(
+            "    reverse_proxy {}:{}\n}}\n",
+            p.proxy, p.proxy_port
+        ));
+        return s;
+    }
+    s.push_str("    header {\n        -Server\n");
+    let hsts = p.acme.then_some(HSTS);
+    for (k, v) in hsts.iter().chain(STATIC_HEADERS.iter()) {
+        s.push_str(&format!("        {k} \"{v}\"\n"));
+    }
+    s.push_str("    }\n\n");
+    s.push_str(&format!(
+        "    handle {}/* {{\n        reverse_proxy {}:{}\n    }}\n\n",
+        p.api_prefix, p.proxy, p.proxy_port
+    ));
+    s.push_str(
+        "    handle {\n        root * /srv/web\n        try_files {path} {path}/index.html\n        file_server\n    }\n\n    handle_errors {\n        root * /srv/web\n        rewrite * /404.html\n        file_server\n    }\n}\n",
+    );
+    s
 }
 
 pub fn render_mosquitto_conf(p: &Plan) -> String {
@@ -626,6 +706,74 @@ depends_on = ["db"]
         assert!(c.contains("POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}"), "{c}");
         assert!(c.contains("  db-data:"), "named volume declared: {c}");
         assert!(render_caddyfile(&p).contains("reverse_proxy web:3000"));
+    }
+
+    #[test]
+    fn a_static_export_is_served_by_caddy_with_the_api_proxied() {
+        let cfg: Config = toml::from_str(
+            "[product]\nname = \"site\"\nversion = \"0.1.0\"\n\n[adapters]\ndeploy = \"compose\"\n\n[deploy]\nstatic_dir = \"apps/web/out/\"\n",
+        )
+        .unwrap();
+        let p = plan(&cfg, None).unwrap();
+        let caddy = render_caddyfile(&p);
+        assert!(
+            caddy.contains("handle /api/* {\n        reverse_proxy server:8080"),
+            "{caddy}"
+        );
+        assert!(
+            caddy.contains("root * /srv/web") && caddy.contains("file_server"),
+            "{caddy}"
+        );
+        assert!(caddy.contains("X-Frame-Options \"DENY\""), "{caddy}");
+        assert!(
+            !caddy.contains("Strict-Transport-Security"),
+            "no HSTS on a LAN name: {caddy}"
+        );
+        assert!(render_compose(&p).contains("      - ../apps/web/out:/srv/web:ro"));
+        let e = plan(
+            &toml::from_str::<Config>(
+                "[product]\nname = \"s\"\nversion = \"0.1.0\"\n\n[adapters]\ndeploy = \"compose\"\n\n[deploy]\nstatic_dir = \"../elsewhere\"\n",
+            )
+            .unwrap(),
+            None,
+        )
+        .err()
+        .unwrap()
+        .to_string();
+        assert!(e.contains("inside the product"), "{e}");
+    }
+
+    #[test]
+    fn a_public_domain_gets_hsts_and_the_headers_match_the_web_template() {
+        let cfg: Config = toml::from_str(
+            "[product]\nname = \"site\"\nversion = \"0.1.0\"\n\n[adapters]\ndeploy = \"compose\"\n\n[deploy]\nhost = \"example.org\"\ntls = \"acme\"\nstatic_dir = \"apps/web/out\"\n",
+        )
+        .unwrap();
+        let caddy = render_caddyfile(&plan(&cfg, None).unwrap());
+        assert!(
+            caddy.contains("Strict-Transport-Security \"max-age=63072000; includeSubDomains\""),
+            "{caddy}"
+        );
+        assert!(!caddy.contains("preload"), "{caddy}");
+
+        // The header names are the web template's own, from its source: a name
+        // added there and not here (or the reverse) is a header the static
+        // export silently lacks.
+        let next = include_str!("../capabilities/web-next/apps/web/next.config.ts");
+        let mut in_next: Vec<&str> = next
+            .split("key: \"")
+            .skip(1)
+            .filter_map(|r| r.split('"').next())
+            .collect();
+        in_next.sort_unstable();
+        let mut here: Vec<&str> = std::iter::once(HSTS.0)
+            .chain(STATIC_HEADERS.iter().map(|(k, _)| *k))
+            .collect();
+        here.sort_unstable();
+        assert_eq!(
+            in_next, here,
+            "next.config.ts securityHeaders vs fid-compose STATIC_HEADERS"
+        );
     }
 
     #[test]
