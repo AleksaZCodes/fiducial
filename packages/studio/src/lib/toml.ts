@@ -16,6 +16,16 @@ export function getPath(doc: unknown, path: string[]): Json | undefined {
   return cur as Json | undefined;
 }
 
+/** The document with the value at `path` replaced (or created). Pure. */
+export function setPath(doc: Record<string, Json>, path: string[], value: Json): Record<string, Json> {
+  const [head, ...rest] = path;
+  if (head === undefined) return doc;
+  if (rest.length === 0) return { ...doc, [head]: value };
+  const child = doc[head];
+  const next = child !== null && typeof child === "object" && !Array.isArray(child) ? child : {};
+  return { ...doc, [head]: setPath(next as Record<string, Json>, rest, value) };
+}
+
 // ── Writing a value ───────────────────────────────────────────────────────────
 
 const BARE = /^[A-Za-z0-9_-]+$/;
@@ -131,36 +141,125 @@ export function editToml(text: string, path: string[], value: Json | undefined):
     return `${text}${sep}${text === "" ? "" : "\n"}[${head}]\n${rendered}\n`;
   }
 
-  // Find the key inside [sectionStart, sectionEnd).
-  const keyRe = new RegExp(`^(\\s*)(?:${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}|"${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}")\\s*=`);
-  for (let i = sectionStart; i < sectionEnd; i++) {
-    const m = keyRe.exec(lines[i]);
+  const out = setKeyInRange(lines, sectionStart, sectionEnd, name, value);
+  return out.join("\n");
+}
+
+const escapeRe = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Set or remove `name` among `lines[start, end)`: replace its value in place
+ * (keeping a trailing comment), or add it after the range's last real line.
+ */
+function setKeyInRange(lines: string[], start: number, end: number, name: string, value: Json | undefined): string[] {
+  const rendered = value === undefined ? null : `${key(name)} = ${inline(value)}`;
+  const keyRe = new RegExp(`^(\\s*)(?:${escapeRe(name)}|"${escapeRe(name)}")\\s*=`);
+  const out = [...lines];
+  for (let i = start; i < end; i++) {
+    const m = keyRe.exec(out[i]);
     if (!m) continue;
     // The value may run over several lines (an array); find where it stops.
     let j = i;
-    let { end, depth } = scanValue(lines[i], m[0].length, 0);
-    let tail = lines[i].slice(end);
-    while (depth > 0 && j + 1 < lines.length) {
+    let { end: stop, depth } = scanValue(out[i], m[0].length, 0);
+    let tail = out[i].slice(stop);
+    while (depth > 0 && j + 1 < out.length) {
       j++;
-      ({ end, depth } = scanValue(lines[j], 0, depth));
-      tail = lines[j].slice(end);
+      ({ end: stop, depth } = scanValue(out[j], 0, depth));
+      tail = out[j].slice(stop);
     }
-    if (rendered === null) {
-      lines.splice(i, j - i + 1);
-    } else {
+    if (rendered === null) out.splice(i, j - i + 1);
+    else {
       const comment = tail.trim().startsWith("#") ? `  ${tail.trim()}` : "";
-      lines.splice(i, j - i + 1, `${m[1]}${rendered}${comment}`);
+      // A list that was laid out over several lines stays that way, so editing
+      // one entry does not collapse the author's formatting into one long line.
+      if (j > i && Array.isArray(value) && value.length > 0) {
+        const lead = m[1];
+        const body = value.map((v) => `${lead}  ${inline(v)},`);
+        const head = `${lead}${key(name)} = [`;
+        out.splice(i, j - i + 1, head, ...body, `${lead}]${comment}`);
+      } else {
+        out.splice(i, j - i + 1, `${m[1]}${rendered}${comment}`);
+      }
     }
-    return lines.join("\n");
+    return out;
   }
+  if (rendered === null) return out;
+  // Absent key: append after the range's last real line.
+  let last = start - 1;
+  for (let i = start; i < end; i++) {
+    if (out[i].trim() !== "" && !out[i].trim().startsWith("#")) last = i;
+  }
+  out.splice(last + 1, 0, rendered);
+  return out;
+}
 
-  if (rendered === null) return text;
-  // Absent key: append after the section's last real line.
-  let last = sectionStart - 1;
-  for (let i = sectionStart; i < sectionEnd; i++) {
-    if (lines[i].trim() !== "" && !lines[i].trim().startsWith("#")) last = i;
+// ── Arrays of tables: `[[node]]`, `[[bus]]` ───────────────────────────────────
+//
+// A topology is a list of blocks, not one table, and a person edits one block at
+// a time: add a node, change a bus, remove a parameter. These work on the n-th
+// `[[name]]` block and leave every other line, comments included, alone.
+
+interface Block {
+  /** Index of the `[[name]]` line. */
+  header: number;
+  /** First line after the header. */
+  start: number;
+  /** One past the block's last line (the next header, or the end). */
+  end: number;
+}
+
+function blocksOf(lines: string[], name: string): Block[] {
+  const open = new RegExp(`^\\s*\\[\\[\\s*${escapeRe(name)}\\s*\\]\\]`);
+  const any = /^\s*\[/;
+  const found: Block[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!open.test(lines[i])) continue;
+    let end = i + 1;
+    while (end < lines.length && !any.test(lines[end])) end++;
+    found.push({ header: i, start: i + 1, end });
   }
-  if (table === "" && last < 0) last = -1;
-  lines.splice(last + 1, 0, rendered);
-  return lines.join("\n");
+  return found;
+}
+
+/** How many `[[name]]` blocks there are. */
+export function blockCount(text: string, name: string): number {
+  return blocksOf(text.split("\n"), name).length;
+}
+
+/** Set (or with `undefined`, remove) a key in the `index`-th `[[name]]` block. */
+export function editBlock(text: string, name: string, index: number, field: string, value: Json | undefined): string {
+  const lines = text.split("\n");
+  const b = blocksOf(lines, name)[index];
+  if (!b) throw new EditRefused(`there is no [[${name}]] number ${index + 1}`);
+  // Keep trailing blank lines (the gap before the next block) out of the range,
+  // so a new key lands beside the others rather than after the gap.
+  let end = b.end;
+  while (end > b.start && lines[end - 1].trim() === "") end--;
+  return setKeyInRange(lines, b.start, end, field, value).join("\n");
+}
+
+/** Append a `[[name]]` block with these keys. */
+export function addBlock(text: string, name: string, entries: Record<string, Json>): string {
+  const body = Object.entries(entries).map(([k, v]) => `${key(k)} = ${inline(v)}`);
+  const trimmed = text.replace(/\n*$/, "");
+  return `${trimmed}${trimmed === "" ? "" : "\n\n"}[[${name}]]\n${body.join("\n")}\n`;
+}
+
+/**
+ * Remove the `index`-th `[[name]]` block. Comment lines directly above it (no
+ * blank line between) describe it and go with it.
+ */
+export function removeBlock(text: string, name: string, index: number): string {
+  const lines = text.split("\n");
+  const b = blocksOf(lines, name)[index];
+  if (!b) throw new EditRefused(`there is no [[${name}]] number ${index + 1}`);
+  let from = b.header;
+  while (from > 0 && lines[from - 1].trim().startsWith("#")) from--;
+  let to = b.end;
+  while (to < lines.length && lines[to].trim() === "") to++;
+  // Leave one blank line between what remains above and below.
+  const hadGapAbove = from > 0 && lines[from - 1].trim() === "";
+  lines.splice(from, to - from);
+  if (hadGapAbove && from < lines.length && lines[from]?.trim() !== "") lines.splice(from, 0, "");
+  return lines.join("\n").replace(/\n*$/, "\n");
 }
