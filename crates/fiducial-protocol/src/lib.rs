@@ -60,6 +60,10 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod can;
+pub mod modbus;
+pub mod segment;
+
 #[cfg(test)]
 extern crate std;
 

@@ -109,9 +109,9 @@ Every row carries a status, and the statuses are honest:
 | IP networking | **`embassy-net`** (smoltcp) | Decided |
 | Custom link/network layer | **`fiducial-protocol`** — framing (`MAGIC · LEN16 · payload · CRC-32`), above the link | Decided |
 | IoT transport | **MQTT 3.1.1 over TLS**, broker **Mosquitto**; per-device credentials, ACL derived from `can()` | Decided |
-| Fieldbus to vendor sensors | **Modbus RTU over RS-485** | Decided |
+| Fieldbus to vendor sensors | **Modbus RTU over RS-485** — `fiducial-protocol::modbus`, tested over a virtual serial port | Decided — built |
 | ESP firmware OTA | `esp-bootloader-esp-idf` partitions + `fiducial-ota` (`embassy-boot` has no ESP backend) | Candidate → first product that needs it |
-| CAN / CAN-FD | ISO 15765-2 (ISO-TP) segmentation in `fiducial-protocol::segment`; FDCAN on MCUs, SocketCAN on Linux | Candidate → distributed Phase 8 |
+| CAN / CAN-FD | ISO 15765-2 (ISO-TP) segmentation in `fiducial-protocol::segment`, frames in `fiducial-protocol::can`; FDCAN on MCUs, SocketCAN on Linux | Decided — the protocol is built and tested over an in-memory bus; no controller driver yet |
 | Linux real-time node runtime | `PREEMPT_RT` (mainline since 6.12), `mlockall`, stack prefault, `SCHED_FIFO` from the declaration | Candidate → distributed Phase 8 |
 | Time-triggered / TSN Ethernet | — | **Gap** — no product needs one |
 | Hardware-in-the-loop rigs | — | Deferred until a board physically exists |
