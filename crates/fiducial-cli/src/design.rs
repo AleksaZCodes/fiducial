@@ -1253,6 +1253,185 @@ pub fn sync_registries(root: &std::path::Path, design: &crate::config::Design) -
     Ok(())
 }
 
+/// Where the product's shadcn components live, and the two stylesheets they
+/// need. Paths are relative to the product root, which is where `shadcn build`
+/// is run.
+pub const UI_DIR: &str = "apps/web/src/components/ui";
+pub const SYSTEM_FILES: [&str; 2] = ["apps/web/src/app/tokens.css", "apps/web/src/app/marks.css"];
+
+/// What the product's components publish, and why any were left out.
+pub struct RegistryItems {
+    pub items: Vec<serde_json::Value>,
+    /// Components not published, each with the reason. Said at derive time: a
+    /// component that silently drops out of a registry is one nobody finds
+    /// until a second product installs it.
+    pub skipped: Vec<String>,
+    /// Every file the registry reads, so a changed component marks it stale.
+    pub inputs: Vec<String>,
+}
+
+/// One `registry:ui` item per component in `apps/web/src/components/ui`, and a
+/// `<name>-system` item carrying the stylesheets they are drawn with.
+///
+/// A component's own imports say what it needs, so nothing is declared twice:
+/// `@/lib/utils` is shadcn's `utils`, `@/components/ui/x` is a sibling in this
+/// registry, a bare package is an npm dependency. A sibling and the system item
+/// are named `@<name>/…`, which resolves through `[design.registries]` in the
+/// product that installs them: a bare name would go to shadcn's own registry.
+pub fn registry_items(
+    root: &std::path::Path,
+    name: &str,
+    design: &crate::config::Design,
+    icon_library: Option<&str>,
+) -> RegistryItems {
+    use serde_json::json;
+    let mut out = RegistryItems {
+        items: vec![],
+        skipped: vec![],
+        inputs: vec![],
+    };
+    let dir = root.join(UI_DIR);
+    let mut files: Vec<_> = std::fs::read_dir(&dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|e| e == "tsx"))
+        .collect();
+    files.sort();
+    let stems: Vec<String> = files
+        .iter()
+        .filter_map(|p| p.file_stem()?.to_str().map(str::to_string))
+        .collect();
+    if stems.is_empty() {
+        return out;
+    }
+
+    let system: Vec<&str> = SYSTEM_FILES
+        .iter()
+        .copied()
+        .filter(|f| root.join(f).is_file())
+        .collect();
+    // How one item names another. A public GitHub repository is addressed
+    // `owner/repo/item`; otherwise `@<name>/item`, which the installing product
+    // resolves through its own `[design.registries]`. A bare name would mean
+    // shadcn's built-in item of that name.
+    let addr = |item: &str| match &design.github {
+        Some(g) => format!("{g}/{item}"),
+        None => format!("@{name}/{item}"),
+    };
+    if !system.is_empty() {
+        let mut css = serde_json::Map::new();
+        for f in &system {
+            let base = f.rsplit('/').next().unwrap_or(f);
+            css.insert(format!("@import \"./{base}\""), json!({}));
+        }
+        out.items.push(json!({
+            "name": "system",
+            "type": "registry:item",
+            "title": format!("{name} design system"),
+            "description": "The token stylesheet and the marks (corner, surface) every component here is drawn with.",
+            "files": system.iter().map(|f| json!({
+                "path": f, "type": "registry:file",
+                "target": format!("~/{}", f.trim_start_matches("apps/web/")),
+            })).collect::<Vec<_>>(),
+            "css": css,
+        }));
+        out.inputs.extend(system.iter().map(|f| f.to_string()));
+    }
+
+    for path in &files {
+        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+        let Ok(src) = std::fs::read_to_string(path) else {
+            continue;
+        };
+        let mut npm = std::collections::BTreeSet::new();
+        let mut reg = std::collections::BTreeSet::new();
+        let mut missing = vec![];
+        for line in src.lines().filter(|l| l.starts_with("import ")) {
+            let Some(spec) = line.rsplit('"').nth(1) else {
+                continue;
+            };
+            match spec {
+                "react" => {}
+                "@/lib/utils" => {
+                    reg.insert("utils".to_string());
+                }
+                s if s.starts_with("@/components/ui/") => {
+                    let sib = s.trim_start_matches("@/components/ui/");
+                    if stems.iter().any(|x| x == sib) {
+                        reg.insert(addr(sib));
+                    } else {
+                        missing.push(s.to_string());
+                    }
+                }
+                s if s.starts_with("@/") || s.starts_with('.') => missing.push(s.to_string()),
+                s => {
+                    // `@scope/pkg/sub` and `pkg/sub` are the package `@scope/pkg` / `pkg`.
+                    let mut parts = s.split('/');
+                    let first = parts.next().unwrap_or(s);
+                    let pkg = if first.starts_with('@') {
+                        format!("{first}/{}", parts.next().unwrap_or(""))
+                    } else {
+                        first.to_string()
+                    };
+                    npm.insert(pkg);
+                }
+            }
+        }
+        if !missing.is_empty() {
+            out.skipped.push(format!(
+                "{stem}: imports {}, which this registry does not carry",
+                missing.join(", ")
+            ));
+            continue;
+        }
+        if !system.is_empty() {
+            reg.insert(addr("system"));
+        }
+        let rel = format!("{UI_DIR}/{stem}.tsx");
+        out.items.push(json!({
+            "name": stem,
+            "type": "registry:ui",
+            "dependencies": npm,
+            "registryDependencies": reg,
+            "files": [{ "path": rel, "type": "registry:ui" }],
+        }));
+        out.inputs.push(rel);
+    }
+
+    // The whole system as shadcn's own kind of item: a `registry:base` is "a
+    // complete design system base", what a project starts from. It carries the
+    // style name, the icon library and the registries this product installs
+    // from, and pulls in the stylesheets and every published component.
+    let mut deps: Vec<String> = vec!["utils".to_string()];
+    if !system.is_empty() {
+        deps.push(addr("system"));
+    }
+    deps.extend(
+        out.items
+            .iter()
+            .filter(|i| i["type"] == "registry:ui")
+            .filter_map(|i| i["name"].as_str().map(&addr)),
+    );
+    let mut config = json!({ "style": name, "tailwind": { "baseColor": "neutral" } });
+    if let Some(lib) = icon_library {
+        config["iconLibrary"] = json!(lib);
+    }
+    if !design.registries.is_empty() {
+        config["registries"] = json!(design.registries);
+    }
+    out.items.push(json!({
+        "name": "base",
+        "type": "registry:base",
+        "title": format!("{name} design system"),
+        "description": "Tokens, marks and components: the whole system, as a project's starting point.",
+        "config": config,
+        "registryDependencies": deps,
+    }));
+    out
+}
+
 /// `oklch(L C H)` as its three numbers. Alpha is not carried: every declared
 /// palette entry is opaque, and a translucent one is refused by the caller.
 fn oklch_components(value: &str) -> Option<[f64; 3]> {
@@ -1398,7 +1577,12 @@ impl DesignSystem {
 
     /// A shadcn `registry.json` with one `registry:theme` item, named
     /// `<name>-theme`. `shadcn build` makes it installable.
-    pub fn generate_registry(&self, name: &str, homepage: &str) -> String {
+    pub fn generate_registry(
+        &self,
+        name: &str,
+        homepage: &str,
+        extra: Vec<serde_json::Value>,
+    ) -> String {
         use serde_json::{json, Map, Value};
 
         let vars = |m: &BTreeMap<String, String>| -> Value {
@@ -1416,25 +1600,27 @@ impl DesignSystem {
             );
         }
         theme.insert("font-sans".into(), Value::String(self.plain_stack("body")));
-        theme.insert(
-            "radius".into(),
-            Value::String(self.shape.radius().to_string()),
-        );
+        // `radius` is a plain variable, not a Tailwind theme key: shadcn's own
+        // registries put it under `light`.
+        let mut light = vars(&self.light);
+        light["radius"] = Value::String(self.shape.radius().to_string());
 
-        let doc = json!({
-            "$schema": "https://ui.shadcn.com/schema/registry.json",
-            "name": name,
-            // `shadcn build` refuses a root registry without one.
-            "homepage": homepage,
-            "items": [{
-                "name": format!("{name}-theme"),
+        let mut items = vec![json!({
+                "name": "theme",
                 "type": "registry:theme",
                 "title": format!("{name} theme"),
                 "description": format!(
                     "Palette, type roles and radius from the {name} design system, in light and dark."
                 ),
-                "cssVars": { "theme": theme, "light": vars(&self.light), "dark": vars(&self.dark) },
-            }],
+                "cssVars": { "theme": theme, "light": light, "dark": vars(&self.dark) },
+        })];
+        items.extend(extra);
+        let doc = json!({
+            "$schema": "https://ui.shadcn.com/schema/registry.json",
+            "name": name,
+            // `shadcn build` refuses a root registry without one.
+            "homepage": homepage,
+            "items": items,
         });
         serde_json::to_string_pretty(&doc).expect("registry serialises") + "\n"
     }
@@ -2067,10 +2253,11 @@ title = "hero""#,
     fn registry_theme_matches_the_declared_palette() {
         let ds = parse(SHIPPED).unwrap();
         let v: serde_json::Value =
-            serde_json::from_str(&ds.generate_registry("acme", "https://acme.example")).unwrap();
+            serde_json::from_str(&ds.generate_registry("acme", "https://acme.example", vec![]))
+                .unwrap();
         let item = &v["items"][0];
         assert_eq!(item["type"], "registry:theme");
-        assert_eq!(item["name"], "acme-theme");
+        assert_eq!(item["name"], "theme");
         assert_eq!(
             item["cssVars"]["light"]["background"],
             ds.light["background"]

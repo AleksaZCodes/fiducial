@@ -233,7 +233,14 @@ fn executor_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
             v.extend(cfg(&["product.name"]));
             v
         }
-        "fid-design" => vec![arg("design-system.md")],
+        "fid-design" => {
+            // The registry publishes the product's components and stylesheets,
+            // so editing one is a change the registry must be re-derived for.
+            let mut v = vec![arg("design-system.md")];
+            v.extend(cfg(&["product.name", "brand", "design"]));
+            v.extend(crate::design::registry_items(root, "x", &Default::default(), None).inputs);
+            v
+        }
         "fid-protocol" => vec![arg(crate::protocol::DECLARATION)],
         "fid-topology" => vec![arg(crate::topology::DECLARATION)],
         "fid-monitoring" => vec![
@@ -3141,6 +3148,11 @@ fn run_fid_design(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         .map(|d| format!("https://{d}"))
         .unwrap_or_else(|| "https://example.com".to_string());
 
+    let icon_library = std::fs::read_to_string(working_dir.join("apps/web/components.json"))
+        .ok()
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+        .and_then(|v| v["iconLibrary"].as_str().map(str::to_string));
+
     // One declaration, several projections, told apart by file name:
     //   *.css        the stylesheet the app imports
     //   tokens.json  W3C Design Tokens (DTCG), for Figma, Style Dictionary, …
@@ -3162,7 +3174,18 @@ fn run_fid_design(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
                 system.generate_css(source)
             }
             "tokens.json" => system.generate_dtcg(source),
-            "registry.json" => system.generate_registry(&name, &homepage),
+            "registry.json" => {
+                let published = crate::design::registry_items(
+                    working_dir,
+                    &name,
+                    config.as_ref().map(|c| &c.design).unwrap_or(&Default::default()),
+                    icon_library.as_deref(),
+                );
+                for why in &published.skipped {
+                    print!(" [not published — {why}]");
+                }
+                system.generate_registry(&name, &homepage, published.items)
+            }
             _ => bail!(
                 "fid-design: unknown output `{out}` (supported: a .css file, tokens.json, registry.json)"
             ),

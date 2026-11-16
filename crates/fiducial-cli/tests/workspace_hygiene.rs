@@ -759,9 +759,23 @@ fn release_scripts_invoke_no_undeclared_tool() {
             };
             for tool in UNDECLARED {
                 // Word-bounded: `jqueue=1` is not an invocation of `jq`.
+                // `http://…` and `python3 -m http.server` are a URL scheme and
+                // a module name, not the `http` command: a word followed by
+                // `:` or `.` is not a command being run.
                 let invoked = code
                     .split(|c: char| !c.is_alphanumeric() && c != '_' && c != '-')
-                    .any(|word| word == *tool);
+                    .enumerate()
+                    .any(|(i, word)| {
+                        if word != *tool {
+                            return false;
+                        }
+                        let start: usize = code
+                            .split(|c: char| !c.is_alphanumeric() && c != '_' && c != '-')
+                            .take(i)
+                            .map(|w| w.len() + 1)
+                            .sum();
+                        !matches!(code[start + word.len()..].chars().next(), Some(':' | '.'))
+                    });
                 if invoked {
                     offences.push(format!(
                         "  {}:{}  invokes `{tool}`\n      {}",

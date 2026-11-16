@@ -521,7 +521,7 @@ without a line there is a decision the next person will change back.
 | Path | Is |
 |---|---|
 | `design-system.md` | **the declaration** — product-owned, edit freely |
-| `pipelines/design.toml` | the derivation: `design-system.md` → `tokens.css`, `tokens.json`, `registry.json`, gated by `fid derive --check` |
+| `pipelines/design.toml` | the derivation: `design-system.md` → `tokens.css`, `design/tokens.json`, `registry.json`, gated by `fid derive --check` |
 | `apps/web/src/app/marks.css` | the mechanism: chamfer, marks, outline and frosted surfaces. Reads tokens, declares none |
 | `scripts/build-design-system.mjs` | generates the gallery from the app's own stylesheet |
 
@@ -531,7 +531,7 @@ And after the first `fid derive`:
 |---|---|
 | `apps/web/src/app/tokens.css` | **generated** — guard-blocked, rewritten every derive |
 | `design/tokens.json` | **generated** — the same tokens in the W3C Design Tokens format, for Figma, Style Dictionary and Tokens Studio |
-| `design/registry.json` | **generated** — a shadcn registry holding the theme. `npx shadcn build design/registry.json` makes it installable, so another product adopts this design system with `npx shadcn add <url>` |
+| `registry.json` | **generated**, at the product root where shadcn reads a GitHub repository as a registry: the theme, a `system` item (`tokens.css`, `marks.css`), one `registry:ui` item per component in `apps/web/src/components/ui`, and `base` (shadcn's `registry:base`) that pulls in all of it. Another product adopts the whole system with `npx shadcn add @<product>/base` after registering the namespace in its own `[design.registries]`, or with `npx shadcn add owner/repo/base` when `[design] github = "owner/repo"` is declared and the repository is public. No `fid`, no hosting; `npx shadcn build` is only for serving the JSON from a static host |
 
 `[design.registries]` in `fiducial.toml` names the registries this product
 installs from (`"@acme" = "https://acme.example/r/{name}.json"`). `fid derive`
