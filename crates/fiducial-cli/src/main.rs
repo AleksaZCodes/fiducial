@@ -118,6 +118,12 @@ EXAMPLES
 }
 
 #[derive(Subcommand)]
+enum StudioCmd {
+    /// Print the JSON Schema for fiducial.toml
+    Schema,
+}
+
+#[derive(Subcommand)]
 enum Commands {
     /// Scaffold a new product repository
     #[command(
@@ -585,6 +591,35 @@ EXIT CODES
         portfolio: bool,
     },
 
+    /// The workbench's local source — edit declarations, preview the app
+    #[command(
+        long_about = "\
+Serve the Studio contract for this product on loopback.
+
+Studio is a static app that edits a product through a source. This is the local
+one: files on disk, a per-run token, nothing leaves the machine. The same
+routes are answered from GitHub's API when there is no laptop.
+
+EXAMPLES
+  fid studio                 serve on 127.0.0.1:7777
+  fid studio --port 0        pick a free port
+  fid studio schema          print the JSON Schema for fiducial.toml",
+        after_long_help = "\
+EXIT CODES
+  0   Stopped.
+  1   Could not bind, or no product here."
+    )]
+    Studio {
+        #[command(subcommand)]
+        action: Option<StudioCmd>,
+        /// Port to listen on (0 picks a free one)
+        #[arg(long, default_value_t = 7777)]
+        port: u16,
+        /// The built Studio app (default: found in node_modules or the workspace)
+        #[arg(long, value_name = "DIR")]
+        app: Option<std::path::PathBuf>,
+    },
+
     /// Survey an existing codebase for reusable logic, art, UI and principles
     #[command(
         long_about = "\
@@ -962,6 +997,10 @@ fn main() -> Result<()> {
             section,
             portfolio,
         } => commands::dash::run(json, section, portfolio),
+        Commands::Studio { action, port, app } => match action {
+            Some(StudioCmd::Schema) => commands::studio::schema(),
+            None => commands::studio::serve(port, app),
+        },
         Commands::Harvest {
             path,
             name,

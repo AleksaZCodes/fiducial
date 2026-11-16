@@ -80,6 +80,7 @@ fid add capability hardware   # one declaration → case, board, schematic, BOM,
 fid add capability firmware-rp2040
 fid derive                    # run every pipeline, hash every output
 fid dash                      # roadmap, decisions, CI, pipelines, freshness
+fid studio                    # the workbench: edit declarations in a browser, preview the app
 ```
 
 Declare the product once, in `hardware/product.toml`: its outline, its parts,

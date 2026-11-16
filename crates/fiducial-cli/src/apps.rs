@@ -32,7 +32,7 @@ use crate::config::Config;
 
 /// One app's choices. Every field is optional: an app declares only what it
 /// chooses, and a missing field is the capability's own default.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct App {
     #[serde(default, skip_serializing_if = "String::is_empty")]
