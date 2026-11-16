@@ -73,8 +73,8 @@ pub const FRAMEWORK: Choices = Choices {
 };
 pub const EDITOR: Choices = Choices {
     field: "editor",
-    implemented: &["keystatic", "tina"],
-    intended: &["pages"],
+    implemented: &["keystatic", "tina", "pages"],
+    intended: &[],
 };
 pub const SHELL: Choices = Choices {
     field: "shell",
@@ -231,13 +231,14 @@ mod tests {
         )
         .is_empty());
         assert!(check("[apps.web]\nframework = \"sveltekit\"\neditor = \"tina\"\n").is_empty());
+        assert!(check("[apps.web]\nframework = \"astro\"\neditor = \"pages\"\n").is_empty());
     }
 
     #[test]
     fn an_intended_choice_says_nothing_builds_it() {
-        let p = check("[apps.web]\nframework = \"next\"\neditor = \"pages\"\n").join("\n");
+        let p = check("[apps.web]\nframework = \"next\"\nshell = [\"electron\"]\n").join("\n");
         assert!(p.contains("intended choice that nothing builds yet"), "{p}");
-        assert!(p.contains("Selectable today: keystatic, tina"), "{p}");
+        assert!(p.contains("Selectable today: tauri"), "{p}");
     }
 
     #[test]

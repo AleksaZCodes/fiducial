@@ -36,14 +36,14 @@ fn an_intended_choice_fails_doctor_with_what_is_selectable() {
     let tmp = tempfile::tempdir().unwrap();
     let root = product(
         tmp.path(),
-        "[apps.web]\nframework = \"next\"\neditor = \"pages\"\n",
+        "[apps.web]\nframework = \"next\"\nshell = [\"electron\"]\n",
     );
     let out = text(&run(&root, &["doctor"]));
     assert!(
         out.contains("names an intended choice that nothing builds yet"),
         "{out}"
     );
-    assert!(out.contains("Selectable today: keystatic, tina"), "{out}");
+    assert!(out.contains("Selectable today: tauri"), "{out}");
 }
 
 #[test]

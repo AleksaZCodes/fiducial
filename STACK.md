@@ -85,7 +85,7 @@ Every row carries a status, and the statuses are honest:
 | Analytics | **DuckDB over R2** | Decided |
 | Transactional email | **Resend**, via `@fiducial/email` | Decided |
 | CMS | **Payload** | Candidate — ROP-proven, not yet platform-generalized |
-| Content editor (git-based) | **Keystatic** (default) and **TinaCMS**, both derived from `content.toml`, `messages/` and `settings.json`; **Pages CMS** next. Decap was removed in 0.15.0 | Decided |
+| Content editor (git-based) | **Keystatic** (default) and **TinaCMS**, both derived from `content.toml`, `messages/` and `settings.json`; **Pages CMS** (hosted, edits through GitHub; `.pages.yml` derived and held to its own schema). Decap was removed in 0.15.0 | Decided |
 | Backend framework | **Hono** (Workers-native; Node for a self-hosted target) | Candidate — roadmap: *A stack chosen per app* |
 | ORM | **Drizzle** over the `database` contract (D1, Postgres, SQLite) | Candidate — roadmap: *A stack chosen per app* |
 | Docs site | **VitePress** | Decided |
