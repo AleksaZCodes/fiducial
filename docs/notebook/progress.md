@@ -2,6 +2,13 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.28.0 · 2026-11-16
+
+Phase 8 closes: the topology declares CAN, CAN-FD and RS-485 bit rates and a
+Linux node's real-time settings, derives them into constants, and `fiducial-rt`
+applies them on the kernel. Latency on `PREEMPT_RT` and the controller drivers
+remain open.
+
 ## 0.27.0 · 2026-11-16
 
 - CAN-FD frames, ISO-TP segmentation and Modbus RTU with RS-485 direction control,
