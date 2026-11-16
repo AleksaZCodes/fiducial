@@ -774,6 +774,60 @@ rather than generating something that half works.
 the right answer to a question `fid new` asks, and a capability nobody would be
 steered to is a capability to maintain for nothing.
 
+### The design system, in the standards — *multiplying* 🟡
+
+**Decided 2026-11-16 after reading the three specs.** Three formats describe
+the same thing: Google's DESIGN.md (YAML tokens and prose in one file, alpha,
+Apache-2.0), W3C Design Tokens (JSON, stable since 2025.10, the interchange
+format Figma and Style Dictionary read) and the shadcn registry (how a project
+installs a theme or a component). `design-system.md` already is a DESIGN.md in
+spirit, and it holds what none of the three can: measured contrast pairs, the
+corner strategy, per-surface rules. So it stays the one source and **each
+standard is a derived, gated projection of it**, never a second declaration.
+
+| Item | State |
+|---|---|
+| `design/tokens.json` (DTCG) and `design/registry.json` (shadcn theme) derived beside `tokens.css`; `[design.registries]` written into `components.json`; verified with `shadcn build`/`add` and Style Dictionary | ✅ 0.33.0 |
+| Publish the product's *adapted components* in the same registry (`registry:ui` items from `for/web-next/…`), so a second product installs the whole system with `shadcn add`. Open: whether the chamfer corner can ship as a `registry:style`; not tested | ⬜ |
+| `fid design export --format design-md`: a Google DESIGN.md for Stitch and agents; `fid design import <DESIGN.md \| tokens.json \| registry url>` seeds a declaration (this is the **Interactive seeding** item, below, with a real input). Waits for DESIGN.md to leave alpha | ⬜ |
+| Static export: the tokens plus shadcn-shaped class rules as one CSS file, so a plain HTML page or an artifact is styled by the same system with no build step. Tailwind v4's CSS-first `@theme` is why this is possible at all | ⬜ |
+| Registry namespaces for the product's own blocks (`@product/pricing`), one block per marketing section, installable into any product | ⬜ |
+
+### Studio — the workbench — *multiplying, and the largest open item* ⬜
+
+The platform has no surface a person can look at. Everything is a command on a
+laptop, which cannot be used from a phone, a browser session or a tool with no
+terminal. This item is that surface: a **workbench that edits Fiducial's own
+declarations, with no AI in it**. AI is optional, and the workbench stands
+without it.
+
+- **Dashboard:** `fid dash`, `fid doctor` and freshness as a page: what is
+  declared, what is stale, what a derive would change, what CI says.
+- **Editors over the declarations, generated from their schemas.** Every
+  declaration is typed in Rust already (`serde`), so a JSON Schema per
+  declaration drives a form for it; writes go back to the TOML with comments
+  kept. A new declaration gets an editor for free instead of a hand-built UI.
+- **Open the content editor in one click** (Tina or Keystatic over the
+  repository), signed in with **GitHub OAuth**, saving as commits or pull
+  requests. This is the hosted-editing item (task: Keystatic GitHub mode, Tina
+  Cloud, the GitHub App), which belongs here because a person with no laptop is
+  the case it exists for.
+- **Block diagrams that are real.** A diagram of how a product looks and works
+  is a *declaration* a generator consumes (topology, flows, page structure),
+  not a picture kept beside the code and sometimes read. Editing the diagram
+  edits the declaration; `fid derive` writes the code. `topology.toml` is the
+  first one that works this way.
+- **Drag-and-drop UI over real code.** The UI is composed from shadcn blocks
+  and registries, and the editor writes the actual component source into the
+  product, which is then ordinary code the product owns. It is Fiducial's,
+  not a third-party CMS's: it must not require one. Candidates to evaluate
+  before building (not yet checked): Puck, Craft.js, GrapesJS.
+
+Built by the owner on top of the platform, which is why the platform's job is
+the declarations, their schemas, and the exports above: every one of them is a
+file a workbench can read and write. The `fid` CLI stays the contract and the
+workbench a client of it.
+
 ### On demand ✅
 
 None of these block a product; each is added when wanted, through the system

@@ -1,7 +1,7 @@
 name     = "design"
 executor = "fid-design"
 args     = ["design-system.md"]
-outputs  = ["apps/web/src/app/tokens.css"]
+outputs  = ["apps/web/src/app/tokens.css", "design/tokens.json", "design/registry.json"]
 
 # `design-system.md` is the declaration. The prose in it is for people; the
 # fenced ```toml fid:<section> blocks are what this pipeline reads. One file,

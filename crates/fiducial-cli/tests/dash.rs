@@ -496,11 +496,13 @@ fn an_output_never_derived_is_distinguished_from_a_stale_one() {
     assert!(run(&root, &["add", "eda"]).status.success());
 
     let d = dash(&root);
-    // Two: the scaffold's own generated messages and flags, which `fid new` derives so a
+    // Four: the scaffold's own generated messages and flags, and the design
+    // system's two portable exports (`design/tokens.json`, `design/registry.json`
+    // need no app, so they are derived with it), which `fid new` derives so a
     // product does not fail the `fid derive --check` in its own CI on the
     // first commit. Every `eda` output is still untracked, which is the
     // distinction under test.
-    assert_eq!(d["freshness"]["artifacts_fresh"], 2);
+    assert_eq!(d["freshness"]["artifacts_fresh"], 4);
     assert!(
         d["freshness"]["artifacts_untracked"].as_u64().unwrap() >= 5,
         "nothing has been derived yet: {}",

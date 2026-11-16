@@ -409,7 +409,12 @@ pub(crate) fn outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<St
         "fid-design" | "fid-thesis" => pipeline
             .outputs
             .iter()
-            .filter(|o| !app_root_exists(root, o))
+            .filter(|o| {
+                // Only the stylesheet and `thesis.ts` wait for an app; the
+                // portable exports live at the product root.
+                let app_gated = o.ends_with(".css") || o.ends_with(".ts");
+                app_gated && !app_root_exists(root, o)
+            })
             .cloned()
             .collect(),
         // The firmware's pin map waits for a firmware: a board with no MCU
@@ -3115,28 +3120,72 @@ fn run_fid_design(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
         .check_contrast()
         .context("fid-design: the declared palette does not meet its own requirements")?;
 
-    let [out] = pipeline.outputs.as_slice() else {
-        bail!(
-            "fid-design: expected exactly one output (the token stylesheet), got {}",
-            pipeline.outputs.len()
-        );
-    };
+    // Config is optional here: a design system is worth policing before a
+    // product has a fiducial.toml worth reading.
+    let config = Config::load(&working_dir.join(crate::config::CONFIG_FILE)).ok();
+    if let Some(c) = &config {
+        c.design.validate().context("fid-design")?;
+    }
+    let name = config
+        .as_ref()
+        .map(|c| c.product.name.clone())
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| "product".to_string());
+    // `shadcn build` requires a homepage. The brand domain is the real one;
+    // before a product has a domain the registry points at the placeholder
+    // address reserved for documentation, and says so by being obviously one.
+    let homepage = config
+        .as_ref()
+        .map(|c| c.brand.domain.trim().to_string())
+        .filter(|d| !d.is_empty())
+        .map(|d| format!("https://{d}"))
+        .unwrap_or_else(|| "https://example.com".to_string());
 
-    // Declared, checked, but with nowhere to land yet. The palette above was
-    // still measured — the declaration is worth policing before there is an app
-    // to apply it to, which is the whole point of writing it first.
-    if !app_root_exists(working_dir, out) {
-        print!(" [{pairs} contrast pairs ok; no app yet — `{out}` not written]");
+    // One declaration, several projections, told apart by file name:
+    //   *.css        the stylesheet the app imports
+    //   tokens.json  W3C Design Tokens (DTCG), for Figma, Style Dictionary, …
+    //   registry.json  a shadcn registry holding the theme, for `shadcn build`
+    let mut written = 0;
+    let mut waiting = 0;
+    for out in &pipeline.outputs {
+        let file = Path::new(out)
+            .file_name()
+            .and_then(|f| f.to_str())
+            .unwrap_or("");
+        let content = match file {
+            f if f.ends_with(".css") => {
+                // Waits for an app to land in.
+                if !app_root_exists(working_dir, out) {
+                    waiting += 1;
+                    continue;
+                }
+                system.generate_css(source)
+            }
+            "tokens.json" => system.generate_dtcg(source),
+            "registry.json" => system.generate_registry(&name, &homepage),
+            _ => bail!(
+                "fid-design: unknown output `{out}` (supported: a .css file, tokens.json, registry.json)"
+            ),
+        };
+        let abs = working_dir.join(out);
+        if let Some(parent) = abs.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("creating {}", parent.display()))?;
+        }
+        std::fs::write(&abs, content).with_context(|| format!("writing {}", abs.display()))?;
+        written += 1;
+    }
+
+    // `components.json` carries the registries a product installs from. It is a
+    // copy of `[design.registries]`, so shadcn needs no second list.
+    if let Some(c) = &config {
+        crate::design::sync_registries(working_dir, &c.design)?;
+    }
+
+    if waiting > 0 && written == 0 {
+        print!(" [{pairs} contrast pairs ok; no app yet — nothing written]");
         return Ok(());
     }
-
-    let css = system.generate_css(source);
-    let abs = working_dir.join(out);
-    if let Some(parent) = abs.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("creating {}", parent.display()))?;
-    }
-    std::fs::write(&abs, css).with_context(|| format!("writing {}", abs.display()))?;
 
     // Said out loud because a silent check is one nobody trusts: the whole
     // point of measuring in the pipeline is that the number is real.

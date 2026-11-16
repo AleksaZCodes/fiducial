@@ -54,6 +54,9 @@ pub struct Config {
     /// `[skills]` — which agents the platform installs and links skills for.
     #[serde(default, skip_serializing_if = "Skills::is_empty")]
     pub skills: Skills,
+    /// `[design]` — the shadcn registries this product installs from.
+    #[serde(default, skip_serializing_if = "Design::is_empty")]
+    pub design: Design,
     /// `[legal]` — jurisdiction and cookie declarations for the legal pipeline.
     ///
     /// Skipped when the product declares no legal facts, so a product that has
@@ -269,6 +272,53 @@ pub struct Freshness {
 impl Freshness {
     pub fn is_empty(&self) -> bool {
         self.gates.is_empty()
+    }
+}
+
+/// `[design]` — registries the product's components come from.
+///
+/// ```toml
+/// [design.registries]
+/// "@acme" = "https://acme.example/r/{name}.json"
+/// ```
+///
+/// shadcn resolves `npx shadcn add @acme/button` through the `registries` map
+/// in `components.json`. That file is a copy of this declaration, rewritten by
+/// `fid derive`, so the list a product installs from is written once.
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Design {
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub registries: std::collections::BTreeMap<String, String>,
+}
+
+impl Design {
+    pub fn is_empty(&self) -> bool {
+        self.registries.is_empty()
+    }
+
+    /// shadcn's own rules for a namespace and its URL template, held here so a
+    /// bad entry fails `fid derive` rather than the first `shadcn add`.
+    pub fn validate(&self) -> anyhow::Result<()> {
+        for (ns, url) in &self.registries {
+            let body = ns.strip_prefix('@').unwrap_or("");
+            if body.is_empty()
+                || !body
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+            {
+                anyhow::bail!(
+                    "[design.registries] `{ns}`: a namespace is `@` then lowercase letters, digits, - or _"
+                );
+            }
+            if !url.starts_with("https://") || !url.contains("{name}") {
+                anyhow::bail!(
+                    "[design.registries] `{ns}`: the URL must be https and contain `{{name}}`, \
+                     the item shadcn substitutes (got `{url}`)"
+                );
+            }
+        }
+        Ok(())
     }
 }
 

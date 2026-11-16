@@ -1211,6 +1211,235 @@ const SHAPE_SURFACE: &str = "  .shape-panel, .shape-control, .shape-chip {\n    
      .shape-outline {\n    --fill: var(--background);\n  }\n  \
      .shape-outline:hover {\n    --fill: var(--muted);\n  }\n";
 
+// ── Portable exports ─────────────────────────────────────────────────────────
+//
+// `design-system.md` is the one declaration. Two more files are derived from
+// it so the same values reach tools that are not this stylesheet:
+//
+// * `tokens.json`: W3C Design Tokens Community Group format. Figma (Variables
+//   import), Style Dictionary, Tokens Studio and the rest read it, so a
+//   designer's tool and the product's CSS cannot disagree.
+// * `registry.json`: a shadcn registry holding the palette, fonts and radius
+//   as one `registry:theme` item. `shadcn build` turns it into a file any
+//   other project installs with `npx shadcn add <url>`, so the design system
+//   is something a second product adopts rather than copies.
+
+/// Write `[design.registries]` into `apps/web/components.json`, keeping every
+/// other key. A product with no web app has no such file and nothing to do.
+pub fn sync_registries(root: &std::path::Path, design: &crate::config::Design) -> Result<()> {
+    let path = root.join("apps/web/components.json");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return Ok(());
+    };
+    let mut value: serde_json::Value =
+        serde_json::from_str(&text).with_context(|| format!("parsing {}", path.display()))?;
+    let declared: serde_json::Map<String, serde_json::Value> = design
+        .registries
+        .iter()
+        .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+        .collect();
+    let current = value.get("registries").and_then(|v| v.as_object()).cloned();
+    if declared.is_empty() {
+        if current.is_none() {
+            return Ok(());
+        }
+        value.as_object_mut().map(|o| o.remove("registries"));
+    } else if current.as_ref() == Some(&declared) {
+        return Ok(());
+    } else {
+        value["registries"] = serde_json::Value::Object(declared);
+    }
+    std::fs::write(&path, serde_json::to_string_pretty(&value)? + "\n")?;
+    Ok(())
+}
+
+/// `oklch(L C H)` as its three numbers. Alpha is not carried: every declared
+/// palette entry is opaque, and a translucent one is refused by the caller.
+fn oklch_components(value: &str) -> Option<[f64; 3]> {
+    let inner = value.trim().strip_prefix("oklch(")?.strip_suffix(')')?;
+    if inner.contains('/') {
+        return None;
+    }
+    let mut it = inner.split_whitespace();
+    let l: f64 = it.next()?.parse().ok()?;
+    let c: f64 = it.next()?.parse().ok()?;
+    let h: f64 = it.next()?.parse().ok()?;
+    it.next().is_none().then_some([l, c, h])
+}
+
+/// A DTCG dimension: `{ "value": 1.5, "unit": "rem" }`. The format allows `px`
+/// and `rem` only, so anything else (`em`, a `clamp()`) is carried as the CSS
+/// string it was declared as, rather than converted into something it is not.
+fn dtcg_dimension(v: &str) -> serde_json::Value {
+    let t = v.trim();
+    for unit in ["rem", "px"] {
+        if let Some(n) = t
+            .strip_suffix(unit)
+            .and_then(|n| n.trim().parse::<f64>().ok())
+        {
+            return serde_json::json!({ "value": n, "unit": unit });
+        }
+    }
+    serde_json::Value::String(t.to_string())
+}
+
+fn dtcg_number(v: &str) -> serde_json::Value {
+    v.trim()
+        .parse::<f64>()
+        .ok()
+        .and_then(serde_json::Number::from_f64)
+        .map(serde_json::Value::Number)
+        .unwrap_or_else(|| serde_json::Value::String(v.trim().to_string()))
+}
+
+fn round4(x: f64) -> f64 {
+    (x * 10_000.0).round() / 10_000.0
+}
+
+impl DesignSystem {
+    /// A role's stack with no loader variable in it: `"Family", fallback`.
+    /// The registry is read by projects that bind no `--face-*` variable.
+    fn plain_stack(&self, role: &str) -> String {
+        let r = &self.roles[role];
+        let mut parts = vec![format!("\"{}\"", r.family)];
+        parts.extend(r.fallback.iter().cloned());
+        parts.join(", ")
+    }
+
+    fn dtcg_color(value: &str) -> serde_json::Value {
+        use serde_json::json;
+        match (oklch_components(value), to_srgb(value)) {
+            (Some([l, c, h]), Some(rgb)) => json!({
+                "$type": "color",
+                "$value": {
+                    "colorSpace": "oklch",
+                    "components": [round4(l), round4(c), round4(h)],
+                    "hex": to_hex(rgb),
+                },
+            }),
+            (None, Some(rgb)) => json!({
+                "$type": "color",
+                "$value": {
+                    "colorSpace": "srgb",
+                    "components": rgb.map(round4),
+                    "hex": to_hex(rgb),
+                },
+            }),
+            // Not a colour this file can express in the token format. Carried
+            // as written rather than dropped: a token that goes missing from
+            // the export is a disagreement nobody sees.
+            _ => json!({ "$type": "color", "$value": value }),
+        }
+    }
+
+    /// The W3C Design Tokens (DTCG) file: colours per mode, type roles, the
+    /// named scale, and shape. Keys are the names `design-system.md` uses.
+    pub fn generate_dtcg(&self, source: &str) -> String {
+        use serde_json::{json, Map, Value};
+
+        let mode = |m: &BTreeMap<String, String>| -> Value {
+            let mut g = Map::new();
+            for (k, v) in m {
+                g.insert(k.clone(), Self::dtcg_color(v));
+            }
+            Value::Object(g)
+        };
+
+        let mut font = Map::new();
+        for (role, r) in &self.roles {
+            font.insert(
+                role.clone(),
+                json!({
+                    "family": { "$type": "fontFamily", "$value": std::iter::once(r.family.clone()).chain(r.fallback.iter().cloned()).collect::<Vec<_>>() },
+                    "weights": { "$type": "fontWeight", "$value": r.weights },
+                }),
+            );
+        }
+
+        let mut scale = Map::new();
+        for name in &self.step_order {
+            let st = &self.steps[name];
+            scale.insert(
+                name.clone(),
+                json!({
+                    "$type": "typography",
+                    "$description": format!("rendered in the {} role", st.role),
+                    "$value": {
+                        "fontFamily": format!("{{font.{}.family}}", st.role),
+                        "fontSize": dtcg_dimension(&st.size),
+                        "lineHeight": dtcg_number(&st.leading),
+                        "fontWeight": dtcg_number(&st.weight),
+                        "letterSpacing": dtcg_dimension(st.tracking.as_deref().unwrap_or("0px")),
+                    },
+                }),
+            );
+        }
+
+        let dim = |v: &str| json!({ "$type": "dimension", "$value": dtcg_dimension(v) });
+        let doc = json!({
+            "$description": format!(
+                "GENERATED by `fid derive` (pipeline: design) from {source}. Do not edit."
+            ),
+            "color": { "light": mode(&self.light), "dark": mode(&self.dark) },
+            "font": font,
+            "type": scale,
+            "shape": {
+                "strategy": { "$type": "string", "$value": self.shape.strategy },
+                "radius": dim(self.shape.radius()),
+                "panel": dim(&self.shape.panel),
+                "control": dim(&self.shape.control),
+                "chip": dim(&self.shape.chip),
+                "border": dim(&self.shape.border),
+                "hair": dim(&self.shape.hair),
+            },
+        });
+        serde_json::to_string_pretty(&doc).expect("tokens serialise") + "\n"
+    }
+
+    /// A shadcn `registry.json` with one `registry:theme` item, named
+    /// `<name>-theme`. `shadcn build` makes it installable.
+    pub fn generate_registry(&self, name: &str, homepage: &str) -> String {
+        use serde_json::{json, Map, Value};
+
+        let vars = |m: &BTreeMap<String, String>| -> Value {
+            Value::Object(
+                m.iter()
+                    .map(|(k, v)| (k.clone(), Value::String(v.clone())))
+                    .collect::<Map<_, _>>(),
+            )
+        };
+        let mut theme = Map::new();
+        for role in ["display", "body", "script", "mono"] {
+            theme.insert(
+                format!("font-{role}"),
+                Value::String(self.plain_stack(role)),
+            );
+        }
+        theme.insert("font-sans".into(), Value::String(self.plain_stack("body")));
+        theme.insert(
+            "radius".into(),
+            Value::String(self.shape.radius().to_string()),
+        );
+
+        let doc = json!({
+            "$schema": "https://ui.shadcn.com/schema/registry.json",
+            "name": name,
+            // `shadcn build` refuses a root registry without one.
+            "homepage": homepage,
+            "items": [{
+                "name": format!("{name}-theme"),
+                "type": "registry:theme",
+                "title": format!("{name} theme"),
+                "description": format!(
+                    "Palette, type roles and radius from the {name} design system, in light and dark."
+                ),
+                "cssVars": { "theme": theme, "light": vars(&self.light), "dark": vars(&self.dark) },
+            }],
+        });
+        serde_json::to_string_pretty(&doc).expect("registry serialises") + "\n"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1811,5 +2040,46 @@ title = "hero""#,
         assert!(sys()
             .generate_css("design-system.md")
             .contains("design-system.md"));
+    }
+
+    #[test]
+    fn dtcg_carries_every_colour_in_both_modes() {
+        let ds = parse(SHIPPED).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&ds.generate_dtcg("x")).unwrap();
+        for mode in ["light", "dark"] {
+            let m = v["color"][mode].as_object().unwrap();
+            assert!(
+                m.contains_key("background") && m.contains_key("primary"),
+                "{mode}"
+            );
+            let bg = &m["background"]["$value"];
+            assert_eq!(bg["colorSpace"], "oklch");
+            assert!(bg["hex"].as_str().unwrap().starts_with('#'));
+        }
+        assert!(
+            v["type"].as_object().unwrap().len() > 3,
+            "scale steps exported"
+        );
+        assert_eq!(v["shape"]["strategy"]["$value"], ds.shape.strategy);
+    }
+
+    #[test]
+    fn registry_theme_matches_the_declared_palette() {
+        let ds = parse(SHIPPED).unwrap();
+        let v: serde_json::Value =
+            serde_json::from_str(&ds.generate_registry("acme", "https://acme.example")).unwrap();
+        let item = &v["items"][0];
+        assert_eq!(item["type"], "registry:theme");
+        assert_eq!(item["name"], "acme-theme");
+        assert_eq!(
+            item["cssVars"]["light"]["background"],
+            ds.light["background"]
+        );
+        assert_eq!(item["cssVars"]["dark"]["background"], ds.dark["background"]);
+        let sans = item["cssVars"]["theme"]["font-sans"].as_str().unwrap();
+        assert!(
+            !sans.contains("var("),
+            "no loader variable in a shared registry: {sans}"
+        );
     }
 }
