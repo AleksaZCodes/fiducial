@@ -283,9 +283,8 @@ fn dev_start(root: &Path, dev: &Arc<Mutex<Dev>>) -> Result<()> {
     if dev_status(dev)["running"] == json!(true) {
         return Ok(());
     }
-    let cmd = dev_command(root).context(
-        "no dev server to run: the product has no `apps/web` with a `dev` script",
-    )?;
+    let cmd = dev_command(root)
+        .context("no dev server to run: the product has no `apps/web` with a `dev` script")?;
     let mut command = Command::new("sh");
     command
         .args(["-c", &cmd])
@@ -451,12 +450,7 @@ fn respond(stream: &mut TcpStream, status: u16, ctype: &str, body: &[u8]) {
 }
 
 fn json_resp(stream: &mut TcpStream, status: u16, v: &Value) {
-    respond(
-        stream,
-        status,
-        "application/json",
-        v.to_string().as_bytes(),
-    );
+    respond(stream, status, "application/json", v.to_string().as_bytes());
 }
 
 fn loopback_host(host: &str) -> bool {
@@ -480,7 +474,9 @@ fn find_app(root: &Path, explicit: Option<PathBuf>) -> Option<PathBuf> {
     let mut candidates: Vec<PathBuf> = explicit.into_iter().chain(from_env).collect();
     candidates.push(root.join("node_modules/@fiducial/studio/dist"));
     candidates.push(root.join("packages/studio/dist"));
-    candidates.into_iter().find(|d| d.join("index.html").is_file())
+    candidates
+        .into_iter()
+        .find(|d| d.join("index.html").is_file())
 }
 
 fn content_type(path: &Path) -> &'static str {
@@ -622,11 +618,7 @@ fn make_token() -> String {
     {
         return hex::encode(buf);
     }
-    let seed = format!(
-        "{:?}{}",
-        std::time::SystemTime::now(),
-        std::process::id()
-    );
+    let seed = format!("{:?}{}", std::time::SystemTime::now(), std::process::id());
     sha256_hex(seed.as_bytes())[..32].to_string()
 }
 
@@ -685,7 +677,16 @@ mod tests {
         let r = dir.path();
         assert!(confine(r, "fiducial.toml").is_ok());
         assert!(confine(r, "a/b/new.toml").is_ok());
-        for bad in ["../x", "/etc/passwd", ".env", "apps/.env.local", ".git/config", "a/node_modules/x", "k.pem", ""] {
+        for bad in [
+            "../x",
+            "/etc/passwd",
+            ".env",
+            "apps/.env.local",
+            ".git/config",
+            "a/node_modules/x",
+            "k.pem",
+            "",
+        ] {
             assert!(confine(r, bad).is_err(), "{bad} must be refused");
         }
     }
@@ -752,21 +753,39 @@ mod tests {
         });
         let call = |method: &str, target: &str, auth: bool, host: &str, body: &str| {
             let mut c = TcpStream::connect(("127.0.0.1", port)).unwrap();
-            let a = if auth { "Authorization: Bearer t0k\r\n" } else { "" };
-            write!(c, "{method} {target} HTTP/1.1\r\nHost: {host}\r\n{a}Content-Length: {}\r\n\r\n{body}", body.len()).unwrap();
+            let a = if auth {
+                "Authorization: Bearer t0k\r\n"
+            } else {
+                ""
+            };
+            write!(
+                c,
+                "{method} {target} HTTP/1.1\r\nHost: {host}\r\n{a}Content-Length: {}\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
             let mut out = String::new();
             c.read_to_string(&mut out).unwrap();
             out
         };
         let h = format!("localhost:{port}");
         assert!(call("GET", "/api/file?path=a.toml", false, &h, "").starts_with("HTTP/1.1 401"));
-        assert!(call("GET", "/api/file?path=a.toml", true, "evil.example", "").starts_with("HTTP/1.1 403"));
+        assert!(
+            call("GET", "/api/file?path=a.toml", true, "evil.example", "")
+                .starts_with("HTTP/1.1 403")
+        );
         let ok = call("GET", "/api/file?path=a.toml", true, &h, "");
         assert!(ok.contains("x = 1"), "{ok}");
         let put = call("PUT", "/api/file?path=b.toml", true, &h, "y = 2\n");
         assert!(put.starts_with("HTTP/1.1 200"), "{put}");
-        assert_eq!(std::fs::read_to_string(dir.path().join("b.toml")).unwrap(), "y = 2\n");
-        assert!(call("GET", "/api/file?path=..%2Fetc%2Fpasswd", true, &h, "").starts_with("HTTP/1.1 400"));
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("b.toml")).unwrap(),
+            "y = 2\n"
+        );
+        assert!(
+            call("GET", "/api/file?path=..%2Fetc%2Fpasswd", true, &h, "")
+                .starts_with("HTTP/1.1 400")
+        );
         assert!(call("GET", "/api/files", true, &h, "").contains("a.toml"));
         // The app itself is public; a client-side route falls back to the shell;
         // nothing outside the app directory is reachable.
@@ -779,8 +798,10 @@ mod tests {
     /// The schema the app bundles must be the one the CLI parses with.
     #[test]
     fn the_bundled_schema_is_current() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/studio/src/fiducial.schema.json");
-        let committed: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../packages/studio/src/fiducial.schema.json");
+        let committed: Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(
             committed,
             config_schema(),
