@@ -217,6 +217,7 @@ fn executor_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
         }
         "fid-legal" => cfg(&["legal", "brand", "i18n"]),
         "fid-deploy" => cfg(&["deploy", "adapters", "product.name"]),
+        "fid-security" => cfg(&["security"]),
         "fid-identity" => cfg(&["identity", "adapters"]),
         "fid-compose" => {
             let mut v = cfg(&["deploy", "adapters", "product.name"]);
@@ -2946,6 +2947,37 @@ fn run_fid_topology(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// The response headers, derived into one framework's file from the platform's
+/// single table. `args[0]` names the form; the one output is where it goes.
+fn run_fid_security(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
+    use crate::security::{render, Format};
+    let config = Config::load(&working_dir.join(crate::config::CONFIG_FILE))
+        .context("fid-security needs fiducial.toml")?;
+    let name = pipeline
+        .args
+        .first()
+        .map(String::as_str)
+        .unwrap_or_default();
+    let Some(format) = Format::parse(name) else {
+        bail!(
+            "fid-security: pipelines/{}.toml names form `{name}`; known forms: {}",
+            pipeline.name,
+            Format::NAMES
+        );
+    };
+    let [out] = pipeline.outputs.as_slice() else {
+        bail!(
+            "fid-security: expected exactly one output (the file the headers go in), got {}",
+            pipeline.outputs.len()
+        );
+    };
+    write_output(
+        working_dir,
+        out,
+        &render(format, config.security.hsts_preload),
+    )
+}
+
 /// `deploy = "compose"`: the services, the proxy and the broker, derived from
 /// the topology and `[adapters]`. See `crate::compose`.
 fn run_fid_compose(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
@@ -3215,6 +3247,7 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             "fid-brand" => return run_fid_brand(pipeline, working_dir),
             "fid-thesis" => return run_fid_thesis(pipeline, working_dir),
             "fid-deploy" => return run_fid_deploy(pipeline, working_dir),
+            "fid-security" => return run_fid_security(pipeline, working_dir),
             "fid-compose" => return run_fid_compose(pipeline, working_dir),
             "fid-identity" => return run_fid_identity(pipeline, working_dir),
             "fid-adapters" => return run_fid_adapters(pipeline, working_dir),
@@ -3228,7 +3261,7 @@ fn run_pipeline_command(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             other => bail!(
                 "unknown executor `{other}` \
                  (supported: cargo-test, shell, fid-validate, fid-mesh, fid-i18n, fid-brand, \
-                 fid-adapters, fid-deploy, fid-compose, fid-identity, fid-schema, fid-legal, fid-design, \
+                 fid-adapters, fid-deploy, fid-security, fid-compose, fid-identity, fid-schema, fid-legal, fid-design, \
                  fid-protocol, fid-topology, fid-monitoring, fid-hardware)"
             ),
         };

@@ -19,7 +19,8 @@ Next.js).
 - **`@cloudflare/vite-plugin`** on the `ssr` environment: `dev` and `build` run the
   server inside `workerd`, the runtime a deploy uses.
 - **A server entry** `src/server.ts` wrapping Start's own handler to set the
-  security headers from `src/security.ts` on every response.
+  security headers from `src/security.generated.ts` on every response (derived by
+  `fid derive` from the platform's one table; `[security] hsts_preload` is the only choice).
 - **Tailwind 4 on the design tokens**: `src/styles.css` imports the `tokens.css` and
   `marks.css` the `design` capability installs into `src/app/`.
 
@@ -39,7 +40,8 @@ entry on purpose: Start's package entry, `@tanstack/react-start/server-entry`,
 builds its own handler and never reads `src/server.ts`, so a custom entry that is
 only *in* `src/` sends none of its headers. Keep `nodejs_compat` in `compatibility_flags`: the `deploy`
 capability seeds it, and Start needs it. `fid doctor` holds the framework and the
-shape to agreeing, and fails an app whose `src/security.ts` lacks a required header.
+shape to agreeing, and fails an app whose `src/security.generated.ts` lacks a required header or has not
+been derived yet.
 
 ## Build, run, deploy
 

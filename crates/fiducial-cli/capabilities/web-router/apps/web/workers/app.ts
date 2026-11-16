@@ -1,5 +1,5 @@
 import { createRequestHandler } from "react-router";
-import { responseHeaders } from "../app/security";
+import { responseHeaders } from "../app/security.generated";
 
 const requestHandler = createRequestHandler(
   () => import("virtual:react-router/server-build"),

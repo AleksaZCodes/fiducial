@@ -60,6 +60,9 @@ pub struct Config {
     /// `[advise]` — whether advisory review is part of this product's procedure.
     #[serde(default, skip_serializing_if = "Advise::is_empty")]
     pub advise: Advise,
+    /// `[security]` — the one choice the response headers leave open.
+    #[serde(default, skip_serializing_if = "Security::is_empty")]
+    pub security: Security,
     /// `[apps.<name>]` — what each app is built with (`crate::apps`).
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub apps: std::collections::BTreeMap<String, crate::apps::App>,
@@ -89,6 +92,28 @@ pub struct Config {
         skip_serializing_if = "std::collections::BTreeMap::is_empty"
     )]
     pub extra: std::collections::BTreeMap<String, toml::Value>,
+}
+
+/// `[security]` — the choices the response headers leave open.
+///
+/// The headers themselves are not declared here: they are one table in the
+/// platform (`security.rs`), derived into every framework's file by
+/// `fid-security`. What a product may choose is the one thing that is a decision
+/// rather than a fact.
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Security {
+    /// Add `preload` to `Strict-Transport-Security`. Off unless declared: it is
+    /// a willingness to be submitted at hstspreload.org, which is slow to undo
+    /// (`docs/specs/2026-09-20-hsts-preload.md`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hsts_preload: bool,
+}
+
+impl Security {
+    pub fn is_empty(&self) -> bool {
+        !self.hsts_preload
+    }
 }
 
 /// `[advise]` — is advisory review part of this product's procedure.

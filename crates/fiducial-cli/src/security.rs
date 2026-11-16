@@ -45,6 +45,13 @@ pub struct SecurityHeader {
     /// Recording that as a level rather than omitting the header keeps the debt
     /// visible — see `docs/specs/2026-09-20-hsts-preload.md`.
     pub required: bool,
+    /// The value sent. The one place it is written: every framework's file and
+    /// the self-hosted Caddyfile are derived from it (`render`, `headers`).
+    ///
+    /// For `Strict-Transport-Security` this is the value *without* `preload`,
+    /// which is a declared choice (`[security] hsts_preload`), not a default:
+    /// see [`headers`].
+    pub value: &'static str,
 }
 
 /// The canonical set. Ordered as a reader would want them explained, not
@@ -55,41 +62,144 @@ pub static SECURITY_HEADERS: &[SecurityHeader] = &[
         protects: "a downgrade attack on a returning visitor. Needs max-age >= 1 year \
              and includeSubDomains to be preload-eligible",
         required: true,
+        value: "max-age=63072000; includeSubDomains",
     },
     SecurityHeader {
         name: "Content-Security-Policy",
         protects: "injected <base> re-rooting every relative URL, a planted form \
              posting credentials off-site, plugin embedding, and framing",
         required: true,
+        value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; media-src 'self' https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
     },
     SecurityHeader {
         name: "X-Content-Type-Options",
         protects: "an upload served back as text/html because its bytes looked like markup",
         required: true,
+        value: "nosniff",
     },
     SecurityHeader {
         name: "Referrer-Policy",
         protects: "leaking full paths cross-site, and any referrer over plain HTTP",
         required: true,
+        value: "strict-origin-when-cross-origin",
     },
     SecurityHeader {
         name: "X-Frame-Options",
         protects: "clickjacking in a browser too old for CSP frame-ancestors, which is \
              why both are sent",
         required: true,
+        value: "DENY",
     },
     SecurityHeader {
         name: "Permissions-Policy",
         protects: "capabilities a content site never needs — camera, microphone, \
              geolocation, payment, usb",
         required: true,
+        value: "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
     },
     SecurityHeader {
         name: "Cross-Origin-Opener-Policy",
         protects: "a popup reaching back through window.opener",
         required: true,
+        value: "same-origin",
     },
 ];
+
+// ── Derived forms ────────────────────────────────────────────────────────────
+
+/// The headers to send, as `(name, value)`, in the canonical order.
+///
+/// `hsts_preload` is the one real choice. `preload` only *declares willingness*:
+/// the site must still be submitted at hstspreload.org, and that is a
+/// deliberate, slow-to-undo step (removal takes months and browsers keep the
+/// pin until they next update, so a subdomain that later needs plain HTTP is
+/// unreachable in the meantime — `docs/specs/2026-09-20-hsts-preload.md`). So it
+/// is off unless a product declares it, and `fid derive` is where it is written.
+pub fn headers(hsts_preload: bool) -> Vec<(&'static str, String)> {
+    SECURITY_HEADERS
+        .iter()
+        .map(|h| {
+            let mut v = h.value.to_string();
+            if hsts_preload && h.name == "Strict-Transport-Security" {
+                v.push_str("; preload");
+            }
+            (h.name, v)
+        })
+        .collect()
+}
+
+/// The file forms the headers are derived into.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Format {
+    /// Cloudflare's `_headers` file, read by Workers Static Assets from the
+    /// build output (an Astro static site has no server to set headers).
+    HeadersFile,
+    /// `export const responseHeaders = [["Name", "value"], …]`, read by a Worker
+    /// entry that sets them on every response (React Router, TanStack Start).
+    TsPairs,
+    /// `export const securityHeaders = [{ key, value }, …]`, the shape Next.js's
+    /// `headers()` takes.
+    TsObjects,
+}
+
+impl Format {
+    pub fn parse(name: &str) -> Option<Format> {
+        match name {
+            "headers-file" => Some(Format::HeadersFile),
+            "ts-pairs" => Some(Format::TsPairs),
+            "ts-objects" => Some(Format::TsObjects),
+            _ => None,
+        }
+    }
+
+    pub const NAMES: &'static str = "headers-file, ts-pairs, ts-objects";
+}
+
+const DERIVED: &str = "Derived by fid-security from [security] in fiducial.toml — do not edit.\n\
+The values are one table in the platform (security.rs), so this file, the other \
+frameworks' and the self-hosted Caddyfile cannot disagree.";
+
+/// The text of one derived file.
+pub fn render(format: Format, hsts_preload: bool) -> String {
+    let headers = headers(hsts_preload);
+    let note = |prefix: &str| {
+        DERIVED
+            .lines()
+            .map(|l| format!("{prefix} {l}\n"))
+            .collect::<String>()
+    };
+    let q = |v: &str| format!("\"{}\"", v.replace('\\', "\\\\").replace('"', "\\\""));
+    match format {
+        Format::HeadersFile => {
+            let mut s = note("#");
+            s.push_str("/*\n");
+            for (k, v) in &headers {
+                s.push_str(&format!("  {k}: {v}\n"));
+            }
+            s
+        }
+        Format::TsPairs => {
+            let mut s = note("//");
+            s.push_str(
+                "\nexport const responseHeaders: ReadonlyArray<readonly [string, string]> = [\n",
+            );
+            for (k, v) in &headers {
+                s.push_str(&format!("  [{}, {}],\n", q(k), q(v)));
+            }
+            s.push_str("];\n");
+            s
+        }
+        Format::TsObjects => {
+            let mut s = note("//");
+            s.push_str("\nexport const securityHeaders = [\n");
+            for (k, v) in &headers {
+                s.push_str(&format!("  {{ key: {}, value: {} }},\n", q(k), q(v)));
+            }
+            s.push_str("];\n");
+            s
+        }
+    }
+}
 
 /// Where a framework declares its response headers.
 ///
@@ -152,14 +262,14 @@ pub static WEB_APP_SHAPES: &[WebAppShape] = &[
     WebAppShape {
         name: "React Router",
         // The Worker sets the headers (`workers/app.ts`) from this module.
-        config: "apps/web/app/security.ts",
+        config: "apps/web/app/security.generated.ts",
         marker: "apps/web/react-router.config.ts",
         also: &[],
     },
     WebAppShape {
         name: "TanStack Start",
         // The server entry sets the headers from this module.
-        config: "apps/web/src/security.ts",
+        config: "apps/web/src/security.generated.ts",
         marker: "apps/web/tsr.config.json",
         also: &[],
     },
@@ -258,5 +368,65 @@ mod tests {
         for h in SECURITY_HEADERS {
             assert!(h.protects.len() > 20, "{} has no rationale", h.name);
         }
+    }
+
+    #[test]
+    fn every_derived_form_carries_every_header_with_the_same_value() {
+        for preload in [false, true] {
+            let want = headers(preload);
+            let file = render(Format::HeadersFile, preload);
+            let pairs = render(Format::TsPairs, preload);
+            let objects = render(Format::TsObjects, preload);
+            for (k, v) in &want {
+                assert!(
+                    file.contains(&format!("{k}: {v}")),
+                    "headers-file lacks {k}"
+                );
+                assert!(
+                    pairs.contains(&format!("\"{k}\", \"{v}\"")),
+                    "ts-pairs lacks {k}"
+                );
+                assert!(
+                    objects.contains(&format!("key: \"{k}\", value: \"{v}\"")),
+                    "ts-objects lacks {k}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn preload_is_a_declared_choice_and_only_on_hsts() {
+        let off = headers(false);
+        let on = headers(true);
+        let hsts = |h: &[(&str, String)]| {
+            h.iter()
+                .find(|(k, _)| *k == "Strict-Transport-Security")
+                .unwrap()
+                .1
+                .clone()
+        };
+        assert!(!hsts(&off).contains("preload"));
+        assert!(hsts(&on).ends_with("; preload"));
+        // Nothing else changes.
+        assert_eq!(
+            off.iter()
+                .filter(|(k, _)| *k != "Strict-Transport-Security")
+                .collect::<Vec<_>>(),
+            on.iter()
+                .filter(|(k, _)| *k != "Strict-Transport-Security")
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn what_the_doctor_requires_is_what_is_derived() {
+        for h in SECURITY_HEADERS.iter().filter(|h| h.required) {
+            assert!(!h.value.is_empty(), "{} has no value to derive", h.name);
+        }
+        let out = render(Format::TsPairs, false);
+        assert!(
+            missing_headers(&out).is_empty(),
+            "a derived file fails the doctor's own check"
+        );
     }
 }

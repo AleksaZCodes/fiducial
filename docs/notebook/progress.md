@@ -2,6 +2,12 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.26.0 · 2026-11-16
+
+- The response headers are one table, derived into every framework's file and the
+  Caddyfile; HSTS preload is a declared choice. SvelteKit's hand-written headers are
+  the one copy left.
+
 ## 0.25.0 · 2026-11-16
 
 - The React Router starter is full stack: loader, action, form, server-only module
