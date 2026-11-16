@@ -1,0 +1,35 @@
+name: Design registry
+
+# The design system is derived into a shadcn registry and a W3C Design Tokens
+# file. shadcn and Style Dictionary can tighten what they accept without any
+# commit here, so this runs weekly as well as when the exporter changes. See
+# scripts/verify-design-registry.sh.
+on:
+  schedule:
+    - cron: "41 6 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "crates/fiducial-cli/src/design.rs"
+      - "crates/fiducial-cli/capabilities/design/**"
+      - "scripts/verify-design-registry.sh"
+      - ".github/workflows/design-registry.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  consumers:
+    name: consumers (shadcn build/add, Style Dictionary)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build the fid binary
+        run: cargo build -p fiducial-cli --bin fid
+      - name: Run the real consumers
+        run: scripts/verify-design-registry.sh

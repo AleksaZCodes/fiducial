@@ -521,7 +521,7 @@ without a line there is a decision the next person will change back.
 | Path | Is |
 |---|---|
 | `design-system.md` | **the declaration** — product-owned, edit freely |
-| `pipelines/design.toml` | the derivation: `design-system.md` → `tokens.css`, gated by `fid derive --check` |
+| `pipelines/design.toml` | the derivation: `design-system.md` → `tokens.css`, `tokens.json`, `registry.json`, gated by `fid derive --check` |
 | `apps/web/src/app/marks.css` | the mechanism: chamfer, marks, outline and frosted surfaces. Reads tokens, declares none |
 | `scripts/build-design-system.mjs` | generates the gallery from the app's own stylesheet |
 
@@ -530,6 +530,13 @@ And after the first `fid derive`:
 | Path | Is |
 |---|---|
 | `apps/web/src/app/tokens.css` | **generated** — guard-blocked, rewritten every derive |
+| `design/tokens.json` | **generated** — the same tokens in the W3C Design Tokens format, for Figma, Style Dictionary and Tokens Studio |
+| `design/registry.json` | **generated** — a shadcn registry holding the theme. `npx shadcn build design/registry.json` makes it installable, so another product adopts this design system with `npx shadcn add <url>` |
+
+`[design.registries]` in `fiducial.toml` names the registries this product
+installs from (`"@acme" = "https://acme.example/r/{name}.json"`). `fid derive`
+copies it into `apps/web/components.json`, where shadcn reads it — add a
+registry there by editing `fiducial.toml`, not the copy.
 
 `marks.css` assumes the Next.js layout `web-next` scaffolds. A SvelteKit
 product moves it to `apps/web/src/marks.css` and imports it from there — the
