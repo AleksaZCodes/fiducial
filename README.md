@@ -15,11 +15,12 @@ Not by working harder at each domain. By deleting the work that exists only
 because the domains don't talk to each other.
 
 Where it is going: one place where every project built with code lives and is
-seen whole — the running app beside its files, its content, configuration,
-deploy, pull requests and the agents' work, with the notes and decisions about
-it kept in the same repository (`docs/notebook/`). Today that is the CLI, the
-shapes (`fid new <name> --shape site`) and the gates; the studio that shows it
-all is the next layer (`docs/notebook/ideas.md`).
+seen whole, with a **workbench** over it: a dashboard of what is declared and
+stale, editors generated from the declarations' own schemas, the content editor
+one click away behind a GitHub sign-in, and a drag-and-drop UI editor that
+writes real code. The platform's job is to make every declaration a typed file
+such a workbench can read and write. That layer is not built yet; see *Studio*
+in [`ROADMAP.md`](./ROADMAP.md).
 
 ---
 
@@ -126,6 +127,91 @@ The whole of it, on a real product: [`examples/sensor-stick/`](examples/sensor-s
 is a USB-C temperature and humidity stick — case, routed board, orderable fab
 files, firmware and a web page from one declaration, built end to end in CI —
 and [how it was made](docs/guides/sensor-stick.md), step by step.
+
+## A system of computers, from one file
+
+A real product is rarely one board. A controller in every room, a Raspberry Pi
+server and a web app each need the same facts, and writing them where each
+needs them is the drift this platform exists to remove. `topology.toml` declares
+them once: which computers exist, what runs on each, what connects them, and
+which settings a person can change.
+
+```toml
+[[system]]
+id    = "site"
+nodes = ["controller", "server"]
+
+[[node]]
+id       = "controller"
+kind     = "mcu"                      # any toolchain: target, runtime and language are free text
+target   = "riscv32imac-unknown-none-elf"
+language = "rust"
+firmware = "controller"
+interfaces = ["wifi", "i2c0"]
+
+[[node]]
+id       = "server"
+kind     = "host"
+runtime  = "linux-compose"
+apps     = ["server"]
+interfaces = ["eth0"]
+
+[[bus]]
+id      = "lan"
+type    = "ip"
+protocol = "mqtt"
+tls     = true                        # MQTT without TLS is refused, not warned about
+broker  = "server"
+connect = ["controller.wifi", "server.eth0"]
+```
+
+`fid derive` turns it into the pin and parameter tables each firmware reads (in
+Rust, C or JSON, whatever the node's language is), the topic table, the
+broker's access rules, the server's `compose.yaml`, and wiring, sequence and
+storage diagrams; `--check` holds all of them to the file. A second room is one
+more `[[node]]`. It refuses what cannot be true: anything crossing a system
+boundary, a default outside its range, an I²C address clash, a pin used for two
+things, a bill of materials over its cost ceiling.
+
+Buses carry their physics too: CAN and CAN-FD (with ISO-TP) and RS-485 (with
+Modbus RTU) declare a bit rate or baud, and a Linux host declares its real-time
+setup (`priority`, `cpu`, `lock_memory`), which `fiducial-rt` applies. Products
+that measure and switch things add the optional `monitoring` capability for
+points, rules, schedules and the cards a web app shows them with. A product that
+is a game controller or a flight controller never installs it.
+
+CI runs the derived broker rules against a real Mosquitto and the server's AI
+adapter against a real Ollama model, not only against their schemas. Not built:
+CAN controller drivers (SocketCAN, FDCAN). Not tested: flashing a board.
+
+## One design system, in the open formats
+
+`design-system.md` is the one declaration: four type roles, a corner strategy,
+a palette that is **measured** (a pair that misses its WCAG minimum fails
+`fid derive`), and the reasons beside each value. Every standard a design tool
+or another product speaks is derived from it and gated, never written twice:
+
+| Derived file | Is | Read by |
+|---|---|---|
+| `apps/web/src/app/tokens.css` | the stylesheet: shadcn-named variables and Tailwind v4's `@theme inline` | the product |
+| `design/tokens.json` | [W3C Design Tokens](https://www.designtokens.org/) format | Figma, Style Dictionary, Tokens Studio |
+| `registry.json` | a [shadcn registry](https://ui.shadcn.com/docs/registry): theme, stylesheets, every component, and a `registry:base` that installs all of it | any project, with `npx shadcn add`, and no `fid` |
+
+The product's UI is shadcn: components come from its registries, through its
+CLI, and `fid` only declares which registries a product uses
+(`[design.registries]`, written into `components.json`). Another product, or a
+fresh sandbox, adopts the whole system with `npx shadcn add @yours/base`, or
+`npx shadcn add owner/repo/base` straight from a public repository.
+`scripts/verify-design-registry.sh` runs the real `shadcn build`, a second
+product's install and Style Dictionary on every change and every week.
+
+## Agents get the right skill, per technology
+
+A capability names the vendor's own skill for the technology it uses (shadcn's
+for components, Cloudflare's for Workers). They are installed by the open
+`skills` CLI into `.agents/skills/`, where Codex, Cursor, Copilot, Gemini CLI,
+OpenCode and Claude Code read them, and only while a capability needs one. See
+*The eight kinds* below.
 
 ## What you can add to it
 
