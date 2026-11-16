@@ -747,10 +747,10 @@ fn the_tanstack_start_shape_names_starts_entry_and_keeps_nodejs_compat() {
     let out = run(&root, &["derive"]);
     assert!(out.status.success(), "fid derive: {}", text(&out));
     let cfg = std::fs::read_to_string(root.join("apps/web/wrangler.jsonc")).unwrap();
-    assert!(
-        cfg.contains("\"main\": \"@tanstack/react-start/server-entry\""),
-        "{cfg}"
-    );
+    // The product's own entry, not the package's default one: the default builds
+    // its own handler and never reads the product's, so its headers would not be sent.
+    assert!(cfg.contains("\"main\": \"src/server.ts\""), "{cfg}");
+    assert!(!cfg.contains("react-start/server-entry"), "{cfg}");
     assert!(cfg.contains("nodejs_compat"), "{cfg}");
     assert!(!cfg.contains("\"assets\""), "{cfg}");
     assert!(run(&root, &["derive", "--check"]).status.success());

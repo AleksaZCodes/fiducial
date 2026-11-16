@@ -700,7 +700,7 @@ pub enum DeployShape {
     /// and the assets, so neither is named here.
     ReactRouter,
     /// A TanStack Start app built the same way: `@cloudflare/vite-plugin`
-    /// produces the deployed config, and the entry is Start's own server entry.
+    /// produces the deployed config, and the entry is the product's `src/server.ts`.
     TanStackStart,
 }
 

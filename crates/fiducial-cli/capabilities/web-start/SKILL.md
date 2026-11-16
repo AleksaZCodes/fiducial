@@ -33,9 +33,11 @@ framework = "tanstack-start"
 shape = "tanstackstart"
 ```
 
-`fid derive` writes `apps/web/wrangler.jsonc` with `main =
-"@tanstack/react-start/server-entry"` (the Cloudflare Vite plugin adds the client
-assets itself). Keep `nodejs_compat` in `compatibility_flags`: the `deploy`
+`fid derive` writes `apps/web/wrangler.jsonc` with `main = "src/server.ts"` (the
+Cloudflare Vite plugin adds the client assets itself). It names the product's own
+entry on purpose: Start's package entry, `@tanstack/react-start/server-entry`,
+builds its own handler and never reads `src/server.ts`, so a custom entry that is
+only *in* `src/` sends none of its headers. Keep `nodejs_compat` in `compatibility_flags`: the `deploy`
 capability seeds it, and Start needs it. `fid doctor` holds the framework and the
 shape to agreeing, and fails an app whose `src/security.ts` lacks a required header.
 
