@@ -1385,7 +1385,7 @@ generator that exists, rather than building a second one.
 **The authored declaration is the capability directory.** Each capability
 already owns a `SKILL.md`, and `fid add` already installs it to
 `.fiducial/skills/<id>.md` with a Claude-discoverable pointer at
-`.claude/skills/<id>.md` — *that split was made for exactly this item.* What
+`.claude/skills/fiducial-<id>/SKILL.md` — *that split was made for exactly this item.* What
 is missing is the other vendors' wiring generated off the same source.
 
 **Do the cheap, high-value half first.** A Codex or Cursor session installing

@@ -148,6 +148,121 @@ impl Source {
     }
 }
 
+/// Where an agent skill comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AgentSkillKind {
+    /// A Claude Code plugin from a marketplace: enabled in `.claude/settings.json`,
+    /// updated by Claude Code, namespaced `plugin:skill`.
+    Plugin,
+    /// A skill installed into the repository by the open `skills` CLI
+    /// (`npx skills add <source> --skill <skill>`): vendored under `.claude/skills/`
+    /// with a `skills-lock.json` that `npx skills check` compares against upstream.
+    SkillsCli,
+}
+
+/// An AI skill a capability needs the agent to load before it touches that
+/// capability's files.
+///
+/// A capability says which technology it uses; the vendor of that technology
+/// ships the authoritative skill for it (shadcn for components, Cloudflare for
+/// Workers). Copying that guidance into a capability's own `SKILL.md` would be
+/// a second declaration that goes stale the day the vendor changes the
+/// technology, so a capability *names* the vendor's skill instead, and the
+/// platform enables it, requires it, and checks it is still there.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgentSkill {
+    /// A key for this skill, unique across capabilities. Two capabilities that
+    /// declare the same `id` are asking for the same skill and it is enabled once.
+    pub id: String,
+    pub kind: AgentSkillKind,
+    /// `plugin`: the marketplace's name (`cloudflare`).
+    #[serde(default)]
+    pub marketplace: String,
+    /// The GitHub repository the marketplace (`plugin`) or the skill (`skills-cli`)
+    /// lives in (`cloudflare/skills`, `shadcn-ui/ui`).
+    #[serde(default)]
+    pub repo: String,
+    /// `plugin`: the plugin's name within the marketplace (`cloudflare`).
+    #[serde(default)]
+    pub plugin: String,
+    /// `skills-cli`: the source passed to `skills add` (`shadcn/ui`).
+    #[serde(default)]
+    pub source: String,
+    /// `skills-cli`: the skill's directory name in that source (`shadcn`).
+    #[serde(default)]
+    pub skill: String,
+    /// The names the `Skill` tool knows these by (`cloudflare:wrangler`). Loading
+    /// any one of them satisfies the gate: the plugin has many skills and no one
+    /// of them is right for every file.
+    pub skills: Vec<String>,
+    /// Editing a file that matches one of these globs needs one of `skills` to
+    /// have been loaded in the session first.
+    pub paths: Vec<String>,
+    /// One sentence on why, shown when the gate stops an edit.
+    pub why: String,
+}
+
+impl AgentSkill {
+    /// A declaration that cannot work is refused when the capability is read,
+    /// not discovered when an agent is blocked by it.
+    pub fn validate(&self, cap: &str) -> Result<()> {
+        let need = |what: &str, v: &str| -> Result<()> {
+            if v.trim().is_empty() {
+                bail!(
+                    "capability `{cap}`: agent skill `{}` needs `{what}`",
+                    self.id
+                );
+            }
+            Ok(())
+        };
+        need("id", &self.id)?;
+        need("why", &self.why)?;
+        need("repo", &self.repo)?;
+        match self.kind {
+            AgentSkillKind::Plugin => {
+                need("marketplace", &self.marketplace)?;
+                need("plugin", &self.plugin)?;
+            }
+            AgentSkillKind::SkillsCli => {
+                need("source", &self.source)?;
+                need("skill", &self.skill)?;
+            }
+        }
+        if self.skills.is_empty() || self.paths.is_empty() {
+            bail!(
+                "capability `{cap}`: agent skill `{}` needs at least one name in `skills` and one glob in `paths`",
+                self.id
+            );
+        }
+        for name in &self.skills {
+            let ok = match self.kind {
+                AgentSkillKind::Plugin => name.starts_with(&format!("{}:", self.plugin)),
+                AgentSkillKind::SkillsCli => name == &self.skill,
+            };
+            if !ok {
+                bail!(
+                    "capability `{cap}`: agent skill `{}` lists `{name}`, which this {} can never provide (a plugin's skills are `{}:<skill>`; a skills-cli skill is `{}`)",
+                    self.id,
+                    match self.kind {
+                        AgentSkillKind::Plugin => "plugin",
+                        AgentSkillKind::SkillsCli => "skills-cli skill",
+                    },
+                    self.plugin,
+                    self.skill
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// The `enabledPlugins` key for a plugin skill: `plugin@marketplace`.
+    pub fn plugin_key(&self) -> String {
+        format!("{}@{}", self.plugin, self.marketplace)
+    }
+}
+
 /// A capability, however it was resolved.
 #[derive(Debug, Clone)]
 pub struct Capability {
@@ -180,6 +295,8 @@ pub struct Capability {
     /// it is caught at install instead.
     pub requires_capabilities: Vec<String>,
     pub guard_rules: Vec<String>,
+    /// The vendor skills this capability needs the agent to load.
+    pub agent_skills: Vec<AgentSkill>,
     /// npm packages the capability's templates import, added to
     /// `apps/web/package.json` on install where they are missing. A template
     /// importing a package nobody installed fails at the first build, after
@@ -231,6 +348,8 @@ struct Manifest {
     deprecated: Option<String>,
     #[serde(default)]
     guard_rules: Vec<String>,
+    #[serde(default)]
+    agent_skills: Vec<AgentSkill>,
     #[serde(default)]
     npm_dependencies: BTreeMap<String, String>,
     #[serde(default)]
@@ -379,6 +498,10 @@ pub fn derive(id: &str, files: &BTreeMap<String, String>, source: Source) -> Res
         .description
         .unwrap_or_else(|| description_from_skill(&skill_md, id));
 
+    for a in &manifest.agent_skills {
+        a.validate(id)?;
+    }
+
     let cap = Capability {
         id: id.to_string(),
         description,
@@ -389,6 +512,7 @@ pub fn derive(id: &str, files: &BTreeMap<String, String>, source: Source) -> Res
         requires_tools: manifest.requires_tools,
         requires_capabilities: manifest.requires_capabilities,
         guard_rules: manifest.guard_rules,
+        agent_skills: manifest.agent_skills,
         npm_dependencies: manifest.npm_dependencies,
         npm_dev_dependencies: manifest.npm_dev_dependencies,
         npm_scripts: manifest.npm_scripts,

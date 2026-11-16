@@ -114,7 +114,8 @@ fn doctor_is_clean_after_installing_legal() {
 
     let neutral = root.join(".fiducial/skills/legal.md");
     assert!(neutral.exists(), "instructions at the vendor-neutral path");
-    let pointer = std::fs::read_to_string(root.join(".claude/skills/legal.md")).unwrap();
+    let pointer =
+        std::fs::read_to_string(root.join(".claude/skills/fiducial-legal/SKILL.md")).unwrap();
     assert!(pointer.contains(".fiducial/skills/legal.md"));
 }
 

@@ -508,6 +508,13 @@ fn check_lock(
     // result, which costs every real finding too. See `crate::ownership`.
     let (mut drifted, owned_edits) = platform_drift(root, &lock, &enabled);
 
+    // The vendor skills the capabilities name: enabled, current, and installed.
+    let skill_findings = crate::agent_skills::problems(root, &enabled);
+    if skill_findings.is_empty() {
+        ok.push("agent skills match the installed capabilities".into());
+    }
+    issues.extend(skill_findings);
+
     if owned_edits > 0 {
         // Counted rather than silent: "you have edited 17 of your own files" is
         // a true and occasionally useful thing to know. It is not a problem,

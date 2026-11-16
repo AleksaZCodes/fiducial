@@ -34,7 +34,7 @@ pub const PLATFORM_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod manifest;
 pub mod source;
 
-pub use manifest::{Capability, Declaration, FileEntry, Source};
+pub use manifest::{AgentSkill, AgentSkillKind, Capability, Declaration, FileEntry, Source};
 
 /// Every built-in capability's files, embedded by `build.rs` from
 /// `capabilities/<id>/`.
@@ -377,6 +377,26 @@ pub fn install_with(
     }
     if cap.id == "seo" {
         seed_page_metadata(root, product_name)?;
+    }
+
+    // Enable the vendor skills this capability names, and nothing the product's
+    // capabilities do not call for.
+    if !cap.agent_skills.is_empty() {
+        let cfg = crate::config::Config::load(&root.join(crate::config::CONFIG_FILE))?;
+        let done = crate::agent_skills::sync(root, &cfg.capabilities.enabled, false)?;
+        for a in &cap.agent_skills {
+            println!(
+                "  ✓ agent skill `{}` required before editing {}",
+                a.id,
+                a.paths.join(", ")
+            );
+        }
+        for a in &done.missing {
+            println!(
+                "  ! `{}` is vendored by the `skills` CLI and not installed yet: run `fid skills sync --install`",
+                a.skill
+            );
+        }
     }
 
     println!("  ✓ {} installed", cap.id);
@@ -850,19 +870,39 @@ pub(crate) fn write_skill(root: &Path, cap: &Capability, product_name: &str) -> 
         &format!(".fiducial/skills/{}.md", cap.id),
         &skill_content,
     )?;
+    // Claude Code finds a project skill only as `.claude/skills/<name>/SKILL.md`.
+    // The pointer used to be a flat `.claude/skills/<id>.md`, which is not a
+    // location it reads for skills, so the instructions never loaded on their
+    // own. The description is what Claude matches a task against, so it says
+    // what the capability is, not just that it exists.
     write_file(
         root,
-        &format!(".claude/skills/{}.md", cap.id),
+        &claude_skill_path(&cap.id),
         &format!(
             "---\n\
              name: fiducial-{id}\n\
-             description: How to use the `{id}` capability in this product.\n\
+             description: \"{desc} Use when working on this product's {id} capability: its declarations, pipelines and generated files.\"\n\
              ---\n\n\
              Read `.fiducial/skills/{id}.md` — the instructions live there so that \
              every agent can find them, not only Claude Code.\n",
-            id = cap.id
+            id = cap.id,
+            desc = cap.description.replace('\\', "").replace('"', "'").replace('\n', " ")
         ),
-    )
+    )?;
+    // The flat pointer an older `fid` wrote is dead weight now; remove it, but
+    // only if it is still the pointer (a file someone wrote there is theirs).
+    let legacy = root.join(format!(".claude/skills/{}.md", cap.id));
+    if std::fs::read_to_string(&legacy)
+        .is_ok_and(|c| c.contains(&format!("name: fiducial-{}", cap.id)))
+    {
+        std::fs::remove_file(&legacy).with_context(|| format!("removing {}", legacy.display()))?;
+    }
+    Ok(())
+}
+
+/// Where Claude Code looks for a capability's skill.
+pub(crate) fn claude_skill_path(id: &str) -> String {
+    format!(".claude/skills/fiducial-{id}/SKILL.md")
 }
 
 /// Every file path a built-in capability installs, for scoping an upgrade to it.

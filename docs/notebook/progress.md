@@ -2,6 +2,13 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.32.0 · 2026-11-16
+
+- Capabilities name the vendor skills they need (shadcn for UI, Cloudflare for
+  Workers). Only the installed capabilities' plugins are enabled; an agent must
+  load the skill before editing the files it covers; CI checks upstream weekly.
+- Capability instructions moved to the folder layout Claude Code discovers.
+
 ## 0.30.0 · 2026-11-16
 
 - Keystatic's GitHub storage is declared and type-checked against the real

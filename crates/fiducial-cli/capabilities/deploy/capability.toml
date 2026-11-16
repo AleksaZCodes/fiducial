@@ -27,3 +27,22 @@ requires_tools = ["wrangler"]
 [[declarations.config]]
 block = "deploy"
 seed = { compatibility_date = "2025-01-01", compatibility_flags = ["nodejs_compat"], d1_database_id = "REPLACE_WITH_DATABASE_ID", r2_bucket_name = "REPLACE_WITH_BUCKET_NAME", queue_name = "REPLACE_WITH_QUEUE_NAME" }
+
+# The Cloudflare plugin's skills (https://github.com/cloudflare/skills). The
+# platform enables the plugin only for a product that has a capability like this
+# one, and an agent must load one of these before editing a Wrangler config.
+[[agent_skills]]
+id          = "cloudflare"
+kind        = "plugin"
+marketplace = "cloudflare"
+repo        = "cloudflare/skills"
+plugin      = "cloudflare"
+skills      = [
+  "cloudflare:wrangler",
+  "cloudflare:workers-best-practices",
+  "cloudflare:frameworks-on-cloudflare",
+  "cloudflare:cloudflare-app-bootstrap",
+  "cloudflare:cloudflare",
+]
+paths       = ["**/wrangler.jsonc", "**/wrangler.json", "**/wrangler.toml"]
+why         = "Wrangler configuration and the Workers runtime change between releases; the Cloudflare skills carry the current ones, and what you remember may not be."

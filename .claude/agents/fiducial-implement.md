@@ -18,7 +18,7 @@ Default agent for all coding work: new features, refactoring, debugging, tests.
 
 1. Run `fid doctor` — verify the product is in sync
 2. Check `ARCHITECTURE.md §5` — confirm where this code belongs (layer, package)
-3. Read the relevant `SKILL.md` in `.claude/skills/` for any installed capability touched
+3. Read the relevant `SKILL.md` under `.claude/skills/` for any installed capability touched
 
 ## Rules
 

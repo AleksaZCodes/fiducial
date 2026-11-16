@@ -270,11 +270,25 @@ fn check_catches_a_hand_edited_generated_module() {
     );
 }
 
+/// `design` (which `i18n` brings) names the vendored shadcn skill, installed from
+/// the network by `fid skills sync --install`. A product that wants a clean doctor
+/// has it, so the test states it as installed.
+fn with_shadcn_skill_installed(root: &Path) {
+    let dir = root.join(".claude/skills/shadcn");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("SKILL.md"),
+        "---\nname: shadcn\ndescription: test double\n---\n",
+    )
+    .unwrap();
+}
+
 /// The product stays healthy after installing and deriving.
 #[test]
 fn doctor_is_clean_after_installing_i18n() {
     let tmp = tempfile::tempdir().unwrap();
     let root = localized_product(tmp.path());
+    with_shadcn_skill_installed(&root);
 
     let out = run(&root, &["doctor"]);
     let output = text(&out);
@@ -296,7 +310,8 @@ fn the_skill_lands_where_every_agent_can_find_it() {
     assert!(body.contains("three plural categories"), "Serbian plurals");
 
     // Claude Code gets a pointer, not a second copy of the content.
-    let pointer = std::fs::read_to_string(root.join(".claude/skills/i18n.md")).unwrap();
+    let pointer =
+        std::fs::read_to_string(root.join(".claude/skills/fiducial-i18n/SKILL.md")).unwrap();
     assert!(pointer.contains(".fiducial/skills/i18n.md"));
     assert!(
         pointer.lines().count() < 15,
@@ -472,6 +487,7 @@ fn hardcoded_strings_are_reported_and_false_positives_are_not() {
 fn hardcoded_strings_never_fail_a_command() {
     let tmp = tempfile::tempdir().unwrap();
     let root = with_component(tmp.path());
+    with_shadcn_skill_installed(&root);
 
     let doctor = run(&root, &["doctor"]);
     assert!(

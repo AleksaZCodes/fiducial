@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 mod adapter;
+mod agent_skills;
 mod apps;
 mod brand;
 mod capability;
@@ -885,6 +886,39 @@ PROTOCOL
   Exit 1: block the tool call (reason printed to stdout for Claude Code to display)"
     )]
     GuardCheck,
+
+    /// The AI skills this product's capabilities need the agent to load
+    #[command(
+        subcommand,
+        long_about = "\
+A capability names the vendor skill for the technology it uses (shadcn for \
+components, Cloudflare for Workers). This enables the skills the installed \
+capabilities need and no others, makes the agent load them before it edits the \
+files they cover, and checks they are still current.
+
+EXAMPLES
+  fid skills list                  what is enforced, and for which files
+  fid skills sync                  make settings and the gate match the capabilities
+  fid skills sync --install        also install vendored skills
+  fid skills check                 exit 1 if anything is missing or stale"
+    )]
+    Skills(commands::skills::SkillsCmd),
+
+    /// PreToolUse hook: require a skill before editing the files it covers
+    #[command(
+        hide = true,
+        after_long_help = "\
+PROTOCOL
+  Input (stdin):  Claude Code PreToolUse JSON
+  Exit 0: allow
+  Exit 2: block; the reason is on stderr, which Claude Code shows the agent
+  FID_SKILL_GATE=off allows everything"
+    )]
+    SkillGate,
+
+    /// PostToolUse hook on `Skill`: record that this session loaded a skill
+    #[command(hide = true)]
+    SkillMark,
 }
 
 // ── Entry point ──────────────────────────────────────────────────────────────
@@ -991,5 +1025,8 @@ fn main() -> Result<()> {
         Commands::Docs { check, accept } => commands::docs::run(check, accept),
         Commands::Doctor => commands::doctor::run(),
         Commands::GuardCheck => guard::check_from_stdin(),
+        Commands::Skills(cmd) => commands::skills::run(cmd),
+        Commands::SkillGate => agent_skills::gate_from_stdin(),
+        Commands::SkillMark => agent_skills::mark_from_stdin(),
     }
 }

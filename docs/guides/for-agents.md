@@ -169,7 +169,7 @@ job includes deciding what is **not** worth lifting.
 | `/fiducial:platform` | Load platform context at session start |
 | `/fiducial:harvest` | Extract reusable work from another codebase |
 
-Capability skills (`.claude/skills/*.md`) are installed by `fid add` and
+Capability skills (`.claude/skills/fiducial-<id>/SKILL.md`) are installed by `fid add` and
 refreshed on every `fid upgrade`. They are platform-owned — do not edit them; the
 next upgrade overwrites them, by design.
 

@@ -1,0 +1,36 @@
+name: Agent skills
+
+# A capability names vendor skills it does not own. The vendor can rename or move
+# one without any commit here, so this runs weekly as well as when a declaration
+# changes: the failure is then a one-line edit to a capability.toml, found this
+# week, instead of a product's agent blocked months from now. See
+# scripts/verify-agent-skills.sh.
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "crates/fiducial-cli/capabilities/*/capability.toml"
+      - "crates/fiducial-cli/src/agent_skills.rs"
+      - "scripts/verify-agent-skills.sh"
+      - ".github/workflows/agent-skills.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  upstream:
+    name: upstream (every named skill still exists)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build the fid binary
+        run: cargo build -p fiducial-cli --bin fid
+      - name: Ask each upstream
+        run: scripts/verify-agent-skills.sh

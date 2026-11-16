@@ -19,3 +19,36 @@ requires_capabilities = ["design"]
 [[declarations.config]]
 block = "security"
 seed = { hsts_preload = false }
+
+# The Cloudflare plugin's skills (https://github.com/cloudflare/skills). The
+# platform enables the plugin only for a product that has a capability like this
+# one, and an agent must load one of these before editing a Wrangler config.
+[[agent_skills]]
+id          = "cloudflare"
+kind        = "plugin"
+marketplace = "cloudflare"
+repo        = "cloudflare/skills"
+plugin      = "cloudflare"
+skills      = [
+  "cloudflare:wrangler",
+  "cloudflare:workers-best-practices",
+  "cloudflare:frameworks-on-cloudflare",
+  "cloudflare:cloudflare-app-bootstrap",
+  "cloudflare:cloudflare",
+]
+paths       = ["**/wrangler.jsonc", "**/wrangler.json", "**/wrangler.toml"]
+why         = "Wrangler configuration and the Workers runtime change between releases; the Cloudflare skills carry the current ones, and what you remember may not be."
+
+# The official shadcn skill (https://github.com/shadcn-ui/ui/tree/main/skills/shadcn),
+# vendored by the `skills` CLI. An agent must load it before editing the component
+# registry config or the copied-in components, because the CLI, not hand edits,
+# is how those stay consistent with the registry.
+[[agent_skills]]
+id     = "shadcn"
+kind   = "skills-cli"
+repo   = "shadcn-ui/ui"
+source = "shadcn/ui"
+skill  = "shadcn"
+skills = ["shadcn"]
+paths  = ["**/components.json", "**/components/ui/**"]
+why    = "shadcn components are added and updated through its CLI and registry rules; hand-editing them or adding one by copy drifts from the registry."

@@ -560,7 +560,8 @@ fn a_scoped_upgrade_refreshes_one_capability_and_its_instructions_only() {
         "instructions not refreshed"
     );
     // The Claude file stays a pointer: the content lives once.
-    let pointer = std::fs::read_to_string(root.join(".claude/skills/hardware.md")).unwrap();
+    let pointer =
+        std::fs::read_to_string(root.join(".claude/skills/fiducial-hardware/SKILL.md")).unwrap();
     assert!(
         pointer.contains("Read `.fiducial/skills/hardware.md`")
             && !pointer.contains("## The model"),

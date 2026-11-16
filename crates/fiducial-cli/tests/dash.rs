@@ -876,6 +876,19 @@ fn text_output_carries_no_escape_codes_when_redirected() {
 
 // ── Propagation ───────────────────────────────────────────────────────────────
 
+/// `design` names the vendored shadcn skill, which is installed from the network
+/// (`fid skills sync --install`), so a test product that wants a clean doctor
+/// states it as installed, as a product that ran that command would be.
+fn with_shadcn_skill_installed(root: &std::path::Path) {
+    let dir = root.join(".claude/skills/shadcn");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("SKILL.md"),
+        "---\nname: shadcn\ndescription: test double\n---\n",
+    )
+    .unwrap();
+}
+
 /// `fid upgrade` installs scaffold templates the platform added after a product
 /// was created.
 ///
@@ -883,6 +896,7 @@ fn text_output_carries_no_escape_codes_when_redirected() {
 /// new template reached only products scaffolded afterwards. The workflow that
 /// gates artifact freshness was added in Phase 18 and would have arrived in zero
 /// existing products.
+
 #[test]
 fn upgrade_installs_templates_added_since_the_product_was_scaffolded() {
     let tmp = tempfile::tempdir().unwrap();
@@ -929,6 +943,7 @@ fn upgrade_installs_templates_added_since_the_product_was_scaffolded() {
     );
 
     // And the product is clean afterwards — the lock tracks what was written.
+    with_shadcn_skill_installed(&root);
     let out = run(&root, &["doctor"]);
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(text.contains("clean"), "doctor after upgrade: {text}");
@@ -1011,6 +1026,7 @@ fn upgrade_renames_a_moved_template_and_removes_the_old_file() {
         "the colliding file must be gone — leaving it defeats the rename"
     );
 
+    with_shadcn_skill_installed(&root);
     let out = run(&root, &["doctor"]);
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(text.contains("clean"), "doctor after rename: {text}");

@@ -336,6 +336,7 @@ rule that matters most.
 | `fid advise` | Advisory review of the rules code cannot check — asks, never gates |
 | `fid docs` | Documentation freshness, including prose nothing can generate |
 | `fid doctor` | Check for drift: outdated deps, stale templates, un-applied migrations |
+| `fid skills` | The AI skills this product's capabilities need the agent to load |
 <!-- fid:end commands -->
 
 Every command takes `--help`, and the help names no phase numbers on purpose —
@@ -355,6 +356,7 @@ Seven kinds, and the difference is not cosmetic — see
 | **Adapter** | a swappable vendor behind a fixed contract, selected in `[adapters]` | `storage = "none"` |
 | **Tool** | an external command the capability's work needs on PATH — declared, never installed | `requires_tools = ["wrangler"]` |
 | **Prerequisite** | another capability this one cannot work without — checked at install, not at first failure | `requires_capabilities = ["i18n"]` |
+| **Agent skill** | a vendor's skill for the technology this capability uses, which the agent must load before editing the files it covers; enabled only while a capability needs it | `[[agent_skills]]` naming `cloudflare:wrangler` |
 | **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
 | **Scoped template** | a template under `for/<capability>/`, installed only alongside that capability | `for/web-svelte/…/LocalePicker.svelte` |
 
@@ -365,6 +367,18 @@ as `site` replaces the plain app's root layout), `npm_dependencies`,
 `apps/web/package.json` or to the `package.json` `npm_package` names, as
 `orm-drizzle` names `apps/api/package.json`), and `seed_messages` (message namespaces inserted into each locale's catalog where
 missing). Each only adds what is absent: the product's own edits win.
+
+`[[agent_skills]]` names a skill the capability does not own (shadcn's for
+components, Cloudflare's for Workers) rather than copying its guidance, which
+would go stale the day the vendor changes the technology. `fid skills sync`
+enables the plugins the installed capabilities need and no others, writes the
+gate's input (`.fiducial/agent-skills.json`), and a `PreToolUse` hook
+(`fid skill-gate`) stops an `Edit` or `Write` to a covered file until the
+session has loaded one of the named skills. It does not stop an edit made
+through a shell command. `fid doctor` reports a plugin that is missing, one no
+capability needs, a vendored skill that is not installed, and a stale gate;
+`scripts/verify-agent-skills.sh` runs weekly against the upstreams, so a vendor
+that renames a skill fails a check here first.
 
 <!-- fid:end-describes -->
 
@@ -477,7 +491,8 @@ not keep. This table is generated from the registry that enforces that rule:
 instructions — an agent without Claude Code's slash commands can read the file
 directly and follow it. Capability instructions install to
 `.fiducial/skills/<id>.md` in a product for exactly that reason, with a pointer
-at `.claude/skills/<id>.md` for Claude's auto-discovery.
+at `.claude/skills/fiducial-<id>/SKILL.md` for Claude's auto-discovery (Claude
+Code finds a project skill only as a folder holding a `SKILL.md`).
 
 Generating the per-vendor wrappers from one authored source is roadmap item
 **agent portability**; today the wrapper for Claude is written by hand and there

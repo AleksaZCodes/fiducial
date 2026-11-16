@@ -276,7 +276,7 @@ One file is a complete capability. The failure mode for an extension system is
 ceremony, so `capability.toml` is optional and a capability without one takes
 its description from the first line of prose in its own skill.
 
-### The seven kinds, and why the difference is not cosmetic
+### The eight kinds, and why the difference is not cosmetic
 
 <!-- fid:describes crates/fiducial-cli/src/capability/manifest.rs#pub fn derive -->
 
@@ -287,6 +287,7 @@ its description from the first line of prose in its own skill.
 | **Adapter** | a swappable vendor behind a fixed contract | `storage = "r2"` |
 | **Tool** | an external command the capability's work needs on PATH — declared, never installed | `requires_tools = ["wrangler"]` |
 | **Prerequisite** | another capability this one cannot work without — checked at install, not at first failure | `requires_capabilities = ["i18n"]` |
+| **Agent skill** | a vendor's skill for the technology this capability uses, which the agent must load before editing the files it covers; enabled only while a capability needs it | `[[agent_skills]]` naming `cloudflare:wrangler` |
 | **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
 | **Scoped template** | a template under `for/<capability>/`, installed only alongside that capability | `for/web-svelte/…/LocalePicker.svelte` |
 
@@ -297,6 +298,18 @@ as `site` replaces the plain app's root layout), `npm_dependencies`,
 `apps/web/package.json` or to the `package.json` `npm_package` names, as
 `orm-drizzle` names `apps/api/package.json`), and `seed_messages` (message namespaces inserted into each locale's catalog where
 missing). Each only adds what is absent: the product's own edits win.
+
+`[[agent_skills]]` names a skill the capability does not own (shadcn's for
+components, Cloudflare's for Workers) rather than copying its guidance, which
+would go stale the day the vendor changes the technology. `fid skills sync`
+enables the plugins the installed capabilities need and no others, writes the
+gate's input (`.fiducial/agent-skills.json`), and a `PreToolUse` hook
+(`fid skill-gate`) stops an `Edit` or `Write` to a covered file until the
+session has loaded one of the named skills. It does not stop an edit made
+through a shell command. `fid doctor` reports a plugin that is missing, one no
+capability needs, a vendored skill that is not installed, and a stale gate;
+`scripts/verify-agent-skills.sh` runs weekly against the upstreams, so a vendor
+that renames a skill fails a check here first.
 
 <!-- fid:end-describes -->
 

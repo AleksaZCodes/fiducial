@@ -425,6 +425,12 @@ pub fn run(dry_run: bool, portfolio: bool, only: Option<String>) -> Result<()> {
     if !dry_run && any_changes {
         lock.save(&lock_path).context("saving fiducial.lock")?;
         println!("  ✓ fiducial.lock updated");
+        // The template just rewrote `.claude/settings.json`; the plugins the
+        // installed capabilities need are put back, and the gate file refreshed.
+        let synced = crate::agent_skills::sync(&root, &cfg.capabilities.enabled, false)?;
+        for w in &synced.wrote {
+            println!("  ✓ {w}: agent skills re-synced");
+        }
         println!();
         println!("✦ upgrade complete. Run `fid doctor` to verify.");
     } else if dry_run {
