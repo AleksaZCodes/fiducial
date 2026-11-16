@@ -785,6 +785,50 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: postgres
 
+  # ── compose: the derived file runs, and the broker enforces the ACL ───────
+  #
+  # Every other check on `deploy = "compose"` reads the file as text. This brings
+  # the broker up with TLS and a password file and asserts what each user may
+  # publish. See scripts/verify-compose.sh.
+  compose:
+    name: compose (the derived broker runs and enforces its ACL)
+    needs: changes
+    if: needs.changes.outputs.adapters == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the fid binary
+        run: cargo build -p fiducial-cli --bin fid
+      - name: Derive, start the broker, assert the ACL
+        run: scripts/verify-compose.sh
+
+  # ── ollama: the adapter against a real model ──────────────────────────────
+  #
+  # The adapter's unit tests serve canned HTTP. This runs it against a real
+  # Ollama and a small model: an answer, a stream, a missing model. The model
+  # is a few hundred MB, which is why it is its own job.
+  ollama:
+    name: ollama (the adapter against a real model)
+    needs: changes
+    if: needs.changes.outputs.adapters == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Start Ollama and pull a small model
+        run: |
+          docker run -d --name ollama --network host ollama/ollama:latest
+          for _ in $(seq 1 30); do curl -sf localhost:11434/api/version && break; sleep 1; done
+          curl -sf localhost:11434/api/pull -d '{"model":"qwen2.5:0.5b","stream":false}'
+      - name: Test the adapter against it
+        run: cargo test -p fiducial-adapters --features ollama --test ollama_real -- --ignored --test-threads=1
+        env:
+          OLLAMA_BASE_URL: http://127.0.0.1:11434/v1
+          OLLAMA_MODEL: qwen2.5:0.5b
+
   # ── adapters: the generated factory is compiled, not string-matched ───────
   #
   # `fid derive` writes src/adapters.generated.ts from [adapters]. Every other
