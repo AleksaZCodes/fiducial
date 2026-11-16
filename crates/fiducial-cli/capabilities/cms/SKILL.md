@@ -40,7 +40,7 @@ relation is the entry's slug as text.
 ### Pages CMS
 
 `.pages.yml` is held to Pages CMS's own strict schema by
-`scripts/verify-pages-cms.sh` in this platform's CI, because Pages CMS ignores a
+`scripts/verify-cms-configs.sh` in this platform's CI, because Pages CMS ignores a
 malformed config without saying so. Three things it cannot do, and so does not:
 
 - **A bare media key.** Its image field stores a public path (`/images/x.png`),
@@ -184,11 +184,27 @@ add `editor = "keystatic"` to `[cms]` if you like it stated, and run
 `pnpm install`. Decap-only keys (`media_prefix`, `[cms.images]` crops) are
 ignored.
 
-## Not here yet
+## Hosted Keystatic (GitHub storage)
 
-Hosted editing through Keystatic's GitHub mode or Tina Cloud needs the media
-pipeline to stop assuming a local staging directory. Pages CMS is hosted today
-(above); the other two are on the roadmap, not half-built here.
+`[cms] storage = "github"` and `repo = "owner/name"` make Keystatic commit
+through the GitHub API instead of writing this working tree. The derived config
+is type-checked against the real `@keystatic/core` in this platform's CI. What
+the config cannot do for you:
+
+- **Run the editor.** `apps/cms` is a Next app; for people with no checkout it
+  has to be deployed somewhere, and the deploy is not wired here.
+- **Authenticate.** Keystatic's GitHub mode needs a GitHub App and four values
+  in the editor's environment (`KEYSTATIC_GITHUB_CLIENT_ID`,
+  `KEYSTATIC_GITHUB_CLIENT_SECRET`, `KEYSTATIC_SECRET`,
+  `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG`). Keystatic's own docs say how to
+  create the app.
+- **Keep media where it was.** Uploads are committed under `media_dir`, so that
+  directory must be tracked, not gitignored; `pnpm media:push` still syncs it to
+  the bucket, and the entries still store keys.
+
+Tina Cloud is configured in Tina's own dashboard, not here, and
+`storage = "github"` with `editor = "tina"` is refused. Pages CMS is already
+hosted and needs none of this.
 
 ## What an agent should do with this
 

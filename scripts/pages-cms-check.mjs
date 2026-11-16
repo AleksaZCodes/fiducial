@@ -7,7 +7,7 @@
 // registers.
 //
 // Usage: node pages-cms-check.mjs <schema.ts, already stubbed> <.pages.yml>
-// (scripts/verify-pages-cms.sh prepares the schema and the dependencies.)
+// (scripts/verify-cms-configs.sh prepares the schema and the dependencies.)
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";

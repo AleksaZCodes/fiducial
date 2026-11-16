@@ -749,9 +749,9 @@ rather than generating something that half works.
   model from `content.toml`, `press/`, `messages/`, `settings.json` and
   `[i18n]`, and emits Keystatic's and Tina's configs from it, selected by
   `[cms] editor`. The content model is declared once and switching editor is a
-  re-derive. Pages CMS is the third emitter (`.pages.yml`); hosted editing through
-  Keystatic's GitHub mode and Tina Cloud waits on media no longer being a local
-  staging directory.
+  re-derive. Pages CMS is the third emitter (`.pages.yml`), and Keystatic's GitHub
+  storage is declared (`[cms] storage = "github"`). Deploying `apps/cms` and its
+  GitHub App are not wired; Tina Cloud is configured in Tina's dashboard.
 - Drizzle: the schema in TypeScript is the declaration, and the SQL it
   generates feeds the existing `Migrator`; do not keep a second, hand-written
   SQL copy of the same tables.

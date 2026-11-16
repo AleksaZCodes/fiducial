@@ -2,6 +2,11 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.30.0 · 2026-11-16
+
+- Keystatic's GitHub storage is declared and type-checked against the real
+  package. The editor's deploy and its GitHub App are not built.
+
 ## 0.29.0 · 2026-11-16
 
 - Pages CMS is the third editor: `.pages.yml`, derived from the content model and

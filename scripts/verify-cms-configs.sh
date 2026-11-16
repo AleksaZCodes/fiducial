@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 #
-# The Pages CMS config derived for a product is accepted by Pages CMS's own
-# schema.
+# The editor configs derived for a product are accepted by the editors' own
+# schemas and types: `.pages.yml` by Pages CMS's zod schema, and
+# `keystatic.config.ts` by the real `@keystatic/core` types, locally and in its
+# GitHub storage mode.
 #
 # Pages CMS ignores a malformed `.pages.yml` without an error, so nothing else
 # would notice an emitter that is wrong. This builds a product that uses every
@@ -15,7 +17,7 @@
 # Usage:
 #
 #   cargo build -p fiducial-cli --bin fid
-#   scripts/verify-pages-cms.sh
+#   scripts/verify-cms-configs.sh
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,7 +32,7 @@ pin=6f4e860a35d934406580287e7042e5e111e207a1
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-echo "── pages-cms ──────────────────────────────────────────────────────────"
+echo "── cms-configs ─────────────────────────────────────────────────────────"
 mkdir "$work/check"
 cd "$work/check"
 echo '{"type":"module","private":true}' > package.json
@@ -97,10 +99,28 @@ grep -q '^media_input' fiducial.toml || { echo "could not set media_input" >&2; 
 check
 grep -q 'type: "image"' .pages.yml || { echo "no image field, for a product that stores URL paths" >&2; exit 1; }
 
+echo "· Keystatic: the config type-checks against the real package, local and GitHub storage"
+ks="$work/ks"
+mkdir "$ks"
+cat > "$ks/package.json" <<'JSON'
+{ "name": "ks-check", "private": true, "type": "module" }
+JSON
+cat > "$ks/tsconfig.json" <<'JSON'
+{ "compilerOptions": { "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler", "strict": true, "noEmit": true, "skipLibCheck": true, "jsx": "react-jsx", "types": ["node"] }, "files": ["keystatic.config.ts"] }
+JSON
+(cd "$ks" && npm install --silent @keystatic/core@0.6.9 typescript@5 react@19 react-dom@19 @types/react@19 @types/node >/dev/null)
+typecheck() { cp apps/cms/keystatic.config.ts "$ks/keystatic.config.ts"; (cd "$ks" && npx tsc -p .); }
+typecheck
+grep -q 'kind: "local"' apps/cms/keystatic.config.ts || { echo "local storage expected" >&2; exit 1; }
+sed -i 's|^media_dir = "media"$|media_dir = "media"\nstorage = "github"\nrepo = "acme/site"|' fiducial.toml
+"$fid" derive >/dev/null
+grep -q 'kind: "github", repo: "acme/site"' apps/cms/keystatic.config.ts || { echo "GitHub storage not derived" >&2; exit 1; }
+typecheck
+
 echo "· a hand edit is caught by the gate"
 echo '# edited' >> .pages.yml
 if "$fid" derive --check >/dev/null 2>&1; then
   echo "a hand-edited .pages.yml passed --check" >&2
   exit 1
 fi
-echo "pages-cms: ok"
+echo "cms-configs: ok"
