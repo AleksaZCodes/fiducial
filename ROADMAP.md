@@ -789,10 +789,11 @@ standard is a derived, gated projection of it**, never a second declaration.
 |---|---|
 | `design/tokens.json` (DTCG) and `design/registry.json` (shadcn theme) derived beside `tokens.css`; `[design.registries]` written into `components.json`; verified with `shadcn build`/`add` and Style Dictionary | ✅ 0.33.0 |
 | The product's *adapted components* and the stylesheets they are drawn with published in the same registry (`registry:ui` items read from `apps/web/src/components/ui`, a `system` item for `tokens.css` and `marks.css`), plus a `base` item (shadcn's `registry:base`, "a complete design system base") that pulls in all of it, so a second product runs `shadcn add @product/base` (or `owner/repo/base` from a public GitHub repo, the root `registry.json` being read directly with nothing to host) and has no need of `fid`. A component that imports something the registry does not carry is left out and said so. Installing `@product/base` into a product with none of it is run in CI. Open: whether the chamfer corner can ship as a `registry:style`; not tested | ✅ 0.34.0, except the chamfer style |
-| **Works anywhere, with no `fid`.** The exports are plain files any host can serve (a static site, a GitHub repo, a Worker) and any sandbox can install from with the open `shadcn` CLI, which is how a Claude Design project, a Stitch session or a fresh agent gets the whole system. For Claude Design and Stitch specifically: `fid design export --format design-md`, a Google DESIGN.md derived from the declaration (and `import`, the reverse; the **Interactive seeding** item below with a real input). Waits for DESIGN.md to leave alpha. A static HTML export was considered and dropped: the registry plus Tailwind v4's CSS-first `@theme` already styles any page | ⬜ |
+| **Works anywhere, with no `fid`.** The exports are plain files any host can serve (a static site, a GitHub repo, a Worker) and any sandbox can install from with the open `shadcn` CLI, which is how a Claude Design project or a fresh agent gets the whole system. A static HTML export was considered and dropped: the registry plus Tailwind v4's CSS-first `@theme` already styles any page. **Google DESIGN.md export/import was dropped from the priorities (2026-11-16):** the format is alpha and Claude Design is reached through `DesignSync`, below. It can return if the format stabilises and a consumer needs it | ✅ for the registry; DESIGN.md dropped |
+| **Claude Design round trip, via `DesignSync`.** The product's components and tokens pushed to a claude.ai design-system project, and changes pulled back, incrementally and one component at a time. `DesignSync` only runs under the `/design-sync` skill, which the person starts after `/design-login`, so the platform's part is to *produce* what that skill uploads: one preview HTML per component with the first-line `<!-- @dsCard group="…" -->` marker, derived from the registry source and gated by `fid derive --check`. Standalone Claude Design closes on 2026-12-14 and moves into Claude, so the target must be re-checked when the work starts. Not built; cannot be verified in a session without `/design-login` | ⬜ next after Studio |
 | Registry namespaces for the product's own blocks (`@product/pricing`), one block per marketing section, installable into any product | ⬜ |
 
-### Studio — the workbench — *multiplying, and the largest open item* ⬜
+### Studio — the workbench — *in progress* 🟡
 
 The platform has no surface a person can look at. Everything is a command on a
 laptop, which cannot be used from a phone, a browser session or a tool with no
@@ -821,6 +822,23 @@ without it.
   product, which is then ordinary code the product owns. It is Fiducial's,
   not a third-party CMS's: it must not require one. Candidates to evaluate
   before building (not yet checked): Puck, Craft.js, GrapesJS.
+
+**Scoped 2026-11-16 into slices, each usable on its own.** Studio is a static
+app that edits a product through a *source*: `fid studio` over loopback (files
+on disk) or GitHub's API (no laptop). It asks a source what it `can` do rather
+than which kind it is, so a third source needs no UI change. The app is
+`packages/studio`: Vite, React, Tailwind v4 and the **shadcn CLI's own
+components**, unmodified beyond the import path.
+
+| Slice | State |
+|---|---|
+| **1. The contract.** `fid studio` serves a token-guarded loopback API (dash, files, schema, derive, dev server); `fid studio schema` emits a JSON Schema for `fiducial.toml` generated from the Rust types the CLI parses with, and a test fails if the copy bundled in the app drifts | ✅ 0.35.0 |
+| **2. The workbench.** Dashboard, schema-generated forms over `fiducial.toml` that patch the TOML text so comments and order survive, a raw editor for any text file, and the **Preview pane**: start the product's dev server from the page and see it in an iframe at phone, tablet or desktop width, with its log. Driven in a real browser | ✅ 0.35.0 |
+| **3. GitHub mode.** Read and commit through the REST API with a fine-grained token, built and typechecked, **not yet run against live GitHub**. Open: OAuth through a small Worker that holds the client secret; saving as a pull request; the one-click Tina/Keystatic editor | 🟡 token path built, rest ⬜ |
+| **Hosted preview.** Over GitHub there is no machine to run a dev server, so the Preview pane takes a deployed preview URL (the pane already does). Open: deriving that URL from the deploy capability's preview deployments. A site that sends `X-Frame-Options` or a strict `frame-ancestors` cannot be framed | ⬜ |
+| **4. Diagrams as declarations.** Topology first, since it already is one | ⬜ |
+| **5. Drag-and-drop over shadcn blocks**, writing real component source. Riskiest, so last; Puck, Craft.js and GrapesJS are unevaluated | ⬜ |
+| Forms for declarations other than `fiducial.toml` (each needs a schema; `design-system.md` is Markdown with TOML blocks) | ⬜ |
 
 Built by the owner on top of the platform, which is why the platform's job is
 the declarations, their schemas, and the exports above: every one of them is a

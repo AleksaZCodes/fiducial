@@ -1,0 +1,684 @@
+{
+  "$defs": {
+    "Adapters": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "`[adapters]` — which implementation satisfies each contract.\n\nA plain map rather than a struct with a field per contract: the contract set\nis declared once in `crate::adapter::CONTRACTS`, and a struct here would be\na second copy of it that drifts the first time one is added.",
+      "type": "object"
+    },
+    "Advise": {
+      "additionalProperties": false,
+      "description": "`[advise]` — is advisory review part of this product's procedure.\n\nOn by default, and **off by declaration**: setting `enabled = false` is the\nescape hatch (principle 3), usable at any point in a product's life, not a\nchoice that has to be made at `fid new`. It lives in `fiducial.toml` because\na switch that exists only in someone's shell or a CI dashboard cannot be\nreviewed, reverted or known about by an agent (principle 4).\n\nIt switches the *asking* off and nothing else. `fid derive`, `fid doctor`\nand the guard never read it, so it cannot change a build — the property\n`tests/determinism.rs` holds for the key holds for this too.",
+      "properties": {
+        "enabled": {
+          "description": "Absent means on: a product that predates this block is not silently\nopted out of the procedure.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Ai": {
+      "additionalProperties": false,
+      "description": "`[ai]` — what an AI gateway needs that nothing can derive.\n\nThe contract targets a gateway rather than a model vendor, so the vendor\naxis (`[adapters] ai`) and the *model* axis are different facts: switching\nfrom Claude to GPT is a one-line change here and no adapter change at all.\nThat is the whole point of the gateway decision, and it only holds if the\nmodel is a declaration.\n\nSo it is declared once here and derived into the generated factory, where\n`fid derive --check` gates it like every other derived fact. A per-call\n`request.model` still wins — an agent that classifies with a small model\nand answers with a large one is a normal agent, and forcing it to build a\nsecond adapter would make this declaration a lie rather than a default.",
+      "properties": {
+        "base_url": {
+          "description": "The OpenAI-compatible endpoint, for `ai = \"ollama\"`: a plain-http URL\nending in `/v1`. Empty means the Compose service,\n`http://ollama:11434/v1`.",
+          "type": "string"
+        },
+        "model": {
+          "description": "Gateway model id, e.g. `anthropic/claude-opus-5`.\n\nDeliberately **not defaulted**. Any default the platform picked would\nbe a vendor choice made on the product's behalf, and would age into a\nmodel that no longer exists — silently, since a gateway reports an\nunknown model at the first call rather than at deploy.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "App": {
+      "additionalProperties": false,
+      "description": "One app's choices. Every field is optional: an app declares only what it\nchooses, and a missing field is the capability's own default.",
+      "properties": {
+        "api": {
+          "description": "The backend this app talks to, when it is not its own: `hono`.",
+          "type": "string"
+        },
+        "editor": {
+          "description": "The content editor for this app's files: `keystatic`, `tina`.",
+          "type": "string"
+        },
+        "framework": {
+          "type": "string"
+        },
+        "orm": {
+          "description": "Typed queries over the `database` contract: `drizzle`.",
+          "type": "string"
+        },
+        "shell": {
+          "description": "Zero or more native shells that wrap the built app.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Brand": {
+      "additionalProperties": false,
+      "description": "`[brand]` — the one declaration every brand-derived artifact reads.\n\nLegal name, trading name, domain and contact email have no platform\ndefault — they are facts about one product, not a decision this platform\ncan make on a product's behalf. The `brand` capability seeds them as\nplaceholder text precisely so `is_empty` is false and the pipeline it\ninstalls does not fail on the very next `fid derive`; `validate` then\ncatches whichever placeholder a product forgot to replace.",
+      "properties": {
+        "background_color": {
+          "type": "string"
+        },
+        "contact_email": {
+          "default": "",
+          "type": "string"
+        },
+        "domain": {
+          "default": "",
+          "type": "string"
+        },
+        "favicon": {
+          "description": "A product-supplied favicon, relative to the product root.\n\nThe generated favicon is initials on a coloured square, which is the\nright default and the wrong answer for any product that has an actual\nmark. Without this, the only ways out are hand-editing a derived file —\nwhich `fid derive --check` correctly fails — or dropping `favicon.svg`\nfrom the pipeline's outputs, which silently loses the artifact.\n\nSo this is the documented override that MISSION.md principle 3 requires:\nthe file stays derived, `--check` still guards it, and the declaration\nsays where its content comes from. The file is copied verbatim; nothing\nhere parses or rewrites SVG.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "legal_name": {
+          "default": "",
+          "type": "string"
+        },
+        "platform_credit": {
+          "default": false,
+          "description": "Whether the product's footer credits Fiducial.\n\n**Opt-in, and false by default.** A credit line is a sentence printed on\nsomebody else's page, under their brand, to their readers. A platform\nthat adds one unless you find the switch has made a claim on a surface\nit does not own, and the products most likely to never notice are\nexactly the ones — a client site, a white-label build — where it is\nleast appropriate. Opting in costs one line; opting out of something you\nnever knew was there costs finding out from the client.\n\nAlways serialized rather than hidden when false, so the flag is\ndiscoverable by reading `fiducial.toml` instead of by reading this\nstruct (MISSION.md 4: everything explicit, in git).",
+          "type": "boolean"
+        },
+        "primary_color": {
+          "type": "string"
+        },
+        "short_name": {
+          "description": "Home-screen label. Falls back to `trading_name`.\n\n`site.webmanifest` used to put the trading name in both `name` and\n`short_name`, which defeats the point of the field: `short_name` is what\na phone prints under an icon, in about twelve characters, and \"Fire\nOutreach Network\" is not that. A product with a short name already\ndeclares nothing here and loses nothing.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "trading_name": {
+          "default": "",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Capabilities": {
+      "additionalProperties": false,
+      "description": "Capability declarations.",
+      "properties": {
+        "enabled": {
+          "default": [],
+          "description": "Installed capability identifiers, e.g. [\"web-next\", \"firmware-rp2040\"].",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ComposeService": {
+      "additionalProperties": false,
+      "description": "One extra service in a self-hosted product's Compose file.",
+      "properties": {
+        "depends_on": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "environment": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Plain values only. A secret is named in `secrets` and set in `.env`.",
+          "type": "object"
+        },
+        "healthcheck": {
+          "description": "A shell command; exit 0 is healthy.",
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "ports": {
+          "description": "`host:container`, published on the host.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "secrets": {
+          "description": "Names of secrets, written as `${NAME}`, never as a value.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "volumes": {
+          "description": "`name:/path` is a named volume; `./dir:/path` is a bind mount.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "image"
+      ],
+      "type": "object"
+    },
+    "Deploy": {
+      "additionalProperties": false,
+      "description": "`[deploy]` — what a deploy config needs that `[adapters]` cannot imply.\n\nThe split is the whole point. Which bindings a Worker needs **is** derivable\n— `[adapters]` already says `database = \"d1\"`, and the `D1Database` adapter\nalready reads a fixed `env.DB`. What is not derivable is everything only the\nCloudflare account knows: the database's id, the bucket's name, the route.\nThose live here; the bindings are generated around them.",
+      "properties": {
+        "api_prefix": {
+          "description": "The path prefix Caddy proxies to the server when `static_dir` is set.\nDefaults to `/api`.",
+          "type": "string"
+        },
+        "assets_binding": {
+          "description": "The binding the Worker reads those assets through.",
+          "type": "string"
+        },
+        "assets_directory": {
+          "description": "Where the adapter writes the static assets it wants served.\n\nOnly read for `shape = \"sveltekit\"` and `\"nextjs\"`, and defaulted to the adapter's own\noutput directory — a product that has not moved it declares nothing.",
+          "type": "string"
+        },
+        "compatibility_date": {
+          "description": "Wrangler `compatibility_date`. Pinned, never \"today\": a date that moves\nchanges runtime behaviour under a product that did not ask it to.",
+          "type": "string"
+        },
+        "compatibility_flags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "custom_domain": {
+          "description": "Whether `route` is a **custom domain** rather than a zone route.\n\nThe distinction is not cosmetic, and getting it wrong fails the deploy\nrather than producing something subtly off:\n\n- A **zone route** (`\"route\": \"example.com/*\"`) matches traffic that\n  already arrives at Cloudflare. It needs a proxied DNS record for that\n  hostname to exist, and `wrangler deploy` will not create one. On a\n  registrar's parked apex it fails with `code: 100117`.\n- A **custom domain** (`\"routes\": [{ \"pattern\": …, \"custom_domain\":\n  true }]`) makes Cloudflare create the DNS record and issue the\n  certificate itself.\n\nFor a product whose Worker *is* the site — `sveltekit` and `nextjs` —\nthe custom domain is almost always what is meant, and it was\ninexpressible here until this field existed. `aleksa.works` therefore\nhand-edited the derived `wrangler.jsonc`, which is the single thing this\ncapability exists to prevent.\n\nLeft `false` so an existing product's generated config does not change\nshape under it: a zone route is what `route` has always meant.",
+          "type": "boolean"
+        },
+        "d1_database_id": {
+          "description": "D1 database id — from `wrangler d1 create`. Only the account knows it.",
+          "type": "string"
+        },
+        "d1_database_name": {
+          "description": "D1 database name, defaulting to the product name.",
+          "type": "string"
+        },
+        "durable_objects": {
+          "description": "Durable Object classes this Worker exports and binds. Like KV, a fact\nabout the product's own Worker rather than a vendor choice. The class\nmust be exported from `main` (for the Next.js shape, a one-line\nre-export beside OpenNext's handler). Declared as SQLite-backed, the\nonly kind the free plan allows.",
+          "items": {
+            "$ref": "#/$defs/DurableObject"
+          },
+          "type": "array"
+        },
+        "host": {
+          "description": "The hostname a self-hosted product answers on (`deploy = \"compose\"`):\na LAN name such as `building.local`, or a public domain. Read only by\n`fid-compose`.",
+          "type": "string"
+        },
+        "kv_namespaces": {
+          "description": "KV namespaces this product binds that no `[adapters]` contract covers.\n\nThe derived bindings come from vendor selections, which is right for\nthe contracts that exist — but a product's own KV namespace is not a\nvendor choice, it is a fact about its account. One product's live\nsignup counter is written by an external script into a namespace whose\nid must survive every migration; there was nowhere to declare that, so\nits config could not be derived at all.",
+          "items": {
+            "$ref": "#/$defs/KvNamespace"
+          },
+          "type": "array"
+        },
+        "main": {
+          "description": "Worker entrypoint, relative to the worker app.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Worker name. Defaults to `<product>-worker` when left empty.",
+          "type": "string"
+        },
+        "observability": {
+          "description": "Whether to turn on Workers observability.",
+          "type": "boolean"
+        },
+        "proxy": {
+          "description": "Which service Caddy proxies to (`deploy = \"compose\"`). Defaults to the\nfirst app of the first host node, or `server` with no topology.",
+          "type": "string"
+        },
+        "proxy_port": {
+          "description": "The port that service listens on. Defaults to 8080.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "queue_name": {
+          "description": "Queue name — from `wrangler queues create`.",
+          "type": "string"
+        },
+        "r2_bucket_name": {
+          "description": "R2 bucket name — from `wrangler r2 bucket create`.",
+          "type": "string"
+        },
+        "registry": {
+          "description": "Where the server image is pushed and pulled (`deploy = \"compose\"`).",
+          "type": "string"
+        },
+        "route": {
+          "description": "Route or custom domain this Worker answers on. Optional: a Worker on\nits `workers.dev` subdomain declares none.",
+          "type": "string"
+        },
+        "services": {
+          "description": "Services this product runs that nothing else declares: a database, a\ncache, a worker (`deploy = \"compose\"`). Apps, the broker and Ollama are\nderived and are not listed here.",
+          "items": {
+            "$ref": "#/$defs/ComposeService"
+          },
+          "type": "array"
+        },
+        "shape": {
+          "description": "What is being deployed — and it is not the same artifact in both cases.\n\n`worker` (the default) is a standalone Worker at `apps/worker/`, whose\nentrypoint is a source file this repository wrote.\n\n`sveltekit` is a SvelteKit app where **`apps/web` is the Worker**, by\nway of `@sveltejs/adapter-cloudflare`: the entrypoint and the static\nassets are both *build output*, and the config lives at the product\nroot because that is where the adapter looks for it.\n\nWithout this, `fid add deploy` on a SvelteKit product wrote an\n`apps/worker/wrangler.toml` describing nothing the product runs, while\nthe real config stayed untracked — worse than not running it, and the\nreason one product declared `[adapters] deploy = \"cloudflare\"` and\ndeliberately did not install this capability.",
+          "type": "string"
+        },
+        "static_dir": {
+          "description": "A static export Caddy serves (`deploy = \"compose\"`): the web app's build\ndirectory, relative to the product root, e.g. `apps/web/out`. Built with\n`STATIC_EXPORT=1` (`pnpm build:static`). With it, `proxy` receives only\n`api_prefix/*`; without it, `proxy` receives everything.",
+          "type": "string"
+        },
+        "tls": {
+          "description": "How Caddy gets its certificate (`deploy = \"compose\"`): `internal` (its\nown CA, for a LAN name, the default) or `acme` (a public domain).",
+          "type": "string"
+        },
+        "vars": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Plain environment variables. Values are **not** secrets — those are\nnamed in a comment and set with `wrangler secret put`, never written\ninto a file in the repository.",
+          "type": "object"
+        },
+        "workers_dev": {
+          "description": "Whether the Worker also answers on its `workers.dev` subdomain.\n\n`None` means \"do not write the field\", which is not the same as `false`:\nwrangler's own default is on when no route is declared and **off when\none is**, so a product that declares a route silently loses the URL it\nhas been checking deploys against. That happened on the first\n`aleksa.works` custom-domain deploy and took the preview URL down with\nit, which is why this is declarable at all rather than left to the\ndefault.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Design": {
+      "additionalProperties": false,
+      "description": "`[design]` — registries the product's components come from.\n\n```toml\n[design.registries]\n\"@acme\" = \"https://acme.example/r/{name}.json\"\n```\n\nshadcn resolves `npx shadcn add @acme/button` through the `registries` map\nin `components.json`. That file is a copy of this declaration, rewritten by\n`fid derive`, so the list a product installs from is written once.",
+      "properties": {
+        "github": {
+          "description": "`owner/repo` of the public GitHub repository this product is pushed to.\n\nshadcn reads a repository with a root `registry.json` as a registry\n(`npx shadcn add owner/repo/button`), with nothing to host or build. When\nthis is declared, the registry's items name each other that way instead\nof through an `@namespace` the installing product would have to configure.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "registries": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "DurableObject": {
+      "additionalProperties": false,
+      "description": "One Durable Object binding: the name the Worker reads, and the class it is.",
+      "properties": {
+        "binding": {
+          "description": "The binding name in the Worker, e.g. `REALTIME`.",
+          "type": "string"
+        },
+        "class": {
+          "description": "The exported class, e.g. `RealtimeDO` (from `@fiducial/realtime`).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "binding",
+        "class"
+      ],
+      "type": "object"
+    },
+    "Freshness": {
+      "additionalProperties": false,
+      "description": "`[freshness]` — how this repository stops a stale artifact reaching `main`.\n\n`fid dash` used to equate \"gated\" with \"a workflow runs `fid derive\n--check`\", and reported *this* repository as ungated while seven gates ran\non every commit. The reason is in `fiducial.toml`: the protocol vectors and\nthe terminal captures are gated by Rust tests on purpose, because a gate\nthat runs through the tool it gates is blind exactly where it matters.\n\nThat is a judgment, so it is declared rather than guessed. `fid derive\n--check` stays recognised without being listed — it is the default for a\nscaffolded product, and requiring every product to restate it would be the\nsecond declaration this block exists to avoid.",
+      "properties": {
+        "gates": {
+          "description": "Commands that gate a generated artifact, matched as substrings against\neach workflow's text.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Guard": {
+      "additionalProperties": false,
+      "description": "Guard configuration — what `fid guard-check` enforces in this product.",
+      "properties": {
+        "rules": {
+          "default": [
+            "no-direct-main-push",
+            "no-unpinned-cli-fetch"
+          ],
+          "description": "Named rule sets that are active.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "I18n": {
+      "additionalProperties": false,
+      "description": "`[i18n]` — the locales this product ships.\n\nDeclared rather than inferred. `default` is **not** `locales[0]`: which\nlanguage a product falls back to is a decision, and inferring it from list\norder is exactly the kind of implicit fact this platform exists to delete.\n\nEmpty `locales` means the product is not localized. That is a valid state\nfor a CLI or a firmware image, and `fid new --locales none` asks for it — but\n`fid new` seeds the `i18n` capability's own locales otherwise, because a product that can be\nbuilt monolingual will be, and principle 1c says monolingual is a state you\npass through before the first commit.",
+      "properties": {
+        "default": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "locales": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "messages_dir": {
+          "description": "Directory holding `<locale>.json`, relative to the product root.\n\n`serde(default)` fills this when *reading*; without the matching skip it\nround-tripped a `Default::default()` value back out as `\"\"`, which then\nfailed to resolve on the next read.",
+          "type": "string"
+        },
+        "same": {
+          "description": "Keys whose value is the same in every locale on purpose — a product\nname, \"Wi-Fi\". Any other value identical to the default locale's is\nuntranslated, and `fid derive --check` refuses it.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Identity": {
+      "additionalProperties": false,
+      "description": "`[identity]` — what grant storage cannot derive from the model.\n\nThe grants table's *shape* follows from the identity model: its `CHECK`\nconstraints are the `Principal`, `Resource` and `Role` variants. Three\nthings do not follow from it, and live here.\n\n**The dialect is derived, not declared** — by default. `[adapters]\ndatabase` already names the vendor, and the vendor implies the dialect:\n`d1` is SQLite, `supabase`/`neon`/`postgres` are Postgres. Declaring it\nagain would be the copy that goes wrong, so `dialect` is an *override* for\nthe case the platform cannot see (a product pointing `none` at a real\ndatabase of its own).",
+      "properties": {
+        "audit": {
+          "description": "Derive an append-only log of authorization decisions.\n\nOff by default. An audit log is a write on every decision and a\nretention obligation on every row, so it is a choice a product makes\nrather than something it acquires by installing identity.\n\nIt arrives as `migrations/0002_audit.sql` — a *second* migration, not\nan edit to the first. Editing an applied migration is the one thing the\nmigration runner refuses outright, and the generator does not get an\nexemption from the rule it generates for.",
+          "type": "boolean"
+        },
+        "current_user_sql": {
+          "description": "The SQL expression yielding the current user's id, for RLS.\n\nDefaults to Supabase's `auth.uid()`. A product connecting with a\nper-request role instead would use something like\n`current_setting('app.user_id', true)`. Normalized to this platform's\nhex form by the generator, because `auth.uid()` returns a hyphenated\nUUID and `principal_id` holds 32 hex characters.",
+          "type": "string"
+        },
+        "dialect": {
+          "description": "`sqlite` | `postgres`. Empty means \"derive it from `[adapters]\ndatabase`\", which is the normal case.",
+          "type": "string"
+        },
+        "rls": {
+          "description": "Generate row-level security policies on the grants table.\n\nPostgres only — SQLite has no RLS. Off by default: a policy that\ncannot identify the current user locks the table rather than\nprotecting it, and whether the database *can* identify them depends on\nhow the product connects (see `current_user_sql`).",
+          "type": "boolean"
+        },
+        "storage": {
+          "description": "Where the permission rows live: `sql` (the default) or `none`.\n\n`fid add identity` used to install the *rule* and the *storage*\ntogether. A product that wants `can()` and seeds its grants from config\nor `MemoryGrantStore` still got a migration it will never apply and a\ngenerated module it will never import.\n\n`none` is this platform's existing word for \"wired in, reported, does\nnothing\" — see the `NONE` adapter, which is a real implementation\nrather than a placeholder. Splitting identity into two capabilities was\nthe alternative, and is more surface for the same result.",
+          "type": "string"
+        },
+        "table": {
+          "description": "Table holding the permission rows. Defaults to `grants`.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "KvNamespace": {
+      "additionalProperties": false,
+      "description": "One KV namespace binding: the name the Worker reads, and the account's id.",
+      "properties": {
+        "binding": {
+          "description": "The binding name in the Worker, e.g. `SPOTS`.",
+          "type": "string"
+        },
+        "id": {
+          "description": "The namespace id from `wrangler kv namespace create`. Account-specific,\nand **load-bearing**: point a deploy at a different id and the data is\nsilently gone rather than missing.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "binding",
+        "id"
+      ],
+      "type": "object"
+    },
+    "Legal": {
+      "additionalProperties": false,
+      "description": "`[legal]` — what the legal pipeline needs that `[brand]` cannot imply.\n\nJurisdiction affects which pages are generated and which clauses are\nincluded. Cookie categories name every tracking purpose the product\ndeclares. `\"necessary\"` is always included regardless of what the product\nlists — it is not a choice.\n\nThe `legal` pipeline depends on both `[brand]` (for the entity name, domain,\nand contact) and `[i18n]` (for the locale set). Neither dependency is\nrestated here: they are declared once in their own blocks.",
+      "properties": {
+        "cookie_categories": {
+          "default": [],
+          "description": "Tracking purposes declared. `\"necessary\"` is always present.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "data_protection_email": {
+          "default": "",
+          "description": "Email address for data protection enquiries. Appears in every page.",
+          "type": "string"
+        },
+        "jurisdiction": {
+          "default": "",
+          "description": "`EU` | `US` | `UK` | `RS` | `other`. Affects which pages are generated\nand which compliance checklist items appear.",
+          "type": "string"
+        },
+        "last_updated": {
+          "default": null,
+          "description": "The date these pages were last reviewed by a person, `YYYY-MM-DD`.\n\nDeclared rather than stamped at derive time on purpose. A generated\ntimestamp would change on every `fid derive` — which breaks\n`--check` — and, worse, it would say \"reviewed today\" about a page\nnobody has read since it was scaffolded. This is a human fact, so a\nhuman types it. Omitted, the pages say so out loud.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "postal_address": {
+          "default": null,
+          "description": "Postal address of the controller. GDPR Art. 13(1)(a) asks for the\ncontroller's identity and contact details; an email alone is thin.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "registration_number": {
+          "default": null,
+          "description": "Statutory identifiers for the entity, shown on the pages that need them.\n\nSerbia's Zakon o elektronskoj trgovini requires a trader to publish its\nregistration and tax numbers; the EU e-Commerce Directive asks for the\nequivalent. An unincorporated project has neither, and omitting them is\ncorrect in that case — inventing them is not.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tax_number": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Product": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Snake-case product identifier; also used as the crate/package name prefix.",
+          "type": "string"
+        },
+        "version": {
+          "default": "0.1.0",
+          "description": "Semver version of the product.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "Security": {
+      "additionalProperties": false,
+      "description": "`[security]` — the choices the response headers leave open.\n\nThe headers themselves are not declared here: they are one table in the\nplatform (`security.rs`), derived into every framework's file by\n`fid-security`. What a product may choose is the one thing that is a decision\nrather than a fact.",
+      "properties": {
+        "hsts_preload": {
+          "description": "Add `preload` to `Strict-Transport-Security`. Off unless declared: it is\na willingness to be submitted at hstspreload.org, which is slow to undo\n(`docs/specs/2026-09-20-hsts-preload.md`).",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "Skills": {
+      "additionalProperties": false,
+      "description": "`[skills]` — the agents this product's skills are linked for.\n\nSkills live once in `.agents/skills/`, the directory the open `skills` CLI\ntreats as shared and that Codex, Cursor, GitHub Copilot, Gemini CLI, OpenCode,\nAmp and others read directly. An agent with a directory of its own (Claude\nCode reads `.claude/skills/`) gets a link to that copy. The default covers\nboth groups; list the agents the team actually uses to add or drop links.",
+      "properties": {
+        "agents": {
+          "description": "`skills` CLI agent identifiers (`claude-code`, `codex`, `cursor`, …).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Spine": {
+      "additionalProperties": false,
+      "description": "Whether this product uses the L0 Rust spine (fiducial-core etc.).\nPure web products may leave this false.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "SystemOne": {
+      "additionalProperties": false,
+      "description": "`[systemOne]` — facts for the typed-decision contract.\n\nUnlike [`Ai`], `model` here is **optional**, and the difference is not an\noversight. `[ai] model` has no safe default because any model the platform\npicked would be a vendor choice made for the product, and would age into an\nid that no longer exists. The decision vendors publish a *tracking alias* —\n`~typesafe/jev-latest` through the gateway, `jev-latest` direct — which by\ndefinition names the current model, so defaulting to it neither picks a\nversion nor rots. Declaring `model` pins a version instead, which is what a\nproduct wants once an answer distribution matters to it.",
+      "properties": {
+        "model": {
+          "description": "Decision model id, e.g. `typesafe/jev-1.13`. Empty means the vendor's\ntracking alias.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "The full `fiducial.toml` schema.",
+  "properties": {
+    "adapters": {
+      "$ref": "#/$defs/Adapters",
+      "description": "`[adapters]` — one vendor per contract."
+    },
+    "advise": {
+      "$ref": "#/$defs/Advise",
+      "description": "`[advise]` — whether advisory review is part of this product's procedure."
+    },
+    "ai": {
+      "$ref": "#/$defs/Ai",
+      "description": "`[ai]` — the model this product talks to, and how it identifies itself."
+    },
+    "apps": {
+      "additionalProperties": {
+        "$ref": "#/$defs/App"
+      },
+      "description": "`[apps.<name>]` — what each app is built with (`crate::apps`).",
+      "type": "object"
+    },
+    "brand": {
+      "$ref": "#/$defs/Brand",
+      "description": "Skipped when the product declares no brand, so a product that has not\nadded the `brand` capability carries no empty `[brand]` block."
+    },
+    "capabilities": {
+      "$ref": "#/$defs/Capabilities",
+      "default": {
+        "enabled": []
+      }
+    },
+    "deploy": {
+      "$ref": "#/$defs/Deploy",
+      "description": "`[deploy]` — the facts a deploy target needs that nothing can derive."
+    },
+    "design": {
+      "$ref": "#/$defs/Design",
+      "description": "`[design]` — the shadcn registries this product installs from."
+    },
+    "freshness": {
+      "$ref": "#/$defs/Freshness",
+      "description": "`[freshness]` — gates other than `fid derive --check`."
+    },
+    "guard": {
+      "$ref": "#/$defs/Guard",
+      "default": {
+        "rules": [
+          "no-direct-main-push",
+          "no-unpinned-cli-fetch"
+        ]
+      }
+    },
+    "i18n": {
+      "$ref": "#/$defs/I18n",
+      "description": "Skipped when the product is not localized, so a non-localized product's\n`fiducial.toml` carries no empty `[i18n]` block."
+    },
+    "identity": {
+      "$ref": "#/$defs/Identity",
+      "description": "`[identity]` — where this product keeps its permission rows."
+    },
+    "legal": {
+      "$ref": "#/$defs/Legal",
+      "description": "`[legal]` — jurisdiction and cookie declarations for the legal pipeline.\n\nSkipped when the product declares no legal facts, so a product that has\nnot added the `legal` capability carries no empty `[legal]` block."
+    },
+    "product": {
+      "$ref": "#/$defs/Product"
+    },
+    "security": {
+      "$ref": "#/$defs/Security",
+      "description": "`[security]` — the one choice the response headers leave open."
+    },
+    "skills": {
+      "$ref": "#/$defs/Skills",
+      "description": "`[skills]` — which agents the platform installs and links skills for."
+    },
+    "spine": {
+      "$ref": "#/$defs/Spine",
+      "default": {
+        "enabled": false
+      }
+    },
+    "systemOne": {
+      "$ref": "#/$defs/SystemOne",
+      "description": "`[systemOne]` — the decision model this product asks typed questions of."
+    }
+  },
+  "required": [
+    "product"
+  ],
+  "title": "Config",
+  "type": "object"
+}

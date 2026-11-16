@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 pub const CONFIG_FILE: &str = "fiducial.toml";
 
 /// The full `fiducial.toml` schema.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Config {
     pub product: Product,
     #[serde(default)]
@@ -97,6 +97,7 @@ pub struct Config {
         default,
         skip_serializing_if = "std::collections::BTreeMap::is_empty"
     )]
+    #[schemars(with = "std::collections::BTreeMap<String, serde_json::Value>")]
     pub extra: std::collections::BTreeMap<String, toml::Value>,
 }
 
@@ -106,7 +107,7 @@ pub struct Config {
 /// platform (`security.rs`), derived into every framework's file by
 /// `fid-security`. What a product may choose is the one thing that is a decision
 /// rather than a fact.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Security {
     /// Add `preload` to `Strict-Transport-Security`. Off unless declared: it is
@@ -133,7 +134,7 @@ impl Security {
 /// It switches the *asking* off and nothing else. `fid derive`, `fid doctor`
 /// and the guard never read it, so it cannot change a build — the property
 /// `tests/determinism.rs` holds for the key holds for this too.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Advise {
     /// Absent means on: a product that predates this block is not silently
@@ -165,7 +166,7 @@ impl Advise {
 /// `request.model` still wins — an agent that classifies with a small model
 /// and answers with a large one is a normal agent, and forcing it to build a
 /// second adapter would make this declaration a lie rather than a default.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Ai {
     /// Gateway model id, e.g. `anthropic/claude-opus-5`.
@@ -194,7 +195,7 @@ pub struct Ai {
 /// definition names the current model, so defaulting to it neither picks a
 /// version nor rots. Declaring `model` pins a version instead, which is what a
 /// product wants once an answer distribution matters to it.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SystemOne {
     /// Decision model id, e.g. `typesafe/jev-1.13`. Empty means the vendor's
@@ -260,7 +261,7 @@ impl Ai {
 /// --check` stays recognised without being listed — it is the default for a
 /// scaffolded product, and requiring every product to restate it would be the
 /// second declaration this block exists to avoid.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Freshness {
     /// Commands that gate a generated artifact, matched as substrings against
@@ -285,7 +286,7 @@ impl Freshness {
 /// shadcn resolves `npx shadcn add @acme/button` through the `registries` map
 /// in `components.json`. That file is a copy of this declaration, rewritten by
 /// `fid derive`, so the list a product installs from is written once.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Design {
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
@@ -350,7 +351,7 @@ impl Design {
 /// Amp and others read directly. An agent with a directory of its own (Claude
 /// Code reads `.claude/skills/`) gets a link to that copy. The default covers
 /// both groups; list the agents the team actually uses to add or drop links.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Skills {
     /// `skills` CLI agent identifiers (`claude-code`, `codex`, `cursor`, …).
@@ -405,7 +406,7 @@ impl SqlDialect {
 /// again would be the copy that goes wrong, so `dialect` is an *override* for
 /// the case the platform cannot see (a product pointing `none` at a real
 /// database of its own).
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Identity {
     /// Where the permission rows live: `sql` (the default) or `none`.
@@ -596,7 +597,7 @@ impl Identity {
 /// already reads a fixed `env.DB`. What is not derivable is everything only the
 /// Cloudflare account knows: the database's id, the bucket's name, the route.
 /// Those live here; the bindings are generated around them.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Deploy {
     /// Worker name. Defaults to `<product>-worker` when left empty.
@@ -770,7 +771,7 @@ fn is_zero(n: &u16) -> bool {
 }
 
 /// One extra service in a self-hosted product's Compose file.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ComposeService {
     pub name: String,
@@ -795,7 +796,7 @@ pub struct ComposeService {
 }
 
 /// One KV namespace binding: the name the Worker reads, and the account's id.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct KvNamespace {
     /// The binding name in the Worker, e.g. `SPOTS`.
@@ -807,7 +808,7 @@ pub struct KvNamespace {
 }
 
 /// One Durable Object binding: the name the Worker reads, and the class it is.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DurableObject {
     /// The binding name in the Worker, e.g. `REALTIME`.
@@ -967,7 +968,7 @@ impl Deploy {
 /// A plain map rather than a struct with a field per contract: the contract set
 /// is declared once in `crate::adapter::CONTRACTS`, and a struct here would be
 /// a second copy of it that drifts the first time one is added.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, schemars::JsonSchema)]
 pub struct Adapters {
     #[serde(flatten)]
     pub selected: std::collections::BTreeMap<String, String>,
@@ -985,7 +986,7 @@ impl Adapters {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Product {
     /// Snake-case product identifier; also used as the crate/package name prefix.
@@ -1001,7 +1002,7 @@ fn default_version() -> String {
 
 /// Whether this product uses the L0 Rust spine (fiducial-core etc.).
 /// Pure web products may leave this false.
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Spine {
     #[serde(default)]
@@ -1009,7 +1010,7 @@ pub struct Spine {
 }
 
 /// Capability declarations.
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Capabilities {
     /// Installed capability identifiers, e.g. ["web-next", "firmware-rp2040"].
@@ -1028,7 +1029,7 @@ pub struct Capabilities {
 /// `fid new` seeds the `i18n` capability's own locales otherwise, because a product that can be
 /// built monolingual will be, and principle 1c says monolingual is a state you
 /// pass through before the first commit.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct I18n {
     #[serde(default)]
@@ -1111,7 +1112,7 @@ impl I18n {
 // type's — empty strings, `None`, and `platform_credit: false`, which is the
 // opt-in default a credit line should have. A hand-written impl listing nine
 // fields is one more place to forget a field when a tenth is added.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Brand {
     #[serde(default)]
@@ -1292,7 +1293,7 @@ fn is_hex_color(s: &str) -> bool {
 /// The `legal` pipeline depends on both `[brand]` (for the entity name, domain,
 /// and contact) and `[i18n]` (for the locale set). Neither dependency is
 /// restated here: they are declared once in their own blocks.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Legal {
     /// `EU` | `US` | `UK` | `RS` | `other`. Affects which pages are generated
@@ -1403,7 +1404,7 @@ impl Legal {
 }
 
 /// Guard configuration — what `fid guard-check` enforces in this product.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Guard {
     /// Named rule sets that are active.

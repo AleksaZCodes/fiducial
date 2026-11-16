@@ -31,6 +31,11 @@ fiducial-geometry = { workspace = true, features = ["std"] }
 fiducial-mesh     = { workspace = true, features = ["std"] }
 fiducial-protocol = { workspace = true, features = ["std"] }
 rusqlite   = { workspace = true }
+schemars   = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+# Stopping the preview's dev server takes its whole process group.
+libc       = { workspace = true }
 
 [dev-dependencies]
 tempfile          = { workspace = true }
