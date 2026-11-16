@@ -227,20 +227,20 @@ fn executor_inputs(pipeline: &Pipeline, root: &Path) -> Vec<String> {
             ));
             v
         }
-        "fid-design" => {
-            // The registry publishes the product's components and stylesheets,
-            // so editing one is a change the registry must be re-derived for.
-            let mut v = cfg(&["product.name", "brand", "design"]);
-            v.extend(crate::design::registry_items(root, "x", &Default::default(), None).inputs);
-            v
-        }
         "fid-adapters" => cfg(&["adapters"]),
         "fid-thesis" => {
             let mut v = expand_inputs(root, &[format!("{}?", crate::thesis::THESIS_FILE)]);
             v.extend(cfg(&["product.name"]));
             v
         }
-        "fid-design" => vec![arg("design-system.md")],
+        "fid-design" => {
+            // The registry publishes the product's components and stylesheets,
+            // so editing one is a change the registry must be re-derived for.
+            let mut v = vec![arg("design-system.md")];
+            v.extend(cfg(&["product.name", "brand", "design"]));
+            v.extend(crate::design::registry_items(root, "x", &Default::default(), None).inputs);
+            v
+        }
         "fid-protocol" => vec![arg(crate::protocol::DECLARATION)],
         "fid-topology" => vec![arg(crate::topology::DECLARATION)],
         "fid-monitoring" => vec![
