@@ -20,4 +20,7 @@ alloc   = []
 std     = ["alloc"]
 
 [dev-dependencies]
-# nothing; tests use only libstd via the `extern crate std;` gate in lib.rs
+# The unit tests use only libstd via the `extern crate std;` gate in lib.rs. The
+# Modbus test opens a pseudo-terminal pair, a virtual serial cable, which libstd
+# cannot.
+libc = { workspace = true }

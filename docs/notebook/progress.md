@@ -2,6 +2,12 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.27.0 · 2026-11-16
+
+- CAN-FD frames, ISO-TP segmentation and Modbus RTU with RS-485 direction control,
+  in `fiducial-protocol`. Proved over an in-memory bus and a virtual serial port;
+  the kernel here has no CAN and there is no transceiver.
+
 ## 0.26.0 · 2026-11-16
 
 - The response headers are one table, derived into every framework's file and the

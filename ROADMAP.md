@@ -656,7 +656,7 @@ cost of delay:
 | 5 | Self-hosted server stack: `sqlite`, `native` auth, `ollama`, `compose`; the broker ACL follows the topology's topic directions, not stored grants | terminal | ✅ |
 | 6 | The web app as a static export served by the server (Next.js; SvelteKit is not wired) | terminal | ✅ |
 | 7 | Derived documentation: topology, wiring, rules, sequence and storage diagrams (`topology.md` from `fid-topology`, `rules.md` from `fid-monitoring`; wiring per variant) | multiplying | ✅ |
-| 8 | CAN / CAN-FD with ISO-TP, and a Linux RT runtime — gated on a product | terminal | ⬜ |
+| 8 | CAN / CAN-FD with ISO-TP (done), RS-485 with Modbus RTU (done), and a Linux RT runtime (to do); no longer gated on a product | terminal | 🟡 |
 
 ### Physical products — outline, region, part, cost ✅
 

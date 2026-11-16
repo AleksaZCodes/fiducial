@@ -64,6 +64,55 @@ for &byte in &out[..written] {
 The decoder is a state machine: it resynchronises after a bad magic byte,
 rejects oversized frames, and never allocates.
 
+## CAN, ISO-TP and Modbus RTU
+
+Three more modules, all `no_std` and none allocating. They are Rust-only: the
+TypeScript port mirrors the frame format above, not these.
+
+- **`can`**: CAN and CAN-FD frames, with identifiers and the sixteen CAN-FD
+  payload lengths checked at construction.
+- **`segment`**: ISO 15765-2 (ISO-TP). A message of up to 4 GiB is split into
+  frames and put back together, with the receiver pacing the sender through flow
+  control (block size, separation time, wait, overflow) and both sides timing out.
+- **`modbus`**: Modbus RTU framing over RS-485 (read and write registers), the
+  device's exception codes, silence-based frame boundaries, and the
+  driver-enable sequence for a half-duplex bus.
+
+None of them owns a clock, a CAN controller or a serial port: the caller passes
+elapsed time in and moves frames to and from the hardware. That is what keeps them
+testable off the hardware. The tests run ISO-TP over an in-memory bus and Modbus
+over a pseudo-terminal pair, because the machine they were written on has no CAN
+and no RS-485 adapter.
+
+```rust
+use fiducial_protocol::segment::{
+    encode_flow_control, Event, Mode, Params, Poll, Receiver, Sender,
+};
+
+let message: Vec<u8> = (0..100).collect();
+let mut sender = Sender::new(&message, Mode::Classic, Params::default()).unwrap();
+let mut receiver: Receiver<256> = Receiver::new(Params::default());
+
+let mut frame = [0u8; 64];
+let mut received = Vec::new();
+loop {
+    match sender.poll(&mut frame).unwrap() {
+        Poll::Frame(n) => match receiver.feed(&frame[..n]).unwrap() {
+            Event::Message(m) => received = m.to_vec(),
+            Event::SendFlowControl(fc) => {
+                let mut reply = [0u8; 64];
+                let n = encode_flow_control(fc, Mode::Classic, Some(0xCC), &mut reply);
+                sender.on_flow_control(&reply[..n]).unwrap();
+            }
+            Event::Pending => {}
+        },
+        Poll::Wait => sender.tick(100).unwrap(),
+        Poll::Done => break,
+    }
+}
+assert_eq!(received, message);
+```
+
 ## Version skew
 
 `WIRE_VERSION` is declared once here and embedded in every compiled artifact.
