@@ -18,7 +18,9 @@ requires_capabilities = ["content", "i18n"]
 # entry as the key `<prefix>/<slug>/<file>`, never a URL — see the `content`
 # skill. `<prefix>` is the collection's `media` in content.toml. Set
 # `public_base = "/images"` only if the site stores URL paths instead of keys;
-# Pages CMS can store only those, so its image picker also needs `media_input`,
+# `storage = "github"` with `repo = "owner/name"` makes Keystatic commit through
+# the GitHub API instead of writing a working tree, so a deployed editor can be
+# used by people with no checkout. Pages CMS can store only those, so its image picker also needs `media_input`,
 # the repository directory it commits uploads to. Without both, a picture is a
 # text field there.
 [[declarations.config]]

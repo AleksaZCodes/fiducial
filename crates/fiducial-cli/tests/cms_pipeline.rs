@@ -415,7 +415,7 @@ fn gallery_images_are_referenced_media() {
 /// Pages CMS is hosted, so its config is a file at the repository root: derived
 /// from the same model, gated like the others, and honest about what it cannot
 /// store. The full shape is held to Pages CMS's own schema by
-/// `scripts/verify-pages-cms.sh`; this keeps the facts a refactor could lose.
+/// `scripts/verify-cms-configs.sh`; this keeps the facts a refactor could lose.
 #[test]
 fn pages_cms_is_derived_from_the_same_model_and_gated() {
     let tmp = tempfile::tempdir().unwrap();
@@ -449,4 +449,65 @@ fn pages_cms_is_derived_from_the_same_model_and_gated() {
         !run(&root, &["derive", "--check"]).status.success(),
         "a hand-edited .pages.yml passed --check"
     );
+}
+
+/// `storage = "github"` is Keystatic's hosted mode. It needs a repository to
+/// commit to, belongs to Keystatic alone, and changes only where it saves: the
+/// same collections at the same paths.
+#[test]
+fn keystatic_github_storage_is_declared_and_refused_when_it_cannot_work() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = cms_product(tmp.path());
+    let fiducial = root.join("fiducial.toml");
+    let base = std::fs::read_to_string(&fiducial).unwrap();
+    let with = |extra: &str| {
+        base.replace(
+            "media_dir = \"media\"",
+            &format!("media_dir = \"media\"\n{extra}"),
+        )
+    };
+
+    std::fs::write(
+        &fiducial,
+        with("storage = \"github\"\nrepo = \"acme/site\""),
+    )
+    .unwrap();
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let config = std::fs::read_to_string(root.join("apps/cms/keystatic.config.ts")).unwrap();
+    assert!(
+        config.contains("storage: { kind: \"github\", repo: \"acme/site\" }"),
+        "{config}"
+    );
+    assert!(
+        config.contains("\"content/posts/en/*\""),
+        "same paths as local: {config}"
+    );
+
+    for (extra, want) in [
+        ("storage = \"github\"", "needs repo = \"owner/name\""),
+        (
+            "storage = \"github\"\nrepo = \"nope\"",
+            "needs repo = \"owner/name\"",
+        ),
+        ("storage = \"cloud\"", "is not one of: local, github"),
+        (
+            "storage = \"github\"\nrepo = \"a/b\"\n#tina",
+            "Tina Cloud is configured in Tina's own dashboard",
+        ),
+    ] {
+        let tina = extra.contains("#tina");
+        let declared = with(extra).replace(
+            "editor = \"keystatic\"",
+            if tina {
+                "editor = \"tina\""
+            } else {
+                "editor = \"keystatic\""
+            },
+        );
+        std::fs::write(&fiducial, declared).unwrap();
+        let out = run(&root, &["derive"]);
+        assert!(!out.status.success(), "{extra}");
+        assert!(text(&out).contains(want), "{extra}: {}", text(&out));
+    }
 }
