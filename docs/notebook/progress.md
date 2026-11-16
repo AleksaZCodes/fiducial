@@ -2,6 +2,12 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.25.0 · 2026-11-16
+
+- The React Router starter is full stack: loader, action, form, server-only module
+  and a resource route, proved on the built app. Remix is React Router v8 now; Remix 3
+  is a different, non-React project and is not added.
+
 ## 0.24.0 · 2026-11-15
 
 - `fid add app start`: TanStack Start on Workers, with its headers set by a custom

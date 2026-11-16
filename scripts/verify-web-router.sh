@@ -72,8 +72,29 @@ for h in Strict-Transport-Security X-Content-Type-Options Referrer-Policy X-Fram
          Permissions-Policy Cross-Origin-Opener-Policy Content-Security-Policy; do
   echo "$headers" | grep -qi "^$h:" || { echo "✗ the response lacks $h" >&2; echo "$headers" >&2; exit 1; }
 done
-curl -fsS "$base/" | grep -q "Hello from the Worker" \
+# The full-stack loop, with JavaScript out of it: the loader's data is in the
+# page, a form POST reaches the action, and bad input comes back as a 400.
+curl -fsS "$base/" | grep -q "<h1>site</h1>" \
   || { echo "✗ the loader's data is not in the page" >&2; exit 1; }
+# A POST to "/" would target the root route, which has no action: the index
+# route's action is addressed as "/?index", and that is what the rendered <form>
+# posts to. Read the address from the page, so the test follows what a browser does.
+action="$(curl -fsS "$base/" | grep -o '<form[^>]*' | grep -o 'action="[^"]*"' | head -1 | sed 's/action="//; s/"$//; s/&amp;/\&/g')"
+[ "$action" = "/?index" ] || { echo "✗ the form posts to '$action', not '/?index'" >&2; exit 1; }
+curl -fsS -d "name=Ada" "$base$action" | grep -q "Hello, Ada" \
+  || { echo "✗ the action did not answer a form POST" >&2; exit 1; }
+code="$(curl -sS -o "$work/bad.html" -w '%{http_code}' -d "name=" "$base$action")"
+[ "$code" = 400 ] || { echo "✗ an empty name returned $code, not 400" >&2; exit 1; }
+grep -q "Tell us your name" "$work/bad.html" \
+  || { echo "✗ the validation message is not in the response" >&2; exit 1; }
+# A resource route is JSON with no component.
+curl -fsS "$base/healthz" | grep -q '"ok":true' \
+  || { echo "✗ the resource route did not answer" >&2; exit 1; }
+# Server-only code stays on the server: the browser bundle must not carry it.
+if grep -rq "rendered on the Worker" build/client; then
+  echo "✗ a .server module reached the client bundle" >&2
+  exit 1
+fi
 
 cd ../..
 if ! "$fid" doctor 2>&1 | grep -q "no platform-owned file has been modified"; then

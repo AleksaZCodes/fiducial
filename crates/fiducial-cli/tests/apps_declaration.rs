@@ -186,3 +186,45 @@ fn a_capability_can_add_dependencies_to_another_apps_manifest() {
         "the web app's manifest must not appear or change"
     );
 }
+
+/// The React Router template is a full-stack app, not a server-rendered page: a
+/// loader to read, an action to write, a form that posts to it, a server-only
+/// module, and a resource route. The real behaviour is proved by
+/// `scripts/verify-web-router.sh`; this keeps the pieces from being deleted.
+#[test]
+fn the_react_router_template_is_full_stack() {
+    let tmp = tempfile::tempdir().unwrap();
+    assert!(run(tmp.path(), &["new", "p"]).status.success());
+    let root = tmp.path().join("p");
+    assert!(run(&root, &["add", "design"]).status.success());
+    assert!(run(&root, &["add", "app", "router"]).status.success());
+    let read = |p: &str| std::fs::read_to_string(root.join("apps/web").join(p)).unwrap();
+
+    let home = read("app/routes/home.tsx");
+    assert!(home.contains("export function loader"), "no loader");
+    assert!(home.contains("export async function action"), "no action");
+    assert!(
+        home.contains("<Form method=\"post\">"),
+        "no form posting to the action"
+    );
+    assert!(
+        home.contains("status: 400"),
+        "the action does not refuse bad input"
+    );
+    assert!(
+        home.contains("greeting.server"),
+        "the action does not use the server-only module"
+    );
+    assert!(root.join("apps/web/app/lib/greeting.server.ts").exists());
+    assert!(
+        read("app/routes.ts").contains("routes/healthz.ts"),
+        "no resource route"
+    );
+    assert!(read("app/routes/healthz.ts").contains("export function loader"));
+
+    // The framework's baseline: a React older than v8 supports would let an
+    // install resolve one that React Router 8 rejects.
+    let pkg = read("package.json");
+    assert!(pkg.contains("\"react\": \"^19.2.8\""), "{pkg}");
+    assert!(pkg.contains("\"react-router\": \"^8."), "{pkg}");
+}
