@@ -117,6 +117,7 @@ $ fid doctor
   ✓ fiducial.toml valid  (product: demo-product, v0.1.0)
   ✓ guard: 2 rule(s), all implemented
   ✓ fiducial.lock valid  (11 template(s) tracked, 0 migration(s) applied)
+  ✓ agent skills match the installed capabilities
   ✓ no platform-owned file has been modified
   ✓ templates up to date with platform vX.Y.Z
   ✓ no pending codemod migrations

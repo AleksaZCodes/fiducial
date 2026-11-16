@@ -387,10 +387,10 @@ pub fn run(dry_run: bool, portfolio: bool, only: Option<String>) -> Result<()> {
             continue;
         }
         if let Some(def) = capability::find(cap_id) {
-            let skill_path = format!(".fiducial/skills/{cap_id}.md");
+            let skill_path = capability::skill_file(cap_id);
             if !dry_run {
                 capability::write_skill(&root, def, &cfg.product.name)?;
-                println!("  ✓ {skill_path}: refreshed from platform (+ .claude/skills pointer)");
+                println!("  ✓ {skill_path}: refreshed from platform (+ agent links)");
             } else {
                 println!("  · {skill_path}: would refresh from platform");
             }
@@ -425,6 +425,17 @@ pub fn run(dry_run: bool, portfolio: bool, only: Option<String>) -> Result<()> {
     if !dry_run && any_changes {
         lock.save(&lock_path).context("saving fiducial.lock")?;
         println!("  ✓ fiducial.lock updated");
+        // The template just rewrote `.claude/settings.json`; the plugins the
+        // installed capabilities need are put back, and the gate file refreshed.
+        let synced = crate::agent_skills::sync(
+            &root,
+            &cfg.capabilities.enabled,
+            &cfg.skills.agents(),
+            false,
+        )?;
+        for w in &synced.wrote {
+            println!("  ✓ {w}: agent skills re-synced");
+        }
         println!();
         println!("✦ upgrade complete. Run `fid doctor` to verify.");
     } else if dry_run {

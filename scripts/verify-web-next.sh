@@ -52,6 +52,7 @@ for lib in $icons; do
     "$fid" add brand >/dev/null
     "$fid" derive >/dev/null
 
+    "$fid" skills sync --install >/dev/null   # a real product installs the vendored skills its capabilities name
     # Doctor must have nothing to say about a tree it wrote a second ago.
     if "$fid" doctor 2>&1 | grep -E "migration pending|upstream template updated"; then
       echo "✗ a fresh product reports upgrades pending" >&2
@@ -100,6 +101,7 @@ if [ "${SITE:-1}" != "0" ]; then
     cd "$work"
     "$fid" new site --shape site >/dev/null
     cd site
+    "$fid" skills sync --install >/dev/null   # a real product installs the vendored skills its capabilities name
     if "$fid" doctor 2>&1 | grep -E "migration pending|upstream template updated"; then
       echo "✗ a fresh site reports upgrades pending" >&2
       exit 1

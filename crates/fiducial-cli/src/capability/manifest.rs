@@ -148,6 +148,77 @@ impl Source {
     }
 }
 
+/// An AI skill a capability needs the agent to load before it touches that
+/// capability's files.
+///
+/// A capability says which technology it uses; the vendor of that technology
+/// ships the authoritative skill for it (shadcn for components, Cloudflare for
+/// Workers). Copying that guidance into a capability's own `SKILL.md` would be a
+/// second declaration that goes stale the day the vendor changes the technology,
+/// so a capability *names* the vendor's skill instead.
+///
+/// Skills are installed the way the open Agent Skills ecosystem installs them: by
+/// the `skills` CLI (`npx skills add <source> --skill <name>`), into the shared
+/// `.agents/skills/` directory that Codex, Cursor, Copilot, Gemini CLI, OpenCode
+/// and others read, and linked into each other agent's own directory, with the
+/// version and content hash recorded in a committed `skills-lock.json`. Nothing
+/// here is specific to one agent.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgentSkill {
+    /// A key for this entry, unique across capabilities. Two capabilities that
+    /// declare the same `id` are asking for the same thing and it is installed once.
+    pub id: String,
+    /// What `skills add` takes: `cloudflare/skills`, `shadcn/ui`.
+    pub source: String,
+    /// The skill names to install from that source, as the source names them.
+    pub skills: Vec<String>,
+    /// Editing a file that matches one of these globs needs one of `skills` to
+    /// have been loaded first.
+    pub paths: Vec<String>,
+    /// One sentence on why, shown to the agent.
+    pub why: String,
+}
+
+impl AgentSkill {
+    /// A declaration that cannot work is refused when the capability is read,
+    /// not discovered when an agent is blocked by it.
+    pub fn validate(&self, cap: &str) -> Result<()> {
+        for (what, v) in [
+            ("id", &self.id),
+            ("source", &self.source),
+            ("why", &self.why),
+        ] {
+            if v.trim().is_empty() {
+                bail!(
+                    "capability `{cap}`: agent skill `{}` needs `{what}`",
+                    self.id
+                );
+            }
+        }
+        if self.skills.is_empty() || self.paths.is_empty() {
+            bail!(
+                "capability `{cap}`: agent skill `{}` needs at least one name in `skills` and one glob in `paths`",
+                self.id
+            );
+        }
+        for name in &self.skills {
+            // The Agent Skills name rule: lowercase letters, digits and hyphens.
+            let ok = !name.is_empty()
+                && name
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+            if !ok {
+                bail!(
+                    "capability `{cap}`: agent skill `{}` lists `{name}`, which is not a skill name (lowercase letters, digits, hyphens)",
+                    self.id
+                );
+            }
+        }
+        Ok(())
+    }
+}
+
 /// A capability, however it was resolved.
 #[derive(Debug, Clone)]
 pub struct Capability {
@@ -180,6 +251,8 @@ pub struct Capability {
     /// it is caught at install instead.
     pub requires_capabilities: Vec<String>,
     pub guard_rules: Vec<String>,
+    /// The vendor skills this capability needs the agent to load.
+    pub agent_skills: Vec<AgentSkill>,
     /// npm packages the capability's templates import, added to
     /// `apps/web/package.json` on install where they are missing. A template
     /// importing a package nobody installed fails at the first build, after
@@ -231,6 +304,8 @@ struct Manifest {
     deprecated: Option<String>,
     #[serde(default)]
     guard_rules: Vec<String>,
+    #[serde(default)]
+    agent_skills: Vec<AgentSkill>,
     #[serde(default)]
     npm_dependencies: BTreeMap<String, String>,
     #[serde(default)]
@@ -379,6 +454,10 @@ pub fn derive(id: &str, files: &BTreeMap<String, String>, source: Source) -> Res
         .description
         .unwrap_or_else(|| description_from_skill(&skill_md, id));
 
+    for a in &manifest.agent_skills {
+        a.validate(id)?;
+    }
+
     let cap = Capability {
         id: id.to_string(),
         description,
@@ -389,6 +468,7 @@ pub fn derive(id: &str, files: &BTreeMap<String, String>, source: Source) -> Res
         requires_tools: manifest.requires_tools,
         requires_capabilities: manifest.requires_capabilities,
         guard_rules: manifest.guard_rules,
+        agent_skills: manifest.agent_skills,
         npm_dependencies: manifest.npm_dependencies,
         npm_dev_dependencies: manifest.npm_dev_dependencies,
         npm_scripts: manifest.npm_scripts,

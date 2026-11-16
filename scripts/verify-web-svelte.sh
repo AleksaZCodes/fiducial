@@ -28,6 +28,7 @@ for step in "add design" "add app svelte" "add brand" "add legal" "add capabilit
   # shellcheck disable=SC2086
   "$fid" $step >/dev/null
 done
+"$fid" skills sync --install >/dev/null   # a real product installs the vendored skills its capabilities name
 "$fid" derive >/dev/null
 "$fid" derive --check
 "${pnpm[@]}" install --fetch-timeout 300000

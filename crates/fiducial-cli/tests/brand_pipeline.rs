@@ -185,8 +185,14 @@ fn doctor_is_clean_after_installing_brand() {
     let out = run(&root, &["doctor"]);
     assert!(out.status.success(), "{}", text(&out));
 
-    let neutral = root.join(".fiducial/skills/brand.md");
-    assert!(neutral.exists(), "instructions at the vendor-neutral path");
-    let pointer = std::fs::read_to_string(root.join(".claude/skills/brand.md")).unwrap();
-    assert!(pointer.contains(".fiducial/skills/brand.md"));
+    let skill =
+        std::fs::read_to_string(root.join(".agents/skills/fiducial-brand/SKILL.md")).unwrap();
+    assert!(
+        skill.starts_with("---\nname: fiducial-brand\n"),
+        "an Agent Skill: {skill}"
+    );
+    assert!(
+        !root.join(".fiducial/skills/brand.md").exists(),
+        "no second copy"
+    );
 }

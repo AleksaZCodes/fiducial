@@ -1,2 +1,11 @@
 description = "Hono API: runs on a Cloudflare Worker and on Node for the self-hosted target, with a typed RPC client"
 guard_rules = ["no-unpinned-cli-fetch"]
+
+# Vendor skills (https://github.com/cloudflare/skills), installed by the `skills`
+# CLI like any other skill. An agent loads one before editing a Wrangler config.
+[[agent_skills]]
+id     = "cloudflare-workers"
+source = "cloudflare/skills"
+skills = ["wrangler", "workers-best-practices"]
+paths  = ["**/wrangler.jsonc", "**/wrangler.json", "**/wrangler.toml"]
+why    = "Wrangler configuration and the Workers runtime change between releases; Cloudflare's skills carry the current ones, and what you remember may not be."

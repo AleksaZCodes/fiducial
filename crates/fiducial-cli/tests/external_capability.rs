@@ -102,7 +102,9 @@ fn a_capability_the_binary_has_never_heard_of_installs_and_is_first_class() {
     // Its files land where the taxonomy says they should.
     assert!(root.join("billing/catalogue.json").is_file());
     assert!(root.join("pipelines/stripe.toml").is_file());
-    assert!(root.join(".fiducial/skills/stripe.md").is_file());
+    assert!(root
+        .join(".agents/skills/fiducial-stripe/SKILL.md")
+        .is_file());
 
     // Its pipeline is a pipeline — `fid derive` picks it up with no extra step,
     // which is the property that separates one from a copied file.

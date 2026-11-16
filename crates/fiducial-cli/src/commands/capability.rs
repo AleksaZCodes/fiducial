@@ -155,7 +155,7 @@ fn cmd_list(show_all: bool) -> Result<()> {
         for id in &installed {
             match capability::find(id) {
                 Some(def) => {
-                    let skill_path = root.join(format!(".claude/skills/{id}.md"));
+                    let skill_path = root.join(capability::skill_file(id));
                     let skill_status = if skill_path.exists() {
                         "✓"
                     } else {
@@ -314,11 +314,11 @@ fn cmd_check(filter: Option<&str>) -> Result<()> {
                 let errors = capability::check_capability(def);
 
                 // Also check that SKILL.md landed in the product.
-                let skill_path = root.join(format!(".claude/skills/{id}.md"));
+                let skill_path = root.join(capability::skill_file(id));
                 let mut combined = errors;
                 if !skill_path.exists() {
                     combined.push(format!(
-                        "SKILL.md not found at `.claude/skills/{id}.md` — \
+                        "SKILL.md not found at `.agents/skills/fiducial-{id}/SKILL.md` — \
                          re-run `fid add {id}` to install"
                     ));
                 }

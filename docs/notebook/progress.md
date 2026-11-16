@@ -2,6 +2,14 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.32.0 · 2026-11-16
+
+- Capabilities name the vendor skills they need (shadcn for UI, Cloudflare for
+  Workers). They are installed by the open `skills` CLI into `.agents/skills/`,
+  linked per agent, locked in `skills-lock.json`, and every `AGENTS.md` reader is
+  told which to load. Claude Code additionally gets a hard stop before editing.
+- Capability instructions moved to the Agent Skills layout every agent reads.
+
 ## 0.30.0 · 2026-11-16
 
 - Keystatic's GitHub storage is declared and type-checked against the real

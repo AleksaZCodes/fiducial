@@ -543,29 +543,27 @@ fn a_scoped_upgrade_refreshes_one_capability_and_its_instructions_only() {
     assert!(out.status.success(), "{}", text(&out));
     // Stale instructions for hardware, and a hand-marked file belonging to
     // another installed capability, which a scoped upgrade must not touch.
-    std::fs::write(root.join(".fiducial/skills/hardware.md"), "stale\n").unwrap();
-    let other = std::fs::read_dir(root.join(".fiducial/skills"))
-        .unwrap()
-        .flatten()
-        .map(|e| e.path())
-        .find(|p| !p.ends_with("hardware.md"))
-        .expect("a second capability's instructions");
+    let skills = root.join(".agents/skills");
+    std::fs::write(skills.join("fiducial-hardware/SKILL.md"), "stale\n").unwrap();
+    let other = skills.join("fiducial-brand/SKILL.md");
+    assert!(other.is_file(), "a second capability's instructions");
     std::fs::write(&other, "mine\n").unwrap();
 
     let out = fid(&root, &["upgrade", "--capability", "hardware"]);
     assert!(out.status.success(), "{}", text(&out));
-    let skill = std::fs::read_to_string(root.join(".fiducial/skills/hardware.md")).unwrap();
+    let skill = std::fs::read_to_string(skills.join("fiducial-hardware/SKILL.md")).unwrap();
     assert!(
         skill.contains("fiducial:hardware"),
         "instructions not refreshed"
     );
-    // The Claude file stays a pointer: the content lives once.
-    let pointer = std::fs::read_to_string(root.join(".claude/skills/hardware.md")).unwrap();
-    assert!(
-        pointer.contains("Read `.fiducial/skills/hardware.md`")
-            && !pointer.contains("## The model"),
-        "{pointer}"
-    );
+    // The content lives once; Claude Code's directory links to it.
+    #[cfg(unix)]
+    assert!(root
+        .join(".claude/skills/fiducial-hardware")
+        .symlink_metadata()
+        .unwrap()
+        .file_type()
+        .is_symlink());
     assert_eq!(
         std::fs::read_to_string(&other).unwrap(),
         "mine\n",

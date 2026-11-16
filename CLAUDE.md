@@ -59,6 +59,6 @@ load, so the command costs no tool round trips. Keep it that way — it is
 invoked at the start of most product sessions, and the rules it might be
 tempted to restate already live in the product's `AGENTS.md`.
 
-Capability skills (`.claude/skills/*.md`) are installed by `fid add` and
+Capability skills (`.agents/skills/fiducial-<id>/SKILL.md`, linked into `.claude/skills/`) are installed by `fid add` and
 overwritten on every `fid upgrade` — they are platform-owned, so do not edit
 them in a product.

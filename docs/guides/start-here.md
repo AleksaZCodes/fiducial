@@ -156,7 +156,7 @@ Product
 Git
   branch         main
   head           no commits yet
-  working tree   10 file(s) with uncommitted changes
+  working tree   11 file(s) with uncommitted changes
   upstream       not tracking a remote branch
 
 Roadmap

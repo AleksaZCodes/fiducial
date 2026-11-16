@@ -112,10 +112,16 @@ fn doctor_is_clean_after_installing_legal() {
     let out = run(&root, &["doctor"]);
     assert!(out.status.success(), "{}", text(&out));
 
-    let neutral = root.join(".fiducial/skills/legal.md");
-    assert!(neutral.exists(), "instructions at the vendor-neutral path");
-    let pointer = std::fs::read_to_string(root.join(".claude/skills/legal.md")).unwrap();
-    assert!(pointer.contains(".fiducial/skills/legal.md"));
+    let skill =
+        std::fs::read_to_string(root.join(".agents/skills/fiducial-legal/SKILL.md")).unwrap();
+    assert!(
+        skill.starts_with("---\nname: fiducial-legal\n"),
+        "an Agent Skill: {skill}"
+    );
+    assert!(
+        !root.join(".fiducial/skills/legal.md").exists(),
+        "no second copy"
+    );
 }
 
 /// Without `[brand]`, `fid derive` fails with a clear message naming the

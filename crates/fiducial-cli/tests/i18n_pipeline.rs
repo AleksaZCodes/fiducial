@@ -4,6 +4,9 @@
 //! property that actually matters to a product: **a missing translation stops
 //! the build**, through the real binary, on a real scaffold.
 
+#[path = "support/skills.rs"]
+mod skills;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -275,6 +278,7 @@ fn check_catches_a_hand_edited_generated_module() {
 fn doctor_is_clean_after_installing_i18n() {
     let tmp = tempfile::tempdir().unwrap();
     let root = localized_product(tmp.path());
+    skills::install_required_skills(&root);
 
     let out = run(&root, &["doctor"]);
     let output = text(&out);
@@ -288,19 +292,26 @@ fn the_skill_lands_where_every_agent_can_find_it() {
     let tmp = tempfile::tempdir().unwrap();
     let root = localized_product(tmp.path());
 
-    let neutral = root.join(".fiducial/skills/i18n.md");
-    assert!(neutral.is_file(), "vendor-neutral instructions exist");
-
-    let body = std::fs::read_to_string(&neutral).unwrap();
+    // The shared directory most agents read, as an Agent Skill.
+    let canonical = root.join(".agents/skills/fiducial-i18n/SKILL.md");
+    let body = std::fs::read_to_string(&canonical).unwrap();
+    assert!(body.starts_with("---\nname: fiducial-i18n\n"), "{body}");
     assert!(body.contains("Keys are named, never the English text"));
     assert!(body.contains("three plural categories"), "Serbian plurals");
 
-    // Claude Code gets a pointer, not a second copy of the content.
-    let pointer = std::fs::read_to_string(root.join(".claude/skills/i18n.md")).unwrap();
-    assert!(pointer.contains(".fiducial/skills/i18n.md"));
+    // Claude Code reads its own directory, which links to that one copy.
+    #[cfg(unix)]
+    {
+        let link = root.join(".claude/skills/fiducial-i18n");
+        assert!(link.symlink_metadata().unwrap().file_type().is_symlink());
+        assert_eq!(
+            std::fs::read_to_string(link.join("SKILL.md")).unwrap(),
+            body
+        );
+    }
     assert!(
-        pointer.lines().count() < 15,
-        "the pointer must not duplicate the content"
+        !root.join(".fiducial/skills/i18n.md").exists(),
+        "no second copy"
     );
 }
 
@@ -472,6 +483,7 @@ fn hardcoded_strings_are_reported_and_false_positives_are_not() {
 fn hardcoded_strings_never_fail_a_command() {
     let tmp = tempfile::tempdir().unwrap();
     let root = with_component(tmp.path());
+    skills::install_required_skills(&root);
 
     let doctor = run(&root, &["doctor"]);
     assert!(

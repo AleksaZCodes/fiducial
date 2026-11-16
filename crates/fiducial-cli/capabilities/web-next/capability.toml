@@ -19,3 +19,29 @@ requires_capabilities = ["design"]
 [[declarations.config]]
 block = "security"
 seed = { hsts_preload = false }
+
+# Vendor skills (https://github.com/cloudflare/skills), installed by the `skills`
+# CLI like any other skill. An agent loads one before editing a Wrangler config.
+[[agent_skills]]
+id     = "cloudflare-workers"
+source = "cloudflare/skills"
+skills = ["wrangler", "workers-best-practices"]
+paths  = ["**/wrangler.jsonc", "**/wrangler.json", "**/wrangler.toml"]
+why    = "Wrangler configuration and the Workers runtime change between releases; Cloudflare's skills carry the current ones, and what you remember may not be."
+
+[[agent_skills]]
+id     = "cloudflare-nextjs"
+source = "cloudflare/skills"
+skills = ["nextjs-on-cloudflare"]
+paths  = ["**/open-next.config.*"]
+why    = "Next.js on Workers goes through an adapter whose configuration changes; this skill is Cloudflare's current guidance for it."
+
+# The official shadcn skill (https://github.com/shadcn-ui/ui/tree/main/skills/shadcn).
+# Components are added and updated through its CLI and registry rules, so an
+# agent loads it before editing the registry config or a copied-in component.
+[[agent_skills]]
+id     = "shadcn"
+source = "shadcn/ui"
+skills = ["shadcn"]
+paths  = ["**/components.json", "**/components/ui/**"]
+why    = "shadcn components are added and updated through its CLI and registry rules; hand-editing them or adding one by copy drifts from the registry."

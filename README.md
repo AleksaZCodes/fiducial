@@ -276,7 +276,7 @@ One file is a complete capability. The failure mode for an extension system is
 ceremony, so `capability.toml` is optional and a capability without one takes
 its description from the first line of prose in its own skill.
 
-### The seven kinds, and why the difference is not cosmetic
+### The eight kinds, and why the difference is not cosmetic
 
 <!-- fid:describes crates/fiducial-cli/src/capability/manifest.rs#pub fn derive -->
 
@@ -287,6 +287,7 @@ its description from the first line of prose in its own skill.
 | **Adapter** | a swappable vendor behind a fixed contract | `storage = "r2"` |
 | **Tool** | an external command the capability's work needs on PATH — declared, never installed | `requires_tools = ["wrangler"]` |
 | **Prerequisite** | another capability this one cannot work without — checked at install, not at first failure | `requires_capabilities = ["i18n"]` |
+| **Agent skill** | the vendor's skill for the technology this capability uses, installed by the open `skills` CLI, which the agent must load before editing the files it covers; installed only while a capability needs it | `[[agent_skills]]` naming `cloudflare/skills` → `wrangler` |
 | **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
 | **Scoped template** | a template under `for/<capability>/`, installed only alongside that capability | `for/web-svelte/…/LocalePicker.svelte` |
 
@@ -297,6 +298,25 @@ as `site` replaces the plain app's root layout), `npm_dependencies`,
 `apps/web/package.json` or to the `package.json` `npm_package` names, as
 `orm-drizzle` names `apps/api/package.json`), and `seed_messages` (message namespaces inserted into each locale's catalog where
 missing). Each only adds what is absent: the product's own edits win.
+
+`[[agent_skills]]` names a skill the capability does not own (shadcn's for
+components, Cloudflare's for Workers) rather than copying its guidance, which
+would go stale the day the vendor changes the technology. Skills are installed
+the way the open Agent Skills ecosystem installs them: by the `skills` CLI
+(`fid skills sync --install` runs it, pinned), into `.agents/skills/`, the
+directory Codex, Cursor, Copilot, Gemini CLI, OpenCode and others read directly,
+with a link for each other agent in `[skills] agents` (Claude Code reads
+`.claude/skills/`), and recorded in a committed `skills-lock.json`. Every agent
+that reads `AGENTS.md` is told which skill to load before editing which files, by
+a block `fid skills sync` derives into it. `fid doctor` and `fid skills check`
+fail on a missing, surplus, stale or locally edited skill, and CI runs them. Claude
+Code, whose documented hooks allow it, is also stopped by a `PreToolUse` hook
+(`fid skill-gate`) on an `Edit` or `Write` to a covered file until it has loaded
+one of the named skills, through the Skill tool or by reading the skill's file.
+Nothing stops an edit made through a shell command, and an agent without such
+hooks relies on the `AGENTS.md` block and the CI check. `scripts/verify-agent-skills.sh`
+runs weekly: it installs every named skill the way a product does, so a vendor
+that renames one fails a check here first.
 
 <!-- fid:end-describes -->
 

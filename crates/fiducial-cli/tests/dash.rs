@@ -9,6 +9,9 @@
 //! The one property every test here defends is that dash is a *view*: it reads
 //! the repository and reports it, holds no state, and never writes.
 
+#[path = "support/skills.rs"]
+mod skills;
+
 use std::{path::Path, process::Command};
 
 fn fid_bin() -> &'static Path {
@@ -883,6 +886,7 @@ fn text_output_carries_no_escape_codes_when_redirected() {
 /// new template reached only products scaffolded afterwards. The workflow that
 /// gates artifact freshness was added in Phase 18 and would have arrived in zero
 /// existing products.
+
 #[test]
 fn upgrade_installs_templates_added_since_the_product_was_scaffolded() {
     let tmp = tempfile::tempdir().unwrap();
@@ -929,6 +933,7 @@ fn upgrade_installs_templates_added_since_the_product_was_scaffolded() {
     );
 
     // And the product is clean afterwards — the lock tracks what was written.
+    skills::install_required_skills(&root);
     let out = run(&root, &["doctor"]);
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(text.contains("clean"), "doctor after upgrade: {text}");
@@ -1011,6 +1016,7 @@ fn upgrade_renames_a_moved_template_and_removes_the_old_file() {
         "the colliding file must be gone — leaving it defeats the rename"
     );
 
+    skills::install_required_skills(&root);
     let out = run(&root, &["doctor"]);
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(text.contains("clean"), "doctor after rename: {text}");

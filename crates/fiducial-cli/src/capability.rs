@@ -34,7 +34,7 @@ pub const PLATFORM_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod manifest;
 pub mod source;
 
-pub use manifest::{Capability, Declaration, FileEntry, Source};
+pub use manifest::{AgentSkill, Capability, Declaration, FileEntry, Source};
 
 /// Every built-in capability's files, embedded by `build.rs` from
 /// `capabilities/<id>/`.
@@ -120,8 +120,8 @@ pub fn find(id: &str) -> Option<&'static Capability> {
 /// Install a capability into the product rooted at `root`.
 ///
 /// 1. Write template files (tracked in `fiducial.lock`).
-/// 2. Write `SKILL.md` to `.fiducial/skills/<capability-id>.md`, plus a pointer
-///    at `.claude/skills/<capability-id>.md` for Claude Code's auto-discovery.
+/// 2. Write `SKILL.md` as an Agent Skill at `.agents/skills/fiducial-<id>/`,
+///    linked for each configured agent that reads a directory of its own.
 /// 3. Add capability id to `fiducial.toml [capabilities]`.
 /// 4. Merge capability guard rules into `fiducial.toml [guard]`.
 pub fn install(cap: &Capability, root: &Path, product_name: &str) -> Result<()> {
@@ -379,6 +379,32 @@ pub fn install_with(
         seed_page_metadata(root, product_name)?;
     }
 
+    // Enable the vendor skills this capability names, and nothing the product's
+    // capabilities do not call for.
+    if !cap.agent_skills.is_empty() {
+        let cfg = crate::config::Config::load(&root.join(crate::config::CONFIG_FILE))?;
+        let done = crate::agent_skills::sync(
+            root,
+            &cfg.capabilities.enabled,
+            &cfg.skills.agents(),
+            false,
+        )?;
+        for a in &cap.agent_skills {
+            println!(
+                "  ✓ skill {} from {} required before editing {}",
+                a.skills.join(", "),
+                a.source,
+                a.paths.join(", ")
+            );
+        }
+        if !done.missing.is_empty() {
+            println!(
+                "  ! not installed yet: {}. Run `fid skills sync --install` (the `skills` CLI) and commit skills-lock.json.",
+                done.missing.join(", ")
+            );
+        }
+    }
+
     println!("  ✓ {} installed", cap.id);
     if cap.guard_rules.is_empty() {
         println!("  ✓ no guard rules — this capability adds none");
@@ -386,8 +412,8 @@ pub fn install_with(
         println!("  ✓ guard rules added: {}", cap.guard_rules.join(", "));
     }
     println!(
-        "  ✓ instructions → .fiducial/skills/{}.md (any agent; see AGENTS.md)",
-        cap.id
+        "  ✓ instructions → {} (an Agent Skill; any agent that reads skills finds it)",
+        skill_file(&cap.id)
     );
     Ok(())
 }
@@ -831,38 +857,68 @@ pub fn seed_page_metadata(root: &Path, product_name: &str) -> Result<()> {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/// A capability's instructions, where every agent finds them: the content at
-/// `.fiducial/skills/<id>.md`, and a pointer at `.claude/skills/<id>.md` for
-/// Claude Code's discovery.
+/// A capability's instructions, as an Agent Skill: one `SKILL.md` in the shared
+/// `.agents/skills/` directory that Codex, Cursor, Copilot, Gemini CLI, OpenCode
+/// and others read directly, linked into the directory of each configured agent
+/// that reads one of its own (Claude Code reads `.claude/skills/`).
 ///
-/// One function for install and upgrade. Upgrade used to write the whole
-/// SKILL.md to the `.claude/` path instead, so after the first `fid upgrade`
-/// the vendor-neutral copy went stale and every non-Claude agent read the old
-/// instructions — the duplication the pointer exists to prevent, re-created by
-/// the command meant to keep things current.
+/// The content exists once. It used to be a neutral file plus a pointer written
+/// only for Claude Code, and that pointer was a flat file Claude Code does not
+/// discover as a skill, so the instructions reached no agent on their own. A
+/// skill is a folder whose `SKILL.md` names itself and says when to use it.
+///
+/// One function for install and upgrade, so an upgrade cannot leave one copy
+/// stale while the other is current.
 pub(crate) fn write_skill(root: &Path, cap: &Capability, product_name: &str) -> Result<()> {
-    let skill_content = cap
+    let body = cap
         .skill_md
         .replace("{{name}}", product_name)
         .replace("{{version}}", PLATFORM_VERSION);
-    write_file(
-        root,
-        &format!(".fiducial/skills/{}.md", cap.id),
-        &skill_content,
-    )?;
-    write_file(
-        root,
-        &format!(".claude/skills/{}.md", cap.id),
-        &format!(
-            "---\n\
-             name: fiducial-{id}\n\
-             description: How to use the `{id}` capability in this product.\n\
-             ---\n\n\
-             Read `.fiducial/skills/{id}.md` — the instructions live there so that \
-             every agent can find them, not only Claude Code.\n",
-            id = cap.id
-        ),
-    )
+    let name = format!("fiducial-{}", cap.id);
+    // A capability that ships its own frontmatter has said what it is called.
+    let content = if body.starts_with("---\n") {
+        body
+    } else {
+        format!(
+            "---\nname: {name}\ndescription: \"{desc} Use when working on this product's {id} capability: its declarations, pipelines and generated files.\"\n---\n\n{body}",
+            id = cap.id,
+            desc = cap.description.replace('\\', "").replace('"', "'").replace('\n', " "),
+        )
+    };
+    write_file(root, &skill_file(&cap.id), &content)?;
+
+    let agents = crate::config::Config::load(&root.join(crate::config::CONFIG_FILE))
+        .map(|c| c.skills.agents())
+        .unwrap_or_else(|_| {
+            crate::config::Skills::DEFAULT_AGENTS
+                .iter()
+                .map(|s| s.to_string())
+                .collect()
+        });
+    crate::agent_skills::link_for_agents(root, &name, &agents)?;
+
+    // Older layouts, written by this platform and by no one else: the neutral
+    // file, and the flat pointer for Claude Code. Removed only if still ours.
+    let neutral = root.join(format!(".fiducial/skills/{}.md", cap.id));
+    if neutral.is_file() {
+        std::fs::remove_file(&neutral)?;
+        let dir = root.join(".fiducial/skills");
+        if std::fs::read_dir(&dir).is_ok_and(|mut d| d.next().is_none()) {
+            let _ = std::fs::remove_dir(&dir);
+        }
+    }
+    let flat = root.join(format!(".claude/skills/{}.md", cap.id));
+    if std::fs::read_to_string(&flat)
+        .is_ok_and(|c| c.contains(&format!("name: fiducial-{}", cap.id)))
+    {
+        std::fs::remove_file(&flat)?;
+    }
+    Ok(())
+}
+
+/// Where a capability's skill lives: the shared directory every agent can read.
+pub(crate) fn skill_file(id: &str) -> String {
+    format!("{}/fiducial-{id}/SKILL.md", crate::agent_skills::SHARED_DIR)
 }
 
 /// Every file path a built-in capability installs, for scoping an upgrade to it.

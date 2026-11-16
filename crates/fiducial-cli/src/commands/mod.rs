@@ -14,5 +14,6 @@ pub mod new;
 pub mod rebaseline;
 pub mod release;
 pub mod repo;
+pub mod skills;
 pub mod thesis;
 pub mod upgrade;

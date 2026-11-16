@@ -98,6 +98,16 @@ pub fn run(
         .context("writing fiducial.lock")?;
     println!("  wrote  fiducial.lock");
 
+    // The skill gate's input and the plugin list, for a product with no
+    // capabilities yet: `fid add` extends both as capabilities arrive.
+    crate::agent_skills::sync(
+        &dest,
+        &[],
+        &crate::config::Skills::default().agents(),
+        false,
+    )
+    .context("writing the agent-skill files")?;
+
     // A design system used to be installed here unconditionally, and the
     // argument for it was good: the alternative to having one is not "no
     // design", it is the default one — Inter, an indigo primary, `rounded-xl`,

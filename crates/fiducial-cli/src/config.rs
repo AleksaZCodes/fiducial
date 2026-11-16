@@ -51,6 +51,9 @@ pub struct Config {
     /// `[freshness]` — gates other than `fid derive --check`.
     #[serde(default, skip_serializing_if = "Freshness::is_empty")]
     pub freshness: Freshness,
+    /// `[skills]` — which agents the platform installs and links skills for.
+    #[serde(default, skip_serializing_if = "Skills::is_empty")]
+    pub skills: Skills,
     /// `[legal]` — jurisdiction and cookie declarations for the legal pipeline.
     ///
     /// Skipped when the product declares no legal facts, so a product that has
@@ -266,6 +269,40 @@ pub struct Freshness {
 impl Freshness {
     pub fn is_empty(&self) -> bool {
         self.gates.is_empty()
+    }
+}
+
+/// `[skills]` — the agents this product's skills are linked for.
+///
+/// Skills live once in `.agents/skills/`, the directory the open `skills` CLI
+/// treats as shared and that Codex, Cursor, GitHub Copilot, Gemini CLI, OpenCode,
+/// Amp and others read directly. An agent with a directory of its own (Claude
+/// Code reads `.claude/skills/`) gets a link to that copy. The default covers
+/// both groups; list the agents the team actually uses to add or drop links.
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Skills {
+    /// `skills` CLI agent identifiers (`claude-code`, `codex`, `cursor`, …).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub agents: Vec<String>,
+}
+
+impl Skills {
+    /// The agents a product that says nothing links for: Claude Code, which has
+    /// its own directory, and Codex, which stands for the shared one.
+    pub const DEFAULT_AGENTS: [&'static str; 2] = ["claude-code", "codex"];
+
+    pub fn is_empty(&self) -> bool {
+        self.agents.is_empty()
+    }
+
+    /// The configured agents, or the default.
+    pub fn agents(&self) -> Vec<String> {
+        if self.agents.is_empty() {
+            Self::DEFAULT_AGENTS.iter().map(|s| s.to_string()).collect()
+        } else {
+            self.agents.clone()
+        }
     }
 }
 
