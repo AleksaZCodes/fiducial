@@ -1535,9 +1535,12 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
             DeployShape::Astro => String::new(),
             // The entry is a source file; the Vite plugin bundles it.
             DeployShape::ReactRouter => "workers/app.ts".to_string(),
-            // Start's own entry; the plugin swaps in `src/server.ts` when the
-            // product has one.
-            DeployShape::TanStackStart => "@tanstack/react-start/server-entry".to_string(),
+            // The product's own server entry, which wraps Start's handler. Not
+            // `@tanstack/react-start/server-entry`: that is the package's
+            // default entry, which builds its own handler and never reads the
+            // product's, so a custom entry named only in `src/` is silently
+            // unused (its headers were never sent).
+            DeployShape::TanStackStart => "src/server.ts".to_string(),
             DeployShape::Worker => "src/index.ts".to_string(),
         }
     } else {
