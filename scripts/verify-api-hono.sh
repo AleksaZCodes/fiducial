@@ -50,6 +50,7 @@ TOML
 sed -i 's/REPLACE_WITH_DATABASE_ID/00000000-0000-0000-0000-000000000000/; s/REPLACE_WITH_BUCKET_NAME/svc-assets/; s/REPLACE_WITH_QUEUE_NAME/svc-jobs/' fiducial.toml
 
 "$fid" derive >/dev/null
+"$fid" skills sync --install >/dev/null   # a real product installs the vendored skills its capabilities name
 if "$fid" doctor 2>&1 | grep -E "migration pending|upstream template updated|✗"; then
   echo "✗ a fresh API product reports problems" >&2
   "$fid" doctor >&2 || true
