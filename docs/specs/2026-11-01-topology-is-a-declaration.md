@@ -34,7 +34,7 @@ multi-computer product has:
 |---|---|
 | `[[system]]` | an isolation boundary: nodes that may share buses and principals |
 | `[[node]]` | one computer, MCU or host, with its firmware member or apps, hardware declaration (and variants), and free-text target, runtime and language |
-| `[[bus]]` | a physical medium plus the protocol on it, and the node interfaces it connects |
+| `[[bus]]` | a physical medium plus the protocol on it, and the node interfaces it connects; `can` and `can-fd` declare `bitrate` (and `data_bitrate`), `rs485` declares `baud` |
 | `[[parameter]]` | a runtime-editable value: unit, range, default |
 | `[[topic]]` | a message channel and its direction; generic defaults when none is declared |
 | `[[unit]]` | a unit beyond the platform's list |
@@ -50,7 +50,7 @@ facts and the same `--check` holds it to them.
 The `topology` capability's pipeline, executor `fid-topology`, derives from it:
 
 - per firmware role, parameter and pin tables in `.rs`, `.h` or `.json`;
-- the product's topic table;
+- the product's topic table, which also carries each node's constants and, for a bus, `BUS_<ID>_BITRATE`, `BUS_<ID>_DATA_BITRATE` or `BUS_<ID>_BAUD`, and for a host node with an `[node.rt]` block `NODE_<ID>_RT_PRIORITY`, `_CPU`, `_LOCK_MEMORY` and `_PREFAULT_STACK_KIB`, which `fiducial-rt` applies;
 - per hardware variant of a module-built node, a wiring table and diagram, a
   bill of materials, and a cost and pin-headroom comparison.
 

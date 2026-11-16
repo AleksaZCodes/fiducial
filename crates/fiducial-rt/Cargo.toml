@@ -1,0 +1,21 @@
+[package]
+name        = "fiducial-rt"
+description = "Real-time setup for a Linux control loop: SCHED_FIFO, mlockall, CPU pinning, stack prefault."
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+homepage.workspace     = true
+authors.workspace      = true
+rust-version.workspace = true
+keywords    = ["realtime", "linux", "sched-fifo", "control", "fiducial"]
+categories  = ["os::linux-apis", "embedded", "hardware-support"]
+
+[lib]
+name = "fiducial_rt"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = { workspace = true }
+
+[dev-dependencies]
+libc = { workspace = true }
