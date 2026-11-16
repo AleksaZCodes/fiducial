@@ -108,19 +108,18 @@ memory.
 
 ## Capability instructions
 
-Every installed capability ships instructions for using it. They are **ordinary
-Markdown at a vendor-neutral path**, so any agent can read them:
+Every installed capability ships instructions for using it, as an **Agent
+Skill** (a folder with a `SKILL.md`) in the shared directory most agents read:
 
 ```
-.fiducial/skills/<capability-id>.md
+.agents/skills/fiducial-<capability-id>/SKILL.md
 ```
 
 The installed capability ids are in `fiducial.toml` under `[capabilities]
 enabled`. Read the file for each one before working on that part of the product.
-
-Claude Code additionally gets a short pointer at `.claude/skills/fiducial-<id>/SKILL.md` so its
-automatic discovery works. That file contains **no instructions of its own** —
-it points here. The content exists once.
+An agent with a skills directory of its own (Claude Code reads `.claude/skills/`)
+finds the same file through a link, so the content exists once. `[skills] agents`
+in `fiducial.toml` names the agents to link for.
 
 These files are platform-owned and rewritten by `fid upgrade`. Do not edit them.
 

@@ -148,59 +148,35 @@ impl Source {
     }
 }
 
-/// Where an agent skill comes from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum AgentSkillKind {
-    /// A Claude Code plugin from a marketplace: enabled in `.claude/settings.json`,
-    /// updated by Claude Code, namespaced `plugin:skill`.
-    Plugin,
-    /// A skill installed into the repository by the open `skills` CLI
-    /// (`npx skills add <source> --skill <skill>`): vendored under `.claude/skills/`
-    /// with a `skills-lock.json` that `npx skills check` compares against upstream.
-    SkillsCli,
-}
-
 /// An AI skill a capability needs the agent to load before it touches that
 /// capability's files.
 ///
 /// A capability says which technology it uses; the vendor of that technology
 /// ships the authoritative skill for it (shadcn for components, Cloudflare for
-/// Workers). Copying that guidance into a capability's own `SKILL.md` would be
-/// a second declaration that goes stale the day the vendor changes the
-/// technology, so a capability *names* the vendor's skill instead, and the
-/// platform enables it, requires it, and checks it is still there.
+/// Workers). Copying that guidance into a capability's own `SKILL.md` would be a
+/// second declaration that goes stale the day the vendor changes the technology,
+/// so a capability *names* the vendor's skill instead.
+///
+/// Skills are installed the way the open Agent Skills ecosystem installs them: by
+/// the `skills` CLI (`npx skills add <source> --skill <name>`), into the shared
+/// `.agents/skills/` directory that Codex, Cursor, Copilot, Gemini CLI, OpenCode
+/// and others read, and linked into each other agent's own directory, with the
+/// version and content hash recorded in a committed `skills-lock.json`. Nothing
+/// here is specific to one agent.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AgentSkill {
-    /// A key for this skill, unique across capabilities. Two capabilities that
-    /// declare the same `id` are asking for the same skill and it is enabled once.
+    /// A key for this entry, unique across capabilities. Two capabilities that
+    /// declare the same `id` are asking for the same thing and it is installed once.
     pub id: String,
-    pub kind: AgentSkillKind,
-    /// `plugin`: the marketplace's name (`cloudflare`).
-    #[serde(default)]
-    pub marketplace: String,
-    /// The GitHub repository the marketplace (`plugin`) or the skill (`skills-cli`)
-    /// lives in (`cloudflare/skills`, `shadcn-ui/ui`).
-    #[serde(default)]
-    pub repo: String,
-    /// `plugin`: the plugin's name within the marketplace (`cloudflare`).
-    #[serde(default)]
-    pub plugin: String,
-    /// `skills-cli`: the source passed to `skills add` (`shadcn/ui`).
-    #[serde(default)]
+    /// What `skills add` takes: `cloudflare/skills`, `shadcn/ui`.
     pub source: String,
-    /// `skills-cli`: the skill's directory name in that source (`shadcn`).
-    #[serde(default)]
-    pub skill: String,
-    /// The names the `Skill` tool knows these by (`cloudflare:wrangler`). Loading
-    /// any one of them satisfies the gate: the plugin has many skills and no one
-    /// of them is right for every file.
+    /// The skill names to install from that source, as the source names them.
     pub skills: Vec<String>,
     /// Editing a file that matches one of these globs needs one of `skills` to
-    /// have been loaded in the session first.
+    /// have been loaded first.
     pub paths: Vec<String>,
-    /// One sentence on why, shown when the gate stops an edit.
+    /// One sentence on why, shown to the agent.
     pub why: String,
 }
 
@@ -208,26 +184,16 @@ impl AgentSkill {
     /// A declaration that cannot work is refused when the capability is read,
     /// not discovered when an agent is blocked by it.
     pub fn validate(&self, cap: &str) -> Result<()> {
-        let need = |what: &str, v: &str| -> Result<()> {
+        for (what, v) in [
+            ("id", &self.id),
+            ("source", &self.source),
+            ("why", &self.why),
+        ] {
             if v.trim().is_empty() {
                 bail!(
                     "capability `{cap}`: agent skill `{}` needs `{what}`",
                     self.id
                 );
-            }
-            Ok(())
-        };
-        need("id", &self.id)?;
-        need("why", &self.why)?;
-        need("repo", &self.repo)?;
-        match self.kind {
-            AgentSkillKind::Plugin => {
-                need("marketplace", &self.marketplace)?;
-                need("plugin", &self.plugin)?;
-            }
-            AgentSkillKind::SkillsCli => {
-                need("source", &self.source)?;
-                need("skill", &self.skill)?;
             }
         }
         if self.skills.is_empty() || self.paths.is_empty() {
@@ -237,29 +203,19 @@ impl AgentSkill {
             );
         }
         for name in &self.skills {
-            let ok = match self.kind {
-                AgentSkillKind::Plugin => name.starts_with(&format!("{}:", self.plugin)),
-                AgentSkillKind::SkillsCli => name == &self.skill,
-            };
+            // The Agent Skills name rule: lowercase letters, digits and hyphens.
+            let ok = !name.is_empty()
+                && name
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
             if !ok {
                 bail!(
-                    "capability `{cap}`: agent skill `{}` lists `{name}`, which this {} can never provide (a plugin's skills are `{}:<skill>`; a skills-cli skill is `{}`)",
-                    self.id,
-                    match self.kind {
-                        AgentSkillKind::Plugin => "plugin",
-                        AgentSkillKind::SkillsCli => "skills-cli skill",
-                    },
-                    self.plugin,
-                    self.skill
+                    "capability `{cap}`: agent skill `{}` lists `{name}`, which is not a skill name (lowercase letters, digits, hyphens)",
+                    self.id
                 );
             }
         }
         Ok(())
-    }
-
-    /// The `enabledPlugins` key for a plugin skill: `plugin@marketplace`.
-    pub fn plugin_key(&self) -> String {
-        format!("{}@{}", self.plugin, self.marketplace)
     }
 }
 

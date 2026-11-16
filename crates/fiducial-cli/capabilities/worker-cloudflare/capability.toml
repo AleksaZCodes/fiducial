@@ -1,21 +1,11 @@
 description = "Cloudflare Worker / Durable Object with Wrangler and Miniflare"
 guard_rules = ["no-unpinned-cli-fetch"]
 
-# The Cloudflare plugin's skills (https://github.com/cloudflare/skills). The
-# platform enables the plugin only for a product that has a capability like this
-# one, and an agent must load one of these before editing a Wrangler config.
+# Vendor skills (https://github.com/cloudflare/skills), installed by the `skills`
+# CLI like any other skill. An agent loads one before editing a Wrangler config.
 [[agent_skills]]
-id          = "cloudflare"
-kind        = "plugin"
-marketplace = "cloudflare"
-repo        = "cloudflare/skills"
-plugin      = "cloudflare"
-skills      = [
-  "cloudflare:wrangler",
-  "cloudflare:workers-best-practices",
-  "cloudflare:frameworks-on-cloudflare",
-  "cloudflare:cloudflare-app-bootstrap",
-  "cloudflare:cloudflare",
-]
-paths       = ["**/wrangler.jsonc", "**/wrangler.json", "**/wrangler.toml"]
-why         = "Wrangler configuration and the Workers runtime change between releases; the Cloudflare skills carry the current ones, and what you remember may not be."
+id     = "cloudflare-workers"
+source = "cloudflare/skills"
+skills = ["wrangler", "workers-best-practices"]
+paths  = ["**/wrangler.jsonc", "**/wrangler.json", "**/wrangler.toml"]
+why    = "Wrangler configuration and the Workers runtime change between releases; Cloudflare's skills carry the current ones, and what you remember may not be."

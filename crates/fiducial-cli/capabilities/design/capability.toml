@@ -1,15 +1,11 @@
 description = "Anti-default design system — four type roles, corner strategy, annotation marks"
 
-# The official shadcn skill (https://github.com/shadcn-ui/ui/tree/main/skills/shadcn),
-# vendored by the `skills` CLI. An agent must load it before editing the component
-# registry config or the copied-in components, because the CLI, not hand edits,
-# is how those stay consistent with the registry.
+# The official shadcn skill (https://github.com/shadcn-ui/ui/tree/main/skills/shadcn).
+# Components are added and updated through its CLI and registry rules, so an
+# agent loads it before editing the registry config or a copied-in component.
 [[agent_skills]]
 id     = "shadcn"
-kind   = "skills-cli"
-repo   = "shadcn-ui/ui"
 source = "shadcn/ui"
-skill  = "shadcn"
 skills = ["shadcn"]
 paths  = ["**/components.json", "**/components/ui/**"]
 why    = "shadcn components are added and updated through its CLI and registry rules; hand-editing them or adding one by copy drifts from the registry."

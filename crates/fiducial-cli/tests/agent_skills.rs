@@ -1,8 +1,10 @@
-//! The AI skills a product's capabilities name, through the real binary: which
-//! plugins are enabled, what the gate enforces, and what `fid doctor` says.
+//! The AI skills a product's capabilities name, through the real binary: what is
+//! required, where skills live, what `fid doctor` says, and the gate.
 //!
-//! The `skills` CLI install and the upstream freshness check need the network and
-//! are covered by `scripts/verify-agent-skills.sh`. Everything here is offline.
+//! The install itself is the `skills` CLI's and needs the network; it is covered
+//! by `scripts/verify-agent-skills.sh`. Everything here is offline, and where a
+//! test needs a skill to be installed it writes what the CLI writes: the skill's
+//! folder under `.agents/skills/` and an entry in `skills-lock.json`.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -45,6 +47,43 @@ fn json(root: &Path, rel: &str) -> serde_json::Value {
     serde_json::from_str(&std::fs::read_to_string(root.join(rel)).unwrap()).unwrap()
 }
 
+fn gate_ids(root: &Path) -> Vec<String> {
+    json(root, ".fiducial/agent-skills.json")["skills"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["id"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// What `npx skills add` leaves behind for a skill: its folder and its lock entry.
+fn install_like_the_cli(root: &Path, names: &[&str]) {
+    let mut entries = serde_json::Map::new();
+    if let Ok(old) = std::fs::read_to_string(root.join("skills-lock.json")) {
+        let v: serde_json::Value = serde_json::from_str(&old).unwrap();
+        entries = v["skills"].as_object().cloned().unwrap_or_default();
+    }
+    for n in names {
+        let dir = root.join(".agents/skills").join(n);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("SKILL.md"),
+            format!("---\nname: {n}\ndescription: x\n---\n"),
+        )
+        .unwrap();
+        entries.insert(
+            n.to_string(),
+            serde_json::json!({ "source": "test/skills" }),
+        );
+    }
+    std::fs::write(
+        root.join("skills-lock.json"),
+        serde_json::to_string_pretty(&serde_json::json!({ "version": 2, "skills": entries }))
+            .unwrap(),
+    )
+    .unwrap();
+}
+
 /// Run a hook the way Claude Code does: JSON on stdin, project dir in the env.
 fn hook(root: &Path, which: &str, input: serde_json::Value) -> Output {
     let mut child = Command::new(fid())
@@ -68,91 +107,75 @@ fn hook(root: &Path, which: &str, input: serde_json::Value) -> Output {
 
 fn edit(root: &Path, session: &str, rel: &str) -> serde_json::Value {
     serde_json::json!({
-        "session_id": session,
-        "cwd": root,
-        "tool_name": "Edit",
-        "tool_input": { "file_path": root.join(rel) },
+        "session_id": session, "cwd": root,
+        "tool_name": "Edit", "tool_input": { "file_path": root.join(rel) },
     })
 }
 
-fn plugins(root: &Path) -> Vec<String> {
-    let mut v: Vec<String> = json(root, ".claude/settings.json")["enabledPlugins"]
-        .as_object()
-        .unwrap()
-        .keys()
-        .cloned()
-        .collect();
-    v.sort();
-    v
-}
-
 #[test]
-fn a_fresh_product_enables_only_the_platform_and_a_capability_adds_what_it_names() {
+fn a_fresh_product_requires_nothing_and_each_capability_adds_what_it_names() {
     let tmp = tempfile::tempdir().unwrap();
     let root = product(tmp.path());
+    assert!(gate_ids(&root).is_empty(), "nothing is required by default");
+    // Nothing of any one agent's is enabled: the settings carry only the platform.
+    let settings = json(&root, ".claude/settings.json");
     assert_eq!(
-        plugins(&root),
-        ["fiducial@fiducial"],
-        "nothing else by default"
+        settings["enabledPlugins"].as_object().unwrap().len(),
+        1,
+        "{settings}"
     );
-    assert_eq!(
-        json(&root, ".fiducial/agent-skills.json")["skills"]
-            .as_array()
-            .unwrap()
-            .len(),
-        0
+    let agents_md = std::fs::read_to_string(root.join("AGENTS.md")).unwrap();
+    assert!(
+        agents_md.contains("No installed capability needs a vendor skill"),
+        "{agents_md}"
     );
 
-    // Workers: the Cloudflare plugin, and not a component skill.
+    // Workers: Cloudflare's skills, by the standard CLI's names, and not a component skill.
     add(&root, &["app", "worker"]);
-    assert_eq!(
-        plugins(&root),
-        ["cloudflare@cloudflare", "fiducial@fiducial"]
+    assert_eq!(gate_ids(&root), ["cloudflare-workers"]);
+    let agents_md = std::fs::read_to_string(root.join("AGENTS.md")).unwrap();
+    assert!(
+        agents_md.contains("`wrangler`") && agents_md.contains("`**/wrangler.jsonc`"),
+        "every agent that reads AGENTS.md is told: {agents_md}"
     );
-    let gate = json(&root, ".fiducial/agent-skills.json");
-    let ids: Vec<&str> = gate["skills"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|s| s["id"].as_str().unwrap())
-        .collect();
-    assert_eq!(ids, ["cloudflare"], "{gate}");
-    let market = &json(&root, ".claude/settings.json")["extraKnownMarketplaces"]["cloudflare"];
-    assert_eq!(market["source"]["repo"], "cloudflare/skills");
+    assert!(!agents_md.contains("shadcn"));
 
-    // UI: shadcn is required too, and is vendored, so doctor says it is missing.
+    // UI: shadcn too.
     add(&root, &["design"]);
-    let ids: Vec<String> = json(&root, ".fiducial/agent-skills.json")["skills"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|s| s["id"].as_str().unwrap().to_string())
-        .collect();
-    assert_eq!(ids, ["cloudflare", "shadcn"]);
+    assert_eq!(gate_ids(&root), ["cloudflare-workers", "shadcn"]);
+
+    // Doctor names exactly what is missing, and nothing else about skills is wrong.
+    let doctor = text(&run(&root, &["doctor"]));
+    for n in ["wrangler", "workers-best-practices", "shadcn"] {
+        assert!(
+            doctor.contains(&format!("skill `{n}`")) && doctor.contains("is not installed"),
+            "{n}: {doctor}"
+        );
+    }
+    assert!(!doctor.contains("is stale or missing"), "{doctor}");
+    assert!(!doctor.contains("skills block in AGENTS.md"), "{doctor}");
+
+    // Once the CLI has installed them, the skills are clean.
+    install_like_the_cli(&root, &["wrangler", "workers-best-practices", "shadcn"]);
     let doctor = text(&run(&root, &["doctor"]));
     assert!(
-        doctor.contains("skill `shadcn` (from shadcn/ui) is not installed"),
+        doctor.contains("agent skills match the installed capabilities"),
         "{doctor}"
     );
-    // …and it is the only thing wrong with the skills: settings and gate are current.
-    assert!(
-        !doctor.contains("does not match the installed capabilities"),
-        "{doctor}"
-    );
-    assert!(!doctor.contains("is stale or missing"), "{doctor}");
-    // The platform's own file, rewritten by sync, is not reported as drift.
-    assert!(
-        doctor.contains("no platform-owned file has been modified"),
-        "{doctor}"
-    );
+    assert!(run(&root, &["skills", "check", "--offline"])
+        .status
+        .success());
 }
 
 #[test]
-fn a_capability_that_is_gone_takes_its_plugin_with_it() {
+fn a_capability_that_is_gone_leaves_its_skills_to_be_removed() {
     let tmp = tempfile::tempdir().unwrap();
     let root = product(tmp.path());
     add(&root, &["app", "worker"]);
-    assert!(plugins(&root).contains(&"cloudflare@cloudflare".to_string()));
+    install_like_the_cli(&root, &["wrangler", "workers-best-practices"]);
+    assert!(run(&root, &["skills", "check", "--offline"])
+        .status
+        .success());
 
     // The capability is taken out of the product's declaration.
     let toml = root.join("fiducial.toml");
@@ -164,35 +187,50 @@ fn a_capability_that_is_gone_takes_its_plugin_with_it() {
         s[open..close].contains("worker-cloudflare"),
         "setup: the capability was listed"
     );
-    let no_worker = format!("{}enabled = []{}", &s[..open], &s[close..]);
-    std::fs::write(&toml, no_worker).unwrap();
+    std::fs::write(&toml, format!("{}enabled = []{}", &s[..open], &s[close..])).unwrap();
 
-    // Doctor says the plugin is no longer called for; sync takes it out.
+    // Doctor says the gate and the AGENTS.md block are stale, and that the skills are surplus.
     let doctor = text(&run(&root, &["doctor"]));
     assert!(
-        doctor.contains("enabled but no capability needs: cloudflare@cloudflare"),
+        doctor.contains("skill `wrangler` is installed but no installed capability needs it"),
         "{doctor}"
     );
-    assert!(run(&root, &["skills", "sync"]).status.success());
-    assert_eq!(plugins(&root), ["fiducial@fiducial"]);
-    let settled = text(&run(&root, &["doctor"]));
+    assert!(doctor.contains("is stale or missing"), "{doctor}");
+    // Sync (offline) settles the gate and the block; removing the files is the CLI's, with --install.
+    let out = run(&root, &["skills", "sync"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(gate_ids(&root).is_empty());
+    assert!(std::fs::read_to_string(root.join("AGENTS.md"))
+        .unwrap()
+        .contains("No installed capability needs"));
+    let said = text(&out);
     assert!(
-        settled.contains("agent skills match the installed capabilities"),
-        "{settled}"
-    );
-    assert!(
-        !settled.contains("enabled but no capability needs"),
-        "{settled}"
+        said.contains("no capability needs:")
+            && said.contains("wrangler")
+            && said.contains("workers-best-practices"),
+        "{said}"
     );
 }
 
 #[test]
-fn the_gate_stops_an_edit_to_a_covered_file_until_the_skill_is_loaded() {
+fn skills_the_product_installed_itself_are_left_alone() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product(tmp.path());
+    // A skill this platform has never heard of, tracked in the lock.
+    install_like_the_cli(&root, &["my-own-skill"]);
+    let doctor = text(&run(&root, &["doctor"]));
+    assert!(!doctor.contains("my-own-skill"), "{doctor}");
+    let out = run(&root, &["skills", "sync"]);
+    assert!(!text(&out).contains("my-own-skill"), "{}", text(&out));
+}
+
+#[test]
+fn the_gate_stops_an_edit_to_a_covered_file_until_a_named_skill_is_loaded() {
     let tmp = tempfile::tempdir().unwrap();
     let root = product(tmp.path());
     add(&root, &["app", "worker"]);
 
-    // Blocked: exit 2, and the reason, on stderr, names the skill and the why.
+    // Blocked: exit 2, the reason on stderr names the skills, the why and the way to get them.
     let out = hook(
         &root,
         "skill-gate",
@@ -201,11 +239,11 @@ fn the_gate_stops_an_edit_to_a_covered_file_until_the_skill_is_loaded() {
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     let why = String::from_utf8_lossy(&out.stderr).to_string();
     assert!(
-        why.contains("cloudflare:wrangler") && why.contains("Skill tool"),
+        why.contains("`wrangler`") && why.contains("fid skills sync --install"),
         "{why}"
     );
 
-    // A file the skill does not cover is not the gate's business.
+    // A file the skills do not cover is not the gate's business.
     let out = hook(
         &root,
         "skill-gate",
@@ -213,37 +251,57 @@ fn the_gate_stops_an_edit_to_a_covered_file_until_the_skill_is_loaded() {
     );
     assert_eq!(out.status.code(), Some(0), "{}", text(&out));
 
-    // Loading the skill (the PostToolUse hook records it) opens it, for that session only.
-    let mark = serde_json::json!({
-        "session_id": "s1", "cwd": root, "tool_name": "Skill",
-        "tool_input": { "skill": "cloudflare:wrangler" },
+    // Loading one through the Skill tool (the PostToolUse hook records it) opens it, for that session only.
+    let loaded = serde_json::json!({
+        "session_id": "s1", "cwd": root, "tool_name": "Skill", "tool_input": { "skill": "wrangler" },
     });
-    assert!(hook(&root, "skill-mark", mark).status.success());
-    let out = hook(
-        &root,
-        "skill-gate",
-        edit(&root, "s1", "apps/worker/wrangler.jsonc"),
-    );
-    assert_eq!(out.status.code(), Some(0), "{}", text(&out));
-    let out = hook(
-        &root,
-        "skill-gate",
-        edit(&root, "s2", "apps/worker/wrangler.jsonc"),
+    assert!(hook(&root, "skill-mark", loaded).status.success());
+    assert_eq!(
+        hook(
+            &root,
+            "skill-gate",
+            edit(&root, "s1", "apps/worker/wrangler.jsonc")
+        )
+        .status
+        .code(),
+        Some(0)
     );
     assert_eq!(
-        out.status.code(),
-        Some(2),
-        "another session is not let through"
+        hook(
+            &root,
+            "skill-gate",
+            edit(&root, "s2", "apps/worker/wrangler.jsonc")
+        )
+        .status
+        .code(),
+        Some(2)
     );
 
-    // The record is the product's local state, never committed.
-    let ignore = std::fs::read_to_string(root.join(".gitignore")).unwrap();
-    assert!(ignore.contains(".fiducial/state/"), "{ignore}");
+    // So does reading the skill's file, which is how an agent without a Skill tool loads one.
+    let read = serde_json::json!({
+        "session_id": "s3", "cwd": root, "tool_name": "Read",
+        "tool_input": { "file_path": root.join(".agents/skills/workers-best-practices/SKILL.md") },
+    });
+    assert!(hook(&root, "skill-mark", read).status.success());
+    assert_eq!(
+        hook(
+            &root,
+            "skill-gate",
+            edit(&root, "s3", "apps/worker/wrangler.jsonc")
+        )
+        .status
+        .code(),
+        Some(0)
+    );
+
+    // The record is local state, never committed.
+    assert!(std::fs::read_to_string(root.join(".gitignore"))
+        .unwrap()
+        .contains(".fiducial/state/"));
 }
 
 #[test]
 fn a_product_with_no_gate_is_never_blocked() {
-    // Outside a product, or in one whose capabilities name no skill.
     let tmp = tempfile::tempdir().unwrap();
     let root = product(tmp.path());
     let out = hook(&root, "skill-gate", edit(&root, "s1", "wrangler.jsonc"));
@@ -254,14 +312,16 @@ fn a_product_with_no_gate_is_never_blocked() {
     assert_eq!(out.status.code(), Some(0), "{}", text(&out));
 }
 
+#[cfg(unix)]
 #[test]
-fn capability_instructions_land_where_claude_code_discovers_skills() {
+fn capability_instructions_are_an_agent_skill_in_the_shared_directory_linked_per_agent() {
     let tmp = tempfile::tempdir().unwrap();
     let root = product(tmp.path());
     add(&root, &["design"]);
-    // A skill is a folder with a SKILL.md; a flat `.md` is not a place it looks.
-    let skill =
-        std::fs::read_to_string(root.join(".claude/skills/fiducial-design/SKILL.md")).unwrap();
+
+    // One copy, in the directory Codex, Cursor, Copilot, Gemini CLI and OpenCode read.
+    let canonical = root.join(".agents/skills/fiducial-design/SKILL.md");
+    let skill = std::fs::read_to_string(&canonical).unwrap();
     assert!(
         skill.starts_with("---\nname: fiducial-design\ndescription: \""),
         "{skill}"
@@ -270,13 +330,16 @@ fn capability_instructions_land_where_claude_code_discovers_skills() {
         skill.contains("Use when working on this product's design capability"),
         "{skill}"
     );
-    assert!(skill.contains(".fiducial/skills/design.md"), "{skill}");
-    assert!(
-        !root.join(".claude/skills/design.md").exists(),
-        "the flat pointer is gone"
+    // Claude Code reads its own directory, which links to it.
+    let link = root.join(".claude/skills/fiducial-design");
+    assert!(link.symlink_metadata().unwrap().file_type().is_symlink());
+    assert_eq!(
+        std::fs::read_to_string(link.join("SKILL.md")).unwrap(),
+        skill
     );
 
-    // An older product's flat pointer is removed on the next write, and only if it is the pointer.
+    // The older layouts are gone, and a file someone wrote is left.
+    assert!(!root.join(".fiducial/skills/design.md").exists());
     let legacy = root.join(".claude/skills/design.md");
     std::fs::write(
         &legacy,
@@ -292,4 +355,42 @@ fn capability_instructions_land_where_claude_code_discovers_skills() {
     std::fs::write(&theirs, "my own notes\n").unwrap();
     add(&root, &["i18n"]);
     assert!(theirs.exists(), "a file someone wrote is theirs");
+}
+
+#[cfg(unix)]
+#[test]
+fn the_agents_a_product_names_decide_where_skills_are_linked() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product(tmp.path());
+    add(&root, &["design"]);
+    assert!(
+        root.join(".claude/skills/fiducial-design").exists(),
+        "the default includes Claude Code"
+    );
+
+    // A team on Codex and Kiro only: the shared directory serves Codex, Kiro gets a link.
+    let toml = root.join("fiducial.toml");
+    let s = std::fs::read_to_string(&toml).unwrap();
+    std::fs::write(
+        &toml,
+        format!("{s}\n[skills]\nagents = [\"codex\", \"kiro-cli\"]\n"),
+    )
+    .unwrap();
+    let out = run(&root, &["skills", "sync"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(root.join(".kiro/skills/fiducial-design/SKILL.md").exists());
+    assert!(root
+        .join(".agents/skills/fiducial-design/SKILL.md")
+        .exists());
+
+    // A name the `skills` CLI does not know is refused by doctor, not silently dropped.
+    let s = std::fs::read_to_string(&toml)
+        .unwrap()
+        .replace("\"kiro-cli\"", "\"kiro-clii\"");
+    std::fs::write(&toml, s).unwrap();
+    let doctor = text(&run(&root, &["doctor"]));
+    assert!(
+        doctor.contains("`kiro-clii`, which the `skills` CLI does not know"),
+        "{doctor}"
+    );
 }

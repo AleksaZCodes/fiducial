@@ -287,7 +287,7 @@ its description from the first line of prose in its own skill.
 | **Adapter** | a swappable vendor behind a fixed contract | `storage = "r2"` |
 | **Tool** | an external command the capability's work needs on PATH — declared, never installed | `requires_tools = ["wrangler"]` |
 | **Prerequisite** | another capability this one cannot work without — checked at install, not at first failure | `requires_capabilities = ["i18n"]` |
-| **Agent skill** | a vendor's skill for the technology this capability uses, which the agent must load before editing the files it covers; enabled only while a capability needs it | `[[agent_skills]]` naming `cloudflare:wrangler` |
+| **Agent skill** | the vendor's skill for the technology this capability uses, installed by the open `skills` CLI, which the agent must load before editing the files it covers; installed only while a capability needs it | `[[agent_skills]]` naming `cloudflare/skills` → `wrangler` |
 | **Template** | a plain file copied in, belonging to no pipeline | `apps/worker/wrangler.toml` |
 | **Scoped template** | a template under `for/<capability>/`, installed only alongside that capability | `for/web-svelte/…/LocalePicker.svelte` |
 
@@ -301,15 +301,22 @@ missing). Each only adds what is absent: the product's own edits win.
 
 `[[agent_skills]]` names a skill the capability does not own (shadcn's for
 components, Cloudflare's for Workers) rather than copying its guidance, which
-would go stale the day the vendor changes the technology. `fid skills sync`
-enables the plugins the installed capabilities need and no others, writes the
-gate's input (`.fiducial/agent-skills.json`), and a `PreToolUse` hook
-(`fid skill-gate`) stops an `Edit` or `Write` to a covered file until the
-session has loaded one of the named skills. It does not stop an edit made
-through a shell command. `fid doctor` reports a plugin that is missing, one no
-capability needs, a vendored skill that is not installed, and a stale gate;
-`scripts/verify-agent-skills.sh` runs weekly against the upstreams, so a vendor
-that renames a skill fails a check here first.
+would go stale the day the vendor changes the technology. Skills are installed
+the way the open Agent Skills ecosystem installs them: by the `skills` CLI
+(`fid skills sync --install` runs it, pinned), into `.agents/skills/`, the
+directory Codex, Cursor, Copilot, Gemini CLI, OpenCode and others read directly,
+with a link for each other agent in `[skills] agents` (Claude Code reads
+`.claude/skills/`), and recorded in a committed `skills-lock.json`. Every agent
+that reads `AGENTS.md` is told which skill to load before editing which files, by
+a block `fid skills sync` derives into it. `fid doctor` and `fid skills check`
+fail on a missing, surplus, stale or locally edited skill, and CI runs them. Claude
+Code, whose documented hooks allow it, is also stopped by a `PreToolUse` hook
+(`fid skill-gate`) on an `Edit` or `Write` to a covered file until it has loaded
+one of the named skills, through the Skill tool or by reading the skill's file.
+Nothing stops an edit made through a shell command, and an agent without such
+hooks relies on the `AGENTS.md` block and the CI check. `scripts/verify-agent-skills.sh`
+runs weekly: it installs every named skill the way a product does, so a vendor
+that renames one fails a check here first.
 
 <!-- fid:end-describes -->
 

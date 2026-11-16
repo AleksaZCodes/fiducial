@@ -1,3 +1,8 @@
+---
+name: fiducial-hardware
+description: "A physical product declared once: outline, regions, parts, mounts, cost → layout, BOM, KiCad frame, assembly steps, gated; STEP/STL + review renders built from them Use when working on this product's hardware capability: its declarations, pipelines and generated files."
+---
+
 # fiducial:hardware — a physical product, declared once
 
 This product has the `hardware` capability. Its case, board frame, bill of

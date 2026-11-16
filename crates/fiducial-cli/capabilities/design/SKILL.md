@@ -431,7 +431,7 @@ on enforcing token names the product has renamed.
 
 ### Brand as a skill
 
-This capability installs `SKILL.md` into `.claude/skills/`, which is the same
+This capability installs `SKILL.md` as an Agent Skill, which is the same
 mechanism Claude uses to keep presentations and documents on brand — a brand
 skill activates automatically whenever a presentation, document or spreadsheet
 is created, without being asked for. That is why the declaration lives next to

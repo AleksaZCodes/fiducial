@@ -6,13 +6,21 @@ re-derive it.
 
 ## Platform
 
-Built on [Fiducial](https://github.com/AleksaZCodes/fiducial) 0.10.2.
+Built on [Fiducial](https://github.com/AleksaZCodes/fiducial) 0.32.0.
 
 - `fid dash` — one read-only view of this product's state; start here
 - `fid doctor` — check for drift before starting work
 - `fid derive` — run pipelines; `--check` fails CI on stale artifacts
 - `fid graph` — the facts → pipelines → artifacts DAG
 - `fid upgrade` — pull upstream template and package updates
+- `fid advise --base <default branch>` — advisory review, run before calling a
+  change done. Two models read it in structural units: calibrated judgments, and
+  a reasoning model checking it against this file and `MISSION.md`, with a list
+  of documents the change may have left stale. Treat every item as a claim to
+  verify: fix it, or say why it stands, and update the documents the change made
+  untrue (never `docs/specs/`, which is append-only). It never gates and never
+  edits. It needs a key (`fid advise key set`, or `OPENROUTER_API_KEY`), and does
+  nothing if `[advise] enabled = false` in `fiducial.toml`
 
 `fid dash --json` is the machine-readable form of the same facts. Prefer it over
 re-deriving product state by reading files: it already reports what is stale,
@@ -187,19 +195,18 @@ memory.
 
 ## Capability instructions
 
-Every installed capability ships instructions for using it. They are **ordinary
-Markdown at a vendor-neutral path**, so any agent can read them:
+Every installed capability ships instructions for using it, as an **Agent
+Skill** (a folder with a `SKILL.md`) in the shared directory most agents read:
 
 ```
-.fiducial/skills/<capability-id>.md
+.agents/skills/fiducial-<capability-id>/SKILL.md
 ```
 
 The installed capability ids are in `fiducial.toml` under `[capabilities]
 enabled`. Read the file for each one before working on that part of the product.
-
-Claude Code additionally gets a short pointer at `.claude/skills/<id>.md` so its
-automatic discovery works. That file contains **no instructions of its own** —
-it points here. The content exists once.
+An agent with a skills directory of its own (Claude Code reads `.claude/skills/`)
+finds the same file through a link, so the content exists once. `[skills] agents`
+in `fiducial.toml` names the agents to link for.
 
 These files are platform-owned and rewritten by `fid upgrade`. Do not edit them.
 
@@ -237,3 +244,9 @@ Fix it where it lives, not where you hit it.
 - Do not commit directly to the default branch (`no-direct-main-push` rule).
 - Do not hand-write derived artifacts — change the upstream declaration and
   re-run `fid derive`.
+
+<!-- fid:begin agent-skills -->
+## Skills to load first
+
+No installed capability needs a vendor skill loaded before editing.
+<!-- fid:end agent-skills -->

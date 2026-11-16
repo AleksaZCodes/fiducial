@@ -344,8 +344,8 @@ This document is the mental model. For depth, go to:
 | The full design specification | `docs/specs/2026-09-06-fiducial-design.md` |
 | What was built, phase by phase | `SHIPPED.md` |
 | What is intended, and what is next | `ROADMAP.md` |
-| Agent context for this session | `AGENTS.md` (and `.claude/skills/fiducial-*/SKILL.md` for installed capabilities) |
-| A specific capability's usage | `.claude/skills/fiducial-<capability-id>/SKILL.md` |
+| Agent context for this session | `AGENTS.md` (and `.agents/skills/fiducial-*/SKILL.md` for installed capabilities) |
+| A specific capability's usage | `.agents/skills/fiducial-<capability-id>/SKILL.md` |
 
 ---
 

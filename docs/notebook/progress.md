@@ -5,9 +5,10 @@
 ## 0.32.0 · 2026-11-16
 
 - Capabilities name the vendor skills they need (shadcn for UI, Cloudflare for
-  Workers). Only the installed capabilities' plugins are enabled; an agent must
-  load the skill before editing the files it covers; CI checks upstream weekly.
-- Capability instructions moved to the folder layout Claude Code discovers.
+  Workers). They are installed by the open `skills` CLI into `.agents/skills/`,
+  linked per agent, locked in `skills-lock.json`, and every `AGENTS.md` reader is
+  told which to load. Claude Code additionally gets a hard stop before editing.
+- Capability instructions moved to the Agent Skills layout every agent reads.
 
 ## 0.30.0 · 2026-11-16
 

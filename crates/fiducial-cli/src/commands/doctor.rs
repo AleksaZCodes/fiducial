@@ -509,7 +509,10 @@ fn check_lock(
     let (mut drifted, owned_edits) = platform_drift(root, &lock, &enabled);
 
     // The vendor skills the capabilities name: enabled, current, and installed.
-    let skill_findings = crate::agent_skills::problems(root, &enabled);
+    let agents = Config::load(&root.join(crate::config::CONFIG_FILE))
+        .map(|c| c.skills.agents())
+        .unwrap_or_default();
+    let skill_findings = crate::agent_skills::problems(root, &enabled, &agents);
     if skill_findings.is_empty() {
         ok.push("agent skills match the installed capabilities".into());
     }

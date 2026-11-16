@@ -5,30 +5,31 @@
 //! says whether it does and whether vendored skills are current upstream,
 //! `list` shows what is enforced.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use clap::Subcommand;
 use std::env;
 
-use crate::agent_skills::{self, SKILLS_CLI};
-use crate::capability::AgentSkillKind;
+use crate::agent_skills;
+use crate::capability;
 use crate::config::Config;
 
 #[derive(Subcommand, Debug)]
 pub enum SkillsCmd {
-    /// Enable the skills the installed capabilities need, and no others
+    /// Make the product's skills match its capabilities
     ///
-    /// Writes `.claude/settings.json` (plugins), `.fiducial/agent-skills.json`
-    /// (what the gate enforces). With `--install`, also installs the skills a
-    /// capability names that are vendored into the repository.
+    /// Writes what the gate enforces (`.fiducial/agent-skills.json`) and the
+    /// skills block in `AGENTS.md`, and re-links the platform's own skills for
+    /// the agents in `[skills] agents`. With `--install`, runs the `skills` CLI to
+    /// install the skills the capabilities name and remove ones none needs.
     Sync {
-        /// Install vendored skills (runs `npx skills add`; needs Node 22.20+)
+        /// Run the `skills` CLI (`npx skills add` / `remove`; needs Node 22.20+)
         #[arg(long)]
         install: bool,
     },
     /// Say whether the skills match the capabilities, and are current upstream
     ///
-    /// Exits 1 on any finding. Vendored skills are compared with their source by
-    /// `npx skills check` (network).
+    /// Exits 1 on any finding. Installed skills are compared with their source by
+    /// `npx skills check`, which also catches a local edit (network).
     Check {
         /// Skip the upstream comparison (no network)
         #[arg(long)]
@@ -48,18 +49,17 @@ pub fn run(cmd: SkillsCmd) -> Result<()> {
         let all: Vec<serde_json::Value> = agent_skills::known()
             .iter()
             .map(|a| {
+                let caps: Vec<&str> = capability::builtins()
+                    .iter()
+                    .filter(|c| c.agent_skills.iter().any(|x| x.id == a.id))
+                    .map(|c| c.id.as_str())
+                    .collect();
                 serde_json::json!({
                     "id": a.id,
-                    "kind": match a.kind {
-                        AgentSkillKind::Plugin => "plugin",
-                        AgentSkillKind::SkillsCli => "skills-cli",
-                    },
-                    "repo": a.repo,
-                    "marketplace": a.marketplace,
-                    "plugin": a.plugin,
                     "source": a.source,
-                    "skill": a.skill,
                     "skills": a.skills,
+                    "paths": a.paths,
+                    "capabilities": caps,
                 })
             })
             .collect();
@@ -73,17 +73,30 @@ pub fn run(cmd: SkillsCmd) -> Result<()> {
 
     match cmd {
         SkillsCmd::Sync { install } => {
-            let done = agent_skills::sync(&root, &enabled, install)?;
-            if done.wrote.is_empty() && done.missing.is_empty() {
+            let agents = cfg.skills.agents();
+            // The platform's own skills, for the agents the product now names.
+            for id in &enabled {
+                if let Some(def) = capability::find(id) {
+                    capability::write_skill(&root, def, &cfg.product.name)?;
+                }
+            }
+            let done = agent_skills::sync(&root, &enabled, &agents, install)?;
+            if done.wrote.is_empty() && done.missing.is_empty() && done.surplus.is_empty() {
                 println!("  ✓ skills already match the installed capabilities");
             }
             for w in &done.wrote {
-                println!("  ✓ wrote {w}");
+                println!("  ✓ {w}");
             }
-            for a in &done.missing {
+            if !done.missing.is_empty() {
                 println!(
-                    "  ! `{}` (from {}) is not installed. Run `fid skills sync --install`.",
-                    a.skill, a.source
+                    "  ! not installed: {}. Run `fid skills sync --install`, then commit skills-lock.json.",
+                    done.missing.join(", ")
+                );
+            }
+            if !done.surplus.is_empty() {
+                println!(
+                    "  ! no capability needs: {}. `fid skills sync --install` removes them.",
+                    done.surplus.join(", ")
                 );
             }
             Ok(())
@@ -95,14 +108,7 @@ pub fn run(cmd: SkillsCmd) -> Result<()> {
                 return Ok(());
             }
             for a in &needed {
-                println!(
-                    "  {}  [{}]",
-                    a.id,
-                    match a.kind {
-                        AgentSkillKind::Plugin => format!("plugin {}", a.plugin_key()),
-                        AgentSkillKind::SkillsCli => format!("skills-cli {}", a.source),
-                    }
-                );
+                println!("  {}  [skills add {}]", a.id, a.source);
                 println!("    load one of: {}", a.skills.join(", "));
                 println!("    before editing: {}", a.paths.join(", "));
                 println!("    why: {}", a.why);
@@ -110,24 +116,15 @@ pub fn run(cmd: SkillsCmd) -> Result<()> {
             Ok(())
         }
         SkillsCmd::Check { offline } => {
-            let mut findings = agent_skills::problems(&root, &enabled);
-            if !offline {
-                let vendored = agent_skills::needed(&enabled)
-                    .into_iter()
-                    .any(|a| a.kind == AgentSkillKind::SkillsCli);
-                if vendored && root.join("skills-lock.json").exists() {
-                    let st = std::process::Command::new("npx")
-                        .args(["--yes", SKILLS_CLI, "check"])
-                        .current_dir(&root)
-                        .status()
-                        .context("running `npx skills check` (is Node 22.20 or newer on PATH?)")?;
-                    if !st.success() {
-                        findings.push(
-                            "a vendored skill is behind its source (or edited locally); `npx skills update` brings it current"
-                                .into(),
-                        );
-                    }
-                }
+            let mut findings = agent_skills::problems(&root, &enabled, &cfg.skills.agents());
+            if !offline
+                && root.join(agent_skills::LOCK_FILE).exists()
+                && !agent_skills::upstream_check(&root)?
+            {
+                findings.push(
+                    "an installed skill is behind its source, or has been edited locally (`skills check` above says which); `npx skills update` brings it current"
+                        .into(),
+                );
             }
             if findings.is_empty() {
                 println!("  ✓ agent skills match the installed capabilities");

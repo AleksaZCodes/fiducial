@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
 #
-# Every vendor skill a capability names still exists where the capability says
-# it does.
+# Every vendor skill a capability names can still be installed, the way a product
+# installs it.
 #
-# A capability names a skill it does not own (Cloudflare's, shadcn's). If the
-# vendor renames or moves it, a product's agent is told to load a skill that is
-# not there and the gate then blocks edits with no way through. This asks each
-# upstream, and fails with the capability's own declaration beside what it found,
-# so the fix is a one-line edit to a `capability.toml` rather than a mystery in a
-# product months later. It runs on a schedule as well as on changes, because the
-# vendor can break us without a commit here.
+# A capability names skills it does not own (Cloudflare's, shadcn's). If a vendor
+# renames or moves one, a product is told to load a skill that is not there. This
+# does what a product does and asks nothing of anyone's pages: scaffold a product
+# with every capability that names a skill, run `fid skills sync --install` (which
+# runs the open `skills` CLI), check each named skill landed in the shared
+# `.agents/skills/` directory, that it is linked for the agents the product names,
+# and that `skills check` finds the lock consistent with upstream.
 #
-# For a plugin it reads the marketplace's `.claude-plugin/marketplace.json`,
-# checks the plugin is listed, and checks each `plugin:skill` name has a
-# `skills/<skill>/SKILL.md` in the plugin's source. For a vendored skill it checks
-# the `SKILL.md` at the path the `skills` CLI installs from.
+# It runs weekly as well as on changes, because a vendor can break this without a
+# commit here; the failure is then a one-line edit to a `capability.toml`, found
+# this week.
+#
+# Needs Node 22.20+ and the network.
 #
 # Usage:
 #
@@ -26,51 +27,50 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 fid="${FID:-$repo/target/debug/fid}"
 [ -x "$fid" ] || { echo "no fid binary at $fid — cargo build -p fiducial-cli --bin fid" >&2; exit 1; }
 
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
 echo "── agent skills ───────────────────────────────────────────────────────"
-"$fid" skills list --all | node --input-type=module -e '
-import { readFileSync } from "node:fs";
-const declared = JSON.parse(readFileSync(0, "utf8"));
-if (declared.length === 0) { console.error("no capability declares an agent skill"); process.exit(1); }
+list="$work/declared.json"
+"$fid" skills list --all > "$list"
 
-const raw = (repo, path) => `https://raw.githubusercontent.com/${repo}/main/${path}`;
-async function get(url) {
-  const r = await fetch(url);
-  return r.ok ? await r.text() : null;
-}
-let bad = 0;
-const fail = (id, msg) => { console.error(`  ✗ ${id}: ${msg}`); bad++; };
+# The capabilities that name a skill, and every skill name they name.
+caps="$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); console.log([...new Set(d.flatMap(x=>x.capabilities))].join(" "))' "$list")"
+names="$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); console.log([...new Set(d.flatMap(x=>x.skills))].join(" "))' "$list")"
+[ -n "$caps" ] && [ -n "$names" ] || { echo "no capability names an agent skill" >&2; exit 1; }
+echo "  capabilities: $caps"
+echo "  skills:       $names"
 
-for (const a of declared) {
-  if (a.kind === "plugin") {
-    const text = await get(raw(a.repo, ".claude-plugin/marketplace.json"));
-    if (text === null) { fail(a.id, `${a.repo} has no .claude-plugin/marketplace.json on main`); continue; }
-    const market = JSON.parse(text);
-    if (market.name !== a.marketplace) {
-      fail(a.id, `the marketplace is named "${market.name}", the capability says "${a.marketplace}"`);
-      continue;
-    }
-    const plugin = (market.plugins ?? []).find((p) => p.name === a.plugin);
-    if (!plugin) {
-      fail(a.id, `no plugin "${a.plugin}" in ${a.repo} (it lists: ${(market.plugins ?? []).map((p) => p.name).join(", ")})`);
-      continue;
-    }
-    if (plugin.source !== "./") {
-      fail(a.id, `the plugin source is ${JSON.stringify(plugin.source)}; this check only knows "./" (extend it, do not skip it)`);
-      continue;
-    }
-    for (const name of a.skills) {
-      const dir = name.slice(a.plugin.length + 1);
-      const md = await get(raw(a.repo, `skills/${dir}/SKILL.md`));
-      if (md === null) fail(a.id, `${name}: no skills/${dir}/SKILL.md in ${a.repo}`);
-      else if (!new RegExp(`^name:\\s*${dir}\\s*$`, "m").test(md)) fail(a.id, `${name}: skills/${dir}/SKILL.md does not declare name: ${dir}`);
-    }
-  } else {
-    const md = await get(raw(a.repo, `skills/${a.skill}/SKILL.md`));
-    if (md === null) fail(a.id, `no skills/${a.skill}/SKILL.md in ${a.repo}; \`skills add ${a.source}\` would not find it`);
-    else if (!new RegExp(`^name:\\s*${a.skill}\\s*$`, "m").test(md)) fail(a.id, `skills/${a.skill}/SKILL.md does not declare name: ${a.skill}`);
+cd "$work"
+"$fid" new p >/dev/null
+cd p
+"$fid" add design >/dev/null
+for c in $caps; do
+  [ "$c" = design ] && continue
+  "$fid" add capability "$c" >/dev/null 2>&1 || "$fid" add app "${c#web-}" >/dev/null 2>&1 || {
+    echo "  ✗ could not install capability $c into a scaffolded product" >&2
+    exit 1
   }
-  if (!bad) console.log(`  ✓ ${a.id} (${a.kind}, ${a.repo})`);
-}
-if (bad) { console.error(`agent-skills: ${bad} problem(s)`); process.exit(1); }
-console.log("agent-skills: ok");
-'
+done
+
+# The production workflow: the CLI does the install and writes the lock.
+"$fid" skills sync --install
+
+bad=0
+for n in $names; do
+  if [ -f ".agents/skills/$n/SKILL.md" ] && grep -q "\"$n\"" skills-lock.json; then
+    echo "  ✓ $n"
+  else
+    echo "  ✗ $n: not installed, or not in skills-lock.json" >&2
+    bad=1
+  fi
+done
+# Claude Code is in the default agents, so each is linked into its directory too.
+for n in $names; do
+  [ -f ".claude/skills/$n/SKILL.md" ] || { echo "  ✗ $n: not linked for claude-code" >&2; bad=1; }
+done
+[ "$bad" = 0 ] || exit 1
+
+# The lock agrees with upstream, and nothing the product needs is missing.
+"$fid" skills check
+echo "agent-skills: ok"

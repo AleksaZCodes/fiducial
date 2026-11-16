@@ -216,8 +216,8 @@ mod tests {
             ".github/workflows/ci.yml",
             ".claude/settings.json",
             ".claude/agents/fiducial-review.md",
-            ".claude/skills/fiducial-design/SKILL.md",
-            ".fiducial/skills/i18n.md",
+            ".agents/skills/fiducial-design/SKILL.md",
+            ".agents/skills/fiducial-i18n/SKILL.md",
             // Derivation scripts a pipeline invokes. Editing one forks
             // platform code, and `fid upgrade` replaces it.
             "scripts/build-design-system.mjs",

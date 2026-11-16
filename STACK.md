@@ -227,7 +227,7 @@ Every row carries a status, and the statuses are honest:
 | --- | --- | --- |
 | Extension unit | **Capability** — fact schemas · pipelines · code · templates · guard rules · migrations · **mandatory `SKILL.md`** · docs · conformance tests | Decided |
 | No privileged domains | Everything Fiducial ships is itself a capability. Electronics occupies the same slot as billing | Decided |
-| Agent knowledge | Every capability ships a skill; the Claude Code plugin **aggregates skills of enabled capabilities** | Decided |
+| Agent knowledge | Every capability ships an Agent Skill (`.agents/skills/`, linked per agent); vendor skills a capability names are installed by the open `skills` CLI and pinned in `skills-lock.json` | Decided |
 | Third-party tools | A capability may be only a skill + guard rules + a wrapper. This is the supported way to bring Blender, Stripe, a fab house or an instrument under the same discipline | Decided |
 | Capability sources | Platform monorepo (first-party) or any git repo (third-party/private) | Decided |
 | Derive graph shape | **DAG, permanently.** One declared design point. Coupled implicit solving is delegated | Decided |

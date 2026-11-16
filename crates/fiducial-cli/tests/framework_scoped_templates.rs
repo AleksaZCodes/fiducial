@@ -12,6 +12,9 @@
 //! the property a product actually experiences: the right files, through the
 //! real binary, on a real scaffold, whatever order `fid add` was run in.
 
+#[path = "support/skills.rs"]
+mod skills;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -144,6 +147,7 @@ fn a_conditional_template_is_tracked_and_the_product_is_clean() {
         "the picker is recorded in fiducial.lock:\n{lock}"
     );
 
+    skills::install_required_skills(&root);
     let out = run(&root, &["doctor"]);
     assert!(
         out.status.success(),
@@ -189,6 +193,7 @@ fn a_svelte_scaffold_declares_csp_where_sveltekit_can_hash_its_own_bootstrap() {
          hash is lost and the app stops hydrating:\n{hooks}"
     );
 
+    skills::install_required_skills(&root);
     let out = run(&root, &["doctor"]);
     assert!(
         out.status.success(),

@@ -1,6 +1,11 @@
+---
+name: fiducial-firmware-rp2040
+description: "RP2040 Embassy firmware with defmt logging and probe-rs flashing Use when working on this product's firmware-rp2040 capability: its declarations, pipelines and generated files."
+---
+
 # Skill: firmware-rp2040
 
-**Capability:** `firmware-rp2040` · **Platform:** Fiducial 0.10.2
+**Capability:** `firmware-rp2040` · **Platform:** Fiducial 0.32.0
 
 ---
 

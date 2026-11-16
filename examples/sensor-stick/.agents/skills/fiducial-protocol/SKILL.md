@@ -1,3 +1,8 @@
+---
+name: fiducial-protocol
+description: "Every message a device and its apps exchange, declared once → a Rust codec for the firmware, a TypeScript codec for the web Use when working on this product's protocol capability: its declarations, pipelines and generated files."
+---
+
 # fiducial:protocol — Protocol Skill
 
 This product has the `protocol` capability. **One declaration, many
