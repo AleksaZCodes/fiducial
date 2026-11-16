@@ -112,7 +112,7 @@ Every row carries a status, and the statuses are honest:
 | Fieldbus to vendor sensors | **Modbus RTU over RS-485** — `fiducial-protocol::modbus`, tested over a virtual serial port | Decided — built |
 | ESP firmware OTA | `esp-bootloader-esp-idf` partitions + `fiducial-ota` (`embassy-boot` has no ESP backend) | Candidate → first product that needs it |
 | CAN / CAN-FD | ISO 15765-2 (ISO-TP) segmentation in `fiducial-protocol::segment`, frames in `fiducial-protocol::can`; FDCAN on MCUs, SocketCAN on Linux | Decided — the protocol is built and tested over an in-memory bus; no controller driver yet |
-| Linux real-time node runtime | `PREEMPT_RT` (mainline since 6.12), `mlockall`, stack prefault, `SCHED_FIFO` from the declaration | Candidate → distributed Phase 8 |
+| Linux real-time node runtime | `PREEMPT_RT` (mainline since 6.12) as the kernel; `fiducial-rt` applies `SCHED_FIFO`, `mlockall`, CPU pinning and stack prefault from the node's `[node.rt]` declaration | Decided — built; hard latency still needs a `PREEMPT_RT` kernel and a measurement on it |
 | Time-triggered / TSN Ethernet | — | **Gap** — no product needs one |
 | Hardware-in-the-loop rigs | — | Deferred until a board physically exists |
 

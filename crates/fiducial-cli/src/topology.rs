@@ -100,6 +100,40 @@ pub struct Node {
     pub apps: Vec<String>,
     #[serde(default)]
     pub interfaces: Vec<String>,
+    /// Real-time settings for a Linux host (`SCHED_FIFO`, memory locking, CPU
+    /// pinning). Applied at run time by `fiducial-rt`.
+    #[serde(default)]
+    pub rt: Option<RtSpec>,
+}
+
+/// How a Linux host node runs its control loop (`docs/specs/2026-11-01-topology-is-a-declaration.md`).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RtSpec {
+    /// `SCHED_FIFO` priority, 1 to 99. Higher runs first.
+    pub priority: u8,
+    /// Pin the loop to this CPU.
+    #[serde(default)]
+    pub cpu: Option<u32>,
+    /// `mlockall`, so a page fault cannot stall the loop. On unless said off.
+    #[serde(default = "RtSpec::default_lock_memory")]
+    pub lock_memory: bool,
+    /// Touch this much stack up front, in KiB, so the loop never faults it in.
+    #[serde(default = "RtSpec::default_prefault_stack_kib")]
+    pub prefault_stack_kib: u32,
+}
+
+impl RtSpec {
+    /// The default for `lock_memory`.
+    pub const fn default_lock_memory() -> bool {
+        true
+    }
+    /// The default for `prefault_stack_kib`.
+    pub const fn default_prefault_stack_kib() -> u32 {
+        512
+    }
+    /// The most stack that may be prefaulted: a thread's default is 8 MiB.
+    pub const MAX_PREFAULT_STACK_KIB: u32 = 8192;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -121,6 +155,15 @@ pub struct Bus {
     pub tls: bool,
     #[serde(default)]
     pub broker: Option<String>,
+    /// Arbitration bit rate, in bits per second, for `can` and `can-fd`.
+    #[serde(default)]
+    pub bitrate: Option<u32>,
+    /// Data-phase bit rate for `can-fd`, which must be at least `bitrate`.
+    #[serde(default)]
+    pub data_bitrate: Option<u32>,
+    /// Baud rate for `rs485` (and the other serial types).
+    #[serde(default)]
+    pub baud: Option<u32>,
     pub connect: Vec<String>,
 }
 
@@ -233,6 +276,107 @@ pub fn hardware_files(n: &Node) -> Vec<&String> {
     files
 }
 
+/// The bit rates a bus declares, held to what its type allows.
+///
+/// A rate is a fact about the wire, and a wrong or missing one is a bus that does
+/// not talk: so it is declared once here and derived into the firmware's
+/// constants, and a rate on a bus that has no such field is refused rather than
+/// ignored, because a typo that is ignored is a typo nobody sees.
+fn bus_rate_problems(b: &Bus, out: &mut Vec<String>) {
+    const CAN_MAX: u32 = 1_000_000;
+    const CAN_FD_DATA_MAX: u32 = 8_000_000;
+    let id = &b.id;
+    let can = matches!(b.kind.as_str(), "can" | "can-fd");
+    let serial = matches!(b.kind.as_str(), "rs485" | "rs232" | "uart");
+
+    if !can {
+        if b.bitrate.is_some() {
+            out.push(format!(
+                "bus `{id}`: `bitrate` belongs to `can` and `can-fd` buses, not `{}`",
+                b.kind
+            ));
+        }
+        if b.data_bitrate.is_some() {
+            out.push(format!(
+                "bus `{id}`: `data_bitrate` belongs to `can-fd` buses, not `{}`",
+                b.kind
+            ));
+        }
+    }
+    if !serial && b.baud.is_some() {
+        out.push(format!(
+            "bus `{id}`: `baud` belongs to `rs485`, `rs232` and `uart` buses, not `{}`",
+            b.kind
+        ));
+    }
+
+    if can {
+        match b.bitrate {
+            None => out.push(format!("bus `{id}`: a `{}` bus needs a `bitrate`", b.kind)),
+            Some(r) if !(10_000..=CAN_MAX).contains(&r) => out.push(format!(
+                "bus `{id}`: bitrate {r} is outside 10 kbit/s to 1 Mbit/s, which is what CAN arbitration runs at"
+            )),
+            _ => {}
+        }
+        if b.kind == "can" && b.data_bitrate.is_some() {
+            out.push(format!(
+                "bus `{id}`: classic `can` has no data phase; use `can-fd` for a `data_bitrate`"
+            ));
+        }
+        if b.kind == "can-fd" {
+            match (b.bitrate, b.data_bitrate) {
+                (_, None) => out.push(format!("bus `{id}`: a `can-fd` bus needs a `data_bitrate`")),
+                (Some(a), Some(d)) if d < a => out.push(format!(
+                    "bus `{id}`: data_bitrate {d} is below bitrate {a}; the data phase is the faster one"
+                )),
+                (_, Some(d)) if d > CAN_FD_DATA_MAX => out.push(format!(
+                    "bus `{id}`: data_bitrate {d} is above 8 Mbit/s, the fastest CAN-FD runs"
+                )),
+                _ => {}
+            }
+        }
+    }
+    if b.kind == "rs485" {
+        match b.baud {
+            None => out.push(format!("bus `{id}`: an `rs485` bus needs a `baud`")),
+            Some(r) if !(1_200..=10_000_000).contains(&r) => out.push(format!(
+                "bus `{id}`: baud {r} is outside 1200 to 10 000 000"
+            )),
+            _ => {}
+        }
+    }
+}
+
+/// A node's real-time settings, held to what the kernel accepts.
+fn rt_problems(n: &Node, out: &mut Vec<String>) {
+    let Some(rt) = &n.rt else { return };
+    if n.kind != NodeKind::Host {
+        out.push(format!(
+            "node `{}`: `rt` is for a Linux host; a microcontroller's timing is its own firmware's",
+            n.id
+        ));
+    }
+    if !(1..=99).contains(&rt.priority) {
+        out.push(format!(
+            "node `{}`: rt priority {} is outside 1 to 99 (SCHED_FIFO's range)",
+            n.id, rt.priority
+        ));
+    }
+    if rt.cpu.is_some_and(|c| c >= 1024) {
+        out.push(format!(
+            "node `{}`: rt cpu {} is beyond the 1024 CPUs a Linux affinity mask holds",
+            n.id,
+            rt.cpu.unwrap_or(0)
+        ));
+    }
+    if rt.prefault_stack_kib > RtSpec::MAX_PREFAULT_STACK_KIB {
+        out.push(format!(
+            "node `{}`: rt prefault_stack_kib {} is more than the {} KiB a thread's stack holds by default",
+            n.id, rt.prefault_stack_kib, RtSpec::MAX_PREFAULT_STACK_KIB
+        ));
+    }
+}
+
 pub fn validate(t: &Topology) -> Vec<String> {
     let mut out = Vec::new();
     let nodes: BTreeMap<&str, &Node> = t.node.iter().map(|n| (n.id.as_str(), n)).collect();
@@ -267,6 +411,7 @@ pub fn validate(t: &Topology) -> Vec<String> {
         if t.system_of(&n.id).is_none() {
             out.push(format!("node `{}` is in no [[system]]", n.id));
         }
+        rt_problems(n, &mut out);
     }
     for s in &t.system {
         for n in &s.nodes {
@@ -337,6 +482,7 @@ pub fn validate(t: &Topology) -> Vec<String> {
                     .join(" and ")
             ));
         }
+        bus_rate_problems(b, &mut out);
         if b.kind == "ip" {
             match b.protocol.as_deref() {
                 Some("mqtt") if !b.tls => out.push(format!(
@@ -527,6 +673,50 @@ fn topics_table(t: &Topology) -> Table {
                 (format!("NODE_{id}_LANGUAGE"), opt_str(&n.language)),
             ]
         })
+        .chain(
+            t.node
+                .iter()
+                .filter_map(|n| n.rt.as_ref().map(|rt| (n, rt)))
+                .flat_map(|(n, rt)| {
+                    let id = upper(&n.id);
+                    [
+                        (
+                            format!("NODE_{id}_RT_PRIORITY"),
+                            Value::Int(rt.priority as i64),
+                        ),
+                        (
+                            format!("NODE_{id}_RT_CPU"),
+                            rt.cpu.map_or(Value::None, |c| Value::Int(c as i64)),
+                        ),
+                        (
+                            format!("NODE_{id}_RT_LOCK_MEMORY"),
+                            Value::Bool(rt.lock_memory),
+                        ),
+                        (
+                            format!("NODE_{id}_RT_PREFAULT_STACK_KIB"),
+                            Value::Int(rt.prefault_stack_kib as i64),
+                        ),
+                    ]
+                }),
+        )
+        .chain(t.bus.iter().flat_map(|b| {
+            let id = upper(&b.id);
+            [
+                (format!("BUS_{id}_TYPE"), Value::Str(b.kind.clone())),
+                (
+                    format!("BUS_{id}_BITRATE"),
+                    b.bitrate.map_or(Value::None, |v| Value::Int(v as i64)),
+                ),
+                (
+                    format!("BUS_{id}_DATA_BITRATE"),
+                    b.data_bitrate.map_or(Value::None, |v| Value::Int(v as i64)),
+                ),
+                (
+                    format!("BUS_{id}_BAUD"),
+                    b.baud.map_or(Value::None, |v| Value::Int(v as i64)),
+                ),
+            ]
+        }))
         .filter(|(_, v)| !matches!(v, Value::None))
         .collect();
     Table {
@@ -975,5 +1165,137 @@ default = 1000
         assert!(d.contains("flowchart LR") && d.contains("sequenceDiagram"));
         assert!(d.contains("room_1") && d.contains("server"));
         assert!(d.contains("parameters (retained)"));
+    }
+
+    const BUSES: &str = r#"
+[[system]]
+id = "cell"
+nodes = ["plc", "drive", "ctl"]
+
+[[node]]
+id = "plc"
+kind = "mcu"
+target = "thumbv7em-none-eabihf"
+runtime = "embassy-stm32"
+firmware = "plc"
+interfaces = ["can0", "uart1"]
+
+[[node]]
+id = "drive"
+kind = "mcu"
+target = "thumbv7em-none-eabihf"
+runtime = "embassy-stm32"
+firmware = "drive"
+interfaces = ["can0", "uart1"]
+
+[[node]]
+id = "ctl"
+kind = "host"
+target = "aarch64-unknown-linux-gnu"
+runtime = "linux-compose"
+apps = ["ctl"]
+interfaces = ["can0"]
+[node.rt]
+priority = 80
+cpu = 2
+
+[[bus]]
+id = "motion"
+type = "can-fd"
+bitrate = 500000
+data_bitrate = 2000000
+connect = ["plc.can0", "drive.can0", "ctl.can0"]
+
+[[bus]]
+id = "field"
+type = "rs485"
+baud = 19200
+connect = ["plc.uart1", "drive.uart1"]
+"#;
+
+    #[test]
+    fn can_and_serial_rates_are_declared_and_derived() {
+        let t = parse(BUSES);
+        assert_eq!(validate(&t), Vec::<String>::new());
+        let h = render_topics(&t, DECLARATION, "h").unwrap();
+        for want in [
+            "BUS_MOTION_BITRATE 500000",
+            "BUS_MOTION_DATA_BITRATE 2000000",
+            "BUS_FIELD_BAUD 19200",
+            "NODE_CTL_RT_PRIORITY 80",
+            "NODE_CTL_RT_CPU 2",
+            "NODE_CTL_RT_LOCK_MEMORY true",
+            "NODE_CTL_RT_PREFAULT_STACK_KIB 512",
+        ] {
+            assert!(h.contains(want), "missing `{want}` in\n{h}");
+        }
+        assert!(
+            !h.contains("BUS_FIELD_BITRATE"),
+            "a baud bus has no bitrate"
+        );
+    }
+
+    #[test]
+    fn a_rate_the_wire_cannot_run_or_that_does_not_belong_is_refused() {
+        let cases = [
+            (
+                "bitrate = 500000\ndata_bitrate",
+                "bitrate = 5000000\ndata_bitrate",
+                "outside 10 kbit/s to 1 Mbit/s",
+            ),
+            (
+                "data_bitrate = 2000000",
+                "data_bitrate = 100000",
+                "data phase is the faster one",
+            ),
+            (
+                "data_bitrate = 2000000",
+                "data_bitrate = 9000000",
+                "above 8 Mbit/s",
+            ),
+            ("data_bitrate = 2000000\n", "", "needs a `data_bitrate`"),
+            ("baud = 19200", "baud = 100", "outside 1200 to 10 000 000"),
+            ("baud = 19200\n", "", "needs a `baud`"),
+            (
+                "type = \"rs485\"",
+                "type = \"rs485\"\nbitrate = 500000",
+                "`bitrate` belongs to `can`",
+            ),
+            (
+                "type = \"can-fd\"",
+                "type = \"can\"",
+                "classic `can` has no data phase",
+            ),
+        ];
+        for (from, to, want) in cases {
+            assert!(BUSES.contains(from), "setup: {from}");
+            let e = validate(&parse(&BUSES.replacen(from, to, 1))).join("\n");
+            assert!(e.contains(want), "{from} -> {to}: {e}");
+        }
+    }
+
+    #[test]
+    fn real_time_settings_are_held_to_what_the_kernel_accepts() {
+        let cases = [
+            ("priority = 80", "priority = 0", "outside 1 to 99"),
+            ("priority = 80", "priority = 120", "outside 1 to 99"),
+            ("cpu = 2", "cpu = 5000", "beyond the 1024 CPUs"),
+            (
+                "cpu = 2",
+                "cpu = 2\nprefault_stack_kib = 99999",
+                "prefault_stack_kib",
+            ),
+        ];
+        for (from, to, want) in cases {
+            let e = validate(&parse(&BUSES.replacen(from, to, 1))).join("\n");
+            assert!(e.contains(want), "{from} -> {to}: {e}");
+        }
+        let on_mcu = BUSES.replacen(
+            "interfaces = [\"can0\", \"uart1\"]\n\n[[node]]\nid = \"drive\"",
+            "interfaces = [\"can0\", \"uart1\"]\n[node.rt]\npriority = 5\n\n[[node]]\nid = \"drive\"",
+            1,
+        );
+        let e = validate(&parse(&on_mcu)).join("\n");
+        assert!(e.contains("`rt` is for a Linux host"), "{e}");
     }
 }
