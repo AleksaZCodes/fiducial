@@ -290,16 +290,37 @@ impl Freshness {
 pub struct Design {
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub registries: std::collections::BTreeMap<String, String>,
+    /// `owner/repo` of the public GitHub repository this product is pushed to.
+    ///
+    /// shadcn reads a repository with a root `registry.json` as a registry
+    /// (`npx shadcn add owner/repo/button`), with nothing to host or build. When
+    /// this is declared, the registry's items name each other that way instead
+    /// of through an `@namespace` the installing product would have to configure.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub github: Option<String>,
 }
 
 impl Design {
     pub fn is_empty(&self) -> bool {
-        self.registries.is_empty()
+        self.registries.is_empty() && self.github.is_none()
     }
 
     /// shadcn's own rules for a namespace and its URL template, held here so a
     /// bad entry fails `fid derive` rather than the first `shadcn add`.
     pub fn validate(&self) -> anyhow::Result<()> {
+        if let Some(g) = &self.github {
+            let ok = g.split_once('/').is_some_and(|(o, r)| {
+                let part = |x: &str| {
+                    !x.is_empty()
+                        && x.chars()
+                            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
+                };
+                part(o) && part(r) && !r.contains('/')
+            });
+            if !ok {
+                anyhow::bail!("[design] github `{g}` must be `owner/repo`");
+            }
+        }
         for (ns, url) in &self.registries {
             let body = ns.strip_prefix('@').unwrap_or("");
             if body.is_empty()
