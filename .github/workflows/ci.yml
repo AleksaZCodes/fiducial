@@ -888,6 +888,12 @@ jobs:
       - name: Scaffold, install, typecheck, build, serve — TanStack Start
         run: scripts/verify-web-start.sh
 
+      # The Pages CMS config the cms capability derives, held to Pages CMS's own
+      # strict schema, which the application itself would otherwise ignore a
+      # violation of. See scripts/verify-pages-cms.sh.
+      - name: Derive and validate the Pages CMS config
+        run: scripts/verify-pages-cms.sh
+
       # A Hono API with Drizzle over it: tests, a Worker dry run, and a schema
       # change carried through to a migration. See scripts/verify-api-hono.sh.
       - name: Scaffold, install, typecheck, test, deploy dry run — Hono and Drizzle

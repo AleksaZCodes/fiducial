@@ -1,7 +1,7 @@
 # fiducial:cms — Content Editor Skill
 
-This product has the `cms` capability: a **local** content editor over the
-repository's own files.
+This product has the `cms` capability: a content editor over the repository's
+own files, local (Keystatic, Tina) or hosted (Pages CMS).
 
 `pnpm dev` in `apps/cms` (or from the root, where turbo runs it with the site)
 serves **Keystatic** at `http://localhost:4321/keystatic`. Every save writes
@@ -21,7 +21,7 @@ same editor serves a Next.js product and a SvelteKit one. That is not a missing
 feature: a hosted editor needs auth, a session, a backend and a second copy of
 the content, and the second copy is the thing this platform exists to delete.
 
-## Two editors, one set of files
+## Three editors, one set of files
 
 `[cms] editor` in `fiducial.toml` picks one:
 
@@ -29,16 +29,34 @@ the content, and the second copy is the thing this platform exists to delete.
 |---|---|---|
 | `keystatic` (default) | Writers who edit forms: collections, fields, a settings page | Real image picker, relationship pickers, slug field. Reads and writes the files directly |
 | `tina` | Editing on the page itself, visual editing, a hosted editor later | Local mode needs no service; hosting it is a Tina Cloud or self-hosted dependency |
+| `pages` | People with no checkout and nothing to run: a hosted editor that commits to GitHub | Reads `.pages.yml` at the repository root; sign in at pagescms.org with GitHub. Needs no `apps/cms` install |
 
-Both configs are derived from one model every time, and both edit the same
+All three configs are derived from one model every time, and all edit the same
 files, so switching is `editor = "tina"`, `fid derive`, `pnpm install` — never a
-content migration. Two honest differences, because Tina stores different values:
-a picture is a text field holding the media **key**, and a relation is the
-entry's slug as text.
+content migration. Honest differences, because Tina and Pages CMS store
+different values: a picture is a text field holding the media **key**, and a
+relation is the entry's slug as text.
+
+### Pages CMS
+
+`.pages.yml` is held to Pages CMS's own strict schema by
+`scripts/verify-pages-cms.sh` in this platform's CI, because Pages CMS ignores a
+malformed config without saying so. Three things it cannot do, and so does not:
+
+- **A bare media key.** Its image field stores a public path (`/images/x.png`),
+  never `site/x.png`. Set `[cms] public_base = "/images"` and
+  `media_input = "public/images"` (the repository directory it commits uploads
+  to) and the picture becomes a picker; without both it stays a text field.
+- **A relation as a picker.** Its `reference` stores the file name *with* its
+  extension (`ada.md`), not the slug the content layer reads, so a relation is a
+  text field. Partial dates ("2026-11") are text for the same kind of reason.
+- **One file name in every language.** Each locale is its own collection; the
+  editor asks for the file name when an entry is created, and keeping it the
+  same across languages is on the person.
 
 ## The config is derived — do not edit it
 
-`apps/cms/keystatic.config.ts`, `apps/cms/tina/config.ts` and
+`apps/cms/keystatic.config.ts`, `apps/cms/tina/config.ts`, `.pages.yml` and
 `apps/cms/package.json` are written by `scripts/derive-cms.mjs` from:
 
 - `content.toml` — every collection, its schema and whether it has a body
@@ -168,9 +186,9 @@ ignored.
 
 ## Not here yet
 
-Hosted editing for people with no checkout (Keystatic's GitHub mode, Tina
-Cloud) needs the media pipeline to stop assuming a local staging directory. It
-is on the roadmap, not half-built here.
+Hosted editing through Keystatic's GitHub mode or Tina Cloud needs the media
+pipeline to stop assuming a local staging directory. Pages CMS is hosted today
+(above); the other two are on the roadmap, not half-built here.
 
 ## What an agent should do with this
 

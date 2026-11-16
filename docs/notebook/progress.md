@@ -2,6 +2,12 @@
 
 *What each release moved, against the open Fiducial tasks. Newest first.*
 
+## 0.29.0 · 2026-11-16
+
+- Pages CMS is the third editor: `.pages.yml`, derived from the content model and
+  held to Pages CMS's own schema in CI. Hosted editing through Keystatic's GitHub
+  mode and Tina Cloud is still open.
+
 ## 0.28.0 · 2026-11-16
 
 Phase 8 closes: the topology declares CAN, CAN-FD and RS-485 bit rates and a

@@ -698,7 +698,7 @@ once, and never guessed.
 | ✅ **TanStack Start (React)** | `web-start` capability | A full-stack React app where end-to-end types matter: typed server functions, TanStack Router and Query, a lot of client state. The choice over Next.js when the app does not want the App Router's server-component model. **Shipped in 0.24.0** on Workers through `@cloudflare/vite-plugin` (verified against Cloudflare's own scaffold), with a custom server entry that sets the security headers |
 | ✅ **Hono** | `api-hono` capability, `apps/api` | A backend for anything, mostly the Astro and SPA cases that have no route handlers of their own. Workers-native, tiny, built on Web standards, and its typed RPC client carries request and response types to the front end. The same app runs on Node for a self-hosted target. **Shipped in 0.22.0:** a Worker entry, a Node entry, a test that drives the app with no server, and the typed `AppType` |
 | ✅ **Drizzle ORM** | `orm-drizzle` capability | An app that wants typed queries over D1, Postgres (Supabase) or self-hosted SQLite. It is a layer over the `database` contract, not a replacement: the contract and its `Migrator` stay, and the app opts in. **Shipped in 0.22.0** for SQLite (D1 and the self-hosted file); Postgres is not wired |
-| ⬜ **Pages CMS** | `cms` editor `pages` | Editors who are not technical and should not run anything locally: a hosted editor over the repository, any framework, no build coupling |
+| ✅ **Pages CMS** | `cms` editor `pages` | Editors who are not technical and should not run anything locally: a hosted editor over the repository, any framework, no build coupling. Shipped in 0.29.0: `.pages.yml` derived from the same model and held to Pages CMS's own schema in CI. A picture is a picker only for a product that stores URL paths; a relation is text, because its reference field stores the file name with its extension |
 | ✅ **Keystatic** | `cms` editor `keystatic` (default) | Writers who edit forms. Shipped in 0.15.0: derived from `content.toml`, one editable collection per locale, real image and relationship pickers. Still to come: its Astro integration (`@keystatic/astro`) and GitHub mode for hosted editing |
 | ✅ **TinaCMS** | `cms` editor `tina` | Editing on the page itself, visual editing. Shipped in 0.15.0 as the second deriver over the same model and the same files; visual editing and Tina Cloud hosting are not wired yet |
 
@@ -749,8 +749,9 @@ rather than generating something that half works.
   model from `content.toml`, `press/`, `messages/`, `settings.json` and
   `[i18n]`, and emits Keystatic's and Tina's configs from it, selected by
   `[cms] editor`. The content model is declared once and switching editor is a
-  re-derive. Pages CMS is the next emitter, and hosted editing (GitHub mode,
-  Tina Cloud) waits on media no longer being a local staging directory.
+  re-derive. Pages CMS is the third emitter (`.pages.yml`); hosted editing through
+  Keystatic's GitHub mode and Tina Cloud waits on media no longer being a local
+  staging directory.
 - Drizzle: the schema in TypeScript is the declaration, and the SQL it
   generates feeds the existing `Migrator`; do not keep a second, hand-written
   SQL copy of the same tables.

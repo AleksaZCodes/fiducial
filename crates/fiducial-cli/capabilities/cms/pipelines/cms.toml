@@ -1,7 +1,7 @@
 name     = "cms"
 executor = "shell"
 args     = ["node", "scripts/derive-cms.mjs"]
-outputs  = ["apps/cms/keystatic.config.ts", "apps/cms/tina/config.ts", "apps/cms/package.json"]
+outputs  = ["apps/cms/keystatic.config.ts", "apps/cms/tina/config.ts", ".pages.yml", "apps/cms/package.json"]
 # What the script reads: an edit here, not re-derived, fails `fid derive --check`.
 inputs   = ["fiducial.toml#cms", "fiducial.toml#i18n", "fiducial.toml#product", "content.toml?", "content/**", "press/**", "messages/**", "settings.json?"]
 
@@ -23,9 +23,9 @@ inputs   = ["fiducial.toml#cms", "fiducial.toml#i18n", "fiducial.toml#product", 
 # So the editor follows the declarations, and `fid derive --check` fails when
 # it is stale. Change a schema and the editor changes on the next derive.
 #
-# ## Both editors, always
+# ## Every editor, always
 #
-# Keystatic (default) and Tina are both derived from one model and both edit
+# Keystatic (default), Tina and Pages CMS are all derived from one model and all edit
 # the same plain files, so `[cms] editor` selects which one runs and nothing
 # else. `apps/cms/package.json` is derived so only that editor is installed.
 #

@@ -15,8 +15,9 @@
 //
 //   keystatic  apps/cms/keystatic.config.ts   (default)
 //   tina       apps/cms/tina/config.ts
+//   pages      .pages.yml                      (Pages CMS: hosted, edits through GitHub)
 //
-// Both configs are always written and both edit the same files — plain `.md`
+// All three configs are always written and both edit the same files — plain `.md`
 // with YAML frontmatter, plain `.json` — so changing `[cms] editor` is a
 // derive and an install, never a content migration. `apps/cms/package.json` is
 // derived too, so only the chosen editor's packages are installed.
@@ -33,7 +34,7 @@ const cfg = parseToml(read("fiducial.toml"));
 const productName = cfg.product?.name ?? "site";
 const locales = cfg.i18n?.locales ?? ["en"];
 const cms = cfg.cms ?? {};
-const EDITORS = ["keystatic", "tina"];
+const EDITORS = ["keystatic", "tina", "pages"];
 const editor = cms.editor ?? "keystatic";
 if (!EDITORS.includes(editor)) {
   throw new Error(`[cms] editor = "${editor}" is not one of: ${EDITORS.join(", ")}`);
@@ -54,6 +55,12 @@ const mediaField = cms.media_field ?? "picker";
 if (!["picker", "text"].includes(mediaField)) {
   throw new Error(`[cms] media_field = "${mediaField}" is not one of: picker, text`);
 }
+// Pages CMS commits an upload into a repository directory and stores the PUBLIC
+// path it is served at. It can therefore hold `/images/x.png`, never a bare key
+// like `site/x.png`: its write path always prefixes `/`. So an image field is
+// offered only for a product that stores URL paths (`public_base`) and says where
+// the repository keeps them (`media_input`); anything else is a text field.
+const mediaInput = cms.media_input ?? "";
 const selects = cms.selects ?? {}; // "collection.field" → ["a", "b"]
 const hints = cms.hints ?? {}; //     "collection.field" → "help text"
 
@@ -576,6 +583,150 @@ export default defineConfig(${print({
 })});
 `;
 
+// ── Emit: Pages CMS ─────────────────────────────────────────────────────────
+// Pages CMS is a hosted editor over a GitHub repository: it reads `.pages.yml`
+// from the root and commits every save, so editing needs no local checkout and
+// no server of ours. The same plain `.md` and `.json` files, again.
+//
+// The shape is the one in its own schema (`lib/config-schema.ts`, strict: an
+// unknown key is an error, and a malformed file is silently tolerated by the
+// app, which is why the derived output is held to that schema in
+// `scripts/verify-pages-cms.mjs`). Values of a few kinds differ from the others,
+// for reasons Pages CMS dictates:
+//  - a picture is a text field holding the media key, unless the product stores
+//    URL paths and names where the repository keeps them (see `mediaInput`);
+//  - a relation is text holding the entry's slug. Its `reference` field would
+//    store `{name}`, which is the file name WITH its extension (`ada.md`), and
+//    nothing it offers yields the slug the content layer reads;
+//  - a partial date ("2026", "2026-11") is text, because its date field only
+//    holds a full day.
+const pagesFile = (e) =>
+  e.kind === "collection" ? undefined : `${e.path}.${e.kind === "data" ? "json" : "md"}`;
+
+function pagesField(f, e) {
+  const base = { name: f.name, label: f.label, description: f.hint || undefined };
+  switch (f.type) {
+    case "long":
+      return { ...base, type: "text" };
+    case "date":
+      return { ...base, type: "date" };
+    case "partial":
+      return { ...base, type: "string", description: f.hint ?? "A year, a month (2026-11) or a day" };
+    case "number":
+      return { ...base, type: "number" };
+    case "bool":
+      return { ...base, type: "boolean" };
+    case "list":
+      return { ...base, type: "string", list: true };
+    case "select":
+      return { ...base, type: "select", options: { values: f.options } };
+    case "multiselect":
+      return { ...base, type: "select", options: { multiple: true, values: f.options } };
+    case "objects":
+      return { ...base, type: "object", list: true, fields: f.fields.map((x) => pagesField(x, e)) };
+    case "object":
+      return { ...base, type: "object", fields: f.fields.map((x) => pagesField(x, e)) };
+    case "body":
+      return { name: "body", label: f.label, type: "rich-text" };
+    case "media":
+      return publicBase && mediaInput
+        ? { ...base, type: "image", options: { media: "uploads" } }
+        : {
+            ...base,
+            type: "string",
+            description:
+              f.hint ?? `Media key under ${f.prefix}/ (staged in ${mediaDir}/, synced by pnpm media:push)`,
+          };
+    case "relation":
+      return {
+        ...base,
+        type: "string",
+        list: f.many || undefined,
+        description: f.hint ?? `Slug of an entry in ${f.target}`,
+      };
+    default:
+      return { ...base, type: "string", ...(f.name === e.title ? { required: true } : {}) };
+  }
+}
+
+function pagesEntry(e) {
+  const fields = e.fields.map((f) => pagesField(f, e));
+  if (e.kind === "collection") {
+    return {
+      name: e.key,
+      label: e.label,
+      type: "collection",
+      path: e.path,
+      format: "yaml-frontmatter",
+      filename: { template: "{primary}.md", field: "create" },
+      view: { primary: e.title, default: { sort: e.title, order: "asc" } },
+      fields,
+    };
+  }
+  return {
+    name: e.key,
+    label: e.label,
+    type: "file",
+    path: pagesFile(e),
+    format: e.kind === "data" ? "json" : "yaml-frontmatter",
+    fields,
+  };
+}
+
+// Group by section the way the other editors' navigation does. Pages CMS finds an
+// entry by its name, so a group's name is prefixed: a `Settings` group and the
+// `settings.json` file would otherwise both be `settings`.
+const pagesContent = [];
+for (const e of entries) {
+  let g = pagesContent.find((x) => x.label === e.group);
+  if (!g) pagesContent.push((g = { name: `group-${e.group.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`, label: e.group, type: "group", items: [] }));
+  g.items.push(pagesEntry(e));
+}
+
+const pagesConfig = {
+  media: publicBase && mediaInput
+    ? [{ name: "uploads", label: "Uploads", input: mediaInput, output: publicBase.replace(/\/$/, "") || "/" }]
+    : undefined,
+  content: pagesContent,
+};
+
+// A small YAML printer for plain data: strings are always double-quoted (JSON
+// strings are valid YAML), so nothing is ever read as a number, a boolean or a
+// date by accident.
+function yaml(v, indent = 0) {
+  const pad = "  ".repeat(indent);
+  if (Array.isArray(v)) {
+    if (v.length === 0) return " []";
+    return `\n${v
+      .map((x) => {
+        if (x && typeof x === "object" && !Array.isArray(x)) {
+          const body = yamlMap(x, indent + 1).replace(/^ +/, "");
+          return `${pad}- ${body}`;
+        }
+        return `${pad}-${yaml(x, indent + 1)}`;
+      })
+      .join("\n")}`;
+  }
+  if (v && typeof v === "object") return `\n${yamlMap(v, indent)}`;
+  return ` ${JSON.stringify(v)}`;
+}
+function yamlMap(o, indent) {
+  const pad = "  ".repeat(indent);
+  return Object.entries(o)
+    .filter(([, v]) => v !== undefined)
+    .map(([k, v]) => `${pad}${k}:${yaml(v, indent + 1)}`)
+    .join("\n");
+}
+
+const pagesYml = `# Generated by \`fid derive\` (pipeline: cms) from content.toml, press/, messages/,
+# settings.json and [i18n]. Do not edit — change the declaration and re-derive.
+# \`fid derive --check\` fails if this file is stale.
+#
+# Read by Pages CMS (https://pagescms.org), which edits these same files through
+# GitHub. It is the editor to choose when the people editing have no checkout.
+${yamlMap(pagesConfig, 0)}
+`;
+
 // ── Emit: the editor workspace's package.json ────────────────────────────────
 const pkg = {
   name: `@${productName}/cms`,
@@ -583,12 +734,16 @@ const pkg = {
   private: true,
   scripts: {
     dev:
-      editor === "tina"
-        ? "node dev.mjs here tinacms dev"
-        : "node dev.mjs root next dev apps/cms --port 4321",
+      editor === "pages"
+        ? 'node -e "console.error(\'Pages CMS is hosted: sign in at https://app.pagescms.org and open this repository.\')"'
+        : editor === "tina"
+          ? "node dev.mjs here tinacms dev"
+          : "node dev.mjs root next dev apps/cms --port 4321",
   },
   dependencies:
-    editor === "tina"
+    editor === "pages"
+      ? {}
+      : editor === "tina"
       ? { "@tinacms/cli": "^4.0.5", tinacms: "^3.15.2", react: "^19.0.0", "react-dom": "^19.0.0" }
       : {
           "@keystatic/core": "^0.6.9",
@@ -612,6 +767,7 @@ function emit(dest, text) {
   writeFileSync(at(dest), text);
 }
 emit("apps/cms/keystatic.config.ts", keystatic);
+emit(".pages.yml", pagesYml);
 emit("apps/cms/tina/config.ts", tina);
 emit("apps/cms/package.json", `${JSON.stringify({ ...pkg, "//": stamp }, null, 2)}\n`);
 console.log(
