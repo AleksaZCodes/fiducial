@@ -22,7 +22,10 @@ pnpm=(npx --yes pnpm@11)
 work="$(mktemp -d)"
 server=""
 cleanup() {
-  [ -n "$server" ] && kill "$server" 2>/dev/null || true
+  # The preview is `npx pnpm exec vite preview`: killing the wrapper alone leaves
+  # vite and workerd running, still holding the port. It runs in its own process
+  # group (setsid), and the whole group goes.
+  [ -n "$server" ] && kill -- "-$server" 2>/dev/null || true
   rm -rf "$work"
 }
 trap cleanup EXIT
@@ -60,10 +63,17 @@ cd apps/web
 
 # The built app, in workerd: every required header is on a real response.
 # curl treats a bare host:port as plain http.
-base="localhost:4173"
-"${pnpm[@]}" exec vite preview --port 4173 --strictPort >"$work/preview.log" 2>&1 &
+base="localhost:4174"
+# One port per script, and a port nobody holds: a server left over from another
+# run answers a request, and a test that cannot tell whose answer it is is not a test.
+if curl -fsS -o /dev/null "$base/" 2>/dev/null; then
+  echo "✗ something already answers on $base" >&2
+  exit 1
+fi
+setsid "${pnpm[@]}" exec vite preview --port 4174 --strictPort >"$work/preview.log" 2>&1 &
 server=$!
 for _ in $(seq 1 60); do
+  kill -0 "$server" 2>/dev/null || { echo "✗ the preview server exited" >&2; cat "$work/preview.log" >&2; exit 1; }
   curl -fsS -o /dev/null "$base/" 2>/dev/null && break
   sleep 1
 done
