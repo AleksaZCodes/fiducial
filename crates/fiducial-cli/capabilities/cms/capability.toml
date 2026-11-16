@@ -9,14 +9,18 @@ requires_capabilities = ["content", "i18n"]
 
 # Which editor runs, and where uploads are staged and how they are keyed.
 #
-# `editor` is `keystatic` or `tina`; both configs are always derived and both
+# `editor` is `keystatic`, `tina` or `pages` (hosted, edits through GitHub); every
+# config is always derived and all of them
 # edit the same files, so changing it never converts content.
 #
 # `media_dir` is the gitignored staging directory. An image added to a post
 # lands at `<media_dir>/<prefix>/<slug>/<file>` locally and is stored in the
 # entry as the key `<prefix>/<slug>/<file>`, never a URL — see the `content`
 # skill. `<prefix>` is the collection's `media` in content.toml. Set
-# `public_base = "/images"` only if the site stores URL paths instead of keys.
+# `public_base = "/images"` only if the site stores URL paths instead of keys;
+# Pages CMS can store only those, so its image picker also needs `media_input`,
+# the repository directory it commits uploads to. Without both, a picture is a
+# text field there.
 [[declarations.config]]
 block = "cms"
 seed = { editor = "keystatic", media_dir = "media" }

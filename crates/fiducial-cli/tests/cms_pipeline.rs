@@ -411,3 +411,42 @@ fn gallery_images_are_referenced_media() {
         text(&out)
     );
 }
+
+/// Pages CMS is hosted, so its config is a file at the repository root: derived
+/// from the same model, gated like the others, and honest about what it cannot
+/// store. The full shape is held to Pages CMS's own schema by
+/// `scripts/verify-pages-cms.sh`; this keeps the facts a refactor could lose.
+#[test]
+fn pages_cms_is_derived_from_the_same_model_and_gated() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = cms_product(tmp.path());
+    add_collection(
+        &root,
+        "[collections.works]\nkind = \"collection\"\nschema = { title = \"string\", cover = \"media\", relatedWorks = \"string[]\" }\nbody = \"none\"\nroute = \"\"",
+        "a",
+        "---\ntitle: A\ncover: w/a.png\nrelatedWorks: []\n---\n",
+        "---\ntitle: A\ncover: w/a.png\nrelatedWorks: []\n---\n",
+    );
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let yml = std::fs::read_to_string(root.join(".pages.yml")).expect("the Pages CMS config");
+
+    // One collection per locale, at the same paths the other editors use.
+    assert!(yml.contains("name: \"works_en\""), "{yml}");
+    assert!(yml.contains("path: \"content/works/sr\""), "{yml}");
+    assert!(yml.contains("format: \"yaml-frontmatter\""), "{yml}");
+    // A group is named apart from any file, so `settings` cannot be both.
+    assert!(yml.contains("name: \"group-works\""), "{yml}");
+    // A media key and a slug cannot be stored by its picker or its reference.
+    assert!(!yml.contains("type: \"image\""), "{yml}");
+    assert!(!yml.contains("type: \"reference\""), "{yml}");
+    // Strings are quoted, so nothing is ever read as a number or a date.
+    assert!(!yml.contains(": works"), "{yml}");
+
+    assert!(run(&root, &["derive", "--check"]).status.success());
+    std::fs::write(root.join(".pages.yml"), "content: []\n").unwrap();
+    assert!(
+        !run(&root, &["derive", "--check"]).status.success(),
+        "a hand-edited .pages.yml passed --check"
+    );
+}
