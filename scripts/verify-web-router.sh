@@ -47,6 +47,7 @@ sed -i 's/^\[deploy\]/[deploy]\nshape = "reactrouter"/' fiducial.toml
 grep -q '^shape = "reactrouter"' fiducial.toml || printf '\n[deploy]\nshape = "reactrouter"\n' >> fiducial.toml
 sed -i 's/REPLACE_WITH_DATABASE_ID/00000000-0000-0000-0000-000000000000/; s/REPLACE_WITH_BUCKET_NAME/site-assets/; s/REPLACE_WITH_QUEUE_NAME/site-jobs/' fiducial.toml
 
+"$fid" skills sync --install >/dev/null   # a real product installs the vendored skills its capabilities name
 "$fid" derive >/dev/null
 if "$fid" doctor 2>&1 | grep -E "migration pending|upstream template updated|✗"; then
   echo "✗ a fresh React Router product reports problems" >&2

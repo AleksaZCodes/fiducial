@@ -41,6 +41,7 @@ TOML
 sed -i 's/^\[deploy\]/[deploy]\nshape = "astro"/' fiducial.toml
 grep -q '^shape = "astro"' fiducial.toml || printf '\n[deploy]\nshape = "astro"\n' >> fiducial.toml
 
+"$fid" skills sync --install >/dev/null   # a real product installs the vendored skills its capabilities name
 "$fid" derive >/dev/null
 if "$fid" doctor 2>&1 | grep -E "migration pending|upstream template updated|✗.*apps"; then
   echo "✗ a fresh Astro product reports problems" >&2
