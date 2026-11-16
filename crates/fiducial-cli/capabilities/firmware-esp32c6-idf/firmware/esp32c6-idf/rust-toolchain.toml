@@ -1,8 +1,14 @@
 [toolchain]
 # `riscv32imac-esp-espidf` is a tier-3 target, so std is built from source.
 #
-# Pinned, not "nightly": on 2026-11-13 the nightly's std for ESP-IDF did not
-# compile against its own libc (`st_atime` missing from `stat`). This one builds
-# std and every crate up to the SDK. Move it on purpose, and rebuild.
-channel    = "nightly-2026-10-15"
+# Pinned, not "nightly", and for a reason that has bitten twice:
+#   - nightly-2026-11-13: std did not compile against its own libc (`st_atime`
+#     missing from `stat`).
+#   - nightly-2026-10-15: std and the SDK build, then rustc crashes (an internal
+#     compiler error, `compare_const_generic_param_types`) on `esp-idf-svc`
+#     0.53.0 against `embedded-svc`'s async `scan_n::<N>`.
+# nightly-2026-10-01 builds the whole product: std, the SDK, esp-idf-svc, and
+# links the firmware (`scripts/verify-firmware.sh`, TARGETS=esp32c6-idf). Move it
+# on purpose, and rebuild: a nightly newer than this is not known to work.
+channel    = "nightly-2026-10-01"
 components = ["rust-src"]
