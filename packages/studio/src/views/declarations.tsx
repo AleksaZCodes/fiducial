@@ -21,7 +21,7 @@ function rank(path: string): number {
   return 3;
 }
 
-export function Declarations() {
+export function Declarations({ onSaved }: { onSaved?: () => void }) {
   const source = useSource();
   const [files, setFiles] = useState<string[]>([]);
   const [query, setQuery] = useState("");
@@ -62,7 +62,8 @@ export function Declarations() {
     try {
       await source.write(open, text);
       setSaved(text);
-      toast.success(source.kind === "github" ? `Committed ${open}` : `Saved ${open}`);
+      onSaved?.();
+      toast.success(source.review ? `Saved ${open} to ${source.review.branch()}` : source.kind === "github" ? `Committed ${open}` : `Saved ${open}`);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -126,7 +127,7 @@ export function Declarations() {
             <div className="flex items-center justify-between gap-2">
               <code className="truncate text-sm">{open}{dirty && " •"}</code>
               <Button onClick={save} disabled={!dirty || saving}>
-                <Save /> {source.kind === "github" ? "Commit" : "Save"}
+                <Save /> {source.review ? "Save to branch" : source.kind === "github" ? "Commit" : "Save"}
               </Button>
             </div>
             <Tabs defaultValue={doc && schema ? "form" : "text"} key={open} className="min-h-0 flex-1">

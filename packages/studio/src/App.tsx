@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Eye, FileCog, LayoutDashboard, LogOut } from "lucide-react";
+import { ReviewBar } from "@/components/review-bar";
 import { Toaster } from "@/components/ui/sonner";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarInset, SidebarMenu,
   SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { loadConfig, type StudioConfig } from "@/lib/config";
 import { SourceContext } from "@/lib/source-context";
 import { githubSource, type GithubTarget } from "@/lib/sources/github";
 import { localSource } from "@/lib/sources/local";
@@ -32,6 +34,18 @@ function safe<T>(fn: () => T): T | null {
   }
 }
 
+/** A token GitHub sign-in just returned in the URL fragment, or one kept for this tab. */
+function signedInToken(): string | null {
+  const hash = new URLSearchParams(location.hash.slice(1));
+  const fresh = hash.get("gh_token");
+  if (fresh) {
+    safe(() => sessionStorage.setItem("studio.ghtoken", fresh));
+    history.replaceState(null, "", location.pathname + location.search);
+    return fresh;
+  }
+  return safe(() => sessionStorage.getItem("studio.ghtoken"));
+}
+
 /** Pick the source from how Studio was opened. `fid studio` prints a URL with
  *  `#token=…`; the fragment never goes to a server, and is moved to session
  *  storage so a reload keeps working. */
@@ -52,11 +66,17 @@ function initialSource(): Source | null {
 export default function App() {
   const [source, setSource] = useState<Source | null>(initialSource);
   const [view, setView] = useState<View>("dashboard");
+  const [saves, setSaves] = useState(0);
+  const [config, setConfig] = useState<StudioConfig>({ authUrl: "" });
+  const [token] = useState(signedInToken);
+  useEffect(() => {
+    loadConfig().then(setConfig);
+  }, []);
   useEffect(() => {
     document.title = source ? `${source.label} · Studio` : "Studio";
   }, [source]);
   const body = useMemo(
-    () => ({ dashboard: <Dashboard />, declarations: <Declarations />, preview: <Preview /> })[view],
+    () => ({ dashboard: <Dashboard />, declarations: <Declarations onSaved={() => setSaves((n) => n + 1)} />, preview: <Preview /> })[view],
     [view],
   );
 
@@ -64,6 +84,8 @@ export default function App() {
     return (
       <>
         <Connect
+          authUrl={config.authUrl}
+          signedInToken={token}
           onGithub={(t, remember) => {
             safe(() => (remember ? localStorage : sessionStorage).setItem(KEY, JSON.stringify(t)));
             setSource(githubSource(t, schema as Schema));
@@ -99,7 +121,7 @@ export default function App() {
             {source.kind === "github" && (
               <SidebarMenuButton
                 onClick={() => {
-                  safe(() => { localStorage.removeItem(KEY); sessionStorage.removeItem(KEY); });
+                  safe(() => { localStorage.removeItem(KEY); sessionStorage.removeItem(KEY); sessionStorage.removeItem("studio.ghtoken"); });
                   setSource(null);
                 }}
               >
@@ -112,6 +134,7 @@ export default function App() {
           <header className="flex h-12 items-center gap-2 border-b px-3">
             <SidebarTrigger />
             <span className="text-sm font-medium">{NAV.find((n) => n.id === view)!.label}</span>
+            <div className="ml-auto"><ReviewBar version={saves} /></div>
           </header>
           <main className="p-4">{body}</main>
         </SidebarInset>

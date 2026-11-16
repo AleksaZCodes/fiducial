@@ -164,7 +164,12 @@ fn is_text_ext(name: &str) -> bool {
 
 /// Process group of the running dev server, so a signal handler (which can do
 /// almost nothing safely) can still stop it. 0 means none.
-static DEV_PGID: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+static DEV_PGIDS: [std::sync::atomic::AtomicI32; TARGETS.len()] =
+    [const { std::sync::atomic::AtomicI32::new(0) }; TARGETS.len()];
+
+/// The servers Studio can run: the product's site, and its content editor.
+/// Each is a slot, so previewing the site and editing content can run at once.
+pub const TARGETS: [&str; 2] = ["web", "cms"];
 
 /// Stop the dev server's whole group. `pnpm dev` is a shell, which starts pnpm,
 /// which starts node, which starts the server: killing only the first leaves the
@@ -179,7 +184,9 @@ fn kill_group(pgid: i32) {
 
 #[cfg(unix)]
 extern "C" fn on_signal(_: libc::c_int) {
-    kill_group(DEV_PGID.load(std::sync::atomic::Ordering::SeqCst));
+    for g in &DEV_PGIDS {
+        kill_group(g.load(std::sync::atomic::Ordering::SeqCst));
+    }
     // SAFETY: `_exit` is async-signal-safe; ordinary exit is not.
     unsafe { libc::_exit(0) };
 }
@@ -204,13 +211,14 @@ struct Dev {
 
 /// What to run for the preview. `[studio] dev` would be declared; until a
 /// product does, the web app's own `dev` script is the answer.
-fn dev_command(root: &Path) -> Option<String> {
-    let pkg = root.join("apps/web/package.json");
+fn dev_command(root: &Path, target: &str) -> Option<String> {
+    let dir = format!("apps/{target}");
+    let pkg = root.join(&dir).join("package.json");
     let has_dev = std::fs::read_to_string(&pkg)
         .ok()
         .and_then(|s| serde_json::from_str::<Value>(&s).ok())
         .is_some_and(|v| v["scripts"]["dev"].is_string());
-    has_dev.then(|| "pnpm --filter ./apps/web dev".to_string())
+    has_dev.then(|| format!("pnpm --filter ./{dir} dev"))
 }
 
 /// `localhost:3000`, `127.0.0.1:5173` and `http://[::1]:4321/` all appear in
@@ -279,12 +287,13 @@ fn dev_status(dev: &Arc<Mutex<Dev>>) -> Value {
     })
 }
 
-fn dev_start(root: &Path, dev: &Arc<Mutex<Dev>>) -> Result<()> {
+fn dev_start(root: &Path, target: &str, slot: usize, dev: &Arc<Mutex<Dev>>) -> Result<()> {
     if dev_status(dev)["running"] == json!(true) {
         return Ok(());
     }
-    let cmd = dev_command(root)
-        .context("no dev server to run: the product has no `apps/web` with a `dev` script")?;
+    let cmd = dev_command(root, target).with_context(|| {
+        format!("no dev server to run: the product has no `apps/{target}` with a `dev` script")
+    })?;
     let mut command = Command::new("sh");
     command
         .args(["-c", &cmd])
@@ -298,7 +307,7 @@ fn dev_start(root: &Path, dev: &Arc<Mutex<Dev>>) -> Result<()> {
         .spawn()
         .with_context(|| format!("starting `{cmd}`"))?;
     #[cfg(unix)]
-    DEV_PGID.store(child.id() as i32, std::sync::atomic::Ordering::SeqCst);
+    DEV_PGIDS[slot].store(child.id() as i32, std::sync::atomic::Ordering::SeqCst);
     let (out, err) = (child.stdout.take(), child.stderr.take());
     {
         let mut d = dev.lock().unwrap();
@@ -317,13 +326,13 @@ fn dev_start(root: &Path, dev: &Arc<Mutex<Dev>>) -> Result<()> {
     Ok(())
 }
 
-fn dev_stop(dev: &Arc<Mutex<Dev>>) {
+fn dev_stop(slot: usize, dev: &Arc<Mutex<Dev>>) {
     let mut d = dev.lock().unwrap();
     if let Some(mut c) = d.child.take() {
         #[cfg(unix)]
         {
             kill_group(c.id() as i32);
-            DEV_PGID.store(0, std::sync::atomic::Ordering::SeqCst);
+            DEV_PGIDS[slot].store(0, std::sync::atomic::Ordering::SeqCst);
         }
         let _ = c.kill();
         let _ = c.wait();
@@ -461,7 +470,8 @@ fn loopback_host(host: &str) -> bool {
 struct State {
     root: PathBuf,
     token: String,
-    dev: Arc<Mutex<Dev>>,
+    /// One dev server per entry of [`TARGETS`].
+    dev: Vec<Arc<Mutex<Dev>>>,
     /// The built Studio app, when one can be found. Public files, no secrets.
     app: Option<PathBuf>,
 }
@@ -595,17 +605,37 @@ fn route(req: &Request, st: &State) -> Result<(u16, Value)> {
                 }),
             ))
         }
-        ("GET", "/api/dev") => Ok((200, dev_status(&st.dev))),
+        ("GET", "/api/dev") => Ok((200, dev_status(&st.dev[target_slot(req)?]))),
         ("POST", "/api/dev/start") => {
-            dev_start(root, &st.dev)?;
-            Ok((200, dev_status(&st.dev)))
+            let slot = target_slot(req)?;
+            dev_start(root, TARGETS[slot], slot, &st.dev[slot])?;
+            Ok((200, dev_status(&st.dev[slot])))
         }
         ("POST", "/api/dev/stop") => {
-            dev_stop(&st.dev);
-            Ok((200, dev_status(&st.dev)))
+            let slot = target_slot(req)?;
+            dev_stop(slot, &st.dev[slot]);
+            Ok((200, dev_status(&st.dev[slot])))
         }
         _ => Ok((404, json!({ "error": "no such route" }))),
     }
+}
+
+fn new_devs() -> Vec<Arc<Mutex<Dev>>> {
+    TARGETS
+        .iter()
+        .map(|_| Arc::new(Mutex::new(Dev::default())))
+        .collect()
+}
+
+/// `?target=cms`, defaulting to the site.
+fn target_slot(req: &Request) -> Result<usize> {
+    let t = req.q("target").unwrap_or("web");
+    TARGETS.iter().position(|x| *x == t).with_context(|| {
+        format!(
+            "unknown target `{t}` (expected one of: {})",
+            TARGETS.join(", ")
+        )
+    })
 }
 
 /// A token nobody can guess: kernel randomness where it exists, otherwise the
@@ -646,7 +676,7 @@ pub fn serve(port: u16, app: Option<PathBuf>) -> Result<()> {
     let st = Arc::new(State {
         root,
         token: make_token(),
-        dev: Arc::new(Mutex::new(Dev::default())),
+        dev: new_devs(),
         app: find_app(&root_for_app, app),
     });
     match &st.app {
@@ -723,6 +753,27 @@ mod tests {
     }
 
     #[test]
+    fn dev_targets_are_named_and_unknown_ones_refused() {
+        let req = |q: &str| Request {
+            method: "GET".into(),
+            path: "/api/dev".into(),
+            query: q
+                .split('&')
+                .filter(|p| !p.is_empty())
+                .map(|p| {
+                    let (k, v) = p.split_once('=').unwrap();
+                    (k.to_string(), v.to_string())
+                })
+                .collect(),
+            headers: vec![],
+            body: vec![],
+        };
+        assert_eq!(target_slot(&req("")).unwrap(), 0, "the site is the default");
+        assert_eq!(target_slot(&req("target=cms")).unwrap(), 1);
+        assert!(target_slot(&req("target=db")).is_err());
+    }
+
+    #[test]
     fn only_loopback_hosts_pass() {
         assert!(loopback_host("localhost:7777"));
         assert!(loopback_host("127.0.0.1:1"));
@@ -739,7 +790,7 @@ mod tests {
         let st = Arc::new(State {
             root: dir.path().to_path_buf(),
             token: "t0k".into(),
-            dev: Arc::new(Mutex::new(Dev::default())),
+            dev: new_devs(),
             app: Some(app_dir.path().to_path_buf()),
         });
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();

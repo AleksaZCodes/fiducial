@@ -3,10 +3,16 @@ import type { Schema, Source } from "../types.ts";
 export interface GithubTarget {
   owner: string;
   repo: string;
-  /** The branch Studio reads and commits to. */
+  /** The branch Studio reads, and where a saved edit lands in `commit` mode. */
   branch: string;
-  /** A fine-grained token with Contents: read/write on this repository. */
+  /** A token with Contents (and, for `pr`, Pull requests) write on this repository. */
   token: string;
+  /**
+   * `commit`: every save is a commit on `branch`.
+   * `pr`: saves go to a new `studio/…` branch and `review.open` raises one pull
+   * request for all of them, so nothing reaches `branch` unreviewed.
+   */
+  mode?: "commit" | "pr";
 }
 
 const API = "https://api.github.com";
@@ -30,17 +36,22 @@ export function b64decode(b64: string): string {
 
 /**
  * The source backed by a repository branch, through GitHub's REST API. No
- * `fid` is involved: this is how a phone, or any browser, edits a product. A
- * save is a commit on `branch`, so history, review and rollback are Git's.
+ * `fid` is involved: this is how a phone, or any browser, edits a product.
  *
  * It cannot run `fid derive` or a dev server (nothing here executes code), so
  * it leaves `dash`, `derive` and `dev` out and the UI hides what it cannot do.
  * `derive` happens where `fid` is: in CI, on the commit this makes.
+ *
+ * `fetchImpl` is injectable so the whole thing is tested without a network.
  */
-export function githubSource(t: GithubTarget, schema: Schema): Source {
+export function githubSource(t: GithubTarget, schema: Schema, fetchImpl: typeof fetch = fetch): Source {
   const repo = `${t.owner}/${t.repo}`;
+  const pr = t.mode === "pr";
+  /** The `studio/…` branch edits go to, once one exists. */
+  let work: string | null = null;
+
   async function gh<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const res = await fetch(`${API}${path}`, {
+    const res = await fetchImpl(`${API}${path}`, {
       method,
       body: body === undefined ? undefined : JSON.stringify(body),
       headers: {
@@ -55,14 +66,29 @@ export function githubSource(t: GithubTarget, schema: Schema): Source {
   }
   const enc = (p: string) => p.split("/").map(encodeURIComponent).join("/");
   const shas = new Map<string, string>();
+  const reading = () => work ?? t.branch;
 
-  return {
+  /** In `pr` mode, make the work branch from the base branch's head, once. */
+  async function ensureBranch(): Promise<string> {
+    if (!pr) return t.branch;
+    if (work) return work;
+    const head = await gh<{ object: { sha: string } }>(
+      "GET",
+      `/repos/${repo}/git/ref/heads/${enc(t.branch)}`,
+    );
+    const name = `studio/${Date.now().toString(36)}`;
+    await gh("POST", `/repos/${repo}/git/refs`, { ref: `refs/heads/${name}`, sha: head.object.sha });
+    work = name;
+    return name;
+  }
+
+  const source: Source = {
     kind: "github",
     label: `${repo}@${t.branch}`,
     async files() {
       const tree = await gh<{ tree: { path: string; type: string }[] }>(
         "GET",
-        `/repos/${repo}/git/trees/${encodeURIComponent(t.branch)}?recursive=1`,
+        `/repos/${repo}/git/trees/${encodeURIComponent(reading())}?recursive=1`,
       );
       return tree.tree
         .filter((e) => e.type === "blob" && TEXT.test(e.path) && !HIDDEN.test(e.path) && !SECRET.test(e.path))
@@ -71,19 +97,20 @@ export function githubSource(t: GithubTarget, schema: Schema): Source {
     async read(path) {
       const f = await gh<{ content: string; sha: string }>(
         "GET",
-        `/repos/${repo}/contents/${enc(path)}?ref=${encodeURIComponent(t.branch)}`,
+        `/repos/${repo}/contents/${enc(path)}?ref=${encodeURIComponent(reading())}`,
       );
       shas.set(path, f.sha);
       return b64decode(f.content);
     },
     async write(path, text, message) {
+      const branch = await ensureBranch();
       // The blob sha is the lock: GitHub refuses the commit if the file changed
       // since it was read, so two editors cannot silently overwrite each other.
       const sha = shas.get(path);
       const r = await gh<{ content: { sha: string } }>("PUT", `/repos/${repo}/contents/${enc(path)}`, {
         message: message ?? `studio: edit ${path}`,
         content: b64encode(text),
-        branch: t.branch,
+        branch,
         ...(sha ? { sha } : {}),
       });
       shas.set(path, r.content.sha);
@@ -92,4 +119,21 @@ export function githubSource(t: GithubTarget, schema: Schema): Source {
     // by `fid studio schema` and a test fails if the committed copy drifts.
     schema: async () => schema,
   };
+
+  if (pr) {
+    source.review = {
+      branch: () => work,
+      async open(title, body) {
+        if (!work) throw new Error("nothing saved yet — there is no branch to propose");
+        const made = await gh<{ html_url: string }>("POST", `/repos/${repo}/pulls`, {
+          title,
+          head: work,
+          base: t.branch,
+          body: body ?? "Edited in Studio.",
+        });
+        return made.html_url;
+      },
+    };
+  }
+  return source;
 }

@@ -63,9 +63,22 @@ export interface Source {
   schema(): Promise<Schema>;
   dash?(): Promise<Dash>;
   derive?(check: boolean): Promise<DeriveResult>;
+  /** Dev servers the source can run, by target: the site, or its content editor. */
   dev?: {
-    status(): Promise<DevStatus>;
-    start(): Promise<DevStatus>;
-    stop(): Promise<DevStatus>;
+    status(target?: DevTarget): Promise<DevStatus>;
+    start(target?: DevTarget): Promise<DevStatus>;
+    stop(target?: DevTarget): Promise<DevStatus>;
+  };
+  /**
+   * Changes collected on a branch for someone to review, instead of landing on
+   * the base branch. Only a source that saves as pull requests has it.
+   */
+  review?: {
+    /** The branch edits are going to, once there has been one. */
+    branch(): string | null;
+    /** Open a pull request for what has been saved; returns its URL. */
+    open(title: string, body?: string): Promise<string>;
   };
 }
+
+export type DevTarget = "web" | "cms";
