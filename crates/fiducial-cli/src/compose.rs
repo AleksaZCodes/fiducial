@@ -74,6 +74,8 @@ pub struct Plan {
     pub product: String,
     pub host: String,
     pub acme: bool,
+    /// `[security] hsts_preload`, applied to the HSTS header on a public domain.
+    pub preload: bool,
     /// The web app's static export, served by Caddy, and the prefix still
     /// proxied to the server.
     pub static_dir: Option<String>,
@@ -344,6 +346,7 @@ pub fn plan(config: &Config, t: Option<&Topology>) -> Result<Plan> {
         product,
         host,
         acme: tls,
+        preload: config.security.hsts_preload,
         static_dir,
         api_prefix,
         services,
@@ -461,34 +464,6 @@ pub fn render_compose(p: &Plan) -> String {
     s
 }
 
-/// The response headers a static export cannot set for itself.
-///
-/// A Next.js static export has no server, so the `headers()` in its config do
-/// not exist, and Caddy sends them instead. They are the same names as
-/// `securityHeaders` in the web template's `next.config.ts`, and a test fails if
-/// the two lists drift. Two values differ on purpose: HSTS is sent only over a
-/// public certificate (a LAN name on Caddy's own CA has nothing to pin) and
-/// without `preload`, which is a deliberate, slow-to-undo step.
-pub const STATIC_HEADERS: [(&str, &str); 6] = [
-    ("X-Content-Type-Options", "nosniff"),
-    ("Referrer-Policy", "strict-origin-when-cross-origin"),
-    ("X-Frame-Options", "DENY"),
-    (
-        "Permissions-Policy",
-        "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
-    ),
-    ("Cross-Origin-Opener-Policy", "same-origin"),
-    (
-        "Content-Security-Policy",
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; media-src 'self' https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
-    ),
-];
-
-pub const HSTS: (&str, &str) = (
-    "Strict-Transport-Security",
-    "max-age=63072000; includeSubDomains",
-);
-
 pub fn render_caddyfile(p: &Plan) -> String {
     let tls = if p.acme {
         "    # A public domain: Caddy gets and renews a certificate itself.\n"
@@ -504,8 +479,13 @@ pub fn render_caddyfile(p: &Plan) -> String {
         return s;
     }
     s.push_str("    header {\n        -Server\n");
-    let hsts = p.acme.then_some(HSTS);
-    for (k, v) in hsts.iter().chain(STATIC_HEADERS.iter()) {
+    // From the platform's one table. HSTS only over a public certificate: a LAN
+    // name on Caddy's own CA has nothing to pin. Never `preload` here: that is a
+    // declared choice for a public site, made in `[security]`.
+    for (k, v) in crate::security::headers(p.preload) {
+        if k == "Strict-Transport-Security" && !p.acme {
+            continue;
+        }
         s.push_str(&format!("        {k} \"{v}\"\n"));
     }
     s.push_str("    }\n\n");
@@ -744,76 +724,25 @@ depends_on = ["db"]
     }
 
     #[test]
-    fn a_public_domain_gets_hsts_and_the_headers_match_the_web_template() {
+    fn a_public_domain_gets_hsts_and_every_header_from_the_one_table() {
         let cfg: Config = toml::from_str(
             "[product]\nname = \"site\"\nversion = \"0.1.0\"\n\n[adapters]\ndeploy = \"compose\"\n\n[deploy]\nhost = \"example.org\"\ntls = \"acme\"\nstatic_dir = \"apps/web/out\"\n",
         )
         .unwrap();
         let caddy = render_caddyfile(&plan(&cfg, None).unwrap());
-        assert!(
-            caddy.contains("Strict-Transport-Security \"max-age=63072000; includeSubDomains\""),
-            "{caddy}"
-        );
-        assert!(!caddy.contains("preload"), "{caddy}");
-
-        // The header names are the web template's own, from its source: a name
-        // added there and not here (or the reverse) is a header the static
-        // export silently lacks.
-        let next = include_str!("../capabilities/web-next/apps/web/next.config.ts");
-        let mut in_next: Vec<&str> = next
-            .split("key: \"")
-            .skip(1)
-            .filter_map(|r| r.split('"').next())
-            .collect();
-        in_next.sort_unstable();
-        let mut here: Vec<&str> = std::iter::once(HSTS.0)
-            .chain(STATIC_HEADERS.iter().map(|(k, _)| *k))
-            .collect();
-        here.sort_unstable();
-        assert_eq!(
-            in_next, here,
-            "next.config.ts securityHeaders vs fid-compose STATIC_HEADERS"
-        );
-
-        // The Astro template's `_headers` is the third copy: the same names and,
-        // for every header the platform shares, the same value.
-        let astro = include_str!("../capabilities/web-astro/apps/web/public/_headers");
-        let mut in_astro: Vec<&str> = astro
-            .lines()
-            .filter(|l| l.starts_with("  "))
-            .filter_map(|l| l.trim().split(':').next())
-            .collect();
-        in_astro.sort_unstable();
-        assert_eq!(
-            in_astro, here,
-            "web-astro _headers vs fid-compose STATIC_HEADERS"
-        );
-        for (k, v) in STATIC_HEADERS.iter().chain(std::iter::once(&HSTS)) {
+        for (k, v) in crate::security::headers(false) {
             assert!(
-                astro.contains(&format!("{k}: {v}")),
-                "web-astro _headers lacks `{k}: {v}`"
+                caddy.contains(&format!("{k} \"{v}\"")),
+                "Caddyfile lacks {k}"
             );
         }
+        assert!(!caddy.contains("preload"), "{caddy}");
 
-        // And the React Router and TanStack Start templates' `security.ts`, the
-        // fourth and fifth: the same names and values, as `["Name", "value"]` pairs.
-        for (name, src) in [
-            (
-                "web-router app/security.ts",
-                include_str!("../capabilities/web-router/apps/web/app/security.ts"),
-            ),
-            (
-                "web-start src/security.ts",
-                include_str!("../capabilities/web-start/apps/web/src/security.ts"),
-            ),
-        ] {
-            for (k, v) in STATIC_HEADERS.iter().chain(std::iter::once(&HSTS)) {
-                assert!(
-                    src.contains(&format!("\"{k}\"")) && src.contains(&format!("\"{v}\"")),
-                    "{name} lacks `{k}: {v}`"
-                );
-            }
-        }
+        // Preload only when the product declares it.
+        let mut with_preload = cfg;
+        with_preload.security.hsts_preload = true;
+        let caddy = render_caddyfile(&plan(&with_preload, None).unwrap());
+        assert!(caddy.contains("includeSubDomains; preload"), "{caddy}");
     }
 
     #[test]

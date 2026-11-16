@@ -29,7 +29,8 @@
       "apps/cms/**",
       "**/.output/**",
       "**/worker-configuration.d.ts",
-      "**/dist/**"
+      "**/dist/**",
+      "**/*.generated.ts"
     ]
   },
   "overrides": [

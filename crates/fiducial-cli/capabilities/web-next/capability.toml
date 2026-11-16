@@ -11,3 +11,11 @@ guard_rules = ["no-unpinned-cli-fetch"]
 # When `fid new` became minimal, nothing declared the dependency, and a
 # minimal product with `fid add app next` stopped building. So it is declared.
 requires_capabilities = ["design"]
+
+# The response headers are derived (pipelines/security-*.toml) from the platform's
+# one table. The only choice a product makes is whether HSTS carries `preload`,
+# which is a willingness to be submitted at hstspreload.org and slow to undo, so
+# it is written down here and off.
+[[declarations.config]]
+block = "security"
+seed = { hsts_preload = false }

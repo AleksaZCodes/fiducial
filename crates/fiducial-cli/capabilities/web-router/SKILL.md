@@ -33,7 +33,8 @@ non-React project and is not what this installs.
 - **`@cloudflare/vite-plugin`** on the `ssr` environment: `dev` and `build` run the
   server inside `workerd`, the runtime a deploy uses.
 - **The Worker entry** `workers/app.ts` calls the request handler and sets the
-  security headers from `app/security.ts` on every response.
+  security headers from `app/security.generated.ts` on every response (derived by
+  `fid derive` from the platform's one table; `[security] hsts_preload` is the only choice).
 - **Tailwind 4 on the design tokens**: `app/app.css` imports the `tokens.css` and
   `marks.css` the `design` capability installs into `src/app/`.
 
@@ -50,7 +51,8 @@ shape = "reactrouter"
 `fid derive` writes `apps/web/wrangler.jsonc` (the name and `main = "workers/app.ts"`;
 the Vite plugin adds the client assets itself, so they are not stated twice).
 `fid doctor` holds the framework and the shape to agreeing, and fails an app whose
-`app/security.ts` lacks a required security header.
+`app/security.generated.ts` lacks a required security header or has not been
+derived yet (`fid derive` writes it).
 
 ## Build, run, deploy
 

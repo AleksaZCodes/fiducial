@@ -14,7 +14,8 @@ mostly words: Astro sends no JavaScript until a component asks for it.
 - **Tailwind 4** through its Vite plugin, on the design tokens: `src/styles/app.css`
   imports `tokens.css` and `marks.css` that the `design` capability derives and
   installs into `src/app/`.
-- **Response headers in `public/_headers`**, read by Workers Static Assets from
+- **Response headers in `public/_headers`**, derived by `fid derive` from the platform's
+  one table (`[security]` is the only choice: `hsts_preload`), read by Workers Static Assets from
   the build output, because a static site has no server to set them. The same
   names and values as the Next.js set and the self-hosted Caddyfile.
 - **Deployed as static assets**: `[deploy] shape = "astro"` derives a
@@ -31,7 +32,8 @@ shape = "astro"
 ```
 
 `fid doctor` holds the two to agreeing, and fails an Astro app whose
-`public/_headers` lacks a required security header.
+`public/_headers` lacks a required security header. Do not edit that file: it is
+derived, and `fid derive --check` fails a changed copy.
 
 ## Build, run, deploy
 

@@ -734,7 +734,8 @@ fn check_security_headers(root: &Path, issues: &mut Vec<String>, ok: &mut Vec<St
         let Ok(primary) = std::fs::read_to_string(&config) else {
             issues.push(format!(
                 "{} app has no `{}`, so nothing sets its response headers.\n      \
-                 Every request it serves goes out without HSTS, CSP, or any of the rest.",
+                 Every request it serves goes out without HSTS, CSP, or any of the rest.\n      \
+                 `fid derive` writes it from [security]; run it if this app was just added.",
                 shape.name, shape.config
             ));
             continue;

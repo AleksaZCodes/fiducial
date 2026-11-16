@@ -1,0 +1,10 @@
+name     = "security-start"
+executor = "fid-security"
+args     = ["ts-pairs"]
+outputs  = ["apps/web/src/security.generated.ts"]
+
+# The response headers, derived from the platform's one table (security.rs), so
+# this file cannot disagree with the other frameworks' or with the self-hosted
+# Caddyfile. The only choice a product makes is `[security] hsts_preload`.
+#
+# Edit nothing here by hand: `fid derive --check` fails on a changed copy.
