@@ -18,6 +18,7 @@
   "files": {
     "ignore": [
       "**/.astro/**",
+      "**/dist/**",
       "**/.wrangler/**",
       "**/node_modules/**",
       "**/generated/**",

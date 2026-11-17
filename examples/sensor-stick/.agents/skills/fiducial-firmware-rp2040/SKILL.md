@@ -5,7 +5,7 @@ description: "RP2040 Embassy firmware with defmt logging and probe-rs flashing U
 
 # Skill: firmware-rp2040
 
-**Capability:** `firmware-rp2040` · **Platform:** Fiducial 0.38.0
+**Capability:** `firmware-rp2040` · **Platform:** Fiducial 0.39.0
 
 ---
 

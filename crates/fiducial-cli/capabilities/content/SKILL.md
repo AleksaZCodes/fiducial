@@ -180,8 +180,8 @@ A database cannot be checked by CI.
 
 ## Rendering a collection
 
-`EntryCards` (`.svelte` under `web-svelte`, `entry-cards.tsx` under
-`web-next`) renders a collection as **one cover story and a grid of the
+`EntryCards` (`.svelte` under `web-svelte`, `.astro` under `web-astro`,
+`entry-cards.tsx` under `web-next`) renders a collection as **one cover story and a grid of the
 rest** — the most recent or pinned entry gets a card with room for its
 summary, the others get a grid below.
 

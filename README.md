@@ -252,7 +252,7 @@ product actually needs.
 | `site` | declares `site`; 1 pipeline(s); 15 template file(s); seeds a `fiducial.toml` block | `fid add capability site` |
 | `tauri` | 5 template file(s); guard rules | `fid add capability tauri` |
 | `topology` | declares `topology.toml`; 1 pipeline(s) | `fid add capability topology` |
-| `web-astro` | declares `security`; 1 pipeline(s); 9 template file(s); seeds a `fiducial.toml` block; guard rules | `fid add capability web-astro` |
+| `web-astro` | declares `security`; 1 pipeline(s); 10 template file(s); seeds a `fiducial.toml` block; guard rules | `fid add capability web-astro` |
 | `web-next` | declares `security`; 1 pipeline(s); 14 template file(s); seeds a `fiducial.toml` block; guard rules | `fid add capability web-next` |
 | `web-router` | declares `security`; 1 pipeline(s); 16 template file(s); seeds a `fiducial.toml` block; guard rules | `fid add capability web-router` |
 | `web-start` | declares `security`; 1 pipeline(s); 12 template file(s); seeds a `fiducial.toml` block; guard rules | `fid add capability web-start` |

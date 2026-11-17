@@ -54,14 +54,33 @@ Deploy with `wrangler deploy` from `apps/web` (the derived config is
 
 Said plainly so it is not rediscovered:
 
-- **No islands.** React and Svelte components are an `astro add` away, and the
-  platform's components are not yet wired for either. Add one when a page needs
-  interactivity, not before.
-- **No content editor wiring.** `@keystatic/astro` is the planned integration
-  (the editor would run inside the dev server, with no separate `apps/cms`). Until
-  then `cms` works as it does for the other frameworks, through its own workspace.
-- **No i18n routing, SEO or `content` accessors.** Those capabilities derive for
-  Next.js and SvelteKit; their Astro forms are the next step.
+- **No framework islands.** React and Svelte components are an `astro add` away
+  and the platform does not wire them. The components below are `.astro` files
+  with a few lines of script each, so a page that uses them still ships almost
+  no JavaScript. Add a framework island when a page needs real interactivity.
+- **No content editor wiring inside the dev server.** `@keystatic/astro` is the
+  planned integration. Until then `cms` works as it does for the other
+  frameworks: through its own workspace, or hosted with `editor = "pages"`.
+- **No i18n routing.** Which URLs a product's languages live at is its own
+  decision (`/en/…` prefixes, `?lang=`); `i18n` derives the catalogs and the
+  picker takes an `href` builder. `seo` derives the sitemap and `hreflang`.
+
+## Components other capabilities add
+
+Installed by `fid add` when both capabilities are present, in either order. Each
+has a React and a Svelte twin; the three are the same decisions, and the
+comment at the top of each file lists them.
+
+| Component | From | What it is |
+|---|---|---|
+| `MobileMenu.astro` | `web-astro` | The nav links in a sheet on a narrow screen: a native modal `<dialog>`, so focus is trapped, the page behind is inert, Escape closes it and focus returns to the button. No library |
+| `LocalePicker.astro` | `i18n` | A list of languages, each named in its own, as real links with `hreflang`; a `<details>` disclosure plus a few lines of script for Escape and click-outside |
+| `EntryCards.astro` | `content` | A collection's entries: one cover story, a grid of the rest, the whole card one link |
+| `PressKit.astro`, `MediaFigure.astro` | `press` | The press room in the order a journalist needs it: assets, facts, copyable boilerplate, stories, contact |
+
+They read the product's design tokens (`--border`, `--radius-md`, `--primary`)
+with fallbacks, take their words and routes as props, and are platform-owned:
+`fid upgrade` keeps them current, so edit the page that uses them, not them.
 
 ## Guard rules activated
 

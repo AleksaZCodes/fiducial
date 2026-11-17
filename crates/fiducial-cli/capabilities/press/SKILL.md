@@ -196,7 +196,8 @@ one of which is not a win.
 
 ## Rendering the press room
 
-`PressKit` (`.svelte` under `web-svelte`, `press-kit.tsx` under `web-next`)
+`PressKit` (`.svelte` under `web-svelte`, `.astro` under `web-astro`,
+`press-kit.tsx` under `web-next`)
 renders the whole room. It reads `generated/press.ts` itself; the product
 supplies labels, the logo list, an optional gallery, and three functions —
 where a story lives, how an angle reads, how a date reads.
