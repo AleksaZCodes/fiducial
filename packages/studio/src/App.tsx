@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Eye, FileCog, LayoutDashboard, LogOut, Network } from "lucide-react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { Blocks as BlocksIcon, Eye, FileCog, LayoutDashboard, LogOut, Network } from "lucide-react";
 import { ReviewBar } from "@/components/review-bar";
 import { Toaster } from "@/components/ui/sonner";
 import {
@@ -19,11 +19,15 @@ import { Diagram } from "@/views/diagram";
 import { Declarations } from "@/views/declarations";
 import { Preview } from "@/views/preview";
 
-type View = "dashboard" | "declarations" | "diagram" | "preview";
+// The block editor carries a parser, so it loads only when opened.
+const Blocks = lazy(() => import("@/views/blocks"));
+
+type View = "dashboard" | "declarations" | "diagram" | "blocks" | "preview";
 const NAV: { id: View; label: string; icon: typeof Eye }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "declarations", label: "Declarations", icon: FileCog },
   { id: "diagram", label: "Topology", icon: Network },
+  { id: "blocks", label: "Pages", icon: BlocksIcon },
   { id: "preview", label: "Preview", icon: Eye },
 ];
 
@@ -81,7 +85,7 @@ export default function App() {
     document.title = source ? `${source.label} · Studio` : "Studio";
   }, [source]);
   const body = useMemo(
-    () => ({ dashboard: <Dashboard />, declarations: <Declarations onSaved={() => setSaves((n) => n + 1)} />, diagram: <Diagram onSaved={() => setSaves((n) => n + 1)} />, preview: <Preview /> })[view],
+    () => ({ dashboard: <Dashboard />, declarations: <Declarations onSaved={() => setSaves((n) => n + 1)} />, diagram: <Diagram onSaved={() => setSaves((n) => n + 1)} />, blocks: <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}><Blocks onSaved={() => setSaves((n) => n + 1)} /></Suspense>, preview: <Preview /> })[view],
     [view],
   );
 
