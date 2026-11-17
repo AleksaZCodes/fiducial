@@ -792,3 +792,70 @@ fn the_astro_shape_serves_the_build_directory_and_names_no_worker() {
     assert!(!cfg.contains("FIDUCIAL_PRODUCT"), "{cfg}");
     assert!(run(&root, &["derive", "--check"]).status.success());
 }
+
+/// One dynamic route on an otherwise static site: the Astro shape with a Worker
+/// (`main`), a KV binding, and `run_worker_first` naming the one path that runs
+/// code. Every other request is a file. Without `run_worker_first`, the Worker
+/// would run for every page view, which is the cost a static site exists to
+/// avoid; and `run_worker_first` with no Worker would route `/api/*` to nothing.
+#[test]
+fn a_static_site_can_run_one_worker_path_and_keep_every_other_request_free() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    assert!(run(tmp.path(), &["new", "p"]).status.success());
+    let root = tmp.path().join("p");
+    assert!(run(&root, &["add", "deploy"]).status.success());
+    std::fs::write(
+        root.join("pipelines/deploy.toml"),
+        "name     = \"deploy\"\nexecutor = \"fid-deploy\"\noutputs  = [\"apps/web/wrangler.jsonc\"]\n",
+    )
+    .unwrap();
+    let config_path = root.join("fiducial.toml");
+    let base = std::fs::read_to_string(&config_path)
+        .unwrap()
+        .replace("REPLACE_WITH_DATABASE_ID", "db-id-1")
+        .replace("REPLACE_WITH_BUCKET_NAME", "p-assets")
+        .replace("REPLACE_WITH_QUEUE_NAME", "p-jobs");
+
+    // The Worker without `main`: refused, naming the missing piece.
+    std::fs::write(
+        &config_path,
+        base.replace(
+            "[deploy]\n",
+            "[deploy]\nshape = \"astro\"\nrun_worker_first = [\"/api/*\"]\n",
+        ),
+    )
+    .unwrap();
+    let out = run(&root, &["derive"]);
+    assert!(!out.status.success(), "{}", text(&out));
+    assert!(
+        text(&out).contains("run_worker_first needs a Worker"),
+        "{}",
+        text(&out)
+    );
+
+    // With one: the Worker, the KV binding and the one path.
+    std::fs::write(
+        &config_path,
+        format!(
+            "{}\n[[deploy.kv_namespaces]]\nbinding = \"SPOTS\"\nid = \"kv-id-1\"\n",
+            base.replace(
+                "[deploy]\n",
+                "[deploy]\nshape = \"astro\"\nmain = \"worker/index.ts\"\nrun_worker_first = [\"/api/*\"]\n"
+            )
+        ),
+    )
+    .unwrap();
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let cfg = std::fs::read_to_string(root.join("apps/web/wrangler.jsonc")).unwrap();
+    assert!(cfg.contains("\"main\": \"worker/index.ts\""), "{cfg}");
+    assert!(
+        cfg.contains("\"assets\": { \"directory\": \"dist\", \"run_worker_first\": [\"/api/*\"] }"),
+        "{cfg}"
+    );
+    assert!(
+        cfg.contains("\"binding\": \"SPOTS\", \"id\": \"kv-id-1\""),
+        "{cfg}"
+    );
+    assert!(run(&root, &["derive", "--check"]).status.success());
+}

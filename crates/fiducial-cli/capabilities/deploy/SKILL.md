@@ -238,6 +238,26 @@ outputs = ["wrangler.jsonc"]
 (default `ASSETS`) are there for a product that moved them; a product that has
 not declares neither.
 
+### A static site with one dynamic route
+
+The `astro` shape serves `dist/` as files and runs no code. A site with one
+dynamic path (a counter, a form handler) names a Worker and the path it runs:
+
+```toml
+[deploy]
+shape            = "astro"
+main             = "worker/index.ts"   # the Worker's entry
+run_worker_first = ["/api/*"]          # only these paths run it
+
+[[deploy.kv_namespaces]]
+binding = "SPOTS"
+id      = "…"
+```
+
+Every other request is a file, served without waking the Worker, so a page view
+costs nothing. `run_worker_first` without a `main` is refused: a path with
+nothing to run is a typo, not a setting.
+
 ## TOML or JSONC — the output path decides
 
 A path ending `.json` or `.jsonc` is written as JSONC, anything else as TOML.

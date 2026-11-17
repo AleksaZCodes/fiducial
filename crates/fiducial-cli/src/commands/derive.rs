@@ -1517,6 +1517,8 @@ struct DeployPlan {
     workers_dev: Option<bool>,
     /// `(directory, binding)` for a SvelteKit product's static assets.
     assets: Option<(String, String)>,
+    /// Paths that run the Worker before the assets are consulted.
+    run_worker_first: Vec<String>,
     observability: bool,
     vars: Vec<(String, String)>,
     d1: Option<(String, String)>,
@@ -1595,6 +1597,17 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
         DeployShape::ReactRouter | DeployShape::TanStackStart => None,
         DeployShape::Worker => None,
     };
+
+    // A path that runs the Worker first needs a Worker. Under the Astro shape
+    // there is none unless the product names one, and `wrangler` would accept
+    // the config and route `/api/*` to nothing.
+    if !d.run_worker_first.is_empty() && (main.is_empty() || assets.is_none()) {
+        bail!(
+            "[deploy] run_worker_first needs a Worker and static assets: set `main` to the \
+             Worker's entry (the `{}` shape has none by default) so there is something to run",
+            d.shape
+        );
+    }
 
     // `FIDUCIAL_PRODUCT` names the product a running Worker belongs to — and
     // only a standalone Worker needs telling. Under the SvelteKit shape the
@@ -1700,6 +1713,7 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
         custom_domain: d.custom_domain,
         workers_dev: d.workers_dev,
         assets,
+        run_worker_first: d.run_worker_first.clone(),
         observability: d.observability,
         vars,
         d1,
@@ -1775,6 +1789,14 @@ fn render_wrangler_toml(p: &DeployPlan) -> String {
         out.push_str(&format!("directory = \"{directory}\"\n"));
         if !binding.is_empty() {
             out.push_str(&format!("binding = \"{binding}\"\n"));
+        }
+        if !p.run_worker_first.is_empty() {
+            let paths: Vec<String> = p
+                .run_worker_first
+                .iter()
+                .map(|x| format!("\"{x}\""))
+                .collect();
+            out.push_str(&format!("run_worker_first = [{}]\n", paths.join(", ")));
         }
     }
 
@@ -1886,7 +1908,20 @@ fn render_wrangler_jsonc(p: &DeployPlan) -> String {
         fields.push("  \"observability\": { \"enabled\": true }".to_string());
     }
     if let Some((directory, binding)) = &p.assets {
-        if binding.is_empty() {
+        if !p.run_worker_first.is_empty() {
+            let paths: Vec<String> = p.run_worker_first.iter().map(|x| q(x)).collect();
+            let binding_field = if binding.is_empty() {
+                String::new()
+            } else {
+                format!(", \"binding\": {}", q(binding))
+            };
+            fields.push(format!(
+                "  // Static files, with only these paths run by the Worker: every other\n  // request is a file, served without waking any code.\n  \"assets\": {{ \"directory\": {}{}, \"run_worker_first\": [{}] }}",
+                q(directory),
+                binding_field,
+                paths.join(", ")
+            ));
+        } else if binding.is_empty() {
             fields.push(format!(
                 "  // The static build output, served as files; no Worker reads it.\n  \"assets\": {{ \"directory\": {} }}",
                 q(directory)
