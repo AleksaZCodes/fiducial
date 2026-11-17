@@ -26,7 +26,13 @@
       "**/public/**",
       "scripts/**",
       "tools/**",
-      "apps/cms/**"
+      "apps/cms/**",
+      "**/*.generated.ts",
+      "registry.json",
+      "design/**",
+      ".fiducial/**",
+      ".agents/**",
+      ".claude/**"
     ]
   },
   "overrides": [

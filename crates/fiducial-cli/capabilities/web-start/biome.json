@@ -30,7 +30,12 @@
       "**/.output/**",
       "**/worker-configuration.d.ts",
       "**/dist/**",
-      "**/*.generated.ts"
+      "**/*.generated.ts",
+      "registry.json",
+      "design/**",
+      ".fiducial/**",
+      ".agents/**",
+      ".claude/**"
     ]
   },
   "overrides": [

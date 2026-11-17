@@ -28,7 +28,12 @@
       "scripts/**",
       "tools/**",
       "apps/cms/**",
-      "**/*.generated.ts"
+      "**/*.generated.ts",
+      "registry.json",
+      "design/**",
+      ".fiducial/**",
+      ".agents/**",
+      ".claude/**"
     ]
   }
 }
