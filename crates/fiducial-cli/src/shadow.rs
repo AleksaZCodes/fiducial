@@ -540,7 +540,12 @@ fn collect(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) {
         let p = e.path();
         let name = e.file_name().to_string_lossy().to_string();
         if p.is_dir() {
+            // A leading `.` or `_` marks a directory that is not the product's own
+            // source: tool state (`.git`), or reference material pulled in whole
+            // (`_ds-remote/`, a design system as the design tool exports it).
+            // A copy of a brand value in a vendored file is not a shadow of it.
             let skip = name.starts_with('.')
+                || name.starts_with('_')
                 || [
                     "node_modules",
                     "target",
@@ -571,6 +576,19 @@ fn rel(root: &Path, p: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn vendored_directories_are_not_scanned() {
+        let dir = tempfile::tempdir().unwrap();
+        for d in ["src", "_ds-remote", ".cache"] {
+            std::fs::create_dir_all(dir.path().join(d)).unwrap();
+            std::fs::write(dir.path().join(d).join("a.ts"), "x").unwrap();
+        }
+        let mut files = Vec::new();
+        collect(dir.path(), dir.path(), &mut files);
+        let names: Vec<String> = files.iter().map(|p| rel(dir.path(), p)).collect();
+        assert_eq!(names, vec!["src/a.ts".to_string()]);
+    }
 
     #[test]
     fn distinctive_strings_are_the_ones_only_a_copy_would_contain() {

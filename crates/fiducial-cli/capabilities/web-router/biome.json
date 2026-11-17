@@ -29,7 +29,12 @@
       "apps/cms/**",
       "**/build/**",
       "**/worker-configuration.d.ts",
-      "**/*.generated.ts"
+      "**/*.generated.ts",
+      "registry.json",
+      "design/**",
+      ".fiducial/**",
+      ".agents/**",
+      ".claude/**"
     ]
   },
   "overrides": [
