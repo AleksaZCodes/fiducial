@@ -751,6 +751,15 @@ pub struct Deploy {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub kv_namespaces: Vec<KvNamespace>,
 
+    /// Paths that run the Worker **before** the static assets are consulted
+    /// (`["/api/*"]`). A static site served as Workers Static Assets answers
+    /// every request from files and wakes no code; a site with one dynamic
+    /// route (a counter, a form handler) names that route here and keeps every
+    /// other request free. Needs a Worker (`main`), since a path with nothing to
+    /// run is a typo, not a setting.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub run_worker_first: Vec<String>,
+
     /// Durable Object classes this Worker exports and binds. Like KV, a fact
     /// about the product's own Worker rather than a vendor choice. The class
     /// must be exported from `main` (for the Next.js shape, a one-line
@@ -851,6 +860,7 @@ impl Deploy {
             && self.route.is_empty()
             && self.shape.is_empty()
             && self.kv_namespaces.is_empty()
+            && self.run_worker_first.is_empty()
             && self.durable_objects.is_empty()
             && self.vars.is_empty()
     }
