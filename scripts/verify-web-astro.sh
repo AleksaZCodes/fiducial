@@ -72,3 +72,49 @@ if ! "$fid" doctor 2>&1 | grep -q "no platform-owned file has been modified"; th
   exit 1
 fi
 echo "✓ astro: installs, typechecks, lints, builds, deploys (dry run)"
+
+# The capability components for Astro (`for/web-astro/`): add i18n, content and
+# press, put every component on a page, and make the real compiler accept them.
+# This is the part the Rust tests cannot prove: that the `.astro` files parse,
+# type-check against the generated modules, and build.
+echo "── web-astro components ───────────────────────────────────────────────"
+"$fid" add capability i18n >/dev/null
+"$fid" add capability content >/dev/null
+"$fid" add capability press >/dev/null
+"$fid" derive >/dev/null
+cat > apps/web/src/pages/components.astro <<'ASTRO'
+---
+import EntryCards from "../components/EntryCards.astro";
+import LocalePicker from "../components/LocalePicker.astro";
+import MobileMenu from "../components/MobileMenu.astro";
+import PressKit from "../components/PressKit.astro";
+import { content } from "../generated/content";
+import { defaultLocale } from "../generated/messages";
+import Base from "../layouts/Base.astro";
+import { formatContentDate } from "../lib/intl";
+
+const locale = defaultLocale;
+const posts = content.collections.posts.byLocale[locale] ?? [];
+---
+
+<Base title="Components">
+  <MobileMenu links={[{ href: "/", label: "Home" }]} openLabel="Menu" closeLabel="Close" />
+  <LocalePicker locale={locale} url={Astro.url} />
+  <EntryCards entries={posts} locale={locale} href={(e) => `/blog/${e.slug}`} readMoreLabel="Read more" />
+  <PressKit
+    locale={locale}
+    labels={{ title: "Press", assets: "Assets", guidelines: "Use as is", facts: "Facts", boilerplate: "Boilerplate", short: "Short", medium: "Medium", long: "Long", stories: "Stories", contact: "Contact", download: "Download" }}
+    logos={[{ label: "Mark", href: "/favicon.svg" }]}
+    storyHref={(s) => `/press/${s}`}
+    formatDate={(iso) => formatContentDate(iso, locale)}
+  />
+</Base>
+ASTRO
+"${pnpm[@]}" install --fetch-timeout 300000
+cd apps/web
+"${pnpm[@]}" run typecheck
+"${pnpm[@]}" run build
+for marker in 'data-fid-locale' 'data-fid-menu' 'fid-cover' 'class="kit"'; do
+  grep -q "$marker" dist/components/index.html || { echo "✗ components page lacks $marker" >&2; exit 1; }
+done
+echo "✓ astro: the i18n, content and press components typecheck and build"

@@ -1,0 +1,147 @@
+---
+/**
+ * The nav links on a narrow screen, in a sheet that slides in from the right.
+ *
+ * Its twin is `web-svelte/.../MobileMenu.svelte` (and the React sheet in
+ * `web-next`): the same decisions in three frameworks.
+ *
+ * ## Why a dialog and not a disclosure
+ *
+ * A row that pushes the header down is simpler and wrong: focus stays behind it,
+ * Escape does nothing, the page underneath keeps scrolling, and nothing returns
+ * focus to the button when it closes. This is a modal dialog, so all four are
+ * handled by the primitive rather than by four listeners somebody has to
+ * remember. The primitive here is the browser's own `<dialog>` opened with
+ * `showModal()`: it traps focus, makes the page behind it inert, closes on
+ * Escape and returns focus to the button, with no library.
+ *
+ * ## What is the product's, and what is not
+ *
+ * This component owns the sheet: how it opens, how it closes, what a screen
+ * reader hears, and where focus goes. It owns no words and no routes: `links`
+ * and both labels come in, because which pages a product has is the product's
+ * fact and translating them is the catalog's job. Composition stays out here
+ * too. There is no `SiteNav` in the platform on purpose: arranging a wordmark,
+ * links, a language picker and a call to action is exactly the decision each
+ * product makes differently.
+ */
+
+interface Props {
+  links: readonly { href: string; label: string }[];
+  /** Also the dialog's accessible name. */
+  openLabel: string;
+  closeLabel: string;
+}
+
+const { links, openLabel, closeLabel } = Astro.props;
+---
+
+<div class="fid-mobile-only" data-fid-menu>
+  <button class="fid-burger" type="button" aria-label={openLabel} data-fid-open>
+    <!-- Drawn rather than pulled from an icon set: two paths beat a dependency,
+         and square ends match an unrounded design system. -->
+    <svg viewBox="0 0 16 16" aria-hidden="true" class="fid-burger-icon">
+      <path d="M2 4 H14 M2 8 H14 M2 12 H14" stroke="currentColor" stroke-width="1.75"></path>
+    </svg>
+  </button>
+
+  <dialog class="fid-sheet" aria-label={openLabel}>
+    <button class="fid-sheet-close" type="button" aria-label={closeLabel} data-fid-close>
+      <svg viewBox="0 0 16 16" aria-hidden="true" class="fid-burger-icon">
+        <path d="M3 3 L13 13 M13 3 L3 13" stroke="currentColor" stroke-width="1.75"></path>
+      </svg>
+    </button>
+    <ul class="fid-sheet-list">
+      {
+        links.map((l) => (
+          <li>
+            {/* Closing on click matters most for a fragment link like `/#contact`:
+                it navigates without a page load, so nothing else would dismiss
+                the sheet and the reader is left staring at a menu over the
+                section they asked for. */}
+            <a class="fid-sheet-link" href={l.href} data-fid-close>{l.label}</a>
+          </li>
+        ))
+      }
+    </ul>
+  </dialog>
+</div>
+
+<script>
+  for (const root of document.querySelectorAll<HTMLElement>("[data-fid-menu]")) {
+    const dialog = root.querySelector("dialog")!;
+    root.querySelector("[data-fid-open]")!.addEventListener("click", () => dialog.showModal());
+    for (const el of root.querySelectorAll("[data-fid-close]")) el.addEventListener("click", () => dialog.close());
+    // A click on the backdrop (the dialog element itself, outside its content) closes it.
+    dialog.addEventListener("click", (e) => {
+      if (e.target === dialog) dialog.close();
+    });
+  }
+</script>
+
+<style>
+  /* Shown only below the breakpoint where the product's own nav collapses. */
+  .fid-mobile-only {
+    display: contents;
+  }
+  @media (min-width: 48rem) {
+    .fid-mobile-only {
+      display: none;
+    }
+  }
+  .fid-burger,
+  .fid-sheet-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    border: 1px solid var(--border, currentColor);
+    border-radius: var(--radius-sm, 3px);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .fid-burger-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  .fid-sheet {
+    position: fixed;
+    inset: 0 0 0 auto;
+    width: min(20rem, 85vw);
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: 1rem;
+    border: 0;
+    border-inline-start: 1px solid var(--border, currentColor);
+    background: var(--background, #fff);
+    color: var(--foreground, inherit);
+  }
+  .fid-sheet::backdrop {
+    background: rgb(0 0 0 / 0.5);
+  }
+  .fid-sheet-close {
+    margin-inline-start: auto;
+  }
+  .fid-sheet-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .fid-sheet-link {
+    display: block;
+    padding: 0.75rem 0.5rem;
+    border-radius: var(--radius-sm, 3px);
+    color: inherit;
+    text-decoration: none;
+    font-size: 1.125rem;
+  }
+  .fid-sheet-link:hover,
+  .fid-sheet-link:focus-visible {
+    background: var(--accent, rgb(0 0 0 / 0.06));
+  }
+</style>

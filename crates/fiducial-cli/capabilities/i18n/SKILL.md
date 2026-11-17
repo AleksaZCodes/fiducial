@@ -269,9 +269,9 @@ that is not negotiable: **switching language keeps the reader on the page they
 are on.** A picker that links to the locale's home page teleports the one
 person least able to find their way back.
 
-**The locale picker** — `LocalePicker.svelte` under `web-svelte`, or
-`locale-picker.tsx` under `web-next`. Same decisions, two frameworks; change
-one, change both. A list not a toggle (a toggle is wrong at three locales),
+**The locale picker** — `LocalePicker.svelte` under `web-svelte`,
+`LocalePicker.astro` under `web-astro`, or `locale-picker.tsx` under `web-next`.
+Same decisions, three frameworks; change one, change all three. A list not a toggle (a toggle is wrong at three locales),
 every locale under its own endonym read from its own catalog, the flag
 `aria-hidden` because a flag is a country and a locale is a language, and each
 row a real `<a href>` so it is middle-clickable and crawlable.
