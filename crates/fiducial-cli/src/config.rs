@@ -1600,3 +1600,91 @@ nested = { a = 1 }
         );
     }
 }
+
+/// The content editor `[cms] editor` selects, as written in `fiducial.toml`.
+///
+/// Read from the raw file rather than through [`Config`]: callers ask it from
+/// places that must not fail on an unrelated parse error (a derive check, a
+/// template restore), and `[cms]` is a block the platform does not type.
+pub fn cms_editor(root: &Path) -> Option<String> {
+    let raw = std::fs::read_to_string(root.join(CONFIG_FILE)).ok()?;
+    let table: toml::Table = raw.parse().ok()?;
+    table
+        .get("cms")?
+        .get("editor")?
+        .as_str()
+        .map(str::to_string)
+}
+
+/// Templates this product's configuration has no use for.
+///
+/// `[cms] editor = "pages"` is a hosted editor that reads `.pages.yml` through
+/// GitHub, so the Keystatic and Tina workspace under `apps/cms/` is dead weight
+/// there: nothing runs it, and `pnpm install` would still fetch Next.js for it.
+/// A template in this state is not required (`fid doctor`), not restored or
+/// added (`fid upgrade`), and its derived config is not an output
+/// (`fid derive`), so deleting the folder is the whole of opting out.
+pub fn template_unused(root: &Path, rel: &str) -> bool {
+    is_cms_workspace(rel) && cms_editor(root).as_deref() == Some("pages")
+}
+
+/// Is this a file of the Keystatic/Tina editor workspace?
+pub fn is_cms_workspace(rel: &str) -> bool {
+    rel.starts_with("apps/cms/")
+}
+
+#[cfg(test)]
+mod template_unused_tests {
+    use super::*;
+
+    fn product(editor: Option<&str>) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        let cms = editor
+            .map(|e| format!("\n[cms]\neditor = \"{e}\"\n"))
+            .unwrap_or_default();
+        std::fs::write(
+            dir.path().join(CONFIG_FILE),
+            format!("[product]\nname = \"p\"\nversion = \"0.1.0\"\n{cms}"),
+        )
+        .unwrap();
+        dir
+    }
+
+    #[test]
+    fn the_keystatic_workspace_is_unused_only_under_pages() {
+        for (editor, unused) in [
+            (Some("pages"), true),
+            (Some("keystatic"), false),
+            (Some("tina"), false),
+            (None, false),
+        ] {
+            let dir = product(editor);
+            assert_eq!(
+                template_unused(dir.path(), "apps/cms/next.config.ts"),
+                unused,
+                "{editor:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn only_the_cms_workspace_is_ever_unused() {
+        let dir = product(Some("pages"));
+        for rel in [
+            "apps/web/src/a.ts",
+            ".pages.yml",
+            "scripts/derive-cms.mjs",
+            "apps/cmsx/a.ts",
+        ] {
+            assert!(!template_unused(dir.path(), rel), "{rel}");
+        }
+    }
+
+    #[test]
+    fn an_unreadable_config_is_never_a_reason_to_skip() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(!template_unused(dir.path(), "apps/cms/a.ts"));
+        std::fs::write(dir.path().join(CONFIG_FILE), "not = [valid").unwrap();
+        assert!(!template_unused(dir.path(), "apps/cms/a.ts"));
+    }
+}

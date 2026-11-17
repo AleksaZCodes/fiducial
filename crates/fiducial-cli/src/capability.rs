@@ -967,6 +967,7 @@ pub(crate) fn install_added(
         let key = rel.replace('\\', "/");
         if lock.templates.contains_key(&key)
             || superseded_by(rel, enabled).is_some_and(|by| by != cap.id)
+            || crate::config::template_unused(root, rel)
         {
             continue;
         }

@@ -511,3 +511,57 @@ fn keystatic_github_storage_is_declared_and_refused_when_it_cannot_work() {
         assert!(text(&out).contains(want), "{extra}: {}", text(&out));
     }
 }
+
+/// A hosted Pages CMS needs no Keystatic workspace, and opting out is the whole
+/// of deleting `apps/cms/`: derive writes `.pages.yml` and nothing under the
+/// folder (not even an empty directory), `--check` and `doctor` do not ask for
+/// it back, and `upgrade` does not restore it. Switching the editor back brings
+/// it back.
+#[test]
+fn pages_cms_needs_no_workspace_and_the_folder_stays_deleted() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = cms_product(tmp.path());
+    assert!(run(&root, &["derive"]).status.success());
+    assert!(
+        root.join("apps/cms/next.config.ts").exists(),
+        "installed for keystatic"
+    );
+
+    let fiducial = root.join("fiducial.toml");
+    let toml = std::fs::read_to_string(&fiducial).unwrap();
+    std::fs::write(
+        &fiducial,
+        toml.replace("editor = \"keystatic\"", "editor = \"pages\""),
+    )
+    .unwrap();
+    std::fs::remove_dir_all(root.join("apps/cms")).unwrap();
+
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(root.join(".pages.yml").exists());
+    assert!(!root.join("apps/cms").exists(), "derive recreated apps/cms");
+
+    let out = run(&root, &["derive", "--check"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let doctor = text(&run(&root, &["doctor"]));
+    assert!(
+        !doctor.contains("apps/cms"),
+        "doctor wants the workspace back: {doctor}"
+    );
+
+    let out = run(&root, &["upgrade"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(!root.join("apps/cms").exists(), "upgrade restored apps/cms");
+
+    // And back: the workspace returns and derives.
+    std::fs::write(&fiducial, toml).unwrap();
+    let out = run(&root, &["upgrade"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(
+        root.join("apps/cms/next.config.ts").exists(),
+        "upgrade did not restore it"
+    );
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(root.join("apps/cms/keystatic.config.ts").exists());
+}
