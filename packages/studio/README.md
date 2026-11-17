@@ -32,6 +32,7 @@ For development, `pnpm --filter @fiducial/studio dev` plus
 - `src/lib/sources/` — `local` and `github` (commits or pull requests).
 - `src/lib/editor.ts` — where the content editor is reached, per editor and source.
 - `src/lib/topology.ts` — the topology as nodes and buses, its layout, and every edit as a change to `topology.toml`.
+- `src/lib/blocks.ts` — a page as a list of blocks, and every edit as a patch to its TSX source.
 - `worker/` — the sign-in Worker.
 - `src/lib/toml.ts` — edits TOML **text** in place, keeping comments and order.
 - `src/lib/schema.ts` — turns the JSON Schema into the form's field kinds.
@@ -59,7 +60,7 @@ built app. Without it, Studio asks for a fine-grained token instead.
 
 ## Not done
 
-Drag-and-drop over shadcn blocks, per-pull-request preview URLs, forms for the
+Installing a block from a shadcn registry in the palette, a WYSIWYG canvas, per-pull-request preview URLs, forms for the
 declarations that have no schema yet. The GitHub source and the
 Worker are tested against mocks, not live GitHub. See the Studio section of the
 repository `ROADMAP.md`.
