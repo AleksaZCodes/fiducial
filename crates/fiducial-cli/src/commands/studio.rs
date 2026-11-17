@@ -70,10 +70,18 @@ const HIDDEN_DIRS: &[&str] = &[
     ".wrangler",
 ];
 
-/// The JSON Schema for `fiducial.toml`.
-pub fn config_schema() -> Value {
-    let schema = schemars::schema_for!(Config);
-    serde_json::to_value(schema).expect("a schema is JSON")
+/// The declarations Studio has a schema for. Each is what a form is generated
+/// from, so adding a declaration to Studio is adding a name here.
+pub const SCHEMAS: [&str; 2] = ["fiducial", "topology"];
+
+/// The JSON Schema for a declaration, by name.
+pub fn named_schema(name: &str) -> Option<Value> {
+    let schema = match name {
+        "fiducial" => schemars::schema_for!(Config),
+        "topology" => schemars::schema_for!(crate::topology::Topology),
+        _ => return None,
+    };
+    Some(serde_json::to_value(schema).expect("a schema is JSON"))
 }
 
 // ── Path confinement ──────────────────────────────────────────────────────────
@@ -164,7 +172,12 @@ fn is_text_ext(name: &str) -> bool {
 
 /// Process group of the running dev server, so a signal handler (which can do
 /// almost nothing safely) can still stop it. 0 means none.
-static DEV_PGID: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+static DEV_PGIDS: [std::sync::atomic::AtomicI32; TARGETS.len()] =
+    [const { std::sync::atomic::AtomicI32::new(0) }; TARGETS.len()];
+
+/// The servers Studio can run: the product's site, and its content editor.
+/// Each is a slot, so previewing the site and editing content can run at once.
+pub const TARGETS: [&str; 2] = ["web", "cms"];
 
 /// Stop the dev server's whole group. `pnpm dev` is a shell, which starts pnpm,
 /// which starts node, which starts the server: killing only the first leaves the
@@ -179,7 +192,9 @@ fn kill_group(pgid: i32) {
 
 #[cfg(unix)]
 extern "C" fn on_signal(_: libc::c_int) {
-    kill_group(DEV_PGID.load(std::sync::atomic::Ordering::SeqCst));
+    for g in &DEV_PGIDS {
+        kill_group(g.load(std::sync::atomic::Ordering::SeqCst));
+    }
     // SAFETY: `_exit` is async-signal-safe; ordinary exit is not.
     unsafe { libc::_exit(0) };
 }
@@ -204,13 +219,14 @@ struct Dev {
 
 /// What to run for the preview. `[studio] dev` would be declared; until a
 /// product does, the web app's own `dev` script is the answer.
-fn dev_command(root: &Path) -> Option<String> {
-    let pkg = root.join("apps/web/package.json");
+fn dev_command(root: &Path, target: &str) -> Option<String> {
+    let dir = format!("apps/{target}");
+    let pkg = root.join(&dir).join("package.json");
     let has_dev = std::fs::read_to_string(&pkg)
         .ok()
         .and_then(|s| serde_json::from_str::<Value>(&s).ok())
         .is_some_and(|v| v["scripts"]["dev"].is_string());
-    has_dev.then(|| "pnpm --filter ./apps/web dev".to_string())
+    has_dev.then(|| format!("pnpm --filter ./{dir} dev"))
 }
 
 /// `localhost:3000`, `127.0.0.1:5173` and `http://[::1]:4321/` all appear in
@@ -279,12 +295,13 @@ fn dev_status(dev: &Arc<Mutex<Dev>>) -> Value {
     })
 }
 
-fn dev_start(root: &Path, dev: &Arc<Mutex<Dev>>) -> Result<()> {
+fn dev_start(root: &Path, target: &str, slot: usize, dev: &Arc<Mutex<Dev>>) -> Result<()> {
     if dev_status(dev)["running"] == json!(true) {
         return Ok(());
     }
-    let cmd = dev_command(root)
-        .context("no dev server to run: the product has no `apps/web` with a `dev` script")?;
+    let cmd = dev_command(root, target).with_context(|| {
+        format!("no dev server to run: the product has no `apps/{target}` with a `dev` script")
+    })?;
     let mut command = Command::new("sh");
     command
         .args(["-c", &cmd])
@@ -298,7 +315,7 @@ fn dev_start(root: &Path, dev: &Arc<Mutex<Dev>>) -> Result<()> {
         .spawn()
         .with_context(|| format!("starting `{cmd}`"))?;
     #[cfg(unix)]
-    DEV_PGID.store(child.id() as i32, std::sync::atomic::Ordering::SeqCst);
+    DEV_PGIDS[slot].store(child.id() as i32, std::sync::atomic::Ordering::SeqCst);
     let (out, err) = (child.stdout.take(), child.stderr.take());
     {
         let mut d = dev.lock().unwrap();
@@ -317,13 +334,13 @@ fn dev_start(root: &Path, dev: &Arc<Mutex<Dev>>) -> Result<()> {
     Ok(())
 }
 
-fn dev_stop(dev: &Arc<Mutex<Dev>>) {
+fn dev_stop(slot: usize, dev: &Arc<Mutex<Dev>>) {
     let mut d = dev.lock().unwrap();
     if let Some(mut c) = d.child.take() {
         #[cfg(unix)]
         {
             kill_group(c.id() as i32);
-            DEV_PGID.store(0, std::sync::atomic::Ordering::SeqCst);
+            DEV_PGIDS[slot].store(0, std::sync::atomic::Ordering::SeqCst);
         }
         let _ = c.kill();
         let _ = c.wait();
@@ -461,7 +478,8 @@ fn loopback_host(host: &str) -> bool {
 struct State {
     root: PathBuf,
     token: String,
-    dev: Arc<Mutex<Dev>>,
+    /// One dev server per entry of [`TARGETS`].
+    dev: Vec<Arc<Mutex<Dev>>>,
     /// The built Studio app, when one can be found. Public files, no secrets.
     app: Option<PathBuf>,
 }
@@ -555,7 +573,16 @@ fn route(req: &Request, st: &State) -> Result<(u16, Value)> {
             let dash = Dash::collect(root, &config)?;
             Ok((200, serde_json::to_value(dash)?))
         }
-        ("GET", "/api/schema") => Ok((200, config_schema())),
+        ("GET", "/api/schema") => {
+            let name = req.q("name").unwrap_or("fiducial");
+            let schema = named_schema(name).with_context(|| {
+                format!(
+                    "no schema `{name}` (expected one of: {})",
+                    SCHEMAS.join(", ")
+                )
+            })?;
+            Ok((200, schema))
+        }
         ("GET", "/api/files") => Ok((200, json!({ "files": list_files(root)? }))),
         ("GET", "/api/file") => {
             let rel = req.q("path").context("`path` is required")?;
@@ -595,17 +622,37 @@ fn route(req: &Request, st: &State) -> Result<(u16, Value)> {
                 }),
             ))
         }
-        ("GET", "/api/dev") => Ok((200, dev_status(&st.dev))),
+        ("GET", "/api/dev") => Ok((200, dev_status(&st.dev[target_slot(req)?]))),
         ("POST", "/api/dev/start") => {
-            dev_start(root, &st.dev)?;
-            Ok((200, dev_status(&st.dev)))
+            let slot = target_slot(req)?;
+            dev_start(root, TARGETS[slot], slot, &st.dev[slot])?;
+            Ok((200, dev_status(&st.dev[slot])))
         }
         ("POST", "/api/dev/stop") => {
-            dev_stop(&st.dev);
-            Ok((200, dev_status(&st.dev)))
+            let slot = target_slot(req)?;
+            dev_stop(slot, &st.dev[slot]);
+            Ok((200, dev_status(&st.dev[slot])))
         }
         _ => Ok((404, json!({ "error": "no such route" }))),
     }
+}
+
+fn new_devs() -> Vec<Arc<Mutex<Dev>>> {
+    TARGETS
+        .iter()
+        .map(|_| Arc::new(Mutex::new(Dev::default())))
+        .collect()
+}
+
+/// `?target=cms`, defaulting to the site.
+fn target_slot(req: &Request) -> Result<usize> {
+    let t = req.q("target").unwrap_or("web");
+    TARGETS.iter().position(|x| *x == t).with_context(|| {
+        format!(
+            "unknown target `{t}` (expected one of: {})",
+            TARGETS.join(", ")
+        )
+    })
 }
 
 /// A token nobody can guess: kernel randomness where it exists, otherwise the
@@ -624,12 +671,18 @@ fn make_token() -> String {
 
 // ── Entry points ──────────────────────────────────────────────────────────────
 
-/// `fid studio schema` — print the JSON Schema for `fiducial.toml`.
+/// `fid studio schema [name]` — print a declaration's JSON Schema.
 ///
 /// Also what an editor's TOML language server wants for completion and
 /// validation, so it is useful with no Studio running at all.
-pub fn schema() -> Result<()> {
-    println!("{}", serde_json::to_string_pretty(&config_schema())?);
+pub fn schema(name: &str) -> Result<()> {
+    let schema = named_schema(name).with_context(|| {
+        format!(
+            "no schema `{name}` (expected one of: {})",
+            SCHEMAS.join(", ")
+        )
+    })?;
+    println!("{}", serde_json::to_string_pretty(&schema)?);
     Ok(())
 }
 
@@ -646,7 +699,7 @@ pub fn serve(port: u16, app: Option<PathBuf>) -> Result<()> {
     let st = Arc::new(State {
         root,
         token: make_token(),
-        dev: Arc::new(Mutex::new(Dev::default())),
+        dev: new_devs(),
         app: find_app(&root_for_app, app),
     });
     match &st.app {
@@ -715,11 +768,32 @@ mod tests {
 
     #[test]
     fn the_schema_names_the_blocks() {
-        let s = config_schema();
+        let s = named_schema("fiducial").unwrap();
         let props = &s["properties"];
         for k in ["product", "capabilities", "design", "deploy"] {
             assert!(props.get(k).is_some(), "schema lacks `{k}`");
         }
+    }
+
+    #[test]
+    fn dev_targets_are_named_and_unknown_ones_refused() {
+        let req = |q: &str| Request {
+            method: "GET".into(),
+            path: "/api/dev".into(),
+            query: q
+                .split('&')
+                .filter(|p| !p.is_empty())
+                .map(|p| {
+                    let (k, v) = p.split_once('=').unwrap();
+                    (k.to_string(), v.to_string())
+                })
+                .collect(),
+            headers: vec![],
+            body: vec![],
+        };
+        assert_eq!(target_slot(&req("")).unwrap(), 0, "the site is the default");
+        assert_eq!(target_slot(&req("target=cms")).unwrap(), 1);
+        assert!(target_slot(&req("target=db")).is_err());
     }
 
     #[test]
@@ -739,7 +813,7 @@ mod tests {
         let st = Arc::new(State {
             root: dir.path().to_path_buf(),
             token: "t0k".into(),
-            dev: Arc::new(Mutex::new(Dev::default())),
+            dev: new_devs(),
             app: Some(app_dir.path().to_path_buf()),
         });
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -795,17 +869,26 @@ mod tests {
         assert!(call("GET", "/..%2Fa.toml", false, &h, "").starts_with("HTTP/1.1 404"));
     }
 
-    /// The schema the app bundles must be the one the CLI parses with.
+    /// The schemas the app bundles must be the ones the CLI parses with.
     #[test]
-    fn the_bundled_schema_is_current() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../packages/studio/src/fiducial.schema.json");
-        let committed: Value =
-            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(
-            committed,
-            config_schema(),
-            "packages/studio/src/fiducial.schema.json is stale: run `fid studio schema > packages/studio/src/fiducial.schema.json`"
-        );
+    fn the_bundled_schemas_are_current() {
+        for name in SCHEMAS {
+            let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
+                "../../packages/studio/src/schemas/{name}.schema.json"
+            ));
+            let committed: Value =
+                serde_json::from_str(&std::fs::read_to_string(&path).unwrap_or_else(|_| {
+                    panic!(
+                        "{} is missing: run `fid studio schema {name}`",
+                        path.display()
+                    )
+                }))
+                .unwrap();
+            assert_eq!(
+                committed,
+                named_schema(name).unwrap(),
+                "packages/studio/src/schemas/{name}.schema.json is stale: run `fid studio schema {name} > packages/studio/src/schemas/{name}.schema.json`"
+            );
+        }
     }
 }

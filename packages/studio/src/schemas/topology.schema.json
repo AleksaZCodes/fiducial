@@ -1,0 +1,348 @@
+{
+  "$defs": {
+    "Bus": {
+      "additionalProperties": false,
+      "properties": {
+        "baud": {
+          "default": null,
+          "description": "Baud rate for `rs485` (and the other serial types).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "bitrate": {
+          "default": null,
+          "description": "Arbitration bit rate, in bits per second, for `can` and `can-fd`.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "broker": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "connect": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "data_bitrate": {
+          "default": null,
+          "description": "Data-phase bit rate for `can-fd`, which must be at least `bitrate`.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "protocol": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tls": {
+          "default": false,
+          "type": "boolean"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "connect"
+      ],
+      "type": "object"
+    },
+    "Direction": {
+      "enum": [
+        "up",
+        "down",
+        "will"
+      ],
+      "type": "string"
+    },
+    "Node": {
+      "additionalProperties": false,
+      "properties": {
+        "apps": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "firmware": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hardware": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "interfaces": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/NodeKind"
+        },
+        "language": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RtSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Real-time settings for a Linux host (`SCHED_FIFO`, memory locking, CPU\npinning). Applied at run time by `fiducial-rt`."
+        },
+        "runtime": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "variants": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "NodeKind": {
+      "enum": [
+        "mcu",
+        "host"
+      ],
+      "type": "string"
+    },
+    "Parameter": {
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "format": "double",
+          "type": "number"
+        },
+        "doc": {
+          "default": "",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "range": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "scope",
+        "unit",
+        "range",
+        "default"
+      ],
+      "type": "object"
+    },
+    "RtSpec": {
+      "additionalProperties": false,
+      "description": "How a Linux host node runs its control loop (`docs/specs/2026-11-01-topology-is-a-declaration.md`).",
+      "properties": {
+        "cpu": {
+          "default": null,
+          "description": "Pin the loop to this CPU.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "lock_memory": {
+          "default": true,
+          "description": "`mlockall`, so a page fault cannot stall the loop. On unless said off.",
+          "type": "boolean"
+        },
+        "prefault_stack_kib": {
+          "default": 512,
+          "description": "Touch this much stack up front, in KiB, so the loop never faults it in.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "priority": {
+          "description": "`SCHED_FIFO` priority, 1 to 99. Higher runs first.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "priority"
+      ],
+      "type": "object"
+    },
+    "System": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "nodes"
+      ],
+      "type": "object"
+    },
+    "Topic": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "$ref": "#/$defs/Direction"
+        },
+        "doc": {
+          "default": "",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "retained": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "direction"
+      ],
+      "type": "object"
+    },
+    "Unit": {
+      "additionalProperties": false,
+      "properties": {
+        "symbol": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "bus": {
+      "items": {
+        "$ref": "#/$defs/Bus"
+      },
+      "type": "array"
+    },
+    "node": {
+      "items": {
+        "$ref": "#/$defs/Node"
+      },
+      "type": "array"
+    },
+    "parameter": {
+      "items": {
+        "$ref": "#/$defs/Parameter"
+      },
+      "type": "array"
+    },
+    "system": {
+      "items": {
+        "$ref": "#/$defs/System"
+      },
+      "type": "array"
+    },
+    "topic": {
+      "items": {
+        "$ref": "#/$defs/Topic"
+      },
+      "type": "array"
+    },
+    "unit": {
+      "items": {
+        "$ref": "#/$defs/Unit"
+      },
+      "type": "array"
+    }
+  },
+  "title": "Topology",
+  "type": "object"
+}

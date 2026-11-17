@@ -10,11 +10,12 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'no linter configured yet'",
-    "test": "node --test --experimental-strip-types src/lib/*.test.ts"
+    "test": "node --test --experimental-strip-types src/lib/*.test.ts src/lib/sources/*.test.ts worker/*.test.ts"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cn": "^0.5.2",
     "lucide-react": "^1.73.0",
     "next-themes": "^0.4.6",
     "radix-ui": "^1.8.1",

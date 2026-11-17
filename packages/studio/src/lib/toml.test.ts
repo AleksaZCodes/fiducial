@@ -68,3 +68,74 @@ test("values render as TOML", () => {
   assert.equal(inline({ a: [1, "x"], b: true }), '{ a = [1, "x"], b = true }');
   assert.equal(inline('say "hi"'), '"say \\"hi\\""');
 });
+
+const topo = `# the system
+[[system]]
+id = "site"
+
+# the controller
+[[node]]
+id = "a"
+kind = "mcu"   # small
+
+[[node]]
+id = "b"
+kind = "host"
+
+[[bus]]
+id = "x"
+`;
+
+import { addBlock, blockCount, editBlock, removeBlock } from "./toml.ts";
+
+test("blocks are counted and one is edited without touching the rest", () => {
+  assert.equal(blockCount(topo, "node"), 2);
+  const out = editBlock(topo, "node", 1, "kind", "mcu");
+  const doc = parseToml(out) as { node: { id: string; kind: string }[] };
+  assert.deepEqual(doc.node.map((n) => n.kind), ["mcu", "mcu"]);
+  assert.match(out, /kind = "mcu"   # small/);
+  assert.match(out, /# the controller/);
+});
+
+test("a new key lands inside its block, before the gap", () => {
+  const out = editBlock(topo, "node", 0, "target", "rp2040");
+  const doc = parseToml(out) as { node: { id: string; target?: string }[] };
+  assert.equal(doc.node[0].target, "rp2040");
+  assert.equal(doc.node[1].target, undefined);
+});
+
+test("a key can be removed from one block", () => {
+  const out = editBlock(topo, "node", 0, "kind", undefined);
+  assert.equal((parseToml(out) as { node: { kind?: string }[] }).node[0].kind, undefined);
+});
+
+test("a block is appended with its keys", () => {
+  const out = addBlock(topo, "node", { id: "c", kind: "mcu", interfaces: ["i2c0"] });
+  const doc = parseToml(out) as { node: { id: string; interfaces?: string[] }[] };
+  assert.equal(doc.node.length, 3);
+  assert.deepEqual(doc.node[2].interfaces, ["i2c0"]);
+  assert.match(out, /# the controller/);
+});
+
+test("removing a block takes its own comment and leaves the others", () => {
+  const out = removeBlock(topo, "node", 0);
+  const doc = parseToml(out) as { node: { id: string }[]; system: unknown[]; bus: unknown[] };
+  assert.deepEqual(doc.node.map((n) => n.id), ["b"]);
+  assert.doesNotMatch(out, /# the controller/);
+  assert.match(out, /# the system/);
+  assert.equal(doc.bus.length, 1);
+});
+
+test("a block that is not there is refused, not guessed at", () => {
+  assert.throws(() => editBlock(topo, "node", 5, "id", "z"), /no \[\[node\]\] number 6/);
+  assert.throws(() => removeBlock(topo, "parameter", 0), /no \[\[parameter\]\]/);
+});
+
+test("adding to an empty file works", () => {
+  assert.deepEqual(JSON.parse(JSON.stringify(parseToml(addBlock("", "node", { id: "a" })))), { node: [{ id: "a" }] });
+});
+
+test("a list laid out over several lines stays that way when an entry changes", () => {
+  const out = editToml('outputs = [\n  "a",\n  "b",\n]  # files\n', ["outputs"], ["a", "b", "c"]);
+  assert.equal(out, 'outputs = [\n  "a",\n  "b",\n  "c",\n]  # files\n');
+});

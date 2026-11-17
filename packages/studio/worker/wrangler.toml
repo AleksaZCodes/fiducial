@@ -1,0 +1,16 @@
+# Studio's GitHub sign-in Worker. Deploy with `wrangler deploy` from this folder.
+#
+#   wrangler secret put GITHUB_CLIENT_SECRET
+#
+# The GitHub App (or OAuth App) needs its callback URL set to
+#   https://<this worker>/callback
+name = "studio-auth"
+main = "index.ts"
+compatibility_date = "2026-01-01"
+
+[vars]
+GITHUB_CLIENT_ID = ""
+# Origins Studio is served from, comma-separated. Anything else is refused.
+ALLOWED_ORIGINS = ""
+# GitHub Apps ignore scopes; an OAuth App needs `repo`.
+OAUTH_SCOPE = ""

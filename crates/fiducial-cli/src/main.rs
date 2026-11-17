@@ -119,8 +119,12 @@ EXAMPLES
 
 #[derive(Subcommand)]
 enum StudioCmd {
-    /// Print the JSON Schema for fiducial.toml
-    Schema,
+    /// Print a declaration's JSON Schema (fiducial, topology)
+    Schema {
+        /// Which declaration
+        #[arg(default_value = "fiducial")]
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -603,7 +607,8 @@ routes are answered from GitHub's API when there is no laptop.
 EXAMPLES
   fid studio                 serve on 127.0.0.1:7777
   fid studio --port 0        pick a free port
-  fid studio schema          print the JSON Schema for fiducial.toml",
+  fid studio schema          print the JSON Schema for fiducial.toml
+  fid studio schema topology print the one for topology.toml",
         after_long_help = "\
 EXIT CODES
   0   Stopped.
@@ -998,7 +1003,7 @@ fn main() -> Result<()> {
             portfolio,
         } => commands::dash::run(json, section, portfolio),
         Commands::Studio { action, port, app } => match action {
-            Some(StudioCmd::Schema) => commands::studio::schema(),
+            Some(StudioCmd::Schema { name }) => commands::studio::schema(&name),
             None => commands::studio::serve(port, app),
         },
         Commands::Harvest {

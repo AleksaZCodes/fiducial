@@ -51,7 +51,7 @@ function Section({ name, field, path, doc, onChange }: Props & { name: string })
   );
 }
 
-interface Props {
+export interface Props {
   field: Field;
   path: string[];
   doc: Record<string, Json>;
@@ -68,7 +68,7 @@ function Labelled({ name, hint, children }: { name: string; hint?: string; child
   );
 }
 
-function FieldView({ field, path, doc, onChange }: Props) {
+export function FieldView({ field, path, doc, onChange }: Props) {
   const value = getPath(doc, path);
   switch (field.kind) {
     case "object":

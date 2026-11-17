@@ -3,7 +3,9 @@ import { ExternalLink, Laptop, Play, RefreshCw, Smartphone, Square, Tablet } fro
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { deployedUrl } from "@/lib/editor";
 import { useSource } from "@/lib/source-context";
+import { parseToml } from "@/lib/toml";
 import type { DevStatus } from "@/lib/types";
 
 const VIEWPORTS = [
@@ -33,8 +35,27 @@ export function Preview() {
   const [error, setError] = useState<string | null>(null);
   const logEnd = useRef<HTMLDivElement>(null);
 
+  // Over GitHub there is no dev server, so offer the deployed site as the
+  // default target, and remember what the person types for next time.
+  useEffect(() => {
+    if (source.dev) return;
+    const key = `studio.preview.${source.label}`;
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(key);
+    } catch { /* storage may be unavailable */ }
+    if (saved) return setCustom(saved);
+    source.read("fiducial.toml").then((t) => setCustom(deployedUrl(parseToml(t)) ?? "")).catch(() => undefined);
+  }, [source]);
+  useEffect(() => {
+    if (source.dev || !custom) return;
+    try {
+      localStorage.setItem(`studio.preview.${source.label}`, custom);
+    } catch { /* storage may be unavailable */ }
+  }, [source, custom]);
+
   const poll = useCallback(() => {
-    source.dev?.status().then(setDev).catch((e: Error) => setError(e.message));
+    source.dev?.status("web").then(setDev).catch((e: Error) => setError(e.message));
   }, [source]);
   useEffect(() => {
     poll();
@@ -54,9 +75,9 @@ export function Preview() {
       <div className="flex flex-wrap items-center gap-2">
         {source.dev && (
           dev?.running ? (
-            <Button variant="outline" onClick={() => source.dev!.stop().then(setDev)}><Square /> Stop</Button>
+            <Button variant="outline" onClick={() => source.dev!.stop("web").then(setDev)}><Square /> Stop</Button>
           ) : (
-            <Button onClick={() => source.dev!.start().then(setDev).catch((e: Error) => setError(e.message))}><Play /> Start dev server</Button>
+            <Button onClick={() => source.dev!.start("web").then(setDev).catch((e: Error) => setError(e.message))}><Play /> Start dev server</Button>
           )
         )}
         <Input

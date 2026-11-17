@@ -30,7 +30,7 @@ const DEFAULT_TOPICS: [(&str, Direction, bool); 6] = [
     ("online", Direction::Will, false),
 ];
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Topology {
     #[serde(default)]
@@ -47,7 +47,7 @@ pub struct Topology {
     pub unit: Vec<Unit>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Topic {
     pub id: String,
@@ -58,7 +58,7 @@ pub struct Topic {
     pub doc: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Direction {
     Up,
@@ -66,20 +66,20 @@ pub enum Direction {
     Will,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Unit {
     pub symbol: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct System {
     pub id: String,
     pub nodes: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Node {
     pub id: String,
@@ -107,7 +107,7 @@ pub struct Node {
 }
 
 /// How a Linux host node runs its control loop (`docs/specs/2026-11-01-topology-is-a-declaration.md`).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RtSpec {
     /// `SCHED_FIFO` priority, 1 to 99. Higher runs first.
@@ -136,14 +136,14 @@ impl RtSpec {
     pub const MAX_PREFAULT_STACK_KIB: u32 = 8192;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum NodeKind {
     Mcu,
     Host,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Bus {
     pub id: String,
@@ -167,7 +167,7 @@ pub struct Bus {
     pub connect: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Parameter {
     pub id: String,
