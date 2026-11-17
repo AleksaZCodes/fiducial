@@ -37,6 +37,15 @@ content migration. Honest differences, because Tina and Pages CMS store
 different values: a picture is a text field holding the media **key**, and a
 relation is the entry's slug as text.
 
+### Opting out of the local workspace
+
+`fid add capability cms` installs the Keystatic workspace under `apps/cms/`,
+because Keystatic is the default. With `editor = "pages"` nothing runs it, so
+set the editor and **delete `apps/cms/`**: `fid derive` then writes only
+`.pages.yml`, `fid doctor` does not ask for the folder back, and `fid upgrade`
+does not restore it. Switching to Keystatic or Tina later is `editor = "..."`,
+`fid upgrade` (which brings the workspace back) and `fid derive`.
+
 ### Pages CMS
 
 `.pages.yml` is held to Pages CMS's own strict schema by

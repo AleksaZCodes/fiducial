@@ -765,6 +765,12 @@ fn merge_one_template(
         None => return Ok(None),
     };
 
+    // Not used by this product's configuration (the Keystatic workspace under a
+    // hosted Pages CMS editor): neither merged nor restored when deleted.
+    if crate::config::template_unused(root, rel_path) {
+        return Ok(None);
+    }
+
     // Look up the current (in-binary) template and expand placeholders.
     let raw = match templates::raw_for(rel_path, enabled) {
         Some(r) => r,
@@ -806,6 +812,38 @@ fn merge_one_template(
             "UNRESOLVED — {rel_path} still contains conflict markers from an \
              earlier upgrade. Nothing was written. Resolve the markers, then re-run"
         ))));
+    }
+
+    // A platform-owned file that is gone from disk is put back, whether or not
+    // the template changed. `fid doctor` tells a person that `fid upgrade` will
+    // rewrite a missing platform-owned file; before this it did so only when
+    // upstream had also changed, so the advice failed on exactly the file that
+    // was simply deleted (and switching `[cms] editor` back from Pages, which
+    // lets the `apps/cms` workspace be deleted, could not bring it back). A
+    // product-owned file the product deleted was deleted on purpose and stays so
+    // (handled below, once upstream changes). The editor workspace is the one
+    // exception under `apps/`: its being absent is how a product opts out of it
+    // under Pages CMS (`config::template_unused`), so once the editor needs it
+    // again it comes back, and nothing is being declined.
+    if !root.join(rel_path).exists()
+        && (!crate::ownership::of(rel_path).is_product()
+            || crate::config::is_cms_workspace(rel_path))
+    {
+        if !dry_run {
+            let local_path = root.join(rel_path);
+            if let Some(parent) = local_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&local_path, &upstream)
+                .with_context(|| format!("restoring deleted {rel_path}"))?;
+            let record = lock.templates.get_mut(rel_path).unwrap();
+            record.base_content = Some(upstream.clone());
+            record.hash = crate::lock::sha256_hex(upstream.as_bytes());
+            record.source_version = PLATFORM_VERSION.into();
+        }
+        return Ok(Some(TemplateOutcome::Clean(
+            "restored (was deleted locally)".into(),
+        )));
     }
 
     if !templates::upstream_changed(raw, product_name, &record.source_version, &base) {

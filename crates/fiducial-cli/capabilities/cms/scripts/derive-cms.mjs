@@ -785,10 +785,19 @@ function emit(dest, text) {
   mkdirSync(dirname(at(dest).pathname), { recursive: true });
   writeFileSync(at(dest), text);
 }
-emit("apps/cms/keystatic.config.ts", keystatic);
 emit(".pages.yml", pagesYml);
-emit("apps/cms/tina/config.ts", tina);
-emit("apps/cms/package.json", `${JSON.stringify({ ...pkg, "//": stamp }, null, 2)}\n`);
-console.log(
-  `wrote apps/cms (${editor}; ${entries.length} editable item(s), ${locales.length} locale(s))`,
-);
+if (editor === "pages") {
+  // Pages CMS is hosted: it reads `.pages.yml` through GitHub and runs nothing
+  // here. The Keystatic and Tina workspace has no reader, so it is not written
+  // (and `fid derive` does not expect it; see `outputs_not_applicable`).
+  console.log(
+    `wrote .pages.yml (pages; ${entries.length} editable item(s), ${locales.length} locale(s))`,
+  );
+} else {
+  emit("apps/cms/keystatic.config.ts", keystatic);
+  emit("apps/cms/tina/config.ts", tina);
+  emit("apps/cms/package.json", `${JSON.stringify({ ...pkg, "//": stamp }, null, 2)}\n`);
+  console.log(
+    `wrote apps/cms (${editor}; ${entries.length} editable item(s), ${locales.length} locale(s))`,
+  );
+}

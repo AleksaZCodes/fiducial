@@ -261,6 +261,11 @@ impl Lock {
     pub fn verify(&self, root: &Path) -> Vec<(PathBuf, String)> {
         let mut issues = Vec::new();
         for (rel, record) in &self.templates {
+            // A template the product's configuration has no use for is neither
+            // required nor checked: deleting it is how a product opts out.
+            if crate::config::template_unused(root, rel) {
+                continue;
+            }
             let abs = root.join(rel);
             match std::fs::read(&abs) {
                 Err(e) => {

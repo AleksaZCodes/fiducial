@@ -432,6 +432,20 @@ pub(crate) fn outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<St
             .filter(|o| o.ends_with("board.rs"))
             .cloned()
             .collect(),
+        // Pages CMS is hosted and reads `.pages.yml`; the Keystatic and Tina
+        // workspace the same pipeline derives has no reader. Only that file is
+        // an output then.
+        "shell"
+            if pipeline.name == "cms"
+                && crate::config::cms_editor(root).as_deref() == Some("pages") =>
+        {
+            pipeline
+                .outputs
+                .iter()
+                .filter(|o| o.starts_with("apps/cms/"))
+                .cloned()
+                .collect()
+        }
         _ => Vec::new(),
     }
 }
@@ -482,6 +496,9 @@ fn not_applicable_reason(pipeline: &Pipeline, output: &str, root: &Path) -> Stri
             "there is no app at that path".to_string()
         }
         "fid-hardware" => "hardware/product.toml declares no `[firmware] mcu`".to_string(),
+        "shell" if pipeline.name == "cms" => {
+            "[cms] editor = \"pages\" is hosted and needs no apps/cms workspace".to_string()
+        }
         other => format!("`{other}` does not derive it in this configuration"),
     }
 }
@@ -3400,9 +3417,14 @@ fn node_sandbox(pipeline: &Pipeline, root: &Path) -> Vec<String> {
             read.push(format!("{}/*", nm.to_string_lossy()));
         }
     }
+    // An output this product's configuration does not produce gets no directory
+    // either: creating `apps/cms/tina/` for a hosted Pages editor left an empty
+    // tree behind that nothing owns.
+    let skip = outputs_not_applicable(pipeline, root);
     let mut write: Vec<String> = pipeline
         .outputs
         .iter()
+        .filter(|o| !skip.contains(o))
         .filter_map(|o| {
             Path::new(o)
                 .parent()
