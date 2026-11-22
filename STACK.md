@@ -62,6 +62,8 @@ Every row carries a status, and the statuses are honest:
 | Component distribution | Package vs shadcn-style copy-in registry | Candidate → Phase 10 |
 | Forms | react-hook-form + Zod (React) | Decided |
 | i18n | `@fiducial/i18n` (next-intl underneath for Next) | Decided |
+| A client site that **sells** | **Next.js + Payload** — one app, admin included (`2026-11-22-payload-is-the-cms-and-commerce-capability`) | Decided |
+| A client site that is **content only** | **Astro**, with the git-based editor. An Astro storefront over the Payload API stays possible and changes no data model | Decided |
 
 ## 4 · Desktop & mobile
 
@@ -82,9 +84,11 @@ Every row carries a status, and the statuses are honest:
 | Database + auth | **Supabase** (Postgres + Auth), declarative schema → generated migrations | Decided |
 | Live/session state | **Cloudflare Durable Objects** (PartyServer/PartySocket, SQLite, Alarms) | Decided |
 | Object storage / archive | **Cloudflare R2**, append-only NDJSON with `schema_version` | Decided |
-| Analytics | **DuckDB over R2** | Decided |
+| Analytics over **high-volume telemetry** | **DuckDB over R2** — device readings and archived NDJSON. Clarified 2026-11-22: it is *not* the answer for a client shop's dozens of orders a month | Decided |
+| Business metrics for a shop | **The commerce data itself** — one timestamp per order status, queried over `orders` and `quotes`. No event store: a second source of truth for "is this paid" is worse than a slower query | Decided |
+| Traffic analytics | **Cloudflare Web Analytics**, loaded only after a recorded `analytics` consent | Decided |
 | Transactional email | **Resend**, via `@fiducial/email` | Decided |
-| CMS | **Payload** | Candidate — ROP-proven, not yet platform-generalized |
+| CMS where the content is a **database** | **Payload 3** on Workers: D1 through `@payloadcms/db-d1-sqlite`, media on R2 through `@payloadcms/storage-r2`, modelled on the official `with-cloudflare-d1` template and deployed through this repo's `nextjs` shape. **Paid Workers plan** (CPU time; the bundle limit is 64 MiB uncompressed since the compressed limit was removed in September 2026 — carried from the decision brief, **not re-verified** against Cloudflare's docs). Spec: `2026-11-22-payload-is-the-cms-and-commerce-capability` | Decided — capability not built yet |
 | Content editor (git-based) | **Keystatic** (default) and **TinaCMS**, both derived from `content.toml`, `messages/` and `settings.json`; **Pages CMS** (hosted, edits through GitHub; `.pages.yml` derived and held to its own schema). Decap was removed in 0.15.0 | Decided |
 | Backend framework | **Hono** (Workers-native; Node for a self-hosted target) | Candidate — roadmap: *A stack chosen per app* |
 | ORM | **Drizzle** over the `database` contract (D1, Postgres, SQLite) | Candidate — roadmap: *A stack chosen per app* |
@@ -92,7 +96,11 @@ Every row carries a status, and the statuses are honest:
 | Self-hosted server | **Rust `axum` + `tokio`**, `sqlx` — a recorded exception to TypeScript server glue (`2026-11-01-a-self-hosted-target`) | Decided |
 | Self-hosted database | **SQLite (WAL)** — raw readings 30 days, hourly roll-ups kept | Decided |
 | Error tracking | — | **Gap** — deliberately undecided, inherited from ROP |
-| Payments | — | **Gap** — decide at first paid product |
+| Staff auth in a client app | **Payload's built-in auth** — staff only, no public sign-up. Access control calls `can()` from `@fiducial/identity`: owner → `owner`, staff → `member`, an agency API key → a `service` principal at `viewer`, all on resource `platform`, so the identity model is unchanged and no grants table exists | Decided |
+| Customer accounts / **Better Auth** | — | Deferred — no client product has customers who log in |
+| Commerce model | **The platform's own Payload collections** — products, variants, orders, quotes, one line-item model, prices in minor units. `@payloadcms/plugin-ecommerce` was evaluated 2026-11-22 and **not adopted**: Beta, a required `customers` collection, and the D1 adapter's no-op transactions with an open data-loss report on array updates (payload#15219, #14766) | Decided |
+| Card payments | — | **Gap** — unchanged. The first paid product is confirmed by phone and paid on delivery or by bank transfer, and an admin action marks it paid. No payment adapter is written, not even a stub |
+| Nightly database backup | **D1 export to R2 on a Cron Trigger**, 30 days kept, restore documented alongside D1 point-in-time recovery | Decided — designed 2026-11-22, not built |
 
 ## 6 · Firmware & embedded
 
@@ -273,11 +281,16 @@ Every row carries a status, and the statuses are honest:
 
 ## Score
 
-**152 rows. 129 Decided · 15 Candidate (each with a named phase) · 5 Gap · 2 Deferred.**
+**167 rows. 140 Decided · 18 Candidate (each with a named phase) · 6 rows marked Gap · 3 Deferred.**
 
-**The gaps, in full:** error tracking · payments · ML framework · FEA/thermal/CFD (which also
-covers structural sizing, materials data and certification evidence) · time-triggered / TSN
-Ethernet.
-**Deferred:** Ruby/Rails · hardware-in-the-loop rigs.
+Recounted 2026-11-22 by reading the tables rather than by editing the previous
+line, which said *152 · 129 · 15 · 5 · 2* and had gone stale — a hand-maintained
+total is a second declaration of the rows above it. The six Gap rows are **five
+distinct gaps**: §16's physics-solver row points at §8's rather than owning one.
+
+**The gaps, in full:** error tracking · **card payments** · ML framework · FEA/thermal/CFD
+(which also covers structural sizing, materials data and certification evidence) ·
+time-triggered / TSN Ethernet.
+**Deferred:** Ruby/Rails · hardware-in-the-loop rigs · customer accounts / Better Auth.
 
 **Nothing on that list blocks Phase 0 through Phase 8.**

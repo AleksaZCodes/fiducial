@@ -774,6 +774,89 @@ rather than generating something that half works.
 the right answer to a question `fid new` asks, and a capability nobody would be
 steered to is a capability to maintain for nothing.
 
+### Client business sites — Payload is the CMS, commerce and admin — *terminal, product-critical* ⬜
+
+Avora ships client business sites, and the first client is a Serbian
+custom-furniture maker: a catalog with fixed prices and variants, a per-product
+order form, a made-to-measure inquiry form, and an admin the owner reviews once
+a week. No customer accounts, no online payment — confirmed by phone, paid on
+delivery or by transfer, marked paid by the owner. Decided and scoped
+2026-11-22: `docs/specs/2026-11-22-payload-is-the-cms-and-commerce-capability.md`.
+
+**Why it is not the editor the platform already has.** Keystatic, Tina and
+Pages CMS edit files, which is why they are the default and why
+`fid derive --check` can hold them. None of them can hold an order written by a
+stranger at 23:40. A shop needs a database, so **Payload 3 moves Candidate →
+Decided** in `STACK.md`: on Workers, with D1 (`@payloadcms/db-d1-sqlite`) and
+R2 (`@payloadcms/storage-r2`), through the `nextjs` deploy shape this platform
+already derives. Next.js + Payload is for client apps that *sell*; Astro stays
+the answer for content-only sites, and an Astro storefront over the Payload API
+remains possible without touching the data model.
+
+**Two capabilities, because they are two decisions.** `payload` is the app —
+admin, staff auth, access control, Pages with blocks, SiteSettings, media on R2,
+revalidation. `commerce` is the domain — products, variants, orders, quotes, one
+line-item model, lead source — and it requires `payload`. A client site that
+wants the editor and no catalog is the second consumer that makes the boundary
+real rather than speculative.
+
+**Where it lands.**
+- `crates/fiducial-cli/capabilities/payload/` and `…/commerce/`, following
+  `site` and `cms`: a `SKILL.md`, a `capability.toml` that `supersedes`
+  `apps/web/next.config.ts` (it must be wrapped in `withPayload`) and
+  `apps/web/open-next.config.ts` (the R2 incremental cache), and one pipeline
+  each whose output is `apps/web/src/generated/{payload,commerce}.ts` — the
+  locales, currency, roles, order statuses and lead sources the collections
+  import rather than restate.
+- `crates/fiducial-cli/src/config.rs` and `commands/derive.rs` gain
+  **`[deploy] crons` and `[deploy] secrets`** (names, never values). The Payload
+  Jobs Queue and the nightly D1 export to R2 both need the first, and nothing
+  in the wrangler derivation can express either today.
+- `crates/fiducial-cli/src/legal.rs` and `profiles/legal.toml`: the RS
+  jurisdiction gains a distance-selling page citing *Zakon o zaštiti
+  potrošača*, including the withdrawal-right exception for goods made to the
+  consumer's specification, and every page is marked for human review. Consent
+  categories and the banner already exist; what is added is the script loader
+  that keeps Cloudflare Web Analytics, the Meta Pixel and the Conversions API
+  behind a recorded yes.
+- Access control calls `can()` from `@fiducial/identity` with the roles mapped
+  onto the existing model — owner → `owner`, staff → `member`, agency API key →
+  a `service` principal at `viewer` — on resource `platform`, so **nothing in
+  `fiducial-identity` changes** and no grants table is created: the `role` field
+  on the Payload user document is the single declaration.
+- `scripts/verify-payload.sh`, in the `web-next-scaffold` CI job: the Rust
+  tests can prove a scaffold derives, and only a real `pnpm install`,
+  `next build`, `opennextjs-cloudflare build` and `wrangler deploy --dry-run`
+  can prove it compiles. That is the 2026-10-13 lesson, not a new rule.
+
+**Resolve first.**
+- **`@payloadcms/plugin-ecommerce` is evaluated and rejected**, and the reasons
+  are specific enough to re-check rather than re-argue: the D1 adapter's
+  transactions are a no-op with an open data-loss report on array updates
+  (payload#15219) and a "too many SQL variables" failure on large schemas
+  (payload#14766), the plugin is Beta, and its config *requires* a `customers`
+  collection this product does not have. Six hand-modelled collections instead.
+  Re-evaluate when the plugin leaves Beta **and** D1 batch support lands, or
+  when a product needs card payments.
+- **The `next` pin.** `@payloadcms/next@3.94.1` needs `next >=16.4.5 <17`;
+  `web-next` pins `^16.0.0`, and `npm_dependencies` only adds what is absent,
+  so the pin has to rise in the template.
+- **Payload's admin has no Serbian.** `@payloadcms/translations` ships `hr` and
+  no `sr`. The owner's chrome will be English or Croatian around Serbian
+  labels and emails. That is a miss against principle 1c, and the fix is where
+  it lives: contribute `sr` upstream.
+- **One sentence of `2026-11-13-one-product-many-shapes.md` says not to do
+  this** ("a hosted CMS with its own database… `fid derive --check` cannot check
+  a database"). The spec argues it is right about content and wrong about
+  transactions, and records the contradiction as an open question rather than
+  deleting it.
+- Payments stay a **Gap**. Nothing card-related is built, and the state machine
+  reaches `paid` by an admin action.
+
+**Out of scope, named so it is not re-proposed:** the agency app, Better Auth,
+card payments, shipping and tax engines, social or ads automation, WhatsApp and
+Telegram, cart UI, customer accounts, and SEO beyond the SiteSettings defaults.
+
 ### The design system, in the standards — *multiplying* 🟡
 
 **Decided 2026-11-16 after reading the three specs.** Three formats describe
