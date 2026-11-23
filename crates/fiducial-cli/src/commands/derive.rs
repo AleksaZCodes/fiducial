@@ -3371,7 +3371,8 @@ fn run_fid_legal(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
     }
     config.brand.validate()?;
 
-    let rendered = crate::legal::render_legal_ts(legal, &config.brand, &locales, &default_locale)?;
+    let analytics_ctx = crate::legal::AnalyticsContext::from_analytics(&config.analytics);
+    let rendered = crate::legal::render_legal_ts(legal, &config.brand, &locales, &default_locale, &analytics_ctx)?;
 
     for out in &pipeline.outputs {
         let abs = working_dir.join(out);

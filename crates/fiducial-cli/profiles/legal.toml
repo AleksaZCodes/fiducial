@@ -22,9 +22,9 @@ categories = ["necessary"]
 source     = "CCPA §1798.100; ADA Title III (accessibility)"
 
 [jurisdiction.RS]
-pages      = ["privacy", "terms", "cookies", "accessibility"]
+pages      = ["privacy", "terms", "cookies", "accessibility", "distance-selling"]
 categories = ["necessary"]
-source     = "Zakon o zaštiti podataka o ličnosti (2018); Zakon o elektronskim komunikacijama čl. 126"
+source     = "Zakon o zaštiti podataka o ličnosti (2018); Zakon o elektronskim komunikacijama čl. 126; Zakon o zaštiti potrošača (Sl. glasnik RS 62/2014, 6/2016, 44/2018, 87/2018) čl. 36 (pravo na odustanak)"
 
 [jurisdiction.other]
 pages      = ["privacy", "terms", "cookies"]
