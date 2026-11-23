@@ -6,3 +6,10 @@ block = "analytics"
 [declarations.config.seed]
 providers = ["first-party", "cloudflare-web-analytics"]
 retention_days = 396
+
+[[declarations.config]]
+block = "deploy"
+
+[declarations.config.seed]
+crons = ["0 0 * * *"]
+secrets = ["ANALYTICS_CRON_SECRET", "ANALYTICS_HMAC_SECRET"]

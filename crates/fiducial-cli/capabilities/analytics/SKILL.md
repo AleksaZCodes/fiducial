@@ -66,6 +66,40 @@ token_env = "CF_BEACON_TOKEN"
 `retention_days` (default 396 = 13 months) derives the scheduled delete cron
 and the retention sentence in the generated privacy notice.
 
+## Retention
+
+`[analytics] retention_days` (default 396 = 13 months) controls how long
+first-party event rows are kept. `fid derive` generates
+`generated/analytics-retention.ts` with `ANALYTICS_RETENTION_DAYS` and
+`cleanupAnalyticsEvents(db)`. The cleanup route lives at
+`apps/web/src/app/api/analytics-cleanup/route.ts`.
+
+If `[deploy]` is not yet declared when analytics is added, the capability seeds
+`[deploy] crons = ["0 0 * * *"]` (daily at midnight UTC) and
+`[deploy] secrets` with `ANALYTICS_CRON_SECRET`. If `[deploy]` is already
+declared, add `crons = ["0 0 * * *"]` to that block and add
+`"ANALYTICS_CRON_SECRET"` to its `secrets` array manually.
+
+**Calling the cleanup from a cron trigger.** Cloudflare scheduled triggers
+run the Worker's `scheduled` export. In an OpenNext app, add a custom Worker
+entrypoint that:
+1. Delegates `fetch` to OpenNext's handler as normal.
+2. In `scheduled`, calls:
+   ```typescript
+   await fetch(new URL('/api/analytics-cleanup', origin), {
+     method: 'POST',
+     headers: { 'x-cron-secret': env.ANALYTICS_CRON_SECRET },
+   })
+   ```
+
+Set the secret: `wrangler secret put ANALYTICS_CRON_SECRET`
+
+**Restore procedure.** There is no on-platform restore for first-party events.
+The D1 database is backed up nightly (commit 9 in the Payload series). To
+restore after accidental deletion: apply the latest R2 snapshot with
+`wrangler d1 execute --file <snapshot.sql>`, then run a manual cleanup
+pass to remove any events beyond the retention window.
+
 ## What an agent should do
 
 - Use `createAnalytics(env)` from `generated/analytics.ts` in route handlers
@@ -74,5 +108,8 @@ and the retention sentence in the generated privacy notice.
   layout's client component.
 - To add a provider: add its id to `[analytics] providers` and run `fid derive`.
   Never edit `generated/analytics.ts` by hand.
+- To change the retention window: edit `[analytics] retention_days` and run
+  `fid derive`. Both `analytics-retention.ts` and the privacy notice update
+  together; `fid derive --check` catches a stale file.
 - To add a custom event type: add it to `[analytics] events` (not built yet;
   see the spec open questions).

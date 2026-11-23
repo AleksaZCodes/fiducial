@@ -216,3 +216,95 @@ fn meta_pixel_without_consent_reported_by_doctor() {
     assert!(t.contains("consent"), "doctor must mention consent: {t}");
     assert!(t.contains("meta-pixel-capi"), "doctor must name the provider: {t}");
 }
+
+// ── Retention (commit 5) ──────────────────────────────────────────────────────
+
+#[test]
+fn derive_writes_analytics_retention_ts() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = analytics_product(tmp.path());
+
+    let ts = std::fs::read_to_string(
+        root.join("apps/web/src/generated/analytics-retention.ts"),
+    )
+    .unwrap();
+    assert!(ts.contains("ANALYTICS_RETENTION_DAYS"), "{ts}");
+    assert!(ts.contains("cleanupAnalyticsEvents"), "{ts}");
+    assert!(ts.contains("do not edit"), "{ts}");
+}
+
+#[test]
+fn analytics_retention_ts_reflects_configured_days() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = analytics_product(tmp.path());
+
+    let ts = std::fs::read_to_string(
+        root.join("apps/web/src/generated/analytics-retention.ts"),
+    )
+    .unwrap();
+    assert!(ts.contains("= 396"), "default 396 days present: {ts}");
+}
+
+#[test]
+fn analytics_retention_ts_deletes_by_timestamp() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = analytics_product(tmp.path());
+
+    let ts = std::fs::read_to_string(
+        root.join("apps/web/src/generated/analytics-retention.ts"),
+    )
+    .unwrap();
+    assert!(ts.contains("DELETE FROM analytics_events WHERE ts <"), "{ts}");
+}
+
+#[test]
+fn check_catches_stale_analytics_retention_ts() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = analytics_product(tmp.path());
+
+    let path = root.join("apps/web/src/generated/analytics-retention.ts");
+    std::fs::write(&path, "// hand-edited\n").unwrap();
+    let out = run(&root, &["derive", "--check"]);
+    assert!(!out.status.success(), "should fail after hand-edit");
+    let t = text(&out);
+    assert!(t.contains("analytics-retention.ts"), "{t}");
+}
+
+#[test]
+fn analytics_cleanup_route_installed_alongside_web_next() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = analytics_web_product(tmp.path());
+
+    assert!(
+        root.join("apps/web/src/app/api/analytics-cleanup/route.ts").exists(),
+        "cleanup route installed with web-next"
+    );
+    let route = std::fs::read_to_string(
+        root.join("apps/web/src/app/api/analytics-cleanup/route.ts"),
+    )
+    .unwrap();
+    assert!(route.contains("cleanupAnalyticsEvents"), "{route}");
+    assert!(route.contains("x-cron-secret"), "{route}");
+}
+
+#[test]
+fn analytics_cleanup_route_not_installed_without_web_next() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = analytics_product(tmp.path());
+
+    assert!(
+        !root.join("apps/web/src/app/api/analytics-cleanup/route.ts").exists(),
+        "cleanup route must not be installed without web-next"
+    );
+}
+
+#[test]
+fn analytics_capability_seeds_deploy_crons_when_deploy_absent() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = analytics_product(tmp.path());
+
+    let config = std::fs::read_to_string(root.join("fiducial.toml")).unwrap();
+    assert!(config.contains("[deploy]"), "deploy block seeded: {config}");
+    assert!(config.contains("0 0 * * *"), "cron expression seeded: {config}");
+    assert!(config.contains("ANALYTICS_CRON_SECRET"), "secret seeded: {config}");
+}
