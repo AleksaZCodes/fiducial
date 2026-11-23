@@ -20,6 +20,7 @@ Every row carries a status, and the statuses are honest:
 | Concern | Decision | Status |
 | --- | --- | --- |
 | JS package manager | **pnpm**, pinned via Corepack. Never npm/yarn | Decided |
+| Node | **22.18 or newer**, pinned by `.nvmrc` and `engines`. 22.18 is the floor because native TypeScript stripping and `module.registerHooks` are what let the Payload CLI run without its bundled tsx (`2026-11-23-analytics-is-a-capability-consent-is-opt-in`, D26); Node 20 went end-of-life in April 2026 | Decided — 2026-11-23, raised from 20 |
 | JS monorepo | **Turborepo** | Decided |
 | Rust workspaces | **Cargo** — one host workspace; **separate workspaces per firmware target** | Decided |
 | Python (build-time only) | **uv** | Decided |
@@ -84,9 +85,11 @@ Every row carries a status, and the statuses are honest:
 | Database + auth | **Supabase** (Postgres + Auth), declarative schema → generated migrations | Decided |
 | Live/session state | **Cloudflare Durable Objects** (PartyServer/PartySocket, SQLite, Alarms) | Decided |
 | Object storage / archive | **Cloudflare R2**, append-only NDJSON with `schema_version` | Decided |
-| Analytics over **high-volume telemetry** | **DuckDB over R2** — device readings and archived NDJSON. Clarified 2026-11-22: it is *not* the answer for a client shop's dozens of orders a month | Decided |
+| Analytics over **high-volume telemetry** | **DuckDB over R2** — device readings and archived NDJSON. Clarified 2026-11-22: it is *not* the answer for a client shop's dozens of orders a month, and 2026-11-23 it is not the `analytics` contract either — that contract's first-party provider writes site events to D1 | Decided |
 | Business metrics for a shop | **The commerce data itself** — one timestamp per order status, queried over `orders` and `quotes`. No event store: a second source of truth for "is this paid" is worse than a slower query | Decided |
-| Traffic analytics | **Cloudflare Web Analytics**, loaded only after a recorded `analytics` consent | Decided |
+| Traffic analytics | **One `analytics` contract, many providers at once** — `track(event)` / `pageview(ctx)`, declared as a list in `[analytics] providers` because `[adapters]` is one vendor per contract. Default on and consent-free: **first-party** (an events table in D1 behind `/api/e`, nothing written to the device, visitor hash = HMAC(declared secret, UTC date, IP, user agent), raw IP never stored) and **Cloudflare Web Analytics** (cookieless beacon). Off by default: **PostHog** (`cookieless_mode: "always"`, EU host) and **Meta Pixel + Conversions API**, which `requiresConsent` and cannot be enabled without the `consent` capability. Spec: `2026-11-23-analytics-is-a-capability-consent-is-opt-in` | Decided — capability not built yet |
+| Consent | **Its own opt-in capability, off by default.** The default template sets no non-essential cookies and loads no third-party scripts, so it ships no banner: strictly necessary storage is the cart in local/session storage and the staff auth cookie, and embedded maps and videos are click-to-load. Installing `consent` adds the banner and the footer preferences link, and is what makes a `requiresConsent` provider legal to enable | Decided — 2026-11-23, supersedes the `legal` capability's banner |
+| First-party analytics retention | **13 months (`[analytics] retention_days = 396`), deleted by a Cron Trigger.** One declaration derives the job and the sentence in the privacy notice | Decided — designed 2026-11-23, not built |
 | Transactional email | **Resend**, via `@fiducial/email` | Decided |
 | CMS where the content is a **database** | **Payload 3** on Workers: D1 through `@payloadcms/db-d1-sqlite`, media on R2 through `@payloadcms/storage-r2`, modelled on the official `with-cloudflare-d1` template and deployed through this repo's `nextjs` shape. **Paid Workers plan** (CPU time; the bundle limit is 64 MiB uncompressed since the compressed limit was removed in September 2026 — carried from the decision brief, **not re-verified** against Cloudflare's docs). Spec: `2026-11-22-payload-is-the-cms-and-commerce-capability` | Decided — capability not built yet |
 | Content editor (git-based) | **Keystatic** (default) and **TinaCMS**, both derived from `content.toml`, `messages/` and `settings.json`; **Pages CMS** (hosted, edits through GitHub; `.pages.yml` derived and held to its own schema). Decap was removed in 0.15.0 | Decided |
@@ -281,11 +284,12 @@ Every row carries a status, and the statuses are honest:
 
 ## Score
 
-**167 rows. 140 Decided · 18 Candidate (each with a named phase) · 6 rows marked Gap · 3 Deferred.**
+**170 rows. 143 Decided · 18 Candidate (each with a named phase) · 6 rows marked Gap · 3 Deferred.**
 
-Recounted 2026-11-22 by reading the tables rather than by editing the previous
-line, which said *152 · 129 · 15 · 5 · 2* and had gone stale — a hand-maintained
-total is a second declaration of the rows above it. The six Gap rows are **five
+Recounted 2026-11-23 by reading the tables rather than by editing the previous
+line, which said *167 · 140 · 18 · 6 · 3* for the tables as they stood before
+the `analytics`, `consent`, retention and Node rows — a hand-maintained total is
+a second declaration of the rows above it. The six Gap rows are **five
 distinct gaps**: §16's physics-solver row points at §8's rather than owning one.
 
 **The gaps, in full:** error tracking · **card payments** · ML framework · FEA/thermal/CFD

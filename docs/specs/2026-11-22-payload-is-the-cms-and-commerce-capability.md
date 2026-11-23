@@ -416,3 +416,33 @@ Written when the implementation agent reached its usage limit. The branch builds
 - The two `captures` tests and several `fiducial-eda` board tests fail in this sandbox. The `captures` failures come from a missing `ortools`.
 - Lighthouse numbers are not measured. They need a live Workers preview.
 - No pull request is to be opened until the user says so. PR #155 was opened by mistake by an agent.
+
+## Superseded in part — 2026-11-23
+
+`docs/specs/2026-11-23-analytics-is-a-capability-consent-is-opt-in.md`
+supersedes, from this spec:
+
+- **D7's second sentence** — "Traffic analytics is Cloudflare Web Analytics,
+  loaded only after consent." Traffic analytics is now a contract with many
+  providers, and the two default ones are cookieless and never consent-gated.
+  D7's first sentence stands: business metrics still come from the commerce
+  rows, and the funnel never mixes with them.
+- **D14 in full** — consent no longer goes through the `legal` capability, the
+  default template ships no banner, and the Meta Pixel / Conversions API are
+  one opt-in provider that cannot be enabled without the new `consent`
+  capability. The distance-selling page and the per-page review markers survive
+  into the new spec's commit 6.
+- **Open question 4** — answered: UTM capture is strictly necessary session
+  storage at landing, not a cookie and not deferred to submit.
+- **Commit 9** of the plan, and the remaining order. Commits 0–5 stay merged;
+  6, 7, 10 and 11 return as 7, 8, 9 and 10 of the new list, which starts with
+  the `payload generate:types` fix.
+
+The "Known problems" entry above — "`payload generate:types` and
+`generate:importmap` crash on Node 22 or later, so the verify script skips
+them" — carries a **wrong diagnosis**. It is not a missing browser-only
+`CacheStorage` global: `require("undici")` succeeds on bare Node 22. The cause,
+reproduced on 2026-11-23, is that the Payload CLI's bundled tsx evaluates
+`undici/lib/core/symbols.js` twice, so undici's own `kConstruct` guard rejects
+`new CacheStorage(kConstruct)`. See the new spec's Context table, and D26 for
+the fix.

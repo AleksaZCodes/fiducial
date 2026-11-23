@@ -774,14 +774,20 @@ rather than generating something that half works.
 the right answer to a question `fid new` asks, and a capability nobody would be
 steered to is a capability to maintain for nothing.
 
-### Client business sites — Payload is the CMS, commerce and admin — *terminal, product-critical* ⬜
+### Client business sites — Payload is the CMS, commerce and admin — *terminal, product-critical* 🟡
 
 Avora ships client business sites, and the first client is a Serbian
 custom-furniture maker: a catalog with fixed prices and variants, a per-product
 order form, a made-to-measure inquiry form, and an admin the owner reviews once
 a week. No customer accounts, no online payment — confirmed by phone, paid on
 delivery or by transfer, marked paid by the owner. Decided and scoped
-2026-11-22: `docs/specs/2026-11-22-payload-is-the-cms-and-commerce-capability.md`.
+2026-11-22: `docs/specs/2026-11-22-payload-is-the-cms-and-commerce-capability.md`,
+amended 2026-11-23 by
+`docs/specs/2026-11-23-analytics-is-a-capability-consent-is-opt-in.md`, which
+supersedes its consent decision (D14) and half of D7: the default site is
+cookieless and banner-free, and analytics is a capability with many providers.
+Commits 0–5 are merged; the rewritten commit order starts with the
+`payload generate:types` fix.
 
 **Why it is not the editor the platform already has.** Keystatic, Tina and
 Pages CMS edit files, which is why they are the default and why
@@ -815,10 +821,33 @@ real rather than speculative.
 - `crates/fiducial-cli/src/legal.rs` and `profiles/legal.toml`: the RS
   jurisdiction gains a distance-selling page citing *Zakon o zaštiti
   potrošača*, including the withdrawal-right exception for goods made to the
-  consumer's specification, and every page is marked for human review. Consent
-  categories and the banner already exist; what is added is the script loader
-  that keeps Cloudflare Web Analytics, the Meta Pixel and the Conversions API
-  behind a recorded yes.
+  consumer's specification, and every page is marked for human review. The
+  privacy and cookie wording is **rewritten cookieless**, derived from
+  `[analytics]`: no cookies for analytics, a first-party statistic identified
+  by a hash that changes daily, Cloudflare Web Analytics, the optional
+  providers listed, and the staff login cookie named as the only cookie the
+  site sets.
+- **`analytics` is its own capability, and `consent` is a second one that is
+  off by default** — decided 2026-11-23,
+  `docs/specs/2026-11-23-analytics-is-a-capability-consent-is-opt-in.md`. One
+  contract (`track`, `pageview`), **many providers at once**, declared as a
+  list in `[analytics] providers` because `[adapters]` is one vendor per
+  contract by construction. `first-party` (an events table in D1 behind
+  `/api/e`, no device storage, visitor hash = HMAC of a declared secret, the
+  UTC date, the IP and the user agent, raw IP never stored) and
+  `cloudflare-web-analytics` are on by default and need no consent; `posthog`
+  (cookieless, EU host) and `meta-pixel-capi` are off, and the second **cannot
+  be enabled unless `consent` is installed** — a config error, reported by
+  `fid doctor`. The default template therefore ships no banner, no third-party
+  script and no non-essential cookie: strictly necessary storage is the cart
+  and the staff auth cookie, and embedded maps and videos are click-to-load.
+- **The Payload CLI has to run before anything else lands.**
+  `payload generate:types` and `generate:importmap` are the derived types and
+  import map the collections depend on, and they have been hand-kept
+  placeholders. Fixed by running the CLI on native Node
+  (`--disable-transpile` plus a 20-line resolve hook) instead of through its
+  bundled tsx, which evaluates `undici`'s symbols module twice; the Node floor
+  rises to 22.18 and both outputs become gated pipeline artifacts.
 - Access control calls `can()` from `@fiducial/identity` with the roles mapped
   onto the existing model — owner → `owner`, staff → `member`, agency API key →
   a `service` principal at `viewer` — on resource `platform`, so **nothing in
@@ -856,6 +885,9 @@ real rather than speculative.
 **Out of scope, named so it is not re-proposed:** the agency app, Better Auth,
 card payments, shipping and tax engines, social or ads automation, WhatsApp and
 Telegram, cart UI, customer accounts, and SEO beyond the SiteSettings defaults.
+Also out: `identify()` and user profiles, session recording, Google Analytics
+and Tag Manager, a consent banner in the default template, and any storage of a
+raw IP address.
 
 ### The design system, in the standards — *multiplying* 🟡
 
