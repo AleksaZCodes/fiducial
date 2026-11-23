@@ -3379,13 +3379,7 @@ fn run_fid_legal(pipeline: &Pipeline, working_dir: &Path) -> Result<()> {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("creating parent for `{out}`"))?;
         }
-        // `consent.ts` is the consent rules; any other output is the pages.
-        let content = if out.ends_with("consent.ts") {
-            crate::legal::render_consent_ts(legal)
-        } else {
-            rendered.clone()
-        };
-        std::fs::write(&abs, &content).with_context(|| format!("writing {out}"))?;
+        std::fs::write(&abs, &rendered).with_context(|| format!("writing {out}"))?;
     }
 
     Ok(())

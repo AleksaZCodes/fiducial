@@ -1,0 +1,6 @@
+description = "Consent banner and footer link for products that need them"
+
+requires_capabilities = ["legal"]
+
+[[declarations.config]]
+block = "legal"

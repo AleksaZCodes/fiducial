@@ -145,37 +145,18 @@ fn derive_fails_without_brand() {
     );
 }
 
-/// Whether a cookie category may be used is derived, not written in the
-/// banner: "nobody has been asked yet" means no, and an edit that makes it
-/// mean yes is a stale output (the paper's round 4, case R7).
+/// The legal pipeline does not generate consent.ts; that belongs to the
+/// `consent` capability's own pipeline.
 #[test]
-fn the_consent_rules_are_derived_and_a_hand_edit_fails_check() {
+fn legal_pipeline_does_not_write_consent_ts() {
     let tmp = tempfile::tempdir().unwrap();
     let root = legal_product(tmp.path());
-    let path = root.join("apps/web/src/generated/consent.ts");
-    let ts = std::fs::read_to_string(&path).unwrap();
     assert!(
-        ts.contains("export type CookieCategory = \"necessary\""),
-        "{ts}"
+        !root.join("apps/web/src/generated/consent.ts").exists(),
+        "consent.ts must not exist after `fid add legal` alone"
     );
     assert!(
-        ts.contains("return cookieConsent()?.granted.includes(category) ?? false;"),
-        "{ts}"
+        !root.join("apps/web/src/components/cookie-consent.tsx").exists(),
+        "banner must not exist after `fid add legal` alone"
     );
-    // The banner is a React component, so it arrives with a Next.js app — added
-    // after `legal` here, which also proves the scoped template back-fills.
-    assert!(!root
-        .join("apps/web/src/components/cookie-consent.tsx")
-        .exists());
-    assert!(run(&root, &["add", "design"]).status.success());
-    assert!(run(&root, &["add", "app", "next"]).status.success());
-    let banner =
-        std::fs::read_to_string(root.join("apps/web/src/components/cookie-consent.tsx")).unwrap();
-    assert!(banner.contains("from \"../generated/consent\""), "{banner}");
-    assert!(!banner.contains("?? false"), "the banner decides nothing");
-
-    std::fs::write(&path, ts.replace("?? false;", "?? true;")).unwrap();
-    let out = run(&root, &["derive", "--check"]);
-    assert!(!out.status.success(), "consent by default passed --check");
-    assert!(text(&out).contains("consent.ts"), "{}", text(&out));
 }

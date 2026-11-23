@@ -1,0 +1,3 @@
+name     = "consent"
+executor = "fid-consent"
+outputs  = ["apps/web/src/generated/consent.ts"]
