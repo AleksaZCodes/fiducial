@@ -774,7 +774,7 @@ rather than generating something that half works.
 the right answer to a question `fid new` asks, and a capability nobody would be
 steered to is a capability to maintain for nothing.
 
-### Client business sites — Payload is the CMS, commerce and admin — *terminal, product-critical* 🟡
+### Client business sites — Payload is the CMS, commerce and admin — *terminal, product-critical* ✅
 
 Avora ships client business sites, and the first client is a Serbian
 custom-furniture maker: a catalog with fixed prices and variants, a per-product
@@ -786,8 +786,9 @@ amended 2026-11-23 by
 `docs/specs/2026-11-23-analytics-is-a-capability-consent-is-opt-in.md`, which
 supersedes its consent decision (D14) and half of D7: the default site is
 cookieless and banner-free, and analytics is a capability with many providers.
-Commits 0–5 are merged; the rewritten commit order starts with the
-`payload generate:types` fix.
+All ten commits merged (0.47.0–0.55.0). The verify script runs end to end
+(`TMPDIR=$PWD/target/tmp scripts/verify-payload.sh`). Lighthouse numbers
+and live D1 are unverified — both need a Workers preview with real bindings.
 
 **Why it is not the editor the platform already has.** Keystatic, Tina and
 Pages CMS edit files, which is why they are the default and why

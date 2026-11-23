@@ -414,3 +414,11 @@ Item 7 of the brief, as four assertions on a **default** scaffold:
 4. `[analytics] providers = ["meta-pixel-capi"]` without `consent` in
    `[capabilities] enabled` fails `fid derive` **and** is reported by
    `fid doctor`.
+
+## Status
+
+**2026-11-23** — All ten commits merged on branch `ccr-c766b4d5-4mp7o3`
+(0.47.0–0.55.0). The four test-plan assertions above hold for items 2, 3 and
+4 (verified via `cargo test`). Item 1 (no Set-Cookie except staff login) is
+not an automated test — it requires a live Workers response. Lighthouse and
+live D1 bindings are unverified.
