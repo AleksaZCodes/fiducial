@@ -13,6 +13,7 @@ import { Carts } from "./src/payload/collections/Carts";
 import { Discounts } from "./src/payload/collections/Discounts";
 import { SiteSettings } from "./src/payload/globals/SiteSettings";
 import { getAllMetrics } from "./src/payload/metrics";
+import { notifyNewOrderTask, notifyNewQuoteTask } from "./src/payload/jobs";
 import { can } from "@fiducial/identity";
 import type { Principal, Resource, Grant } from "@fiducial/identity";
 import {
@@ -75,6 +76,10 @@ export default buildConfig({
   collections: [Users, Pages, Media, Products, Variants, Orders, Quotes, Carts, Discounts],
 
   globals: [SiteSettings],
+
+  jobs: {
+    tasks: [notifyNewOrderTask, notifyNewQuoteTask],
+  },
 
   editor: lexicalEditor(),
 

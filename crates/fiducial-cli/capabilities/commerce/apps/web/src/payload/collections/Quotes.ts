@@ -7,6 +7,7 @@ import { leadSourceField, utmFields } from "../fields/leadSource";
 import { statusTimestampFields, setStatusTimestamp } from "../fields/statusTimestamps";
 import { lineItemsJsonField } from "../fields/lineItems";
 import { COMMERCE_STATUSES } from "../../generated/commerce";
+import { notifyOnCreateQuote } from "../hooks/notifyOnCreate";
 
 const STATUS_OPTIONS = COMMERCE_STATUSES.map((s) => ({ label: s, value: s }));
 
@@ -116,5 +117,6 @@ export const Quotes: CollectionConfig = {
   ],
   hooks: {
     beforeChange: [setStatusTimestamp],
+    afterChange: [notifyOnCreateQuote],
   },
 };

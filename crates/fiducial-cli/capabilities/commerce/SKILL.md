@@ -154,6 +154,51 @@ This capability supersedes two `payload`-owned files:
 | `apps/web/payload.config.ts` | Registers the commerce collections |
 | `apps/web/src/payload/blocks/ProductGrid.ts` | Uses a `relationship` to `products` instead of a slug array |
 
+## Email notifications and the jobs queue
+
+Orders and Quotes each fire a Payload `afterChange` hook on `create` that queues
+two jobs — one to notify the owner, one to send a confirmation to the customer:
+
+| Task slug | Input | What it sends |
+|---|---|---|
+| `notify-new-order` | `orderId`, `ownerEmail` | Owner alert + customer confirmation |
+| `notify-new-quote` | `quoteId`, `ownerEmail` | Owner alert + customer confirmation |
+
+Both tasks use the `email` slot from `createAdapters(env)`. Select `resend` as
+the email vendor in `[adapters]` and set `RESEND_API_KEY` with
+`wrangler secret put`.
+
+**Required secrets** (`wrangler secret put <NAME>`):
+
+| Secret | Purpose |
+|---|---|
+| `RESEND_API_KEY` | Email sending via Resend |
+| `OWNER_EMAIL` | Recipient for owner notification emails |
+| `CF_CRON_SECRET` | Authorizes the cron-triggered `POST /api/jobs/run` |
+| `DOMAIN` | Optional sender domain; defaults to `example.com` |
+
+**Queue processing** — slow work is deferred; a cron drains the queue.
+Add to `[deploy]` in `fiducial.toml`:
+
+```toml
+[deploy]
+crons   = ["0 */6 * * *"]
+secrets = ["RESEND_API_KEY", "OWNER_EMAIL", "CF_CRON_SECRET"]
+```
+
+Then configure a Cloudflare Worker cron trigger that calls:
+
+```
+POST https://<your-domain>/api/jobs/run
+Authorization: Bearer <CF_CRON_SECRET>
+```
+
+Or add a `scheduled` handler in `open-next.config.ts` that calls the same
+endpoint internally when the cron fires.
+
+The endpoint processes up to 25 pending jobs per call. Increase the `limit`
+in `apps/web/src/app/api/jobs/run/route.ts` for high-volume products.
+
 ## Rules
 
 - Never hand-edit `apps/web/src/generated/commerce.ts`.

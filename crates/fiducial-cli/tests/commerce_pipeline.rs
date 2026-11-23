@@ -384,3 +384,102 @@ fn commerce_adds_adapters_npm_dependency() {
     let pkg = std::fs::read_to_string(root.join("apps/web/package.json")).unwrap();
     assert!(pkg.contains("@fiducial/adapters"), "package.json must list @fiducial/adapters: {pkg}");
 }
+
+#[test]
+fn commerce_installs_jobs_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    let path = root.join("apps/web/src/payload/jobs/index.ts");
+    assert!(path.exists(), "jobs/index.ts must be installed with commerce");
+    let src = std::fs::read_to_string(&path).unwrap();
+    assert!(src.contains("notify-new-order"), "jobs must define notify-new-order task: {src}");
+    assert!(src.contains("notify-new-quote"), "jobs must define notify-new-quote task: {src}");
+}
+
+#[test]
+fn commerce_installs_notify_hook() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    let path = root.join("apps/web/src/payload/hooks/notifyOnCreate.ts");
+    assert!(path.exists(), "hooks/notifyOnCreate.ts must be installed with commerce");
+    let src = std::fs::read_to_string(&path).unwrap();
+    assert!(src.contains("notifyOnCreateOrder"), "hook must export notifyOnCreateOrder: {src}");
+    assert!(src.contains("notifyOnCreateQuote"), "hook must export notifyOnCreateQuote: {src}");
+}
+
+#[test]
+fn commerce_installs_jobs_run_route() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    let path = root.join("apps/web/src/app/api/jobs/run/route.ts");
+    assert!(path.exists(), "jobs/run/route.ts must be installed with commerce");
+    let src = std::fs::read_to_string(&path).unwrap();
+    assert!(src.contains("CF_CRON_SECRET"), "jobs run route must check CF_CRON_SECRET: {src}");
+    assert!(src.contains("payload.jobs.run"), "jobs run route must call payload.jobs.run: {src}");
+}
+
+#[test]
+fn orders_collection_has_after_change_hook() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    let orders =
+        std::fs::read_to_string(root.join("apps/web/src/payload/collections/Orders.ts")).unwrap();
+    assert!(
+        orders.contains("notifyOnCreateOrder"),
+        "Orders must use notifyOnCreateOrder hook: {orders}"
+    );
+    assert!(
+        orders.contains("afterChange"),
+        "Orders must have afterChange hooks: {orders}"
+    );
+}
+
+#[test]
+fn quotes_collection_has_after_change_hook() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    let quotes =
+        std::fs::read_to_string(root.join("apps/web/src/payload/collections/Quotes.ts")).unwrap();
+    assert!(
+        quotes.contains("notifyOnCreateQuote"),
+        "Quotes must use notifyOnCreateQuote hook: {quotes}"
+    );
+    assert!(
+        quotes.contains("afterChange"),
+        "Quotes must have afterChange hooks: {quotes}"
+    );
+}
+
+#[test]
+fn payload_config_registers_job_tasks() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    let cfg = std::fs::read_to_string(root.join("apps/web/payload.config.ts")).unwrap();
+    assert!(cfg.contains("notifyNewOrderTask"), "config must import notifyNewOrderTask: {cfg}");
+    assert!(cfg.contains("notifyNewQuoteTask"), "config must import notifyNewQuoteTask: {cfg}");
+    assert!(cfg.contains("jobs:"), "config must register jobs: {cfg}");
+}
+
+#[test]
+fn commerce_seed_messages_include_email_subjects() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    for locale in &["en", "sr"] {
+        let msgs = std::fs::read_to_string(root.join(format!("messages/{locale}.json"))).unwrap();
+        assert!(
+            msgs.contains("newOrderNotificationSubject"),
+            "[{locale}] messages must contain newOrderNotificationSubject: {msgs}"
+        );
+        assert!(
+            msgs.contains("newQuoteNotificationSubject"),
+            "[{locale}] messages must contain newQuoteNotificationSubject: {msgs}"
+        );
+    }
+}
