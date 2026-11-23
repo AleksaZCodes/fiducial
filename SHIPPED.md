@@ -1245,3 +1245,4 @@ by a test, now simply removed, because a gated duplicate is still a duplicate.
 
 *(ROP migration wave 2 — eligible rules to L0 Rust — remains optional and
 unscheduled, as wave 1 does.)*
+| **74** | Commerce: products, variants, orders and quotes (0.46.0) | New capability `commerce`, requiring `payload`: a `[commerce]` declaration (currency, order statuses, lead sources) derived into `apps/web/src/generated/commerce.ts`, and the collections Products, Variants (dimensions, material, color), Carts, Orders, Quotes and a hidden Discounts, sharing one line-item field group, prices in minor units, a timestamp per status and a lead-source group. A quote converts into an order through an endpoint. `@payloadcms/plugin-ecommerce` was evaluated and not adopted; the reasons are in the spec. |

@@ -1,0 +1,24 @@
+description = "Products, variants, orders and quotes — the commerce model for a Payload-backed client shop"
+
+requires_capabilities = ["payload"]
+guard_rules = ["no-unpinned-cli-fetch"]
+
+supersedes = [
+  "apps/web/payload.config.ts",
+  "apps/web/src/payload/blocks/ProductGrid.ts",
+]
+
+[[declarations.config]]
+block = "commerce"
+
+[declarations.config.seed]
+currency = "RSD"
+cart = false
+statuses = ["new", "quoted", "confirmed", "paid", "delivered", "cancelled"]
+lead_sources = ["direct", "instagram", "facebook", "referral", "other"]
+
+[seed_messages.en]
+commerce = { currency = "RSD", productLabel = "Product", variantLabel = "Variant", orderLabel = "Order", quoteLabel = "Quote", cartLabel = "Cart", newStatus = "New", quotedStatus = "Quoted", confirmedStatus = "Confirmed", paidStatus = "Paid", deliveredStatus = "Delivered", cancelledStatus = "Cancelled", leadSourceDirect = "Direct", leadSourceInstagram = "Instagram", leadSourceFacebook = "Facebook", leadSourceReferral = "Referral", leadSourceOther = "Other", guestName = "Name", guestPhone = "Phone", guestEmail = "Email", guestCity = "City", guestAddress = "Address", markAsPaid = "Mark as paid", convertToOrder = "Convert to order" }
+
+[seed_messages.sr]
+commerce = { currency = "RSD", productLabel = "Proizvod", variantLabel = "Varijanta", orderLabel = "Narudžbina", quoteLabel = "Upit", cartLabel = "Korpa", newStatus = "Nova", quotedStatus = "Na čekanju", confirmedStatus = "Potvrđena", paidStatus = "Plaćena", deliveredStatus = "Isporučena", cancelledStatus = "Otkazana", leadSourceDirect = "Direktno", leadSourceInstagram = "Instagram", leadSourceFacebook = "Facebook", leadSourceReferral = "Preporuka", leadSourceOther = "Ostalo", guestName = "Ime", guestPhone = "Telefon", guestEmail = "Email", guestCity = "Grad", guestAddress = "Adresa", markAsPaid = "Označi kao plaćeno", convertToOrder = "Pretvori u narudžbinu" }

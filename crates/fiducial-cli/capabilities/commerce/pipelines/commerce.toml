@@ -1,0 +1,5 @@
+name     = "commerce"
+executor = "shell"
+args     = ["node", "scripts/derive-commerce.mjs"]
+outputs  = ["apps/web/src/generated/commerce.ts"]
+inputs   = ["fiducial.toml#commerce"]
