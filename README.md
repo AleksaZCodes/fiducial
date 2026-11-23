@@ -229,7 +229,7 @@ product actually needs.
 | `api-hono` | 9 template file(s); guard rules | `fid add capability api-hono` |
 | `brand` | declares `brand`; 2 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability brand` |
 | `cms` | declares `cms`; 1 pipeline(s); 14 template file(s); seeds a `fiducial.toml` block | `fid add capability cms` |
-| `commerce` | declares `commerce`; 1 pipeline(s); 11 template file(s); seeds a `fiducial.toml` block; guard rules | `fid add capability commerce` |
+| `commerce` | declares `commerce`; 1 pipeline(s); 13 template file(s); seeds a `fiducial.toml` block; guard rules | `fid add capability commerce` |
 | `consent` | declares `legal`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability consent` |
 | `content` | declares `content.toml`, `content/posts/en/hello.md`; 1 pipeline(s); 2 template file(s) | `fid add capability content` |
 | `deploy` | declares `deploy`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability deploy` |

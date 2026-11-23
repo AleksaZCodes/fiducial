@@ -263,3 +263,54 @@ fn fid_derive_check_passes_after_derive() {
         text(&out)
     );
 }
+
+#[test]
+fn commerce_installs_dashboard_view() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    assert!(
+        root.join("apps/web/src/payload/views/Dashboard.tsx").exists(),
+        "Dashboard.tsx must be installed with commerce"
+    );
+}
+
+#[test]
+fn dashboard_is_a_server_component() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    let dashboard =
+        std::fs::read_to_string(root.join("apps/web/src/payload/views/Dashboard.tsx")).unwrap();
+    assert!(dashboard.contains("async"), "Dashboard must be an async server component: {dashboard}");
+    assert!(!dashboard.contains("\"use client\""), "Dashboard must not be a client component: {dashboard}");
+}
+
+#[test]
+fn commerce_installs_metrics_module() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    assert!(
+        root.join("apps/web/src/payload/metrics.ts").exists(),
+        "metrics.ts must be installed with commerce"
+    );
+    let metrics =
+        std::fs::read_to_string(root.join("apps/web/src/payload/metrics.ts")).unwrap();
+    assert!(metrics.contains("getWeeklyOrders"), "{metrics}");
+    assert!(metrics.contains("getOpenQuotesCount"), "{metrics}");
+    assert!(metrics.contains("getLeadsBySource"), "{metrics}");
+    assert!(metrics.contains("getWeeklyFunnel"), "{metrics}");
+    assert!(metrics.contains("getAllMetrics"), "{metrics}");
+}
+
+#[test]
+fn payload_config_registers_dashboard_and_metrics_endpoint() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    let cfg = std::fs::read_to_string(root.join("apps/web/payload.config.ts")).unwrap();
+    assert!(cfg.contains("Dashboard"), "config must register Dashboard view: {cfg}");
+    assert!(cfg.contains("commerce-metrics"), "config must register metrics endpoint: {cfg}");
+    assert!(cfg.contains("getAllMetrics"), "config must import getAllMetrics: {cfg}");
+}
