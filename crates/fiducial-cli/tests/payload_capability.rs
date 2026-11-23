@@ -429,6 +429,63 @@ fn site_settings_global_has_menus_and_banners() {
 }
 
 #[test]
+fn payload_installs_d1_backup_route() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let path = root.join("apps/web/src/app/api/d1-backup/route.ts");
+    assert!(path.exists(), "d1-backup route must be installed with payload");
+    let src = std::fs::read_to_string(&path).unwrap();
+    assert!(src.contains("DB.dump"), "backup route must call DB.dump: {src}");
+    assert!(src.contains("BACKUP_TOKEN"), "backup route must check BACKUP_TOKEN: {src}");
+    assert!(src.contains("BUCKET"), "backup route must write to BUCKET: {src}");
+}
+
+#[test]
+fn d1_backup_route_names_the_key_by_date() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let src = std::fs::read_to_string(
+        root.join("apps/web/src/app/api/d1-backup/route.ts"),
+    ).unwrap();
+    assert!(src.contains("backup/"), "backup route must write to backup/ prefix: {src}");
+    assert!(src.contains(".sql"), "backup route must write .sql files: {src}");
+}
+
+#[test]
+fn payload_skill_md_documents_restore_procedure() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let skill = std::fs::read_to_string(root.join(".agents/skills/fiducial-payload/SKILL.md")).unwrap();
+    assert!(skill.contains("time-travel"), "SKILL.md must document D1 Time Travel restore: {skill}");
+    assert!(skill.contains("Restore procedure"), "SKILL.md must have a Restore procedure section: {skill}");
+    assert!(skill.contains("BACKUP_TOKEN"), "SKILL.md must name BACKUP_TOKEN secret: {skill}");
+}
+
+#[test]
 fn next_config_uses_cloudflare_image_loader() {
     let tmp = tempfile::tempdir().unwrap();
     let out = run(tmp.path(), &["new", "p"]);

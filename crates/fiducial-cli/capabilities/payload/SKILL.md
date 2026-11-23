@@ -172,13 +172,73 @@ write without D1's `batch` API and SQLite transactions are a no-op. The
 
 ## Nightly backup
 
-A Cron Trigger at `0 2 * * *` calls Cloudflare's D1 export REST endpoint and
-writes the dump to `backup/<date>.sql.gz` in R2. Declared in `[deploy] crons`
-(added by this capability's install) and `[deploy] secrets = ["BACKUP_TOKEN"]`.
+A Cron Trigger at `0 2 * * *` calls `POST /api/d1-backup`, which uses
+`env.DB.dump()` (the D1 Workers binding) to export the full SQLite database and
+writes it to `backup/<YYYY-MM-DD>.sql` in R2. No Cloudflare REST API token is
+needed — the binding dump runs inside the Worker.
 
-**Restore procedure:** download from R2, run
-`wrangler d1 execute <db> --file <dump>`. Record the last restore date in this
-file as evidence.
+**Setup** — add to `[deploy]` in `fiducial.toml`:
+
+```toml
+[deploy]
+crons   = ["0 2 * * *"]
+secrets = ["BACKUP_TOKEN"]
+```
+
+Then run `fid derive` and `wrangler secret put BACKUP_TOKEN`.
+
+Call the endpoint from the cron handler with:
+
+```
+POST https://<your-domain>/api/d1-backup
+Authorization: Bearer <BACKUP_TOKEN>
+```
+
+If `BACKUP_TOKEN` is unset, the endpoint runs without auth (suitable for local
+testing; set it in production).
+
+---
+
+### Restore procedure
+
+**Last restored:** _(update this line after every restore)_
+
+#### Option A — from an R2 nightly backup
+
+```sh
+wrangler r2 object get <bucket> backup/<YYYY-MM-DD>.sql --file restore.sql
+wrangler d1 execute <database> --file restore.sql --remote
+```
+
+Replace `<bucket>` with the R2 bucket name from `[deploy] r2_bucket_name` and
+`<database>` with the database name (`[deploy] d1_database_name` or the product
+name).
+
+#### Option B — D1 Time Travel (point-in-time recovery)
+
+Cloudflare D1 preserves up to 30 days of history automatically. Use Time Travel
+to restore to any second within that window without touching R2:
+
+```sh
+wrangler d1 time-travel restore <database> --timestamp <ISO8601>
+```
+
+Example — restore to two hours ago:
+
+```sh
+wrangler d1 time-travel restore <database> \
+  --timestamp "$(date -u -v-2H '+%Y-%m-%dT%H:%M:%SZ')"
+```
+
+On Linux, replace `-v-2H` with `-d '-2 hours'`.
+
+Inspect available bookmarks without restoring:
+
+```sh
+wrangler d1 time-travel info <database>
+```
+
+Time Travel is available on the Cloudflare Workers Paid plan.
 
 ## Worker limits
 
