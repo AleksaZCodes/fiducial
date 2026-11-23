@@ -398,3 +398,21 @@ and are gated — but they run only where `node_modules` exists, which is CI and
 developer's machine, not the Rust tests. And `TMPDIR=$PWD/target/tmp` is
 required, because a Payload `node_modules` in a tmpfs `/tmp` is how a session
 dies mid-build.
+
+## Status
+
+Written when the implementation agent reached its usage limit. The branch builds, and the new payload and commerce conformance tests pass.
+
+**Done:** commits 0 to 5 (spec, deploy crons and secrets, payload capability, verify script and CI step, blocks and revalidation, commerce model).
+
+**In progress:** nothing uncommitted.
+
+**Next:** commit 6 (order and made-to-measure forms, Turnstile, lead source), 7 (owner and customer email, jobs queue), 8 (dashboard, read-only API key), 9 (Serbian distance-selling legal page and consent-gated scripts), 10 (nightly D1 export to R2 and restore runbook), 11 (docs, SHIPPED, context), then the review pass.
+
+**Known problems:**
+- Commit `aa9301c` has an 80-character subject, so `commit_subjects_are_not_overlong` fails. Fixing it needs a history rewrite of a pushed branch, which was not done.
+- `scripts/verify-payload.sh` has not been confirmed to run end to end here. The commit 4 agent skipped it without trying.
+- `payload generate:types` and `generate:importmap` crash on Node 22 or later, so the verify script skips them.
+- The two `captures` tests and several `fiducial-eda` board tests fail in this sandbox. The `captures` failures come from a missing `ortools`.
+- Lighthouse numbers are not measured. They need a live Workers preview.
+- No pull request is to be opened until the user says so. PR #155 was opened by mistake by an agent.
