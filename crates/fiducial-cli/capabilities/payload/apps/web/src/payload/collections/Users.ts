@@ -24,6 +24,9 @@ export const Users: CollectionConfig = {
       required: true,
       defaultValue: "staff",
       options: ROLES.map((r) => ({ label: r, value: r })),
+      access: {
+        update: isOwner,
+      },
     },
     {
       name: "name",

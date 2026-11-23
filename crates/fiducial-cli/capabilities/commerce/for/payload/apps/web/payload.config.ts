@@ -15,7 +15,8 @@ import { SiteSettings } from "./src/payload/globals/SiteSettings";
 import { getAllMetrics } from "./src/payload/metrics";
 import { notifyNewOrderTask, notifyNewQuoteTask } from "./src/payload/jobs";
 import { can } from "@fiducial/identity";
-import type { Principal, Resource, Grant } from "@fiducial/identity";
+import type { Principal, Resource } from "@fiducial/identity";
+import { grantsFor, principalFrom } from "./src/payload/access";
 import {
   adminLocale,
   defaultLocale,
@@ -24,17 +25,6 @@ import {
 } from "./src/generated/payload";
 
 type MetricsUser = { id: string; role: "owner" | "staff" | "agency-admin" };
-
-function grantsFor(user: MetricsUser): Grant[] {
-  const principal: Principal = { kind: user.role === "agency-admin" ? "service" : "user", id: user.id };
-  const resource: Resource = { kind: "platform" };
-  const roleMap: Record<MetricsUser["role"], Grant["role"]> = {
-    owner: "owner",
-    staff: "member",
-    "agency-admin": "viewer",
-  };
-  return [{ principal, resource, role: roleMap[user.role] }];
-}
 
 export default buildConfig({
   admin: {
@@ -59,10 +49,7 @@ export default buildConfig({
       handler: async (req) => {
         const user = req.user as MetricsUser | null;
         if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-        const principal: Principal =
-          user.role === "agency-admin"
-            ? { kind: "service", id: user.id }
-            : { kind: "user", id: user.id };
+        const principal: Principal = principalFrom(user);
         const resource: Resource = { kind: "platform" };
         if (!can(principal, "read", resource, grantsFor(user))) {
           return Response.json({ error: "Forbidden" }, { status: 403 });
@@ -83,7 +70,7 @@ export default buildConfig({
 
   editor: lexicalEditor(),
 
-  secret: process.env.PAYLOAD_SECRET ?? "",
+  secret: process.env.PAYLOAD_SECRET ?? (() => { throw new Error("PAYLOAD_SECRET is required"); })(),
 
   typescript: {
     outputFile: "./src/payload/payload-types.ts",

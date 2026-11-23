@@ -1,7 +1,7 @@
 import type { CollectionConfig } from "payload";
 import { can } from "@fiducial/identity";
-import type { Grant, Principal, Resource } from "@fiducial/identity";
-import { isOwner, isOwnerOrStaff } from "../access";
+import type { Principal, Resource } from "@fiducial/identity";
+import { isOwner, isOwnerOrStaff, grantsFor, principalFrom } from "../access";
 import { priceField } from "../fields/price";
 import { leadSourceField, utmFields } from "../fields/leadSource";
 import { statusTimestampFields, setStatusTimestamp } from "../fields/statusTimestamps";
@@ -10,19 +10,6 @@ import { COMMERCE_STATUSES } from "../../generated/commerce";
 import { notifyOnCreateOrder } from "../hooks/notifyOnCreate";
 
 const STATUS_OPTIONS = COMMERCE_STATUSES.map((s) => ({ label: s, value: s }));
-
-type OrdersUser = { id: string; role: "owner" | "staff" | "agency-admin" };
-
-function grantsFor(user: OrdersUser): Grant[] {
-  const principal: Principal = { kind: "user", id: user.id };
-  const resource: Resource = { kind: "platform" };
-  const roleMap: Record<OrdersUser["role"], Grant["role"]> = {
-    owner: "owner",
-    staff: "member",
-    "agency-admin": "viewer",
-  };
-  return [{ principal, resource, role: roleMap[user.role] }];
-}
 
 export const Orders: CollectionConfig = {
   slug: "orders",
@@ -45,11 +32,11 @@ export const Orders: CollectionConfig = {
         const { payload, routeParams } = req as typeof req & {
           routeParams: { id: string };
         };
-        const user = req.user as OrdersUser | null;
+        const user = req.user as { id: string; role: "owner" | "staff" | "agency-admin" } | null;
         if (!user) {
           return Response.json({ error: "Unauthorized" }, { status: 401 });
         }
-        const principal: Principal = { kind: "user", id: user.id };
+        const principal: Principal = principalFrom(user);
         const resource: Resource = { kind: "platform" };
         if (!can(principal, "write", resource, grantsFor(user))) {
           return Response.json({ error: "Forbidden" }, { status: 403 });
@@ -95,6 +82,8 @@ export const Orders: CollectionConfig = {
       },
     },
     { name: "note", type: "textarea", localized: true },
+    { name: "locale", type: "text", admin: { position: "sidebar", readOnly: true } },
+    { name: "sourceQuoteId", type: "text", admin: { position: "sidebar", readOnly: true } },
     leadSourceField,
     ...utmFields,
     ...statusTimestampFields,

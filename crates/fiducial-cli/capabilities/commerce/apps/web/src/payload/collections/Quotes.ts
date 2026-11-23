@@ -1,7 +1,7 @@
 import type { CollectionConfig } from "payload";
 import { can } from "@fiducial/identity";
-import type { Grant, Principal, Resource } from "@fiducial/identity";
-import { isOwner, isOwnerOrStaff } from "../access";
+import type { Principal, Resource } from "@fiducial/identity";
+import { isOwner, isOwnerOrStaff, grantsFor, principalFrom } from "../access";
 import { priceField } from "../fields/price";
 import { leadSourceField, utmFields } from "../fields/leadSource";
 import { statusTimestampFields, setStatusTimestamp } from "../fields/statusTimestamps";
@@ -10,19 +10,6 @@ import { COMMERCE_STATUSES } from "../../generated/commerce";
 import { notifyOnCreateQuote } from "../hooks/notifyOnCreate";
 
 const STATUS_OPTIONS = COMMERCE_STATUSES.map((s) => ({ label: s, value: s }));
-
-type QuotesUser = { id: string; role: "owner" | "staff" | "agency-admin" };
-
-function grantsFor(user: QuotesUser): Grant[] {
-  const principal: Principal = { kind: "user", id: user.id };
-  const resource: Resource = { kind: "platform" };
-  const roleMap: Record<QuotesUser["role"], Grant["role"]> = {
-    owner: "owner",
-    staff: "member",
-    "agency-admin": "viewer",
-  };
-  return [{ principal, resource, role: roleMap[user.role] }];
-}
 
 export const Quotes: CollectionConfig = {
   slug: "quotes",
@@ -45,14 +32,23 @@ export const Quotes: CollectionConfig = {
         const { payload, routeParams } = req as typeof req & {
           routeParams: { id: string };
         };
-        const user = req.user as QuotesUser | null;
+        const user = req.user as { id: string; role: "owner" | "staff" | "agency-admin" } | null;
         if (!user) {
           return Response.json({ error: "Unauthorized" }, { status: 401 });
         }
-        const principal: Principal = { kind: "user", id: user.id };
+        const principal: Principal = principalFrom(user);
         const resource: Resource = { kind: "platform" };
         if (!can(principal, "write", resource, grantsFor(user))) {
           return Response.json({ error: "Forbidden" }, { status: 403 });
+        }
+        const existing = await payload.find({
+          collection: "orders",
+          where: { sourceQuoteId: { equals: routeParams.id } },
+          limit: 1,
+          depth: 0,
+        });
+        if (existing.docs.length > 0) {
+          return Response.json({ order: existing.docs[0] });
         }
         const quote = await payload.findByID({ collection: "quotes", id: routeParams.id });
         const now = new Date().toISOString();
@@ -61,6 +57,7 @@ export const Quotes: CollectionConfig = {
           data: {
             status: "confirmed",
             confirmedAt: now,
+            sourceQuoteId: routeParams.id,
             guestName: quote.guestName,
             guestPhone: quote.guestPhone,
             guestEmail: quote.guestEmail,
@@ -111,6 +108,7 @@ export const Quotes: CollectionConfig = {
       type: "textarea",
       localized: true,
     },
+    { name: "locale", type: "text", admin: { position: "sidebar", readOnly: true } },
     leadSourceField,
     ...utmFields,
     ...statusTimestampFields,

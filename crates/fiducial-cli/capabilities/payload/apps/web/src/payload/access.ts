@@ -2,14 +2,18 @@ import { type Grant, type Principal, type Resource, can } from "@fiducial/identi
 import type { Access, AccessArgs } from "payload";
 import type { PayloadRole } from "../generated/payload";
 
-type PayloadUser = {
+export type RequestUser = {
   id: string;
   role: PayloadRole;
-  collection: "users";
 };
 
-function grantsFor(user: PayloadUser): Grant[] {
-  const principal: Principal = { kind: "user", id: user.id };
+export function principalFrom(user: RequestUser): Principal {
+  if (user.role === "agency-admin") return { kind: "service", id: user.id };
+  return { kind: "user", id: user.id };
+}
+
+export function grantsFor(user: RequestUser): Grant[] {
+  const principal = principalFrom(user);
   const resource: Resource = { kind: "platform" };
   const roleMap: Record<PayloadRole, Grant["role"]> = {
     owner: "owner",
@@ -19,34 +23,22 @@ function grantsFor(user: PayloadUser): Grant[] {
   return [{ principal, resource, role: roleMap[user.role] }];
 }
 
-function principalFrom(user: PayloadUser | null | undefined): Principal {
-  if (!user) return { kind: "anonymous" };
-  if (user.role === "agency-admin") {
-    return { kind: "service", id: user.id };
-  }
-  return { kind: "user", id: user.id };
-}
-
 export const isOwnerOrStaff: Access = ({ req }: AccessArgs) => {
-  const user = req.user as PayloadUser | null;
+  const user = req.user as RequestUser | null;
   if (!user) return false;
-  const principal = principalFrom(user);
-  const grants = grantsFor(user);
   const resource: Resource = { kind: "platform" };
-  return can(principal, "write", resource, grants);
+  return can(principalFrom(user), "write", resource, grantsFor(user));
 };
 
 export const isOwner: Access = ({ req }: AccessArgs) => {
-  const user = req.user as PayloadUser | null;
+  const user = req.user as RequestUser | null;
   if (!user) return false;
-  const principal = principalFrom(user);
-  const grants = grantsFor(user);
   const resource: Resource = { kind: "platform" };
-  return can(principal, "admin", resource, grants);
+  return can(principalFrom(user), "admin", resource, grantsFor(user));
 };
 
 export const isAgencyAdmin: Access = ({ req }: AccessArgs) => {
-  const user = req.user as PayloadUser | null;
+  const user = req.user as RequestUser | null;
   if (!user) return false;
   return user.role === "agency-admin";
 };

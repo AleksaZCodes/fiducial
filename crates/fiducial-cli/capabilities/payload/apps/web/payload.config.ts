@@ -23,7 +23,7 @@ export default buildConfig({
 
   editor: lexicalEditor(),
 
-  secret: process.env.PAYLOAD_SECRET ?? "",
+  secret: process.env.PAYLOAD_SECRET ?? (() => { throw new Error("PAYLOAD_SECRET is required"); })(),
 
   typescript: {
     outputFile: "./src/payload/payload-types.ts",

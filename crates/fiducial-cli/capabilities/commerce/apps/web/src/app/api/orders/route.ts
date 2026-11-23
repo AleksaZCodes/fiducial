@@ -4,8 +4,10 @@ import config from "@payload-config";
 import { Turnstile, NoneBotProtection } from "@fiducial/adapters/bot-protection";
 import type { Analytics } from "@fiducial/adapters/analytics";
 import { NoneAnalytics } from "@fiducial/adapters/analytics";
+import { COMMERCE_CURRENCY } from "../../../generated/commerce";
 
 const MAX_BODY = 8192;
+const MAX_QUANTITY = 100;
 
 interface OrderRequest {
   guestName: string;
@@ -15,11 +17,8 @@ interface OrderRequest {
   guestAddress?: string;
   productId: string;
   variantId?: string;
-  productName: string;
-  variantName?: string;
-  unitPriceMinor?: number;
-  currency?: string;
   quantity?: number;
+  locale?: string;
   leadSource?: string;
   whereDidYouFindUs?: string;
   utmSource?: string;
@@ -34,8 +33,7 @@ function isValidRequest(v: unknown): v is OrderRequest {
   const r = v as Record<string, unknown>;
   return typeof r.guestName === "string" && r.guestName.length > 0
     && typeof r.guestPhone === "string" && r.guestPhone.length > 0
-    && typeof r.productId === "string"
-    && typeof r.productName === "string"
+    && typeof r.productId === "string" && r.productId.length > 0
     && typeof r.turnstileToken === "string";
 }
 
@@ -67,6 +65,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const env = process.env as unknown as Record<string, string | undefined>;
   const secretKey = env.TURNSTILE_SECRET_KEY;
+  const skipTurnstile = env.TURNSTILE_SKIP === "true";
+  if (!secretKey && !skipTurnstile) {
+    return NextResponse.json({ error: "bot protection not configured" }, { status: 503 });
+  }
   const bp = secretKey ? new Turnstile({ TURNSTILE_SECRET_KEY: secretKey }) : new NoneBotProtection();
   const ip = req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for") ?? undefined;
 
@@ -75,25 +77,72 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "challenge failed" }, { status: 400 });
   }
 
-  const quantity = body.quantity ?? 1;
-  const unitPriceMinor = body.unitPriceMinor ?? 0;
-  const currency = body.currency ?? "RSD";
+  const rawQuantity = body.quantity ?? 1;
+  if (!Number.isInteger(rawQuantity) || rawQuantity < 1 || rawQuantity > MAX_QUANTITY) {
+    return NextResponse.json({ error: "quantity must be an integer between 1 and 100" }, { status: 400 });
+  }
+  const quantity = rawQuantity;
+
+  const payload = await getPayload({ config });
+
+  const locale = body.locale ?? "en";
+
+  const product = await payload.findByID({
+    collection: "products",
+    id: body.productId,
+    locale: locale as never,
+    depth: 1,
+  }).catch(() => null);
+  if (!product) {
+    return NextResponse.json({ error: "product not found" }, { status: 404 });
+  }
+
+  const productData = product as unknown as {
+    id: string;
+    title: string;
+    price?: { amountMinor?: number; currency?: string };
+  };
+
+  let unitPriceMinor = productData.price?.amountMinor ?? 0;
+  let productName = String(productData.title);
+  let variantName: string | null = null;
+
+  if (body.variantId) {
+    const variant = await payload.findByID({
+      collection: "variants",
+      id: body.variantId,
+      locale: locale as never,
+      depth: 0,
+    }).catch(() => null);
+    if (variant) {
+      const vd = variant as unknown as {
+        title: string;
+        price?: { amountMinor?: number };
+      };
+      variantName = String(vd.title);
+      if (vd.price?.amountMinor != null) {
+        unitPriceMinor = vd.price.amountMinor;
+      }
+    }
+  }
+
+  const currency = COMMERCE_CURRENCY;
   const lineItem = {
     productId: body.productId,
     variantId: body.variantId ?? null,
-    productName: body.productName,
-    variantName: body.variantName ?? null,
+    productName,
+    variantName,
     quantity,
     unitPriceMinor,
     currency,
     totalMinor: unitPriceMinor * quantity,
   };
 
-  const payload = await getPayload({ config });
   const order = await payload.create({
     collection: "orders",
     data: {
       status: "new",
+      locale,
       guestName: body.guestName,
       guestPhone: body.guestPhone,
       guestEmail: body.guestEmail,

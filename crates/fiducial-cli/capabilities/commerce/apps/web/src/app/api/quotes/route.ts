@@ -4,6 +4,7 @@ import config from "@payload-config";
 import { Turnstile, NoneBotProtection } from "@fiducial/adapters/bot-protection";
 import type { Analytics } from "@fiducial/adapters/analytics";
 import { NoneAnalytics } from "@fiducial/adapters/analytics";
+import { COMMERCE_CURRENCY } from "../../../generated/commerce";
 
 const MAX_BODY = 8192;
 
@@ -14,7 +15,7 @@ interface QuoteRequest {
   guestCity?: string;
   guestAddress?: string;
   productId?: string;
-  productName?: string;
+  locale?: string;
   requirements?: string;
   leadSource?: string;
   whereDidYouFindUs?: string;
@@ -61,6 +62,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const env = process.env as unknown as Record<string, string | undefined>;
   const secretKey = env.TURNSTILE_SECRET_KEY;
+  const skipTurnstile = env.TURNSTILE_SKIP === "true";
+  if (!secretKey && !skipTurnstile) {
+    return NextResponse.json({ error: "bot protection not configured" }, { status: 503 });
+  }
   const bp = secretKey ? new Turnstile({ TURNSTILE_SECRET_KEY: secretKey }) : new NoneBotProtection();
   const ip = req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for") ?? undefined;
 
@@ -69,29 +74,44 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "challenge failed" }, { status: 400 });
   }
 
-  const lineItems = body.productId && body.productName
-    ? JSON.stringify([{
-        productId: body.productId,
-        productName: body.productName,
+  const locale = body.locale ?? "en";
+  const currency = COMMERCE_CURRENCY;
+
+  let lineItemsJson = "[]";
+  if (body.productId) {
+    const payload = await getPayload({ config });
+    const product = await payload.findByID({
+      collection: "products",
+      id: body.productId,
+      locale: locale as never,
+      depth: 0,
+    }).catch(() => null);
+    if (product) {
+      const pd = product as unknown as { id: string; title: string };
+      lineItemsJson = JSON.stringify([{
+        productId: pd.id,
+        productName: String(pd.title),
         quantity: 1,
         unitPriceMinor: 0,
-        currency: "RSD",
+        currency,
         totalMinor: 0,
-      }])
-    : "[]";
+      }]);
+    }
+  }
 
   const payload = await getPayload({ config });
   const quote = await payload.create({
     collection: "quotes",
     data: {
       status: "quoted",
+      locale,
       guestName: body.guestName,
       guestPhone: body.guestPhone,
       guestEmail: body.guestEmail,
       guestCity: body.guestCity,
       guestAddress: body.guestAddress,
-      lineItemsJson: lineItems,
-      total: { amountMinor: 0, currency: "RSD" },
+      lineItemsJson,
+      total: { amountMinor: 0, currency },
       note: body.requirements,
       leadSource: body.whereDidYouFindUs ?? body.leadSource,
       utmSource: body.utmSource,
