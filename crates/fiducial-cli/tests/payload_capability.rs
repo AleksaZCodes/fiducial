@@ -1,0 +1,190 @@
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
+
+fn fid() -> PathBuf {
+    PathBuf::from(env!("CARGO_BIN_EXE_fid"))
+}
+
+fn run(cwd: &Path, args: &[&str]) -> Output {
+    Command::new(fid())
+        .args(args)
+        .current_dir(cwd)
+        .env("NO_COLOR", "1")
+        .output()
+        .expect("running fid")
+}
+
+fn text(out: &Output) -> String {
+    format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    )
+}
+
+fn payload_product(tmp: &Path) -> PathBuf {
+    let out = run(tmp, &["new", "p"]);
+    assert!(out.status.success(), "fid new: {}", text(&out));
+    let root = tmp.join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&path).unwrap();
+    let config = config
+        .replace("REPLACE_WITH_DATABASE_ID", "db-id-1")
+        .replace("REPLACE_WITH_BUCKET_NAME", "p-assets")
+        .replace("REPLACE_WITH_QUEUE_NAME", "p-jobs");
+    std::fs::write(&path, config).unwrap();
+
+    let out = run(&root, &["derive"]);
+    assert!(out.status.success(), "fid derive: {}", text(&out));
+    root
+}
+
+#[test]
+fn installing_payload_adds_the_pipeline() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    assert!(
+        root.join("pipelines/payload.toml").exists(),
+        "pipeline file written"
+    );
+}
+
+#[test]
+fn installing_payload_writes_the_capability_files() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    assert!(root.join("apps/web/payload.config.ts").exists());
+    assert!(root.join("apps/web/src/payload/access.ts").exists());
+    assert!(root.join("apps/web/src/payload/collections/Users.ts").exists());
+    assert!(root.join("apps/web/src/payload/collections/Pages.ts").exists());
+    assert!(root.join("apps/web/src/payload/collections/Media.ts").exists());
+    assert!(root.join("apps/web/src/payload/globals/SiteSettings.ts").exists());
+    assert!(root.join("apps/web/src/app/(payload)/layout.tsx").exists());
+    assert!(root
+        .join("apps/web/src/app/(payload)/admin/[[...segments]]/page.tsx")
+        .exists());
+    assert!(root
+        .join("apps/web/src/app/(payload)/api/[...slug]/route.ts")
+        .exists());
+}
+
+#[test]
+fn payload_capability_supersedes_next_config() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let next_config = std::fs::read_to_string(root.join("apps/web/next.config.ts")).unwrap();
+    assert!(
+        next_config.contains("withPayload"),
+        "next.config.ts must wrap with withPayload: {next_config}"
+    );
+}
+
+#[test]
+fn payload_capability_supersedes_open_next_config() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let open_next = std::fs::read_to_string(root.join("apps/web/open-next.config.ts")).unwrap();
+    assert!(
+        open_next.contains("incrementalCache"),
+        "open-next.config.ts must enable the R2 incremental cache: {open_next}"
+    );
+}
+
+#[test]
+fn derive_writes_payload_ts() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = payload_product(tmp.path());
+
+    let ts = std::fs::read_to_string(root.join("apps/web/src/generated/payload.ts")).unwrap();
+    assert!(ts.contains("payloadLocales"), "{ts}");
+    assert!(ts.contains("defaultLocale"), "{ts}");
+    assert!(ts.contains("adminLocale"), "{ts}");
+    assert!(ts.contains("entityName"), "{ts}");
+    assert!(ts.contains("PayloadRole"), "{ts}");
+    assert!(ts.contains("\"owner\""), "{ts}");
+    assert!(ts.contains("\"staff\""), "{ts}");
+    assert!(ts.contains("\"agency-admin\""), "{ts}");
+}
+
+#[test]
+fn derive_payload_ts_carries_the_declared_brand_name() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = payload_product(tmp.path());
+
+    let ts = std::fs::read_to_string(root.join("apps/web/src/generated/payload.ts")).unwrap();
+    assert!(
+        ts.contains("Example"),
+        "entity name from [brand] must appear: {ts}"
+    );
+}
+
+#[test]
+fn check_catches_a_hand_edited_payload_ts() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = payload_product(tmp.path());
+
+    let path = root.join("apps/web/src/generated/payload.ts");
+    std::fs::write(&path, "// hand-edited\n").unwrap();
+
+    let out = run(&root, &["derive", "--check"]);
+    assert!(
+        !out.status.success(),
+        "a hand-edited payload.ts must fail --check"
+    );
+    assert!(text(&out).contains("payload.ts"), "{}", text(&out));
+}
+
+#[test]
+fn access_ts_calls_can_from_fiducial_identity() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let access = std::fs::read_to_string(root.join("apps/web/src/payload/access.ts")).unwrap();
+    assert!(access.contains("@fiducial/identity"), "{access}");
+    assert!(access.contains("can("), "{access}");
+}

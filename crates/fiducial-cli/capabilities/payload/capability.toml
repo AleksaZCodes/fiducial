@@ -1,0 +1,49 @@
+description = "Payload CMS 3 on D1 and R2: admin, auth, access control, media, and ISR"
+
+requires_capabilities = ["web-next", "design", "i18n", "brand"]
+requires_tools = ["wrangler"]
+guard_rules = ["no-unpinned-cli-fetch"]
+
+supersedes = [
+  "apps/web/next.config.ts",
+  "apps/web/open-next.config.ts",
+]
+
+[npm_dependencies]
+payload = "^3.94.1"
+"@payloadcms/next" = "^3.94.1"
+"@payloadcms/db-d1-sqlite" = "^3.94.1"
+"@payloadcms/storage-r2" = "^3.94.1"
+"@payloadcms/richtext-lexical" = "^3.94.1"
+"@fiducial/identity" = "*"
+
+[npm_scripts]
+payload = "payload"
+"generate:types" = "payload generate:types"
+"generate:importmap" = "payload generate:importmap"
+
+[seed_messages.en]
+payload = { adminTitle = "Admin", loginTitle = "Sign in", loginDescription = "Sign in to manage content", logoutLabel = "Sign out", emailLabel = "Email", passwordLabel = "Password" }
+
+[seed_messages.sr]
+payload = { adminTitle = "Admin", loginTitle = "Prijava", loginDescription = "Prijavite se za upravljanje sadržajem", logoutLabel = "Odjava", emailLabel = "Email", passwordLabel = "Lozinka" }
+
+[[declarations.config]]
+block = "i18n"
+
+[[declarations.config]]
+block = "brand"
+
+[[agent_skills]]
+id     = "cloudflare-workers"
+source = "cloudflare/skills"
+skills = ["wrangler", "workers-best-practices"]
+paths  = ["**/wrangler.jsonc", "**/wrangler.json", "**/wrangler.toml"]
+why    = "Wrangler configuration and the Workers runtime change between releases; Cloudflare's skills carry the current ones, and what you remember may not be."
+
+[[agent_skills]]
+id     = "cloudflare-nextjs"
+source = "cloudflare/skills"
+skills = ["nextjs-on-cloudflare"]
+paths  = ["**/open-next.config.*"]
+why    = "Next.js on Workers goes through an adapter whose configuration changes; this skill is Cloudflare's current guidance for it."

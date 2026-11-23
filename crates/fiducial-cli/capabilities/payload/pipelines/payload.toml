@@ -1,0 +1,5 @@
+name     = "payload"
+executor = "shell"
+args     = ["node", "scripts/derive-payload.mjs"]
+outputs  = ["apps/web/src/generated/payload.ts"]
+inputs   = ["fiducial.toml#i18n", "fiducial.toml#brand", "messages/*.json"]
