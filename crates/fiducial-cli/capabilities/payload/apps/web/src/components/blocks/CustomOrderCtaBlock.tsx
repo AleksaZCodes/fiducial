@@ -1,21 +1,13 @@
-import Image from "next/image";
 import type { Page } from "@/payload/payload-types";
+import Image from "next/image";
 
-type Props = Extract<
-  NonNullable<Page["blocks"]>[number],
-  { blockType: "custom-order-cta" }
->;
+type Props = Extract<NonNullable<Page["blocks"]>[number], { blockType: "custom-order-cta" }>;
 
-export default function CustomOrderCtaBlock({
-  heading,
-  image,
-  ctaLabel,
-  formAnchor,
-}: Props) {
+export default function CustomOrderCtaBlock({ heading, image, ctaLabel, formAnchor }: Props) {
   return (
     <section className="mx-auto max-w-5xl px-4 py-16">
       <div className="flex flex-col gap-8 md:flex-row md:items-center">
-        {image && typeof image !== "string" && image.url && (
+        {image && typeof image !== "number" && image.url && (
           <div className="relative h-64 w-full md:h-80 md:w-1/2 shrink-0">
             <Image
               src={image.url}

@@ -1,10 +1,10 @@
 import type { CollectionConfig } from "payload";
-import { isOwnerOrStaff, isAuthenticated } from "../access";
-import { revalidatePage } from "../revalidate";
-import { Hero } from "../blocks/Hero";
-import { Faq } from "../blocks/Faq";
-import { ProductGrid } from "../blocks/ProductGrid";
+import { isAuthenticated, isOwnerOrStaff } from "../access";
 import { CustomOrderCta } from "../blocks/CustomOrderCta";
+import { Faq } from "../blocks/Faq";
+import { Hero } from "../blocks/Hero";
+import { ProductGrid } from "../blocks/ProductGrid";
+import { revalidatePage } from "../revalidate";
 
 export const Pages: CollectionConfig = {
   slug: "pages",

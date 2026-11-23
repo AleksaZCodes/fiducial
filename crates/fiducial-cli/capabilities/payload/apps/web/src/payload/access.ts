@@ -1,5 +1,5 @@
+import { type Grant, type Principal, type Resource, can } from "@fiducial/identity";
 import type { Access, AccessArgs } from "payload";
-import { can, type Grant, type Principal, type Resource } from "@fiducial/identity";
 import type { PayloadRole } from "../generated/payload";
 
 type PayloadUser = {

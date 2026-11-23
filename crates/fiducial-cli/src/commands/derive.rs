@@ -446,6 +446,15 @@ pub(crate) fn outputs_not_applicable(pipeline: &Pipeline, root: &Path) -> Vec<St
                 .cloned()
                 .collect()
         }
+        // The Payload codegen pipeline calls the Payload CLI through
+        // node_modules, so its outputs are not applicable until node_modules
+        // exists. `fid derive --check` skips them when node_modules is absent.
+        "shell"
+            if pipeline.name == "payload-codegen"
+                && !root.join("apps/web/node_modules").is_dir() =>
+        {
+            pipeline.outputs.clone()
+        }
         _ => Vec::new(),
     }
 }
@@ -498,6 +507,9 @@ fn not_applicable_reason(pipeline: &Pipeline, output: &str, root: &Path) -> Stri
         "fid-hardware" => "hardware/product.toml declares no `[firmware] mcu`".to_string(),
         "shell" if pipeline.name == "cms" => {
             "[cms] editor = \"pages\" is hosted and needs no apps/cms workspace".to_string()
+        }
+        "shell" if pipeline.name == "payload-codegen" => {
+            "apps/web/node_modules is absent (run pnpm install in apps/web first)".to_string()
         }
         other => format!("`{other}` does not derive it in this configuration"),
     }

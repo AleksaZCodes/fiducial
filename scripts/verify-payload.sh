@@ -9,13 +9,6 @@
 # compiler, builds the Worker bundle with OpenNext and has Wrangler accept the
 # config — without a live D1, a Cloudflare token or a browser.
 #
-# Note: `payload generate:types` and `payload generate:importmap` are developer
-# workflow commands, not CI steps.  Both crash on Node ≥ 22 because undici 7
-# requires a browser-only `CacheStorage` global that Node does not expose.
-# The templates include a hand-maintained importMap.ts placeholder and the
-# tsconfig already defines `@payload-config`, so the build proceeds without
-# running them.
-#
 # Usage:
 #
 #   cargo build -p fiducial-cli --bin fid
@@ -50,6 +43,9 @@ echo "── payload: scaffold ────────────────�
 
   cd apps/web
   "${pnpm[@]}" install --fetch-timeout 300000
+  cd ../..
+  "$fid" derive --pipeline payload-codegen
+  cd apps/web
   "${pnpm[@]}" run typecheck
   "${pnpm[@]}" run lint
   "${pnpm[@]}" exec opennextjs-cloudflare build

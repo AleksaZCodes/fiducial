@@ -1,0 +1,14 @@
+name        = "payload-codegen"
+executor    = "shell"
+args        = ["node", "scripts/derive-payload-codegen.mjs"]
+working_dir = "apps/web"
+outputs     = [
+  "apps/web/src/payload/payload-types.ts",
+  "apps/web/src/app/(payload)/admin/importMap.js",
+]
+inputs      = [
+  "apps/web/payload.config.ts",
+  "apps/web/src/payload/collections/*.ts",
+  "apps/web/src/payload/globals/*.ts",
+  "apps/web/src/payload/blocks/*.ts",
+]

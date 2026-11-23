@@ -59,7 +59,68 @@ fn installing_payload_adds_the_pipeline() {
 
     assert!(
         root.join("pipelines/payload.toml").exists(),
-        "pipeline file written"
+        "payload pipeline written"
+    );
+    assert!(
+        root.join("pipelines/payload-codegen.toml").exists(),
+        "payload-codegen pipeline written"
+    );
+}
+
+#[test]
+fn admin_page_imports_importmap_from_generated_path() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let page = std::fs::read_to_string(
+        root.join("apps/web/src/app/(payload)/admin/[[...segments]]/page.tsx"),
+    ).unwrap();
+    assert!(
+        page.contains("\"../importMap.js\""),
+        "admin page must import the generated importMap.js, not the placeholder: {page}"
+    );
+    assert!(
+        !page.contains("\"../../importMap"),
+        "admin page must not import from the old placeholder path: {page}"
+    );
+}
+
+#[test]
+fn payload_codegen_outputs_not_applicable_without_node_modules() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = payload_product(tmp.path());
+
+    let out = run(&root, &["derive", "--check", "--pipeline", "payload-codegen"]);
+    assert!(
+        out.status.success(),
+        "derive --check --pipeline payload-codegen must pass without node_modules: {}",
+        text(&out)
+    );
+}
+
+#[test]
+fn tsconfig_has_erasable_syntax_only() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let tsconfig = std::fs::read_to_string(root.join("apps/web/tsconfig.json")).unwrap();
+    assert!(
+        tsconfig.contains("erasableSyntaxOnly"),
+        "tsconfig.json must include erasableSyntaxOnly: {tsconfig}"
     );
 }
 
@@ -88,9 +149,12 @@ fn installing_payload_writes_the_capability_files() {
     assert!(root
         .join("apps/web/src/app/(payload)/api/[...slug]/route.ts")
         .exists());
-    assert!(root
-        .join("apps/web/src/app/(payload)/importMap.ts")
-        .exists());
+    assert!(
+        !root.join("apps/web/src/app/(payload)/importMap.ts").exists(),
+        "importMap.ts placeholder must not exist — it is generated to importMap.js"
+    );
+    assert!(root.join("apps/web/scripts/payload-ts-resolve.mjs").exists());
+    assert!(root.join("apps/web/scripts/derive-payload-codegen.mjs").exists());
 }
 
 #[test]

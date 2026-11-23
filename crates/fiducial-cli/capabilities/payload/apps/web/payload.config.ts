@@ -1,17 +1,12 @@
-import { buildConfig } from "payload";
 import { sqliteD1Adapter } from "@payloadcms/db-d1-sqlite";
-import { r2Storage } from "@payloadcms/storage-r2";
 import { lexicalEditor } from "@payloadcms/richtext-lexical";
-import { Users } from "./src/payload/collections/Users";
-import { Pages } from "./src/payload/collections/Pages";
+import { r2Storage } from "@payloadcms/storage-r2";
+import { buildConfig } from "payload";
+import { adminLocale, defaultLocale, entityName, payloadLocales } from "./src/generated/payload";
 import { Media } from "./src/payload/collections/Media";
+import { Pages } from "./src/payload/collections/Pages";
+import { Users } from "./src/payload/collections/Users";
 import { SiteSettings } from "./src/payload/globals/SiteSettings";
-import {
-  adminLocale,
-  defaultLocale,
-  entityName,
-  payloadLocales,
-} from "./src/generated/payload";
 
 export default buildConfig({
   admin: {

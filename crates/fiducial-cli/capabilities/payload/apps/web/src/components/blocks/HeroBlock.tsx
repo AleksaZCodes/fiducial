@@ -1,15 +1,12 @@
-import Image from "next/image";
 import type { Page } from "@/payload/payload-types";
+import Image from "next/image";
 
-type Props = Extract<
-  NonNullable<Page["blocks"]>[number],
-  { blockType: "hero" }
->;
+type Props = Extract<NonNullable<Page["blocks"]>[number], { blockType: "hero" }>;
 
 export default function HeroBlock({ heading, subheading, image, ctaLabel, ctaHref }: Props) {
   return (
     <section className="relative overflow-hidden">
-      {image && typeof image !== "string" && image.url && (
+      {image && typeof image !== "number" && image.url && (
         <div className="absolute inset-0 -z-10">
           <Image
             src={image.url}

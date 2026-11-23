@@ -1,5 +1,5 @@
 import type { GlobalConfig } from "payload";
-import { isOwnerOrStaff, isAuthenticated } from "../access";
+import { isAuthenticated, isOwnerOrStaff } from "../access";
 import { revalidateSiteSettings } from "../revalidate";
 
 export const SiteSettings: GlobalConfig = {

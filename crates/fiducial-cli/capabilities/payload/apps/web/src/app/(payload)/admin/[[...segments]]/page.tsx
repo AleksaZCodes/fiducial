@@ -1,6 +1,6 @@
-import { generatePageMetadata, RootPage } from "@payloadcms/next/views";
 import config from "@payload-config";
-import { importMap } from "../../importMap.js";
+import { RootPage, generatePageMetadata } from "@payloadcms/next/views";
+import { importMap } from "../importMap.js";
 
 type Props = {
   params: Promise<{ segments: string[] }>;
@@ -8,7 +8,9 @@ type Props = {
 };
 
 export default function Page({ params, searchParams }: Props) {
-  return <RootPage config={config} importMap={importMap} params={params} searchParams={searchParams} />;
+  return (
+    <RootPage config={config} importMap={importMap} params={params} searchParams={searchParams} />
+  );
 }
 
 export async function generateMetadata({ params, searchParams }: Props) {

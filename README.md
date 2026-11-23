@@ -245,7 +245,7 @@ product actually needs.
 | `migrations` | declares `migrations`; 1 pipeline(s) | `fid add capability migrations` |
 | `monitoring` | declares `monitoring.toml`; 1 pipeline(s) | `fid add capability monitoring` |
 | `orm-drizzle` | 3 template file(s); guard rules | `fid add capability orm-drizzle` |
-| `payload` | declares `i18n`, `brand`; 1 pipeline(s); 25 template file(s); seeds a `fiducial.toml` block; guard rules | `fid add capability payload` |
+| `payload` | declares `i18n`, `brand`; 2 pipeline(s); 27 template file(s); seeds a `fiducial.toml` block; guard rules | `fid add capability payload` |
 | `press` | declares `press`, `press/docs/en/boilerplate.md`, `press/docs/en/facts.md`, `press/stories/en/0001-why-this-exists.md`; 1 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability press` |
 | `protocol` | declares `protocol.toml`; 1 pipeline(s) | `fid add capability protocol` |
 | `realtime` | a skill | `fid add capability realtime` |

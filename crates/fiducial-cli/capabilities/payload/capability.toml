@@ -5,6 +5,7 @@ requires_tools = ["wrangler"]
 guard_rules = ["no-unpinned-cli-fetch"]
 
 supersedes = [
+  "apps/web/biome.json",
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
   "apps/web/tsconfig.json",
@@ -21,8 +22,8 @@ payload = "^3.94.1"
 
 [npm_scripts]
 payload = "payload"
-"generate:types" = "payload generate:types"
-"generate:importmap" = "payload generate:importmap"
+"generate:types" = "node --import ./scripts/payload-ts-resolve.mjs node_modules/payload/bin.js generate:types --disable-transpile"
+"generate:importmap" = "node --import ./scripts/payload-ts-resolve.mjs node_modules/payload/bin.js generate:importmap --disable-transpile"
 
 [seed_messages.en]
 payload = { adminTitle = "Admin", loginTitle = "Sign in", loginDescription = "Sign in to manage content", logoutLabel = "Sign out", emailLabel = "Email", passwordLabel = "Password" }

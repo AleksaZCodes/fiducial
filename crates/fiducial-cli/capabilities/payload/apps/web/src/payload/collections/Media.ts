@@ -1,5 +1,5 @@
 import type { CollectionConfig } from "payload";
-import { isOwnerOrStaff, isOwner, isAuthenticated } from "../access";
+import { isAuthenticated, isOwner, isOwnerOrStaff } from "../access";
 
 export const Media: CollectionConfig = {
   slug: "media",

@@ -27,18 +27,31 @@ map onto the platform's identity model (D6 of `docs/specs/2026-11-22-payload-is-
 
 ```sh
 pnpm dev --filter @{{name}}/web           # starts Next dev with Payload
-pnpm --filter @{{name}}/web run payload   # payload CLI (generate:types etc.)
+pnpm --filter @{{name}}/web run payload   # payload CLI
 pnpm --filter @{{name}}/web run generate:types
 pnpm --filter @{{name}}/web run generate:importmap
 ```
 
+The `generate:types` and `generate:importmap` scripts use
+`scripts/payload-ts-resolve.mjs` — a Node module hook that retries
+extensionless relative imports with `.ts`, `.tsx`, and `/index.ts`.
+This replaces the tsx-based path that double-evaluates undici's symbols
+on Node ≥ 22, causing `TypeError: Illegal constructor`.
+
 Payload's admin runs at `http://localhost:3000/admin`.
 
-## The derive pipeline
+## The derive pipelines
 
 `pipelines/payload.toml` runs `scripts/derive-payload.mjs`, which reads
 `[i18n]` and `[brand]` from `fiducial.toml` and writes
 `apps/web/src/generated/payload.ts`.
+
+`pipelines/payload-codegen.toml` runs `scripts/derive-payload-codegen.mjs`
+from `apps/web/` and writes `apps/web/src/payload/payload-types.ts` and
+`apps/web/src/app/(payload)/admin/importMap.js`. It is **not applicable**
+until `apps/web/node_modules` exists — `fid derive --check` skips it on a
+fresh checkout and fails it on a machine where packages are installed but the
+files are stale.
 
 That module exports:
 
@@ -173,10 +186,19 @@ This capability requires the **Cloudflare Workers Paid plan** — Payload's
 bundle exceeds the 1 MB free limit (Workers runs up to 64 MiB uncompressed
 since September 2026).
 
+## Node floor
+
+This capability requires **Node ≥ 22.18**. The codegen pipeline uses
+`module.registerHooks` (added in Node 22.13) and native TypeScript type
+stripping (unflagged since Node 22.18). Both are needed to run the Payload
+CLI without tsx.
+
 ## Rules
 
 - Never put a value in `[deploy] secrets` — only the name.
-- Never hand-edit `apps/web/src/generated/payload.ts`.
+- Never hand-edit `apps/web/src/generated/payload.ts` or the generated
+  `apps/web/src/payload/payload-types.ts`.
 - Collections and globals are product-owned templates, so edit them freely.
-- `payload generate:types` and `payload generate:importmap` are pipeline
-  outputs — run them after any schema change, not by hand mid-session.
+- After any schema change, run `fid derive payload-codegen` (or
+  `pnpm --filter @{{name}}/web run generate:types && generate:importmap`)
+  to regenerate the types and import map.

@@ -1,6 +1,6 @@
 import type { CollectionConfig } from "payload";
-import { isOwner, isOwnerOrStaff, isAuthenticated } from "../access";
 import type { PayloadRole } from "../../generated/payload";
+import { isAuthenticated, isOwner, isOwnerOrStaff } from "../access";
 
 const ROLES: PayloadRole[] = ["owner", "staff", "agency-admin"];
 
