@@ -1,5 +1,10 @@
 import type { CollectionConfig } from "payload";
 import { isOwnerOrStaff, isAuthenticated } from "../access";
+import { revalidatePage } from "../revalidate";
+import { Hero } from "../blocks/Hero";
+import { Faq } from "../blocks/Faq";
+import { ProductGrid } from "../blocks/ProductGrid";
+import { CustomOrderCta } from "../blocks/CustomOrderCta";
 
 export const Pages: CollectionConfig = {
   slug: "pages",
@@ -36,16 +41,10 @@ export const Pages: CollectionConfig = {
       name: "blocks",
       type: "blocks",
       localized: true,
-      blocks: [],
+      blocks: [Hero, Faq, ProductGrid, CustomOrderCta],
     },
   ],
   hooks: {
-    afterChange: [
-      async ({ doc }) => {
-        const { revalidatePath } = await import("next/cache");
-        revalidatePath(`/${doc.slug}`);
-        revalidatePath("/");
-      },
-    ],
+    afterChange: [revalidatePage],
   },
 };

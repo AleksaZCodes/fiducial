@@ -233,6 +233,14 @@ specification**, and every generated legal page is marked for human review.
   removes the only reason to install the second one for this product.
 - `[deploy] crons` and `[deploy] secrets` become available to every product,
   not just this one.
+- **Lighthouse measurement (commit 4).** `opennextjs-cloudflare preview` requires
+  a Cloudflare account token and a live D1 binding; neither is available in CI or
+  in the sandbox where this was built. The manual step: after the first deploy to
+  a named Workers preview URL, run Chrome DevTools Lighthouse (mobile, throttled)
+  against the home page and a product page, and paste the scores here. Target:
+  mobile performance ≥ 90. The `scripts/verify-payload.sh` CI job proves the
+  bundle builds and deploys dry-run; a Lighthouse gate requires a deploy-preview
+  URL, which is roadmap item *Studio hosted preview*.
 
 ## What this deliberately does not do
 

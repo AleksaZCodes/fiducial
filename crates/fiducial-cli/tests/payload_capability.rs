@@ -230,3 +230,156 @@ fn access_ts_calls_can_from_fiducial_identity() {
     assert!(access.contains("@fiducial/identity"), "{access}");
     assert!(access.contains("can("), "{access}");
 }
+
+#[test]
+fn installing_payload_writes_the_block_definitions() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    assert!(root.join("apps/web/src/payload/blocks/Hero.ts").exists());
+    assert!(root.join("apps/web/src/payload/blocks/Faq.ts").exists());
+    assert!(root.join("apps/web/src/payload/blocks/ProductGrid.ts").exists());
+    assert!(root.join("apps/web/src/payload/blocks/CustomOrderCta.ts").exists());
+}
+
+#[test]
+fn pages_collection_references_all_four_blocks() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let pages = std::fs::read_to_string(root.join("apps/web/src/payload/collections/Pages.ts")).unwrap();
+    assert!(pages.contains("Hero"), "Pages must import Hero block: {pages}");
+    assert!(pages.contains("Faq"), "Pages must import Faq block: {pages}");
+    assert!(pages.contains("ProductGrid"), "Pages must import ProductGrid block: {pages}");
+    assert!(pages.contains("CustomOrderCta"), "Pages must import CustomOrderCta block: {pages}");
+}
+
+#[test]
+fn installing_payload_writes_block_renderers() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    assert!(root.join("apps/web/src/components/blocks/HeroBlock.tsx").exists());
+    assert!(root.join("apps/web/src/components/blocks/FaqBlock.tsx").exists());
+    assert!(root.join("apps/web/src/components/blocks/ProductGridBlock.tsx").exists());
+    assert!(root.join("apps/web/src/components/blocks/CustomOrderCtaBlock.tsx").exists());
+    assert!(root.join("apps/web/src/components/blocks/BlockRenderer.tsx").exists());
+}
+
+#[test]
+fn hero_block_renderer_has_explicit_image_sizes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let hero = std::fs::read_to_string(
+        root.join("apps/web/src/components/blocks/HeroBlock.tsx"),
+    ).unwrap();
+    assert!(hero.contains("sizes="), "HeroBlock must have explicit sizes: {hero}");
+}
+
+#[test]
+fn custom_order_cta_renderer_has_explicit_image_sizes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let cta = std::fs::read_to_string(
+        root.join("apps/web/src/components/blocks/CustomOrderCtaBlock.tsx"),
+    ).unwrap();
+    assert!(cta.contains("sizes="), "CustomOrderCtaBlock must have explicit sizes: {cta}");
+}
+
+#[test]
+fn revalidate_ts_is_written() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    assert!(root.join("apps/web/src/payload/revalidate.ts").exists());
+    let rv = std::fs::read_to_string(root.join("apps/web/src/payload/revalidate.ts")).unwrap();
+    assert!(rv.contains("revalidatePath"), "revalidate.ts must call revalidatePath: {rv}");
+    assert!(rv.contains("revalidateTag"), "revalidate.ts must call revalidateTag: {rv}");
+}
+
+#[test]
+fn site_settings_global_has_menus_and_banners() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let settings = std::fs::read_to_string(
+        root.join("apps/web/src/payload/globals/SiteSettings.ts"),
+    ).unwrap();
+    assert!(settings.contains("mainNav"), "SiteSettings must have mainNav: {settings}");
+    assert!(settings.contains("footerNav"), "SiteSettings must have footerNav: {settings}");
+    assert!(settings.contains("banner"), "SiteSettings must have banner: {settings}");
+    assert!(settings.contains("seoTitle"), "SiteSettings must have seoTitle: {settings}");
+    assert!(settings.contains("companyName"), "SiteSettings must have companyName: {settings}");
+    assert!(settings.contains("revalidateSiteSettings"), "SiteSettings must call revalidateSiteSettings: {settings}");
+}
+
+#[test]
+fn next_config_uses_cloudflare_image_loader() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let next_config = std::fs::read_to_string(root.join("apps/web/next.config.ts")).unwrap();
+    assert!(
+        next_config.contains("cloudflare-image-loader"),
+        "next.config.ts must reference the Cloudflare image loader: {next_config}"
+    );
+    assert!(root.join("apps/web/src/lib/cloudflare-image-loader.ts").exists());
+}

@@ -10,6 +10,20 @@ const staticExport = process.env.STATIC_EXPORT === "1";
 const shared: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  images: {
+    loader: "custom",
+    loaderFile: "./src/lib/cloudflare-image-loader.ts",
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**.r2.cloudflarestorage.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.cloudflare.com",
+      },
+    ],
+  },
 };
 
 const config: NextConfig = staticExport

@@ -68,11 +68,66 @@ who may do what.
 | Collection | Purpose |
 |---|---|
 | `users` | Staff and owner accounts — Payload auth, `role` field |
-| `pages` | CMS pages with blocks (commit 4 adds the blocks) |
+| `pages` | CMS pages with four blocks: `hero`, `faq`, `product-grid`, `custom-order-cta` |
 | `media` | Uploaded files, stored in R2 via `@payloadcms/storage-r2` |
 
-The global `SiteSettings` stores site-wide defaults (site name, tagline,
-default OG image).
+The global `SiteSettings` stores site-wide defaults: site name, tagline,
+company info, main/footer nav menus, a promo banner, and SEO defaults.
+
+## Blocks
+
+Four blocks are registered on the `pages` collection:
+
+| Block slug | File | Fields |
+|---|---|---|
+| `hero` | `src/payload/blocks/Hero.ts` | `heading`, `subheading`, `image` (upload), `ctaLabel`, `ctaHref` |
+| `faq` | `src/payload/blocks/Faq.ts` | `heading`, `items[]` (`question`, `answer` richText) |
+| `product-grid` | `src/payload/blocks/ProductGrid.ts` | `heading`, `productSlugs[]` (`slug`) |
+| `custom-order-cta` | `src/payload/blocks/CustomOrderCta.ts` | `heading`, `body` richText, `image`, `ctaLabel`, `formAnchor` |
+
+The `product-grid` block uses a `productSlugs` array field rather than a
+relationship, because the `products` collection does not exist until the
+`commerce` capability is installed. When `commerce` is added, replace the array
+with a `relationship` field targeting `products`.
+
+## Block renderers
+
+Each block has a **server component** in `src/components/blocks/`:
+
+| Component | Used for |
+|---|---|
+| `HeroBlock.tsx` | Full-width hero with optional background image |
+| `FaqBlock.tsx` | Accordion-style FAQ list |
+| `ProductGridBlock.tsx` | Grid of product links by slug |
+| `CustomOrderCtaBlock.tsx` | CTA panel with optional image |
+| `BlockRenderer.tsx` | Dispatches `Page.blocks[]` to the right component |
+
+Every `<Image>` in a block renderer carries an explicit `sizes` attribute (D10).
+
+## Revalidation
+
+`src/payload/revalidate.ts` exports two Payload hooks:
+
+| Hook | Used by | Does |
+|---|---|---|
+| `revalidatePage` | `Pages` `afterChange` | `revalidatePath("/<slug>")` + `revalidateTag("page:<slug>")` + `revalidateTag("pages")` + `revalidatePath("/")` |
+| `revalidateSiteSettings` | `SiteSettings` `afterChange` | `revalidatePath("/", "layout")` + `revalidateTag("site-settings")` |
+
+Never call `revalidate*` in a client component — these hooks run server-side.
+
+## Images
+
+Images are stored in R2 and resized through Cloudflare Images (`/cdn-cgi/image/…`).
+`next.config.ts` sets `loader: "custom"` pointing at
+`src/lib/cloudflare-image-loader.ts`. The loader maps Next.js `width`/`quality`
+props to Cloudflare Images transform parameters.
+
+This requires the **Cloudflare Images** product to be enabled on the zone. The
+loader is a no-op in `output: "export"` (Cloudflare workers builds), where
+`images: { unoptimized: true }` takes over automatically.
+
+Every `<Image>` in a block renderer must carry an explicit `sizes` attribute;
+omitting it triggers `next/image` warnings and prevents correct responsive sizing.
 
 ## Superseded files
 
