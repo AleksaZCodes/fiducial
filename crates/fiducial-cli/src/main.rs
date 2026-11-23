@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 
 mod adapter;
 mod agent_skills;
+mod analytics;
 mod apps;
 mod brand;
 mod capability;

@@ -1,0 +1,8 @@
+description = "Traffic analytics: one contract, many providers, cookieless by default"
+
+[[declarations.config]]
+block = "analytics"
+
+[declarations.config.seed]
+providers = ["first-party", "cloudflare-web-analytics"]
+retention_days = 396

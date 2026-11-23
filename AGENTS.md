@@ -420,6 +420,7 @@ The capabilities this platform ships:
 | Capability | Contributes | Install |
 |---|---|---|
 | `adapters` | declares `adapters`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability adapters` |
+| `analytics` | declares `analytics`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability analytics` |
 | `api-hono` | 9 template file(s); guard rules | `fid add capability api-hono` |
 | `brand` | declares `brand`; 2 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability brand` |
 | `cms` | declares `cms`; 1 pipeline(s); 14 template file(s); seeds a `fiducial.toml` block | `fid add capability cms` |

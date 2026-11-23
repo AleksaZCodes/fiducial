@@ -63,6 +63,10 @@ pub struct Config {
     /// not added the `legal` capability carries no empty `[legal]` block.
     #[serde(default, skip_serializing_if = "Legal::is_empty")]
     pub legal: Legal,
+    /// `[analytics]` — which providers collect traffic data, and how long it
+    /// is kept. Skipped when the product declares no analytics.
+    #[serde(default, skip_serializing_if = "Analytics::is_empty")]
+    pub analytics: Analytics,
     /// `[advise]` — whether advisory review is part of this product's procedure.
     #[serde(default, skip_serializing_if = "Advise::is_empty")]
     pub advise: Advise,
@@ -1721,5 +1725,64 @@ mod template_unused_tests {
         assert!(!template_unused(dir.path(), "apps/cms/a.ts"));
         std::fs::write(dir.path().join(CONFIG_FILE), "not = [valid").unwrap();
         assert!(!template_unused(dir.path(), "apps/cms/a.ts"));
+    }
+}
+
+/// `[analytics]` — which providers collect traffic data and for how long.
+///
+/// A list rather than a single vendor (unlike `[adapters]`): several providers
+/// run together, and the generated factory fans out. D16 gives the full
+/// reasoning for why this is not `[adapters] analytics`.
+///
+/// Per-provider sub-tables (`[analytics.cloudflare-web-analytics]`) are kept in
+/// `extra` via `flatten` — the keys contain hyphens, so they cannot be named
+/// Rust fields, and the CLI reads only the top-level declarations at validate
+/// time; the generated TypeScript reads them from the same `fiducial.toml`.
+#[derive(Debug, Clone, Default, Deserialize, Serialize, schemars::JsonSchema)]
+pub struct Analytics {
+    /// Provider ids to enable, e.g. `["first-party", "cloudflare-web-analytics"]`.
+    #[serde(default)]
+    pub providers: Vec<String>,
+    /// How many days first-party event rows are kept. Seeded at 396 (13 months).
+    #[serde(default = "default_retention_days", skip_serializing_if = "is_default_retention_days")]
+    pub retention_days: u32,
+    /// Per-provider sub-tables and any other keys this binary does not need to
+    /// parse at validation time (e.g. `[analytics.cloudflare-web-analytics]`).
+    #[serde(flatten, default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    #[schemars(with = "std::collections::BTreeMap<String, serde_json::Value>")]
+    pub extra: std::collections::BTreeMap<String, toml::Value>,
+}
+
+fn default_retention_days() -> u32 {
+    396
+}
+
+fn is_default_retention_days(v: &u32) -> bool {
+    *v == default_retention_days()
+}
+
+impl Analytics {
+    /// True when the product has not declared analytics at all.
+    pub fn is_empty(&self) -> bool {
+        self.providers.is_empty()
+    }
+
+    /// Fail when any listed provider requires consent and the `consent`
+    /// capability is not in the enabled list.
+    pub fn validate(&self, capabilities: &Capabilities) -> anyhow::Result<()> {
+        if let Some(p) = crate::analytics::problem(&self.providers, &capabilities.enabled) {
+            anyhow::bail!("{p}");
+        }
+        Ok(())
+    }
+
+    /// The token environment variable for the Cloudflare Web Analytics beacon,
+    /// if one is configured. `None` means the token is not declared and the
+    /// beacon script will fall back to the token hard-coded in the template.
+    pub fn cloudflare_beacon_token_env(&self) -> Option<&str> {
+        self.extra
+            .get("cloudflare-web-analytics")
+            .and_then(|t| t.get("token_env"))
+            .and_then(|v| v.as_str())
     }
 }

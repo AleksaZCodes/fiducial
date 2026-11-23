@@ -54,6 +54,7 @@ pub fn run() -> Result<()> {
     if let Some(cfg) = &cfg {
         check_adapters(cfg, lock.as_ref(), &mut issues, &mut ok);
         check_apps(cfg, &mut issues, &mut ok);
+        check_analytics(cfg, &mut issues, &mut ok);
     }
 
     // ── 8. Hardcoded user-visible strings ─────────────────────────────────
@@ -207,6 +208,26 @@ fn check_adapters(
         ok.push(format!(
             "adapters: {} contract(s) selected, all resolvable",
             cfg.adapters.selected.len()
+        ));
+    }
+}
+
+/// Report analytics configuration problems.
+///
+/// A `requires_consent` provider without the `consent` capability is an issue
+/// (a misconfiguration the product cannot legally run), not a report.
+fn check_analytics(cfg: &Config, issues: &mut Vec<String>, ok: &mut Vec<String>) {
+    if cfg.analytics.is_empty() {
+        return;
+    }
+    if let Some(problem) =
+        crate::analytics::problem(&cfg.analytics.providers, &cfg.capabilities.enabled)
+    {
+        issues.push(format!("fiducial.toml [analytics]: {problem}"));
+    } else {
+        ok.push(format!(
+            "analytics: {} provider(s) configured",
+            cfg.analytics.providers.len()
         ));
     }
 }

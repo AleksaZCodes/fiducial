@@ -36,6 +36,27 @@
       },
       "type": "object"
     },
+    "Analytics": {
+      "additionalProperties": true,
+      "description": "`[analytics]` — which providers collect traffic data and for how long.\n\nA list rather than a single vendor (unlike `[adapters]`): several providers\nrun together, and the generated factory fans out. D16 gives the full\nreasoning for why this is not `[adapters] analytics`.\n\nPer-provider sub-tables (`[analytics.cloudflare-web-analytics]`) are kept in\n`extra` via `flatten` — the keys contain hyphens, so they cannot be named\nRust fields, and the CLI reads only the top-level declarations at validate\ntime; the generated TypeScript reads them from the same `fiducial.toml`.",
+      "properties": {
+        "providers": {
+          "default": [],
+          "description": "Provider ids to enable, e.g. `[\"first-party\", \"cloudflare-web-analytics\"]`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "retention_days": {
+          "description": "How many days first-party event rows are kept. Seeded at 396 (13 months).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
     "App": {
       "additionalProperties": false,
       "description": "One app's choices. Every field is optional: an app declares only what it\nchooses, and a missing field is the capability's own default.",
@@ -624,6 +645,10 @@
     "ai": {
       "$ref": "#/$defs/Ai",
       "description": "`[ai]` — the model this product talks to, and how it identifies itself."
+    },
+    "analytics": {
+      "$ref": "#/$defs/Analytics",
+      "description": "`[analytics]` — which providers collect traffic data, and how long it\nis kept. Skipped when the product declares no analytics."
     },
     "apps": {
       "additionalProperties": {

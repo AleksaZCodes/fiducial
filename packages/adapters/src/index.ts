@@ -13,6 +13,20 @@
  *   import { NoneDatabase, NoneStorage, NoneEmail, NoneDiagnostics } from "@fiducial/adapters";
  */
 
+export type {
+  Analytics,
+  AnalyticsEvent,
+  AnalyticsEventName,
+  PageviewContext,
+} from "./analytics.js";
+export {
+  CloudflareWebAnalytics,
+  FirstPartyAnalytics,
+  MetaPixelCapi,
+  NoneAnalytics,
+  PostHogAnalytics,
+} from "./analytics.js";
+
 export type { Database, Row, SqlValue, WriteResult } from "./database.js";
 export { D1Database, DatabaseError, MapRow, NoneDatabase, SupabaseDatabase } from "./database.js";
 

@@ -1,0 +1,13 @@
+name     = "analytics"
+executor = "fid-analytics"
+outputs  = ["apps/web/src/generated/analytics.ts"]
+
+# `[analytics]` in fiducial.toml is the declaration. The output is a TypeScript
+# file exporting `createAnalytics(env)`: a fan-out factory that calls every
+# configured provider's `track` and `pageview` methods, isolating each failure
+# so a broken provider cannot lose events for the others.
+#
+# A `requires_consent` provider in [analytics] providers without the `consent`
+# capability fails this pipeline with a clear message (D22).
+#
+# `fid derive --check` fails when the output is missing or stale.

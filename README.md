@@ -225,6 +225,7 @@ product actually needs.
 | Capability | Contributes | Install |
 |---|---|---|
 | `adapters` | declares `adapters`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability adapters` |
+| `analytics` | declares `analytics`; 1 pipeline(s); seeds a `fiducial.toml` block | `fid add capability analytics` |
 | `api-hono` | 9 template file(s); guard rules | `fid add capability api-hono` |
 | `brand` | declares `brand`; 2 pipeline(s); 2 template file(s); seeds a `fiducial.toml` block | `fid add capability brand` |
 | `cms` | declares `cms`; 1 pipeline(s); 14 template file(s); seeds a `fiducial.toml` block | `fid add capability cms` |
@@ -451,7 +452,7 @@ hashed into the lock too, and `--check` names the one that moved.
 Executors are `shell` and `cargo-test` — which need no platform change at all —
 plus the in-process ones (`fid-validate`, `fid-mesh`, `fid-i18n`, `fid-brand`,
 `fid-thesis`, `fid-deploy`, `fid-security`, `fid-compose`, `fid-identity`, `fid-adapters`, `fid-schema`,
-`fid-legal`, `fid-design`, `fid-protocol`, `fid-topology`, `fid-monitoring`, `fid-hardware`). Reach for `shell` first; a new in-process executor
+`fid-legal`, `fid-analytics`, `fid-consent`, `fid-design`, `fid-protocol`, `fid-topology`, `fid-monitoring`, `fid-hardware`). Reach for `shell` first; a new in-process executor
 is warranted only when the work is genuinely a Rust library call rather than a
 tool invocation.
 
