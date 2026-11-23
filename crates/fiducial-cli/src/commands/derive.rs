@@ -1528,6 +1528,7 @@ struct DeployPlan {
     /// `(binding, class)`.
     durable_objects: Vec<(String, String)>,
     secrets: Vec<String>,
+    crons: Vec<String>,
 }
 
 fn deploy_plan(config: &Config) -> Result<DeployPlan> {
@@ -1703,6 +1704,12 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
     }
     let mut seen = std::collections::HashSet::new();
     secrets.retain(|s| seen.insert(*s));
+    let mut all_secrets: Vec<String> = secrets.into_iter().map(str::to_string).collect();
+    for s in &d.secrets {
+        if !all_secrets.contains(s) {
+            all_secrets.push(s.clone());
+        }
+    }
 
     Ok(DeployPlan {
         name,
@@ -1725,7 +1732,8 @@ fn deploy_plan(config: &Config) -> Result<DeployPlan> {
             .iter()
             .map(|o| (o.binding.clone(), o.class.clone()))
             .collect(),
-        secrets: secrets.into_iter().map(str::to_string).collect(),
+        secrets: all_secrets,
+        crons: d.crons.clone(),
     })
 }
 
@@ -1845,6 +1853,12 @@ fn render_wrangler_toml(p: &DeployPlan) -> String {
         out.push_str("[[kv_namespaces]]\n");
         out.push_str(&format!("binding = \"{binding}\"\n"));
         out.push_str(&format!("id = \"{id}\"\n"));
+    }
+
+    if !p.crons.is_empty() {
+        let exprs: Vec<String> = p.crons.iter().map(|c| format!("\"{c}\"")).collect();
+        out.push_str("\n[triggers]\n");
+        out.push_str(&format!("crons = [{}]\n", exprs.join(", ")));
     }
 
     if !p.secrets.is_empty() {
@@ -1986,6 +2000,14 @@ fn render_wrangler_jsonc(p: &DeployPlan) -> String {
             "  // [deploy.durable_objects] — classes exported from `main`.\n  \"durable_objects\": {{ \"bindings\": [\n{}\n  ] }},\n  \"migrations\": [{{ \"tag\": \"v1\", \"new_sqlite_classes\": [{}] }}]",
             bindings.join(",\n"),
             classes.join(", ")
+        ));
+    }
+
+    if !p.crons.is_empty() {
+        let exprs: Vec<String> = p.crons.iter().map(|c| q(c)).collect();
+        fields.push(format!(
+            "  \"triggers\": {{ \"crons\": [{}] }}",
+            exprs.join(", ")
         ));
     }
 

@@ -793,6 +793,124 @@ fn the_astro_shape_serves_the_build_directory_and_names_no_worker() {
     assert!(run(&root, &["derive", "--check"]).status.success());
 }
 
+// ── Cron triggers ────────────────────────────────────────────────────────────
+
+#[test]
+fn declared_crons_appear_as_triggers_crons_in_toml() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_deploy(tmp.path(), "deploy = \"cloudflare\"");
+    let path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        config.replace(
+            "[deploy]\n",
+            "[deploy]\ncrons = [\"0 2 * * *\", \"*/30 * * * *\"]\n",
+        ),
+    )
+    .unwrap();
+    assert!(run(&root, &["derive"]).status.success());
+
+    let w = wrangler(&root);
+    assert!(w.contains("[triggers]"), "{w}");
+    assert!(w.contains("0 2 * * *"), "{w}");
+    assert!(w.contains("*/30 * * * *"), "{w}");
+    assert!(run(&root, &["derive", "--check"]).status.success());
+}
+
+#[test]
+fn declared_crons_appear_as_triggers_crons_in_jsonc() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = sveltekit_product(tmp.path());
+    let config_path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&config_path).unwrap();
+    std::fs::write(
+        &config_path,
+        config.replace(
+            "[deploy]\n",
+            "[deploy]\ncrons = [\"0 3 * * *\"]\n",
+        ),
+    )
+    .unwrap();
+    assert!(run(&root, &["derive"]).status.success());
+
+    let cfg = std::fs::read_to_string(root.join("wrangler.jsonc")).unwrap();
+    assert!(cfg.contains("\"triggers\""), "{cfg}");
+    assert!(cfg.contains("\"crons\""), "{cfg}");
+    assert!(cfg.contains("0 3 * * *"), "{cfg}");
+    assert!(run(&root, &["derive", "--check"]).status.success());
+}
+
+#[test]
+fn no_crons_declared_means_no_triggers_section() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_deploy(tmp.path(), "deploy = \"cloudflare\"");
+    assert!(run(&root, &["derive"]).status.success());
+
+    let w = wrangler(&root);
+    assert!(!w.contains("[triggers]"), "{w}");
+    assert!(!w.contains("crons"), "{w}");
+}
+
+// ── Declared secrets ──────────────────────────────────────────────────────────
+
+#[test]
+fn declared_secrets_appear_in_the_comment_block() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_deploy(tmp.path(), "deploy = \"cloudflare\"");
+    let path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        config.replace(
+            "[deploy]\n",
+            "[deploy]\nsecrets = [\"PAYLOAD_SECRET\", \"BACKUP_TOKEN\"]\n",
+        ),
+    )
+    .unwrap();
+    assert!(run(&root, &["derive"]).status.success());
+
+    let w = wrangler(&root);
+    assert!(w.contains("wrangler secret put PAYLOAD_SECRET"), "{w}");
+    assert!(w.contains("wrangler secret put BACKUP_TOKEN"), "{w}");
+    for line in w.lines() {
+        if line.contains("PAYLOAD_SECRET") || line.contains("BACKUP_TOKEN") {
+            assert!(
+                line.trim_start().starts_with('#'),
+                "a declared secret must never appear as an assignment: {line}"
+            );
+        }
+    }
+}
+
+#[test]
+fn declared_secrets_do_not_duplicate_adapter_implied_ones() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = product_with_deploy(
+        tmp.path(),
+        "deploy = \"cloudflare\"\nemail = \"resend\"",
+    );
+    let path = root.join("fiducial.toml");
+    let config = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        config.replace(
+            "[deploy]\n",
+            "[deploy]\nsecrets = [\"RESEND_API_KEY\", \"MY_OWN_SECRET\"]\n",
+        ),
+    )
+    .unwrap();
+    assert!(run(&root, &["derive"]).status.success());
+
+    let w = wrangler(&root);
+    let count = w
+        .lines()
+        .filter(|l| l.contains("wrangler secret put RESEND_API_KEY"))
+        .count();
+    assert_eq!(count, 1, "RESEND_API_KEY must not be duplicated:\n{w}");
+    assert!(w.contains("wrangler secret put MY_OWN_SECRET"), "{w}");
+}
+
 /// One dynamic route on an otherwise static site: the Astro shape with a Worker
 /// (`main`), a KV binding, and `run_worker_first` naming the one path that runs
 /// code. Every other request is a file. Without `run_worker_first`, the Worker

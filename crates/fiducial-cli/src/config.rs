@@ -773,6 +773,29 @@ pub struct Deploy {
     /// into a file in the repository.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub vars: std::collections::BTreeMap<String, String>,
+
+    /// Cron expressions this Worker is triggered on, e.g. `["0 2 * * *"]`.
+    ///
+    /// Emitted as `triggers.crons` in the derived wrangler config. The
+    /// expressions are Cloudflare's cron syntax (UTC), and each one becomes a
+    /// scheduled trigger that runs the Worker's `scheduled` handler.
+    ///
+    /// Because cron schedules are facts about the product — not vendor account
+    /// data — they belong here rather than in a hand-edited config section.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub crons: Vec<String>,
+
+    /// Secret names this Worker reads that no `[adapters]` selection implies.
+    ///
+    /// Names only, never values. Each name appears in the generated
+    /// `wrangler secret put` comment block so a deployer knows what to set.
+    /// Values must never enter a file in the repository.
+    ///
+    /// Adapter-implied secrets (`TURNSTILE_SECRET_KEY`, `RESEND_API_KEY`, …)
+    /// are already added automatically; list only secrets the product's own
+    /// code reads that nothing else declares.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub secrets: Vec<String>,
 }
 
 fn is_zero(n: &u16) -> bool {
@@ -863,6 +886,8 @@ impl Deploy {
             && self.run_worker_first.is_empty()
             && self.durable_objects.is_empty()
             && self.vars.is_empty()
+            && self.crons.is_empty()
+            && self.secrets.is_empty()
     }
 
     /// Which artifact is being described, defaulting to a standalone Worker.

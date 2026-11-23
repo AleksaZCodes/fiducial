@@ -209,6 +209,13 @@
           },
           "type": "array"
         },
+        "crons": {
+          "description": "Cron expressions this Worker is triggered on, e.g. `[\"0 2 * * *\"]`.\n\nEmitted as `triggers.crons` in the derived wrangler config. The\nexpressions are Cloudflare's cron syntax (UTC), and each one becomes a\nscheduled trigger that runs the Worker's `scheduled` handler.\n\nBecause cron schedules are facts about the product — not vendor account\ndata — they belong here rather than in a hand-edited config section.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "custom_domain": {
           "description": "Whether `route` is a **custom domain** rather than a zone route.\n\nThe distinction is not cosmetic, and getting it wrong fails the deploy\nrather than producing something subtly off:\n\n- A **zone route** (`\"route\": \"example.com/*\"`) matches traffic that\n  already arrives at Cloudflare. It needs a proxied DNS record for that\n  hostname to exist, and `wrangler deploy` will not create one. On a\n  registrar's parked apex it fails with `code: 100117`.\n- A **custom domain** (`\"routes\": [{ \"pattern\": …, \"custom_domain\":\n  true }]`) makes Cloudflare create the DNS record and issue the\n  certificate itself.\n\nFor a product whose Worker *is* the site — `sveltekit` and `nextjs` —\nthe custom domain is almost always what is meant, and it was\ninexpressible here until this field existed. `aleksa.works` therefore\nhand-edited the derived `wrangler.jsonc`, which is the single thing this\ncapability exists to prevent.\n\nLeft `false` so an existing product's generated config does not change\nshape under it: a zone route is what `route` has always meant.",
           "type": "boolean"
@@ -280,6 +287,13 @@
         },
         "run_worker_first": {
           "description": "Paths that run the Worker **before** the static assets are consulted\n(`[\"/api/*\"]`). A static site served as Workers Static Assets answers\nevery request from files and wakes no code; a site with one dynamic\nroute (a counter, a form handler) names that route here and keeps every\nother request free. Needs a Worker (`main`), since a path with nothing to\nrun is a typo, not a setting.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "secrets": {
+          "description": "Secret names this Worker reads that no `[adapters]` selection implies.\n\nNames only, never values. Each name appears in the generated\n`wrangler secret put` comment block so a deployer knows what to set.\nValues must never enter a file in the repository.\n\nAdapter-implied secrets (`TURNSTILE_SECRET_KEY`, `RESEND_API_KEY`, …)\nare already added automatically; list only secrets the product's own\ncode reads that nothing else declares.",
           "items": {
             "type": "string"
           },

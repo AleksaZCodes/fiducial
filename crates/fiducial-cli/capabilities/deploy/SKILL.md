@@ -266,6 +266,20 @@ from anything else — a SvelteKit app scaffolded by `create-cloudflare` already
 has a `wrangler.jsonc`, and two configs in two formats disagreeing is exactly
 the failure this capability exists to end.
 
+## Cron triggers
+
+`[deploy] crons` declares the scheduled triggers this Worker runs on:
+
+```toml
+[deploy]
+crons = ["0 2 * * *", "*/30 * * * *"]
+```
+
+The expressions follow Cloudflare's cron syntax (UTC). Each one becomes a
+`scheduled` event the Worker handles. They are emitted as `triggers.crons` in
+the generated config — a declaration in one file, not a hand-added section in
+another.
+
 ## `vars` are plain text, and only plain text
 
 `[deploy] vars` is for non-secret configuration — a default count, a feature
@@ -283,6 +297,17 @@ An adapter that needs a secret (`turnstile` → `TURNSTILE_SECRET_KEY`,
 it and the `wrangler secret put` line to run. Values never enter the
 generated file — a file in the repository is the one place a secret must not
 be.
+
+Secrets the product's own code reads that no adapter implies are declared by
+name in `[deploy] secrets`:
+
+```toml
+[deploy]
+secrets = ["PAYLOAD_SECRET", "BACKUP_TOKEN"]
+```
+
+Each name appears in the same comment block as the adapter-implied secrets.
+Never put a value here — only the name.
 
 ## Validation
 
