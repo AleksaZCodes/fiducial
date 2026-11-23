@@ -88,6 +88,9 @@ fn installing_payload_writes_the_capability_files() {
     assert!(root
         .join("apps/web/src/app/(payload)/api/[...slug]/route.ts")
         .exists());
+    assert!(root
+        .join("apps/web/src/app/(payload)/importMap.ts")
+        .exists());
 }
 
 #[test]
@@ -126,6 +129,45 @@ fn payload_capability_supersedes_open_next_config() {
         open_next.contains("incrementalCache"),
         "open-next.config.ts must enable the R2 incremental cache: {open_next}"
     );
+}
+
+#[test]
+fn payload_capability_supersedes_tsconfig_with_payload_paths() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let tsconfig = std::fs::read_to_string(root.join("apps/web/tsconfig.json")).unwrap();
+    assert!(
+        tsconfig.contains("@payload-config"),
+        "tsconfig.json must include @payload-config path alias: {tsconfig}"
+    );
+}
+
+#[test]
+fn route_ts_uses_rest_named_exports() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = run(tmp.path(), &["new", "p"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let root = tmp.path().join("p");
+
+    for cap in ["design", "web-next", "i18n", "brand", "payload"] {
+        let out = run(&root, &["add", "capability", cap]);
+        assert!(out.status.success(), "fid add {cap}: {}", text(&out));
+    }
+
+    let route = std::fs::read_to_string(
+        root.join("apps/web/src/app/(payload)/api/[...slug]/route.ts"),
+    )
+    .unwrap();
+    assert!(route.contains("REST_GET"), "{route}");
+    assert!(route.contains("REST_POST"), "{route}");
 }
 
 #[test]

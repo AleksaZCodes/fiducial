@@ -1,5 +1,5 @@
 import { buildConfig } from "payload";
-import { d1Adapter } from "@payloadcms/db-d1-sqlite";
+import { sqliteD1Adapter } from "@payloadcms/db-d1-sqlite";
 import { r2Storage } from "@payloadcms/storage-r2";
 import { lexicalEditor } from "@payloadcms/richtext-lexical";
 import { Users } from "./src/payload/collections/Users";
@@ -40,7 +40,7 @@ export default buildConfig({
     fallback: true,
   },
 
-  db: d1Adapter({
+  db: sqliteD1Adapter({
     // @ts-expect-error env is injected by the Cloudflare Workers runtime
     binding: (process.env as unknown as { DB: D1Database }).DB,
   }),

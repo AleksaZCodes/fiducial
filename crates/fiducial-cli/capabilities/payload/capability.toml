@@ -7,6 +7,7 @@ guard_rules = ["no-unpinned-cli-fetch"]
 supersedes = [
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
+  "apps/web/tsconfig.json",
 ]
 
 [npm_dependencies]
@@ -16,6 +17,7 @@ payload = "^3.94.1"
 "@payloadcms/storage-r2" = "^3.94.1"
 "@payloadcms/richtext-lexical" = "^3.94.1"
 "@fiducial/identity" = "*"
+"@opennextjs/cloudflare" = "^1.11.0"
 
 [npm_scripts]
 payload = "payload"

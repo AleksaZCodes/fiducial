@@ -943,6 +943,14 @@ jobs:
       - name: Scaffold, install, typecheck, test, deploy dry run — Hono and Drizzle
         run: scripts/verify-api-hono.sh
 
+      # A Payload CMS 3 product: install, typecheck, OpenNext build and a
+      # wrangler dry run — no live D1 or Cloudflare token needed.
+      # See scripts/verify-payload.sh.
+      - name: Scaffold, install, typecheck, build, deploy dry run — Payload CMS
+        run: scripts/verify-payload.sh
+        env:
+          TMPDIR: ${{ github.workspace }}/target/tmp
+
   # ── portfolio: workbench v1 ───────────────────────────────────────────────
   #
   # Phase 17. `fid dash --portfolio` aggregates multiple product repos from a
