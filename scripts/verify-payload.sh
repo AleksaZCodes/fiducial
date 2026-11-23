@@ -59,3 +59,38 @@ echo "── payload: scaffold ────────────────�
   fi
 )
 echo "✓ payload: installs, typechecks, builds for Workers, deploys (dry run)"
+
+echo "── commerce: scaffold ──────────────────────────────────────────────────"
+(
+  cd "$work"
+  "$fid" new cshop >/dev/null
+  cd cshop
+  for cap in design web-next i18n brand payload commerce; do
+    "$fid" add capability "$cap" >/dev/null
+  done
+
+  cfg="$PWD/fiducial.toml"
+  content="$(cat "$cfg")"
+  content="${content//REPLACE_WITH_DATABASE_ID/db-id-2}"
+  content="${content//REPLACE_WITH_BUCKET_NAME/cshop-assets}"
+  content="${content//REPLACE_WITH_QUEUE_NAME/cshop-jobs}"
+  content="${content/\[i18n\]/[i18n]
+same = ["commerce.guestEmail","commerce.leadSourceFacebook","commerce.leadSourceInstagram","payload.adminTitle","payload.emailLabel"]}"
+  printf '%s\n' "$content" > "$cfg"
+
+  "$fid" derive >/dev/null
+
+  for f in \
+    apps/web/src/app/api/orders/route.ts \
+    apps/web/src/app/api/quotes/route.ts \
+    apps/web/src/components/commerce/VariantPicker.tsx \
+    apps/web/src/components/commerce/OrderForm.tsx \
+    apps/web/src/components/commerce/QuoteForm.tsx; do
+    [ -f "$f" ] || { echo "✗ missing commerce template: $f" >&2; exit 1; }
+  done
+
+  cd apps/web
+  "${pnpm[@]}" install --fetch-timeout 300000
+  "${pnpm[@]}" run typecheck
+)
+echo "✓ commerce: templates present, installs, typechecks"

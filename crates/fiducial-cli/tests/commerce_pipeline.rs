@@ -314,3 +314,73 @@ fn payload_config_registers_dashboard_and_metrics_endpoint() {
     assert!(cfg.contains("commerce-metrics"), "config must register metrics endpoint: {cfg}");
     assert!(cfg.contains("getAllMetrics"), "config must import getAllMetrics: {cfg}");
 }
+
+#[test]
+fn commerce_installs_order_route() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    assert!(
+        root.join("apps/web/src/app/api/orders/route.ts").exists(),
+        "order route missing"
+    );
+    let route = std::fs::read_to_string(root.join("apps/web/src/app/api/orders/route.ts")).unwrap();
+    assert!(route.contains("BotProtection") || route.contains("Turnstile"), "order route must use bot protection contract: {route}");
+    assert!(route.contains("order_submitted"), "order route must emit order_submitted event: {route}");
+    assert!(route.contains("turnstileToken"), "order route must validate turnstile: {route}");
+}
+
+#[test]
+fn commerce_installs_quote_route() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    assert!(
+        root.join("apps/web/src/app/api/quotes/route.ts").exists(),
+        "quote route missing"
+    );
+    let route = std::fs::read_to_string(root.join("apps/web/src/app/api/quotes/route.ts")).unwrap();
+    assert!(route.contains("BotProtection") || route.contains("Turnstile"), "quote route must use bot protection contract: {route}");
+    assert!(route.contains("quote_request"), "quote route must emit quote_request event: {route}");
+}
+
+#[test]
+fn commerce_installs_client_components() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    for name in &["VariantPicker", "OrderForm", "QuoteForm"] {
+        let path = root.join(format!("apps/web/src/components/commerce/{name}.tsx"));
+        assert!(path.exists(), "{name}.tsx missing");
+        let src = std::fs::read_to_string(&path).unwrap();
+        assert!(src.contains(r#""use client""#), "{name} must be a client component: {src}");
+    }
+}
+
+#[test]
+fn order_form_reads_utm_from_session_storage() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    let form = std::fs::read_to_string(root.join("apps/web/src/components/commerce/OrderForm.tsx")).unwrap();
+    assert!(form.contains("sessionStorage"), "OrderForm must read UTM from sessionStorage: {form}");
+    assert!(form.contains("whereDidYouFindUs"), "OrderForm must have whereDidYouFindUs field: {form}");
+}
+
+#[test]
+fn quote_form_has_requirements_field() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    let form = std::fs::read_to_string(root.join("apps/web/src/components/commerce/QuoteForm.tsx")).unwrap();
+    assert!(form.contains("requirements"), "QuoteForm must have requirements field: {form}");
+}
+
+#[test]
+fn commerce_adds_adapters_npm_dependency() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = commerce_product(tmp.path());
+
+    let pkg = std::fs::read_to_string(root.join("apps/web/package.json")).unwrap();
+    assert!(pkg.contains("@fiducial/adapters"), "package.json must list @fiducial/adapters: {pkg}");
+}

@@ -8,6 +8,9 @@ supersedes = [
   "apps/web/src/payload/blocks/ProductGrid.ts",
 ]
 
+[npm_dependencies]
+"@fiducial/adapters" = "*"
+
 [[declarations.config]]
 block = "commerce"
 
